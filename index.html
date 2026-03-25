@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Jefferson Williams Dotcom</title>
+    <title>Jefferson Williams</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-
+    <link rel="icon" type="image/svg+xml" href="/liongemini3b.svg" />
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,6 +32,17 @@
 
       .page {
         max-width: 640px;
+      }
+
+      .logo-wrapper {
+        margin-bottom: 0.75rem;
+      }
+
+      .logo {
+        display: block;
+        max-width: 84px;
+        /* I removed this line because I wanted to */
+        /* max-height: 48px; */
       }
 
       h1 {
@@ -74,27 +85,31 @@
   </head>
   <body>
     <main class="page">
+      <div class="logo-wrapper">
+        <img src="liongemini3b.svg" alt="" class="logo" />
+      </div>
+
       <h1>Jefferson Williams</h1>
 
-<nav class="links" aria-label="Applications">
-  <a
-    class="app-link"
-    href="/bullion/"
-    target="_blank"
-    rel="noopener noreferrer"
-  >
-    Bullion.
-  </a>
+      <nav class="links" aria-label="Applications">
+        <a
+          class="app-link"
+          href="/bullion/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Bullion.
+        </a>
 
-  <a
-    class="app-link"
-    href="/lionship/"
-    target="_blank"
-    rel="noopener noreferrer"
-  >
-    Lionship.
-  </a>
-</nav>
+        <a
+          class="app-link"
+          href="/lionship/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Lionship.
+        </a>
+      </nav>
     </main>
   </body>
 </html>
