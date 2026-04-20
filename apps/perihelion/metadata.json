@@ -1,0 +1,5 @@
+{
+  "name": "Perihelion - Image Browser",
+  "description": "A simple image browser that loads images from a backend folder with pagination.",
+  "requestFramePermissions": []
+}

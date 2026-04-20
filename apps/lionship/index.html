@@ -1,0 +1,71 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lionship | Linkstream</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Signika:wght@300..700&family=Cactus+Classical+Serif&family=Archivo:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cactus Classical Serif', serif;
+            background-color: #F0F0F0;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        .font-heading {
+            font-family: 'Signika', sans-serif;
+        }
+        .font-archivo {
+            font-family: 'Archivo', sans-serif;
+        }
+        .top-banner {
+            height: 36px;
+            background-color: white;
+            border-bottom: 3px solid black;
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            width: 100%;
+        }
+        .bottom-banner {
+            height: 36px;
+            background-color: white;
+            border-top: 3px solid black;
+            display: flex;
+            align-items: center;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            width: 100%;
+        }
+        /* Custom scrollbar to keep it minimalist */
+        ::-webkit-scrollbar {
+            width: 0px;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.37.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

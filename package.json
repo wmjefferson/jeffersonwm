@@ -1,0 +1,14 @@
+{
+  "name": "jeffersonwm-dotcom",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build:perihelion": "npm --prefix apps/perihelion run build",
+    "build:bullion": "npm --prefix apps/bullion run build",
+    "build:lionship": "npm --prefix apps/lionship run build",
+    "build:jeffersonwm": "npm --prefix apps/jeffersonwm run build"
+  }
+}
