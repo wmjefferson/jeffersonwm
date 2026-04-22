@@ -10,3 +10,6 @@ Thumbs.db
 .env.*.local
 coverage/
 *.tsbuildinfo
+*.code-workspace
+metadata.json
+migrated_prompt_history/
