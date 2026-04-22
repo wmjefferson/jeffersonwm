@@ -2,13 +2,16 @@
   "name": "jeffersonwm-dotcom",
   "private": true,
   "version": "1.0.0",
-  "workspaces": [
-    "apps/*"
-  ],
   "scripts": {
+    "install:perihelion": "npm --prefix apps/perihelion install",
+    "install:bullion": "npm --prefix apps/bullion install",
+    "install:lionship": "npm --prefix apps/lionship install",
+    "install:jeffersonwm": "npm --prefix apps/jeffersonwm install",
+    "install:all": "npm run install:perihelion && npm run install:bullion && npm run install:lionship && npm run install:jeffersonwm",
     "build:perihelion": "npm --prefix apps/perihelion run build",
     "build:bullion": "npm --prefix apps/bullion run build",
     "build:lionship": "npm --prefix apps/lionship run build",
-    "build:jeffersonwm": "npm --prefix apps/jeffersonwm run build"
+    "build:jeffersonwm": "npm --prefix apps/jeffersonwm run build",
+    "build": "npm run build:perihelion && npm run build:bullion && npm run build:lionship && npm run build:jeffersonwm"
   }
 }
