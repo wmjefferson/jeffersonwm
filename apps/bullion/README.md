@@ -20,6 +20,12 @@ cd apps/bullion
 npm run dev
 ```
 
+If Bullion uses Gemini-backed features, copy `.env.example` to `.env.local` and set:
+
+```text
+GEMINI_API_KEY=your_key_here
+```
+
 ## Deployment
 
 Hosted path:

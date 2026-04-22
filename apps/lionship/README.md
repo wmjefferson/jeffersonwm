@@ -18,7 +18,11 @@ cd apps/lionship
 npm run dev
 ```
 
-If the app uses Gemini features, set `GEMINI_API_KEY` in `apps/lionship/.env.local`.
+If the app uses Gemini features, copy `.env.example` to `.env.local` and set:
+
+```text
+GEMINI_API_KEY=your_key_here
+```
 
 ## Deployment
 
