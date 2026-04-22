@@ -12,6 +12,8 @@
     "build:bullion": "npm --prefix apps/bullion run build",
     "build:lionship": "npm --prefix apps/lionship run build",
     "build:jeffersonwm": "npm --prefix apps/jeffersonwm run build",
-    "build": "npm run build:perihelion && npm run build:bullion && npm run build:lionship && npm run build:jeffersonwm"
+    "build": "npm run build:perihelion && npm run build:bullion && npm run build:lionship && npm run build:jeffersonwm",
+    "verify": "npm run install:all && npm run build",
+    "deploy:prepare": "npm run build"
   }
 }

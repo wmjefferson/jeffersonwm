@@ -1,11 +1,35 @@
-# I am William Jefferson...
+# Bullion
+
 ![Bullion - Batch Rename](https://jeffersonwm.com/pic/gitprofbullion.jpg)
-## ...and this is my Git for Bullion.
 
-Bullion is a batch rename utility for quickly sorting and renaming files with flexible rules. It is designed to feel practical and direct: load files, preview the new names, then export the processed set as a ZIP.
+Bullion is a batch rename utility for sorting files, previewing new names, and exporting the processed set as a ZIP. It is designed to feel direct and practical, with a small number of strong features instead of a sprawling interface.
 
-This project is part of my larger JeffersonWM toolset, where I focus on design, functionality, and specific personal workflows while learning more of the engineering side as I go.
+## Local Development
 
-All of this is in progress, and I'll keep refining it over time.
+From the monorepo root:
 
-Thanks for reading. I put this file together with [StackEdit](https://github.com/benweet/stackedit/).
+```powershell
+npm run install:bullion
+npm run build:bullion
+```
+
+For app development inside the app folder:
+
+```powershell
+cd apps/bullion
+npm run dev
+```
+
+## Deployment
+
+Hosted path:
+
+- `https://jeffersonwm.com/bullion/`
+
+Build output:
+
+- `apps/bullion/dist`
+
+Hosted destination:
+
+- `/home2/jeffers4/jeffersonwm.com/bullion/`

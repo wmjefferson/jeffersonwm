@@ -1,11 +1,41 @@
-﻿# I am William Jefferson...
+# Perihelion
+
 ![Perihelion - Image Browser](https://jeffersonwm.com/pic/gitprofperihelion.jpg)
-## ...and this is my Git for Perihelion.
 
-I created this limited-by-design image browser in order for me to access my picture collections, AI-generated images, and famous art. I am a Studio Arts major at City College of San Francisco, learning to draw and paint with these examples from all around time and space.
+Perihelion is a limited-by-design image browser for navigating picture collections, staged selections, exports, and shareable pages. It is built for personal art-study and reference workflows, but the structure is flexible enough to grow into a broader image utility.
 
-Perihelion allows me quickly browse in singles and multiples, stage and download zips or sharable pages with unique urls so I can pick and sort, then access the sort from any device with internet access. And when downloading, I can rename, batch rename, and/or limit file sizes or resize within certain dimensions.
+## Local Development
 
-All of this is in progress, I'll update this as I move along.
+From the monorepo root:
 
-Thanks for reading. I put this file together with [StackEdit](https://github.com/benweet/stackedit/).
+```powershell
+npm run install:perihelion
+npm run build:perihelion
+```
+
+For local frontend + backend development inside the app folder:
+
+```powershell
+cd apps/perihelion
+npm run dev
+```
+
+## Deployment
+
+Frontend path:
+
+- `https://jeffersonwm.com/perihelion/`
+
+Build output:
+
+- `apps/perihelion/dist`
+
+Hosted destination:
+
+- `/home2/jeffers4/jeffersonwm.com/perihelion/`
+
+Perihelion's API and media backend are served separately from the home server through:
+
+- `https://api.jeffersonwm.com`
+
+That means ASO deployment covers the frontend build only.
