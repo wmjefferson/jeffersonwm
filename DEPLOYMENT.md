@@ -66,7 +66,25 @@ Bullion is a frontend-only app. Deploy the built files from `apps/bullion/dist`.
 
 ### Lionship
 
-Lionship is a frontend-only app. Deploy the built files from `apps/lionship/dist`.
+Lionship now has two possible deployment modes.
+
+#### Frontend-only mode
+
+Deploy the built files from `apps/lionship/dist`.
+
+This keeps the app static and relies on browser local storage.
+
+#### Backend-backed mode
+
+Lionship also includes:
+
+- `apps/lionship/server.ts`
+- Express API routes
+- optional MySQL-backed persistence
+
+If you want centralized saved links across devices, this backend must run in a Node-capable environment with the `MYSQL_` variables configured.
+
+If you stay on ASO static hosting only, use the frontend-only mode.
 
 ### JeffersonWM
 
