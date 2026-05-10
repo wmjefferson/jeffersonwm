@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
     return {
       base: '/lionship/',
       server: {
-        port: 3000,
+        port: 8041,
         host: '0.0.0.0',
       },
       plugins: [react()],

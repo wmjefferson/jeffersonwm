@@ -1,91 +1,106 @@
 # Lionship
 
-Lionship is a high-density link dashboard for organizing personal web destinations into a fast, visually minimal hub. It began as an AI Studio app and now lives inside the JeffersonWmDotcom monorepo as a React/TypeScript app with an optional Express/MySQL backend.
+Lionship is a compact link index with optional shared persistence. It lives inside the JeffersonWM repo, but it now follows the same runtime pattern as the other apps:
 
-## Architecture
+- local source repo for editing
+- static frontend build for hosting
+- optional Node API for shared storage
+- optional MySQL backend for persistence across devices
 
-Lionship can run in two modes:
+## Runtime Model
 
-- frontend-only mode
-- backend-backed mode
+Lionship has two practical modes.
 
-### Frontend-only mode
+### Local or static-only mode
 
-The app works as a static site and falls back to browser local storage for saved links. This is the simplest deployment path and fits standard ASO static hosting.
+In this mode:
+
+- the built frontend is hosted statically
+- the browser falls back to local storage
+- no Node process or database is required
+
+This is the lowest-friction mode if you only need the current device to remember link edits.
 
 ### Backend-backed mode
 
-The app can also run with:
+In this mode:
 
-- `server.ts`
-- Express API routes at `/api/links`
-- optional MySQL persistence
+- `server.ts` runs a Node/Express API
+- the app reads and writes through `/api/links`
+- MySQL stores the shared link data
 
-In this mode, link edits can be stored centrally instead of only in the browser.
+This is the right mode if you want the same link set to be editable across devices.
 
 ## Local Development
 
-From the monorepo root:
-
-```powershell
-npm run install:lionship
-npm run build:lionship
-```
-
-For app development inside the app folder:
+From the app folder:
 
 ```powershell
 cd apps/lionship
+npm install
 npm run dev
 ```
 
-If the app uses Gemini features or the optional database backend, copy `.env.example` to `.env.local` and set the values you need:
+That starts the integrated app server on:
 
-```text
-GEMINI_API_KEY=your_key_here
-MYSQL_HOST=your_host
-MYSQL_USER=your_user
-MYSQL_PASSWORD=your_password
-MYSQL_DATABASE=your_database
+- `http://localhost:8040`
+
+If you want to run only the frontend Vite client separately, use:
+
+```powershell
+npm run dev:client
 ```
 
-## Deployment
+That serves the frontend on:
 
-Hosted path:
+- `http://localhost:8041`
 
-- `https://jeffersonwm.com/lionship/`
+## Environment Variables
 
-Build output:
+Copy `.env.example` to a local env file and set only what you need.
+
+```text
+GEMINI_API_KEY=
+VITE_API_BASE_URL=
+PORT=8040
+HOST=0.0.0.0
+PUBLIC_BASE_URL=http://localhost:8040
+ALLOWED_ORIGINS=http://localhost:8040,http://localhost:8041
+MYSQL_HOST=
+MYSQL_USER=
+MYSQL_PASSWORD=
+MYSQL_DATABASE=
+```
+
+### Notes
+
+- Leave `VITE_API_BASE_URL` blank if the frontend and API share the same origin.
+- Set `VITE_API_BASE_URL` if the frontend is hosted separately from the API.
+- If `MYSQL_*` values are missing, the UI falls back to local storage.
+
+## Build and Deploy
+
+Build the frontend with:
+
+```powershell
+npm run build
+```
+
+Output:
 
 - `apps/lionship/dist`
 
-Hosted destination:
+Current hosted frontend path:
 
-- `/home2/jeffers4/jeffersonwm.com/lionship/`
+- `https://jeffersonwm.com/lionship/`
 
-## Deployment Options
+## Suggested Production Shape
 
-### Option 1: frontend-only on ASO
+The clean long-term pattern is:
 
-Upload the built `dist` contents to the hosted `lionship` folder. In this setup:
+- frontend hosted statically
+- Node API running on the home server
+- Lionship API port standardized to `8040`
+- MySQL used for shared persistence
 
-- the app is static
-- local storage remains the fallback storage
-- no server process or database is required
-
-### Option 2: backend-backed deployment
-
-Run `server.ts` in an environment that supports:
-
-- Node.js
-- Express
-- environment variables
-- optional MySQL access
-
-In this setup:
-
-- the frontend can still be built with Vite
-- the backend serves `/api/links`
-- edits can persist in MySQL
-
-This is better if you want Lionship to store edits centrally across devices.
+That keeps Lionship aligned with Perihelion, Dooky, and Jeffershizzle while still letting it degrade gracefully if the database is unavailable.

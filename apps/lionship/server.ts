@@ -6,10 +6,30 @@ import path from 'path';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || '8040');
+  const HOST = process.env.HOST || '0.0.0.0';
+  const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
 
   app.use(express.json());
-  app.use(cors());
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Origin not allowed by CORS'));
+    }
+  }));
 
   let pool: mysql.Pool | null = null;
 
@@ -63,6 +83,27 @@ async function startServer() {
       }
     }
     next();
+  });
+
+  app.get('/health', async (_req, res) => {
+    const db = initDb();
+    let dbConnected = false;
+
+    if (db) {
+      try {
+        await db.query('SELECT 1');
+        dbConnected = true;
+      } catch (error) {
+        console.error('Health check database query failed:', error);
+      }
+    }
+
+    res.json({
+      ok: true,
+      publicBaseUrl: PUBLIC_BASE_URL,
+      dbConfigured: Boolean(db),
+      dbConnected
+    });
   });
 
   // GET all links
@@ -152,8 +193,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`Server running on ${PUBLIC_BASE_URL}`);
   });
 }
 

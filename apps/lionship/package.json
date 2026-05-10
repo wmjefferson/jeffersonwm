@@ -1,10 +1,12 @@
 {
-  "name": "linkstream-minimalist-hub",
+  "name": "lionship",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "server": "tsx server.ts",
+    "dev:client": "vite",
     "start": "node server.ts",
     "build": "vite build",
     "preview": "vite preview"

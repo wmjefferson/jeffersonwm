@@ -106,6 +106,8 @@ const INITIAL_LINKS: LinkItem[] = [
 type SortKey = 'acronym' | 'title';
 type SortOrder = 'asc' | 'desc';
 type SearchEngine = 'GOOGLE' | 'BING';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
 
 const App: React.FC = () => {
   const [links, setLinks] = useState<LinkItem[]>(INITIAL_LINKS);
@@ -113,7 +115,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Try to load from database first
-    fetch('/api/links')
+    fetch(apiUrl('/api/links'))
       .then(res => {
         if (!res.ok) throw new Error('DB not available');
         return res.json();
@@ -126,7 +128,7 @@ const App: React.FC = () => {
           const linksToSync = savedStr ? JSON.parse(savedStr) : INITIAL_LINKS;
           setLinks(linksToSync);
           
-          await fetch('/api/links/batch', {
+          await fetch(apiUrl('/api/links/batch'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ links: linksToSync })
@@ -179,7 +181,7 @@ const App: React.FC = () => {
       updatedLinks = links.map(l => l.id === editingLinkId ? newOrUpdatedLink : l);
       
       if (dbStatus === 'CONNECTED') {
-        await fetch(`/api/links/${editingLinkId}`, {
+        await fetch(apiUrl(`/api/links/${editingLinkId}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newOrUpdatedLink)
@@ -191,7 +193,7 @@ const App: React.FC = () => {
       updatedLinks = [...links, newOrUpdatedLink];
 
       if (dbStatus === 'CONNECTED') {
-        await fetch(`/api/links`, {
+        await fetch(apiUrl('/api/links'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newOrUpdatedLink)
@@ -207,7 +209,7 @@ const App: React.FC = () => {
   const handleDeleteLink = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this link?')) {
       if (dbStatus === 'CONNECTED') {
-        await fetch(`/api/links/${id}`, {
+        await fetch(apiUrl(`/api/links/${id}`), {
           method: 'DELETE'
         }).catch(err => console.error(err));
       }
