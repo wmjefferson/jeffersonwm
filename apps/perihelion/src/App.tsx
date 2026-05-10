@@ -18,6 +18,30 @@ const APIBASE = 'https://api.jeffersonwm.com';
 const IMAGE_PATH = `${APIBASE}/images`;
 const API_PATH = `${APIBASE}/api`;
 
+const getShareIdFromLocation = () => {
+  const params = new URLSearchParams(window.location.search);
+  const queryShareId = params.get('share');
+  if (queryShareId) {
+    return queryShareId;
+  }
+
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const perihelionIndex = segments.indexOf('perihelion');
+  if (perihelionIndex >= 0) {
+    return segments[perihelionIndex + 1] || '';
+  }
+
+  return '';
+};
+
+const buildSharePageUrl = (shareId: string) => {
+  const origin = window.location.origin;
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const perihelionIndex = segments.indexOf('perihelion');
+  const basePath = perihelionIndex >= 0 ? `/${segments.slice(0, perihelionIndex + 1).join('/')}/` : '/';
+  return new URL(`${shareId}`, `${origin}${basePath}`).toString();
+};
+
 export default function App() {
   const [images, setImages] = useState<string[]>([]);
   const [directories, setDirectories] = useState<string[]>([]);
@@ -52,7 +76,7 @@ const stagedImages = Array.from(selectedImages.size ? selectedImages : new Set(p
   // Initialize state from URL on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const shareId = params.get('share');
+    const shareId = getShareIdFromLocation();
     if (shareId) {
       setIsSharedView(true);
       const controller = new AbortController();

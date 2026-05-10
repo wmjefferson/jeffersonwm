@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Lionship">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#f4f1ea"/>
+  <path d="M24 22h10a8 8 0 010 16H24a8 8 0 010-16z" fill="none" stroke="#101010" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M30 26h10a8 8 0 010 16H30" fill="none" stroke="#101010" stroke-width="4" stroke-linejoin="round"/>
+</svg>

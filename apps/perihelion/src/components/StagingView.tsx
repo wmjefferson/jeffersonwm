@@ -4,6 +4,15 @@ import { ArrowLeft, Download, GripVertical, X, Settings2, Image as ImageIcon, Fi
 const APIBASE = 'https://api.jeffersonwm.com';
 const IMAGE_PATH = `${APIBASE}/images`;
 const SHARE_API = `${APIBASE}/api/share`;
+
+const buildSharePageUrl = (shareId: string) => {
+  const origin = window.location.origin;
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const perihelionIndex = segments.indexOf('perihelion');
+  const basePath = perihelionIndex >= 0 ? `/${segments.slice(0, perihelionIndex + 1).join('/')}/` : '/';
+  return new URL(`${shareId}`, `${origin}${basePath}`).toString();
+};
+
 const renderableExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg', '.bmp'];
 const isRenderable = (filename: string) => {
   const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
@@ -139,7 +148,7 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
       if (data.id) {
         setShowTitlePopup(false);
         setPageTitle('');
-        const shareUrl = `${window.location.origin}${window.location.pathname}?share=${data.id}`;
+        const shareUrl = buildSharePageUrl(data.id);
         window.open(shareUrl, '_blank');
       }
     } catch (err) {
@@ -152,18 +161,19 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
   return (
     <div className="flex flex-col h-screen bg-[#F0F0F0] text-black">
       {/* Header */}
-      <header className="h-[36px] bg-white border-b-[3px] border-black shrink-0 flex items-center px-4 justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="hover:bg-[#f0f0f0] p-0.5 transition-colors border-[2px] border-transparent hover:border-black flex items-center justify-center">
+      <header className="bg-white border-b-[3px] border-black shrink-0 sticky top-0 z-40 pt-[max(8px,env(safe-area-inset-top))] pb-2 px-3 sm:h-[36px] sm:py-0 sm:px-4">
+        <div className="flex flex-col gap-3 sm:h-full sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 pt-1 sm:pt-0">
+          <button onClick={onBack} className="hover:bg-[#f0f0f0] p-1 sm:p-0.5 transition-colors border-[2px] border-transparent hover:border-black flex items-center justify-center">
             <ArrowLeft size={16} strokeWidth={2.5} />
           </button>
           <h1 className="font-archivo text-sm uppercase tracking-wider font-bold">Staging & Export</h1>
         </div>
-        <div className="flex items-center gap-3 relative">
+        <div className="flex flex-wrap items-start gap-2 sm:items-center sm:gap-3 relative pl-7 sm:pl-0">
           <button 
             onClick={() => setSelectedForDownload(new Set())}
             disabled={selectedForDownload.size === 0}
-            className="bg-white text-black border-[2px] border-black px-3 py-0.5 flex items-center gap-2 hover:bg-[#f0f0f0] disabled:opacity-50 transition-colors font-bold uppercase text-[11px] tracking-wider"
+            className="bg-white text-black border-[2px] border-black px-3 py-1 sm:py-0.5 min-h-[40px] sm:min-h-0 flex items-center gap-2 hover:bg-[#f0f0f0] disabled:opacity-50 transition-colors font-bold uppercase text-[11px] tracking-wider"
           >
             <X size={12} strokeWidth={2.5} />
             Clear Selection
@@ -172,13 +182,13 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
             <button 
               onClick={() => setShowTitlePopup(!showTitlePopup)}
               disabled={isGenerating || selectedForDownload.size === 0}
-              className="bg-white text-black border-[2px] border-black px-3 py-0.5 flex items-center gap-2 hover:bg-[#f0f0f0] disabled:opacity-50 transition-colors font-bold uppercase text-[11px] tracking-wider"
+              className="bg-white text-black border-[2px] border-black px-3 py-1 sm:py-0.5 min-h-[40px] sm:min-h-0 flex items-center gap-2 hover:bg-[#f0f0f0] disabled:opacity-50 transition-colors font-bold uppercase text-[11px] tracking-wider"
             >
               <Share size={12} strokeWidth={2.5} />
               {isGenerating ? 'Generating...' : 'Generate Page'}
             </button>
             {showTitlePopup && (
-              <div className="absolute top-full right-0 mt-2 w-72 bg-white border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4 z-50 flex flex-col gap-3">
+              <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 w-[min(18rem,calc(100vw-4rem))] bg-white border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4 z-50 flex flex-col gap-3">
                 <label className="font-sans text-[11px] font-bold uppercase tracking-wider text-black">
                   Page Title (Optional)
                 </label>
@@ -213,11 +223,12 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
           <button 
             onClick={handleDownloadClick}
             disabled={isDownloading || selectedForDownload.size === 0}
-            className="bg-black text-white px-3 py-0.5 flex items-center gap-2 hover:bg-[#333] disabled:bg-[#888] transition-colors font-bold uppercase text-[11px] tracking-wider"
+            className="bg-black text-white px-3 py-1 sm:py-0.5 min-h-[40px] sm:min-h-0 flex items-center gap-2 hover:bg-[#333] disabled:bg-[#888] transition-colors font-bold uppercase text-[11px] tracking-wider"
           >
             <Download size={12} strokeWidth={2.5} />
             {isDownloading ? 'Processing...' : `Export ${selectedForDownload.size} Images`}
           </button>
+        </div>
         </div>
       </header>
 
@@ -227,7 +238,7 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
         <div className="w-[400px] bg-white text-black overflow-y-auto border-r-[3px] border-black flex flex-col shrink-0">
           
           {/* Naming Rules Section */}
-          <div className="p-6 border-b-[3px] border-black">
+          <div className="px-6 pt-8 pb-6 sm:pt-6 border-b-[3px] border-black">
             <div className="flex items-center justify-between mb-4">
               <label className="flex items-center gap-2 cursor-pointer group w-fit">
                 <input 
@@ -325,7 +336,7 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
           </div>
 
           {/* Resize Options Section */}
-          <div className="p-6">
+          <div className="px-6 pt-8 pb-6 sm:pt-6">
             <h2 className="font-sans font-bold uppercase tracking-widest text-sm text-black mb-4">Processing Options</h2>
             
             <div className="flex flex-col gap-5">
