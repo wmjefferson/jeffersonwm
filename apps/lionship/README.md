@@ -94,6 +94,10 @@ Current hosted frontend path:
 
 - `https://jeffersonwm.com/lionship/`
 
+Chosen production API hostname:
+
+- `https://api-lionship.jeffersonwm.com`
+
 ## Suggested Production Shape
 
 The clean long-term pattern is:
@@ -101,6 +105,7 @@ The clean long-term pattern is:
 - frontend hosted statically
 - Node API running on the home server
 - Lionship API port standardized to `8040`
+- API hostname: `https://api-lionship.jeffersonwm.com`
 - MySQL used for shared persistence
 
 That keeps Lionship aligned with Perihelion, Dooky, and Jeffershizzle while still letting it degrade gracefully if the database is unavailable.

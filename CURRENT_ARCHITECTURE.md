@@ -43,6 +43,7 @@ This is the current working shape of the active sites and services.
 - Perihelion API: `https://api.jeffersonwm.com`
 - Dooky Detective API: `https://api.dookydetective.com`
 - Jeffershizzle API: `https://api.jeffershizzle.com`
+- Lionship API: `https://api-lionship.jeffersonwm.com`
 
 ## Cloudflare Tunnels
 
@@ -55,6 +56,9 @@ This is the current working shape of the active sites and services.
 - `api-jeffershizzle`
   - hostname: `api.jeffershizzle.com`
   - service: `http://localhost:8030`
+- `api-lionship`
+  - hostname: `api-lionship.jeffersonwm.com`
+  - service: `http://localhost:8040`
 
 ## Deployment Split
 

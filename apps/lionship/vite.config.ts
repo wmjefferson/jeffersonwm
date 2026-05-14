@@ -9,6 +9,13 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 8041,
         host: '0.0.0.0',
+        allowedHosts: [
+          'api-lionship.jeffersonwm.com',
+          'jeffersonwm.com',
+          'www.jeffersonwm.com',
+          'localhost',
+          '127.0.0.1',
+        ],
       },
       plugins: [react()],
       define: {

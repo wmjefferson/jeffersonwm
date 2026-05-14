@@ -62,6 +62,12 @@ Recommended live setup:
 - backend port: `8040`
 - MySQL stores shared link data
 
+## Current Recommended Production Shape
+
+- frontend: `https://jeffersonwm.com/lionship/`
+- API: `https://api-lionship.jeffersonwm.com`
+- backend port: `8040`
+
 ## Safe Update Flow
 
 1. Edit code locally.

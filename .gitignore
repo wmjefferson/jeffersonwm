@@ -13,3 +13,5 @@ coverage/
 *.code-workspace
 metadata.json
 migrated_prompt_history/
+_widget_staging/
+*.zip

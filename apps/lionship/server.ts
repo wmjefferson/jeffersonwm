@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import mysql from 'mysql2/promise';
@@ -106,6 +107,77 @@ async function startServer() {
     });
   });
 
+  app.get(['/', '/index.html'], async (_req, res) => {
+    const db = initDb();
+    let dbConnected = false;
+
+    if (db) {
+      try {
+        await db.query('SELECT 1');
+        dbConnected = true;
+      } catch (error) {
+        console.error('Status page database query failed:', error);
+      }
+    }
+
+    const body = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lionship API</title>
+    <style>
+      :root { color-scheme: light; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #f3f4f6;
+        color: #111827;
+        font: 16px/1.5 "Segoe UI", Arial, sans-serif;
+      }
+      main {
+        width: min(560px, calc(100vw - 48px));
+        padding: 28px 32px;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        box-shadow: 0 12px 28px rgba(17, 24, 39, 0.08);
+      }
+      h1 { margin: 0 0 8px; font-size: 28px; }
+      p { margin: 0 0 16px; }
+      code {
+        display: inline-block;
+        padding: 2px 6px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+      }
+      ul { margin: 0 0 16px; padding-left: 18px; }
+      .ok { color: #166534; font-weight: 600; }
+      .warn { color: #92400e; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Lionship API</h1>
+      <p class="${dbConnected ? 'ok' : 'warn'}">
+        ${dbConnected ? 'Connected to shared links database.' : 'Running, but the database is not connected.'}
+      </p>
+      <ul>
+        <li><code>/health</code> returns API and database status</li>
+        <li><code>/api/links</code> returns the live link set</li>
+      </ul>
+      <p>Public base URL: <code>${PUBLIC_BASE_URL}</code></p>
+    </main>
+  </body>
+</html>`;
+
+    res
+      .status(200)
+      .setHeader('Content-Type', 'text/html; charset=utf-8')
+      .send(body);
+  });
+
   // GET all links
   app.get('/api/links', async (req, res) => {
     try {
@@ -188,7 +260,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.use((req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
