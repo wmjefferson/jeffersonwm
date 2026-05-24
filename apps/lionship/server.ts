@@ -33,6 +33,29 @@ async function startServer() {
   }));
 
   let pool: mysql.Pool | null = null;
+  let widgetEventsSchemaReady: Promise<void> | null = null;
+  const FALLBACK_FONTS = ['Inter', 'Roboto', 'Open Sans', 'Playfair Display', 'Outfit'];
+  const FALLBACK_WOTD = [
+    {
+      dictionary: 'Meliorism',
+      merriam: 'M\u00e9tier',
+      oxford: 'Serendipity',
+      wiktionary: 'Verisimilitude'
+    },
+    {
+      dictionary: 'Susurrus',
+      merriam: 'Luminous',
+      oxford: 'Resilience',
+      wiktionary: 'Ubuntu'
+    },
+    {
+      dictionary: 'Quixotic',
+      merriam: 'Sempiternal',
+      oxford: 'Ineffable',
+      wiktionary: 'Eunoia'
+    }
+  ];
+  let wotdCache: { data: typeof FALLBACK_WOTD[number]; timestamp: number } | null = null;
 
   const initDb = () => {
     if (pool) return pool;
@@ -75,9 +98,230 @@ async function startServer() {
 
   initDb();
 
+  const isMissingDescriptionColumnError = (error: unknown) =>
+    error instanceof Error && /Unknown column 'description'|description.*doesn't exist/i.test(error.message);
+
+  const ensureWidgetEventsSchema = async () => {
+    const db = initDb();
+    if (!db) return;
+    if (widgetEventsSchemaReady) {
+      return widgetEventsSchemaReady;
+    }
+
+    widgetEventsSchemaReady = (async () => {
+      try {
+        const [rows] = await db.query(
+          `SELECT COUNT(*) AS count
+           FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = 'jeffers4_dates'
+             AND TABLE_NAME = 'events'
+             AND COLUMN_NAME = 'description'`
+        );
+        const count = Number((rows as Array<{ count?: number }>)[0]?.count || 0);
+        if (count === 0) {
+          await db.execute('ALTER TABLE jeffers4_dates.events ADD COLUMN description TEXT NULL');
+          console.log('Widget events schema updated with description column.');
+        }
+      } catch (error) {
+        console.error('Widget event schema check failed:', error);
+      }
+    })();
+
+    return widgetEventsSchemaReady;
+  };
+
+  const getWidgetFonts = async () => {
+    const db = initDb();
+    if (!db) return FALLBACK_FONTS;
+
+    try {
+      const [rows] = await db.query('SELECT name FROM jeffers4_fonts.fonts');
+      const fonts = (rows as Array<{ name?: string }>)
+        .map(row => row.name?.trim())
+        .filter((name): name is string => Boolean(name));
+      return fonts.length > 0 ? fonts : FALLBACK_FONTS;
+    } catch (error) {
+      console.error('Widget fonts query failed:', error);
+      return FALLBACK_FONTS;
+    }
+  };
+
+  const getWidgetNextEvent = async () => {
+    const db = initDb();
+    if (!db) return null;
+    await ensureWidgetEventsSchema();
+
+    try {
+      const [rows] = await db.query('SELECT id, name, description, date, end_date FROM jeffers4_dates.events');
+      const events = rows as Array<{
+        id: number;
+        name: string;
+        description?: string | null;
+        date: Date | string;
+        end_date?: Date | string | null;
+      }>;
+
+      if (events.length === 0) {
+        return null;
+      }
+
+      const now = new Date();
+      const currentVal = (now.getUTCMonth() + 1) * 100 + now.getUTCDate();
+      const sortedEvents = [...events].sort((a, b) => {
+        const aDate = new Date(a.date);
+        const bDate = new Date(b.date);
+        const aVal = (aDate.getUTCMonth() + 1) * 100 + aDate.getUTCDate();
+        const bVal = (bDate.getUTCMonth() + 1) * 100 + bDate.getUTCDate();
+        return aVal - bVal;
+      });
+
+      const nextEvent = sortedEvents.find(event => {
+        const eventDate = new Date(event.date);
+        const eventVal = (eventDate.getUTCMonth() + 1) * 100 + eventDate.getUTCDate();
+        return eventVal >= currentVal;
+      }) || sortedEvents[0];
+
+      return nextEvent;
+    } catch (error) {
+      if (isMissingDescriptionColumnError(error)) {
+        try {
+          const [fallbackRows] = await db.query('SELECT id, name, date, end_date FROM jeffers4_dates.events');
+          const fallbackEvents = (fallbackRows as Array<{
+            id: number;
+            name: string;
+            date: Date | string;
+            end_date?: Date | string | null;
+          }>).map(event => ({ ...event, description: null }));
+
+          if (fallbackEvents.length === 0) {
+            return null;
+          }
+
+          const now = new Date();
+          const currentVal = (now.getUTCMonth() + 1) * 100 + now.getUTCDate();
+          const sortedEvents = [...fallbackEvents].sort((a, b) => {
+            const aDate = new Date(a.date);
+            const bDate = new Date(b.date);
+            const aVal = (aDate.getUTCMonth() + 1) * 100 + aDate.getUTCDate();
+            const bVal = (bDate.getUTCMonth() + 1) * 100 + bDate.getUTCDate();
+            return aVal - bVal;
+          });
+
+          return sortedEvents.find(event => {
+            const eventDate = new Date(event.date);
+            const eventVal = (eventDate.getUTCMonth() + 1) * 100 + eventDate.getUTCDate();
+            return eventVal >= currentVal;
+          }) || sortedEvents[0];
+        } catch (fallbackError) {
+          console.error('Widget next event fallback query failed:', fallbackError);
+        }
+      }
+      console.error('Widget next event query failed:', error);
+      return null;
+    }
+  };
+
+  const getWidgetAllEvents = async () => {
+    const db = initDb();
+    if (!db) return [];
+    await ensureWidgetEventsSchema();
+
+    try {
+      const [rows] = await db.query(
+        'SELECT id, name, description, date, end_date FROM jeffers4_dates.events ORDER BY MONTH(date) ASC, DAY(date) ASC'
+      );
+      return rows as Array<{
+        id: number;
+        name: string;
+        description?: string | null;
+        date: Date | string;
+        end_date?: Date | string | null;
+      }>;
+    } catch (error) {
+      if (isMissingDescriptionColumnError(error)) {
+        try {
+          const [fallbackRows] = await db.query(
+            'SELECT id, name, date, end_date FROM jeffers4_dates.events ORDER BY MONTH(date) ASC, DAY(date) ASC'
+          );
+          return (fallbackRows as Array<{
+            id: number;
+            name: string;
+            date: Date | string;
+            end_date?: Date | string | null;
+          }>).map(event => ({ ...event, description: null }));
+        } catch (fallbackError) {
+          console.error('Widget all events fallback query failed:', fallbackError);
+        }
+      }
+      console.error('Widget all events query failed:', error);
+      return [];
+    }
+  };
+
+  const getWidgetWotd = async () => {
+    if (wotdCache && (Date.now() - wotdCache.timestamp) < 60 * 60 * 1000) {
+      return wotdCache.data;
+    }
+
+    const fetchOptions = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      }
+    };
+
+    const dailyFallback = FALLBACK_WOTD[Math.floor(Date.now() / 86400000) % FALLBACK_WOTD.length];
+    const result = { ...dailyFallback };
+
+    try {
+      const dictRes = await fetch('https://www.dictionary.com/e/word-of-the-day/', fetchOptions);
+      const dictHtml = await dictRes.text();
+      const dictMatch = dictHtml.match(/<div class=\"otd-item-headword__word\">[\s\S]*?<h1>(.*?)<\/h1>/i)
+        || dictHtml.match(/<title>Word of the Day: (.*?) \| Dictionary\.com<\/title>/i);
+      if (dictMatch?.[1]) {
+        result.dictionary = dictMatch[1].replace(/<[^>]*>/g, '').trim();
+      }
+    } catch (error) {
+      console.error('Dictionary WOTD fetch failed:', error);
+    }
+
+    try {
+      const mwRes = await fetch('https://www.merriam-webster.com/wotd/feed/rss2', fetchOptions);
+      const mwXml = await mwRes.text();
+      const mwMatch = mwXml.match(/<item>[\s\S]*?<title>(?:Word of the Day: )?(.*?)<\/title>/i);
+      if (mwMatch?.[1]) {
+        result.merriam = mwMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+      }
+    } catch (error) {
+      console.error('Merriam WOTD fetch failed:', error);
+    }
+
+    try {
+      const wikRes = await fetch('https://en.wiktionary.org/w/api.php?action=featuredfeed&feed=wotd&format=xml', fetchOptions);
+      const wikXml = await wikRes.text();
+      const items = wikXml.split('<item>');
+      const lastItem = items[items.length - 1];
+      const wikMatch = lastItem.match(/id=&quot;WOTD-rss-title&quot;&gt;(.*?)&lt;\/span&gt;/i)
+        || lastItem.match(/id=\"WOTD-rss-title\">(.*?)<\/span>/i)
+        || lastItem.match(/<title>(?:Word of the day for .*: )?(.*?)<\/title>/i);
+      if (wikMatch?.[1]) {
+        result.wiktionary = wikMatch[1].replace(/<[^>]*>/g, '').trim();
+      }
+    } catch (error) {
+      console.error('Wiktionary WOTD fetch failed:', error);
+    }
+
+    wotdCache = {
+      data: result,
+      timestamp: Date.now()
+    };
+
+    return result;
+  };
+
   // Middleware to ensure DB connection
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) {
+    if (req.path === '/api/links' || req.path === '/api/links/batch' || req.path.startsWith('/api/links/')) {
       const db = initDb();
       if (!db) {
         return res.status(503).json({ error: 'Database not configured securely. Please enter MYSQL_ variables in settings.' });
@@ -187,6 +431,112 @@ async function startServer() {
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
+  });
+
+  app.get('/api/widget/fonts', async (_req, res) => {
+    res.json(await getWidgetFonts());
+  });
+
+  app.get('/api/widget/next-event', async (_req, res) => {
+    res.json(await getWidgetNextEvent());
+  });
+
+  app.get('/api/widget/all-events', async (_req, res) => {
+    res.json(await getWidgetAllEvents());
+  });
+
+  app.post('/api/widget/events', async (req, res) => {
+    const db = initDb();
+    if (!db) {
+      return res.status(503).json({ error: 'Database not configured.' });
+    }
+
+    await ensureWidgetEventsSchema();
+
+    const { name, description, date, end_date } = req.body ?? {};
+    if (!name || !date) {
+      return res.status(400).json({ error: 'Name and date are required.' });
+    }
+
+    try {
+      try {
+        const [result] = await db.execute(
+          'INSERT INTO jeffers4_dates.events (name, description, date, end_date) VALUES (?, ?, ?, ?)',
+          [name, description || null, date, end_date || null]
+        );
+        res.status(201).json({ success: true, id: (result as mysql.ResultSetHeader).insertId });
+        return;
+      } catch (error) {
+        if (!isMissingDescriptionColumnError(error)) {
+          throw error;
+        }
+      }
+
+      const [result] = await db.execute(
+        'INSERT INTO jeffers4_dates.events (name, date, end_date) VALUES (?, ?, ?)',
+        [name, date, end_date || null]
+      );
+      res.status(201).json({ success: true, id: (result as mysql.ResultSetHeader).insertId });
+    } catch (error) {
+      console.error('Widget add event failed:', error);
+      res.status(500).json({ error: 'Failed to add event.' });
+    }
+  });
+
+  app.put('/api/widget/events/:id', async (req, res) => {
+    const db = initDb();
+    if (!db) {
+      return res.status(503).json({ error: 'Database not configured.' });
+    }
+
+    const { id } = req.params;
+    await ensureWidgetEventsSchema();
+
+    const { name, description, date, end_date } = req.body ?? {};
+    if (!name || !date) {
+      return res.status(400).json({ error: 'Name and date are required.' });
+    }
+
+    try {
+      try {
+        await db.execute(
+          'UPDATE jeffers4_dates.events SET name = ?, description = ?, date = ?, end_date = ? WHERE id = ?',
+          [name, description || null, date, end_date || null, id]
+        );
+      } catch (error) {
+        if (!isMissingDescriptionColumnError(error)) {
+          throw error;
+        }
+
+        await db.execute(
+          'UPDATE jeffers4_dates.events SET name = ?, date = ?, end_date = ? WHERE id = ?',
+          [name, date, end_date || null, id]
+        );
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Widget update event failed:', error);
+      res.status(500).json({ error: 'Failed to update event.' });
+    }
+  });
+
+  app.delete('/api/widget/events/:id', async (req, res) => {
+    const db = initDb();
+    if (!db) {
+      return res.status(503).json({ error: 'Database not configured.' });
+    }
+
+    try {
+      await db.execute('DELETE FROM jeffers4_dates.events WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Widget delete event failed:', error);
+      res.status(500).json({ error: 'Failed to delete event.' });
+    }
+  });
+
+  app.get('/api/widget/wotd', async (_req, res) => {
+    res.json(await getWidgetWotd());
   });
   
   // SYNC existing initial links (one-off sync helper for the frontend)

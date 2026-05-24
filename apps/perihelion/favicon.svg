@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Perihelion">
-  <rect x="4" y="4" width="56" height="56" rx="14" fill="#f8f6f1"/>
-  <circle cx="32" cy="32" r="9" fill="#101010"/>
-  <circle cx="32" cy="32" r="19" fill="none" stroke="#101010" stroke-width="3"/>
-  <path d="M32 9v8M32 47v8M9 32h8M47 32h8" stroke="#101010" stroke-width="3" stroke-linecap="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="12" fill="none" stroke="#000" stroke-width="4"/><path d="M28 20 L32 12 L36 20 Z M40 20 L48 16 L44 24 Z M44 28 L52 32 L44 36 Z M40 44 L48 48 L44 40 Z M28 44 L32 52 L36 44 Z M24 44 L16 48 L20 40 Z M20 28 L12 32 L20 36 Z M24 20 L16 16 L20 24 Z" fill="#000" stroke="none"/><path d="M12 32 A20 12 0 1 0 52 32 A20 12 0 1 0 12 32" fill="none" stroke="#000" stroke-width="2"/><circle cx="52" cy="32" r="4" fill="#000"/></svg>

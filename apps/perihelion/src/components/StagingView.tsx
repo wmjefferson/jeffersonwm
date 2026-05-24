@@ -19,6 +19,64 @@ const isRenderable = (filename: string) => {
   return renderableExts.includes(ext);
 };
 
+const extensionOf = (filename: string) => {
+  const name = filename.split('/').pop() || filename;
+  const dotIndex = name.lastIndexOf('.');
+  return dotIndex >= 0 ? name.slice(dotIndex).toLowerCase() : '';
+};
+
+const getFileTypeCode = (filename: string) => {
+  const ext = extensionOf(filename).replace('.', '').toUpperCase();
+  return ext || 'FILE';
+};
+
+const getFileTypeTone = (filename: string) => {
+  const ext = extensionOf(filename);
+
+  if (['.pdf', '.doc', '.docx', '.rtf', '.txt', '.md'].includes(ext)) {
+    return {
+      accent: 'text-[#8A5A44]',
+      border: 'border-[#B89D91]',
+      bg: 'bg-[#F7F0EC]',
+      label: 'DOCUMENT FILE',
+    };
+  }
+
+  if (['.zip', '.rar', '.7z', '.tar', '.gz'].includes(ext)) {
+    return {
+      accent: 'text-[#586B8A]',
+      border: 'border-[#9CAAC0]',
+      bg: 'bg-[#EEF2F7]',
+      label: 'ARCHIVE FILE',
+    };
+  }
+
+  if (['.mp3', '.wav', '.flac', '.aac', '.m4a'].includes(ext)) {
+    return {
+      accent: 'text-[#6D5A8A]',
+      border: 'border-[#AEA1C1]',
+      bg: 'bg-[#F2EFF7]',
+      label: 'AUDIO FILE',
+    };
+  }
+
+  if (['.mp4', '.mov', '.avi', '.mkv', '.webm'].includes(ext)) {
+    return {
+      accent: 'text-[#476E66]',
+      border: 'border-[#94B3AC]',
+      bg: 'bg-[#ECF5F3]',
+      label: 'VIDEO FILE',
+    };
+  }
+
+  return {
+    accent: 'text-[#666]',
+    border: 'border-[#B9B9B9]',
+    bg: 'bg-[#F3F3F3]',
+    label: 'FILE',
+  };
+};
+
 interface StagingViewProps {
   selectedImages: string[];
   onBack: () => void;
@@ -113,6 +171,9 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
     });
     return names;
   }, [rules, selectedImages]);
+
+  const selectedItemLabel = selectedForDownload.size === 1 ? 'Item' : 'Items';
+  const totalItemLabel = selectedImages.length === 1 ? 'Item' : 'Items';
 
   const handleDownloadClick = () => {
     const filesToDownload = selectedImages.filter(img => selectedForDownload.has(img));
@@ -226,7 +287,7 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
             className="bg-black text-white px-3 py-1 sm:py-0.5 min-h-[40px] sm:min-h-0 flex items-center gap-2 hover:bg-[#333] disabled:bg-[#888] transition-colors font-bold uppercase text-[11px] tracking-wider"
           >
             <Download size={12} strokeWidth={2.5} />
-            {isDownloading ? 'Processing...' : `Export ${selectedForDownload.size} Images`}
+            {isDownloading ? 'Processing...' : `Export ${selectedForDownload.size} ${selectedItemLabel}`}
           </button>
         </div>
         </div>
@@ -444,9 +505,14 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
                       className="h-full w-auto object-contain" 
                     />
                   ) : (
-                    <div className="flex flex-col items-center justify-center text-[#888] gap-2 w-48 h-full">
-                      <FileImage size={24} strokeWidth={1.5} />
-                      <span className="text-[9px] font-bold uppercase tracking-[widest]">{img.split('.').pop()}</span>
+                    <div className={`flex flex-col items-center justify-center gap-3 w-48 h-full px-5 ${getFileTypeTone(img).accent}`}>
+                      <div className={`w-14 h-14 rounded-full border-[2px] flex items-center justify-center ${getFileTypeTone(img).border} ${getFileTypeTone(img).bg}`}>
+                        <FileImage size={24} strokeWidth={1.5} />
+                      </div>
+                      <div className="flex flex-col items-center gap-1 text-center">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.25em]">{getFileTypeCode(img)}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest opacity-80">{getFileTypeTone(img).label}</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -459,7 +525,7 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
       {/* Footer */}
       <footer className="h-[36px] bg-white border-t-[3px] border-black shrink-0 flex items-center px-4 justify-between sticky bottom-0 z-40">
         <div className="font-sans text-[11px] font-bold uppercase tracking-wider text-[#666]">
-          {selectedForDownload.size} of {selectedImages.length} Images Selected
+          {selectedForDownload.size} of {selectedImages.length} {totalItemLabel} Selected
         </div>
         <div className="flex items-center gap-4">
         </div>

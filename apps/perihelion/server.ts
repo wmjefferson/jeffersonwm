@@ -5,6 +5,35 @@ import path from "path";
 import archiver from "archiver";
 import sharp from "sharp";
 
+const IMAGE_EXTS = new Set([
+  ".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif",
+  ".tif", ".tiff", ".bmp", ".svg", ".heic", ".heif",
+  ".raw", ".cr2", ".nef", ".arw", ".psd", ".ai", ".eps", ".pdf"
+]);
+const VIDEO_EXTS = new Set([".mp4", ".mov", ".avi", ".mkv", ".webm"]);
+
+type MediaKind = "image" | "video" | "other";
+
+const normalizeSafePath = (value: string) =>
+  path.normalize(value).replace(/^(\.\.(\/|\\|$))+/, "");
+
+const toWebPath = (...parts: string[]) => parts.filter(Boolean).join("/").replace(/\\/g, "/");
+const isVisibleName = (name: string) => !name.startsWith(".");
+const extensionOf = (name: string) => path.extname(name).toLowerCase();
+
+const getMediaKind = (name: string): MediaKind => {
+  const ext = extensionOf(name);
+  if (IMAGE_EXTS.has(ext)) return "image";
+  if (VIDEO_EXTS.has(ext)) return "video";
+  return "other";
+};
+
+const listVisibleFiles = (targetDir: string) =>
+  fs.readdirSync(targetDir, { withFileTypes: true })
+    .filter(item => item.isFile() && isVisibleName(item.name))
+    .map(item => item.name)
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -21,54 +50,72 @@ async function startServer() {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 25;
     const subPath = req.query.path ? String(req.query.path) : "";
-    const safePath = path.normalize(subPath).replace(/^(\.\.(\/|\\|$))+/, '');
+    const safePath = normalizeSafePath(subPath);
     const targetDir = path.join(IMAGES_DIR, safePath);
 
     if (!fs.existsSync(targetDir)) {
       return res.status(404).json({ error: "Directory not found" });
     }
 
-    fs.readdir(targetDir, { withFileTypes: true }, (err, items) => {
-      if (err) {
-        return res.status(500).json({ error: "Failed to read images directory" });
-      }
+    try {
+      const items = fs.readdirSync(targetDir, { withFileTypes: true });
 
-      let imageFiles = items
-        .filter(item => item.isFile())
-        .map(item => item.name)
-        .filter(file => {
-          if (file.startsWith('.')) return false;
-          const ext = path.extname(file).toLowerCase();
-          const allowedExts = [
-            ".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", 
-            ".tif", ".tiff", ".bmp", ".svg", ".heic", ".heif", 
-            ".raw", ".cr2", ".nef", ".arw", ".psd", ".ai", ".eps", ".pdf"
-          ];
-          return allowedExts.includes(ext);
-        })
-        .map(name => safePath ? `${safePath}/${name}` : name);
+      const fileEntries = listVisibleFiles(targetDir).map(name => {
+        const relativePath = safePath ? toWebPath(safePath, name) : name;
+        return {
+          name,
+          path: relativePath,
+          type: "file" as const,
+          ext: extensionOf(name),
+          kind: getMediaKind(name),
+        };
+      });
 
       const directories = items
-        .filter(item => item.isDirectory())
-        .map(item => item.name);
+        .filter(item => item.isDirectory() && isVisibleName(item.name))
+        .map(item => item.name)
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 
-      imageFiles.sort();
+      const folders = directories.map(name => {
+        const folderPath = path.join(targetDir, name);
+        const relativeFolderPath = safePath ? toWebPath(safePath, name) : name;
+        const childFiles = listVisibleFiles(folderPath);
+        const firstFile = childFiles[0];
+        const thumbnailPath = firstFile ? toWebPath(relativeFolderPath, firstFile) : null;
 
-      const total = imageFiles.length;
+        return {
+          name,
+          path: relativeFolderPath,
+          type: "directory" as const,
+          itemCount: childFiles.length,
+          thumbnailPath,
+          thumbnailKind: firstFile ? getMediaKind(firstFile) : null,
+          thumbnailExt: firstFile ? extensionOf(firstFile) : "",
+        };
+      });
+
+      const imageFiles = fileEntries
+        .filter(file => file.kind === "image")
+        .map(file => file.path);
+
+      const total = fileEntries.length;
       const totalPages = Math.ceil(total / limit) || 1;
       const startIndex = (page - 1) * limit;
       const endIndex = startIndex + limit;
 
-      const paginatedFiles = imageFiles.slice(startIndex, endIndex);
-
       res.json({
-        images: paginatedFiles,
+        images: imageFiles.slice(startIndex, endIndex),
         directories,
+        files: fileEntries.slice(startIndex, endIndex),
+        folders,
         page,
         totalPages,
-        total
+        total,
       });
-    });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Failed to read images directory" });
+    }
   });
 
   app.get("/api/download/*", async (req, res) => {

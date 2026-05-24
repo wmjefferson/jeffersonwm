@@ -15,3 +15,5 @@ metadata.json
 migrated_prompt_history/
 _widget_staging/
 *.zip
+__pycache__/
+*.py[cod]

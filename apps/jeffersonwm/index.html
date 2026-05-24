@@ -20,6 +20,12 @@
     />
 
     <style>
+      :root {
+        --frame: 42px;
+        --widget-width: 320px;
+        --widget-gap: 72px;
+      }
+
       * {
         box-sizing: border-box;
       }
@@ -28,16 +34,18 @@
         margin: 0;
         min-height: 100vh;
         font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        display: flex;
-        align-items: flex-start;
-        justify-content: flex-start;
-        padding: 2.5rem 1.5rem;
+        padding: var(--frame);
         background: #fdfdfd;
         color: #111827;
       }
 
+      .layout {
+        width: 100%;
+        display: block;
+      }
+
       .page {
-        max-width: 640px;
+        max-width: min(640px, calc(100vw - var(--widget-width) - var(--widget-gap) - (var(--frame) * 2)));
       }
 
       .logo-wrapper {
@@ -47,8 +55,7 @@
       .logo {
         display: block;
         max-width: 84px;
-        /* I removed this line because I wanted to */
-        /* max-height: 48px; */
+        max-height: 48px;
       }
 
       h1 {
@@ -87,59 +94,990 @@
       .app-link:hover::after {
         transform: scaleX(1);
       }
+
+      .widget {
+        position: fixed;
+        top: var(--frame);
+        right: var(--frame);
+        width: min(var(--widget-width), calc(100vw - (var(--frame) * 2)));
+      }
+
+      .widget-panel {
+        position: relative;
+        width: 100%;
+        text-align: right;
+        color: #1a1a1a;
+      }
+
+      .widget-time {
+        margin: 0 0 0.35rem auto;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        font-size: clamp(3rem, 8vw, 4.5rem);
+        font-weight: 300;
+        line-height: 0.92;
+        letter-spacing: -0.08em;
+        cursor: pointer;
+      }
+
+      .widget-time:hover,
+      .widget-event:hover,
+      .widget-word:hover {
+        opacity: 0.72;
+      }
+
+      .widget-location,
+      .widget-date {
+        margin: 0 0 0.4rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        opacity: 0.58;
+      }
+
+      .widget-location {
+        display: inline-block;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        cursor: pointer;
+        text-align: right;
+      }
+
+      .widget-location:hover {
+        opacity: 0.9;
+      }
+
+      .widget-event {
+        display: inline-block;
+        margin: 0 0 1.75rem;
+        text-decoration: none;
+        color: inherit;
+        font-family: inherit;
+        font-size: 0.92rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        border: 0;
+        padding: 0;
+        background: transparent;
+      }
+
+      .widget-weather {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.7rem;
+        margin: 0 0 1.35rem auto;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        cursor: pointer;
+        transition: color 0.15s ease-out;
+      }
+
+      .widget-weather:hover {
+        color: var(--weather-hover-color, #6b7280);
+      }
+
+      .widget-weather-icon {
+        font-size: 1.8rem;
+        line-height: 1;
+      }
+
+      .widget-weather-temp {
+        font-size: 2.2rem;
+        font-weight: 300;
+        letter-spacing: -0.05em;
+      }
+
+      .widget-words {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.25rem;
+        opacity: 0.62;
+      }
+
+      .widget-word {
+        color: inherit;
+        font-family: inherit;
+        text-decoration: none;
+        font-size: 0.92rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+
+      .widget-events-popup {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
+        padding: var(--frame);
+        padding-bottom: 0;
+        background: rgba(253, 253, 253, 0.96);
+        overflow-y: auto;
+        z-index: 20;
+      }
+
+      .widget-events-popup[hidden] {
+        display: none;
+      }
+
+      .widget-events-shell {
+        width: min(var(--widget-width), calc(100vw - (var(--frame) * 2)));
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.45rem;
+        text-align: right;
+      }
+
+      .widget-events-header {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        width: 100%;
+        gap: 1rem;
+        margin-bottom: 0.4rem;
+      }
+
+      .widget-events-spacer {
+        min-height: 1px;
+      }
+
+      .widget-events-close {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        cursor: pointer;
+        opacity: 0.36;
+      }
+
+      .widget-events-close:hover {
+        opacity: 1;
+      }
+
+      .widget-events-list {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.36rem;
+        width: 100%;
+      }
+
+      .widget-events-item {
+        font-size: 0.82rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+
+      .widget-events-item-text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.12rem;
+        align-items: flex-end;
+      }
+
+      .widget-events-item-description {
+        font-size: 0.68rem;
+        font-weight: 500;
+        letter-spacing: 0.03em;
+        line-height: 1.45;
+        max-width: 18rem;
+        opacity: 0.54;
+      }
+
+      .widget-events-item--row {
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .widget-events-label {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        line-height: 1.35;
+        text-align: right;
+        cursor: pointer;
+        opacity: 0.34;
+        transition: opacity 0.15s ease-out, transform 0.15s ease-out, color 0.15s ease-out;
+      }
+
+      .widget-events-label:hover {
+        opacity: 1;
+        transform: translateX(-2px);
+      }
+
+      .widget-events-empty {
+        font-size: 0.86rem;
+        font-weight: 600;
+        opacity: 0.5;
+      }
+
+      .widget-events-editor {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(17, 24, 39, 0.32);
+        backdrop-filter: blur(3px);
+        z-index: 30;
+      }
+
+      .widget-events-editor[hidden] {
+        display: none;
+      }
+
+      .widget-events-editor-card {
+        width: min(420px, calc(100vw - 2rem));
+        border: 1px solid rgba(17, 24, 39, 0.82);
+        background: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 18px 42px rgba(17, 24, 39, 0.18);
+        padding: 2rem 1.8rem 1.7rem;
+      }
+
+      .widget-events-editor-title {
+        margin: 0 0 1.5rem;
+        font-size: 0.92rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-align: right;
+      }
+
+      .widget-events-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        text-align: right;
+      }
+
+      .widget-events-field label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        opacity: 0.48;
+      }
+
+      .widget-events-field input,
+      .widget-events-field textarea {
+        width: 100%;
+        border: 0;
+        border-bottom: 1px solid rgba(17, 24, 39, 0.86);
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        padding: 0.45rem 0;
+        resize: vertical;
+        outline: none;
+        text-align: right;
+      }
+
+      .widget-events-field input:focus,
+      .widget-events-field textarea:focus {
+        border-bottom-color: rgba(17, 24, 39, 1);
+      }
+
+      .widget-events-date-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+      }
+
+      .widget-events-editor-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-top: 1.35rem;
+      }
+
+      .widget-events-editor-buttons {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 1rem;
+      }
+
+      .widget-events-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.9rem;
+        width: 100%;
+        margin-top: 1.2rem;
+      }
+
+      .widget-events-action {
+        padding: 0.8rem 1.35rem;
+        border: 1px solid rgba(17, 24, 39, 0.72);
+        background: rgba(255, 255, 255, 0.8);
+        color: inherit;
+        font-family: inherit;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        opacity: 0.58;
+        transition: opacity 0.15s ease-out, background 0.15s ease-out, color 0.15s ease-out;
+      }
+
+      .widget-events-action:hover {
+        opacity: 1;
+        background: #111827;
+        color: #fff;
+      }
+
+      .widget-events-action--ghost {
+        border-color: transparent;
+        background: transparent;
+      }
+
+      .widget-events-action--ghost:hover {
+        background: transparent;
+        color: inherit;
+      }
+
+      .widget-events-action--danger {
+        color: #8f3d3d;
+      }
+
+      .widget-events-action--danger:hover {
+        background: #8f3d3d;
+        color: #fff;
+      }
+
+      @media (max-width: 900px) {
+        body {
+          padding: var(--frame);
+        }
+
+        .page {
+          max-width: 100%;
+        }
+
+        .widget {
+          position: static;
+          width: 100%;
+          margin-top: 2.5rem;
+        }
+
+        .widget-panel {
+          text-align: left;
+        }
+
+        .widget-time,
+        .widget-weather {
+          margin-left: 0;
+          margin-right: 0;
+        }
+
+        .widget-weather {
+          justify-content: flex-start;
+        }
+
+        .widget-words {
+          align-items: flex-start;
+        }
+
+        .widget-events-popup {
+          padding: var(--frame);
+        }
+
+        .widget-events-shell {
+          width: 100%;
+          align-items: flex-start;
+          text-align: left;
+        }
+
+        .widget-events-header,
+        .widget-events-list,
+        .widget-events-footer {
+          justify-content: flex-start;
+        }
+
+        .widget-events-item-text {
+          align-items: flex-start;
+        }
+
+        .widget-events-label {
+          text-align: left;
+        }
+
+        .widget-events-editor-card {
+          width: min(420px, calc(100vw - 2rem));
+        }
+
+        .widget-events-date-grid {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
-    <main class="page">
-      <div class="logo-wrapper">
-        <img src="favicon.svg" alt="" class="logo" />
-      </div>
+    <div class="layout">
+      <main class="page">
+        <div class="logo-wrapper">
+          <img src="/favicon.svg" alt="" class="logo" />
+        </div>
 
-      <h1>Jefferson Williams</h1>
+        <h1>Jefferson Williams</h1>
 
-      <nav class="links" aria-label="Applications">
-        <a
-          class="app-link"
-          href="/bullion/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Bullion.
-        </a>
+        <nav class="links" aria-label="Applications">
+          <a
+            class="app-link"
+            href="/bullion/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Bullion.
+          </a>
 
-        <a
-          class="app-link"
-          href="/lionship/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Lionship. v.0.1
-        </a>
-        <a
-          class="app-link"
-          href="/perihelion/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Perihelion. v.0.3
-        </a>
-        <a
-          class="app-link"
-          href="https://dookydetective.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Dooky Detective. v.0.2
-        </a>
-        <a
-          class="app-link"
-          href="https://jeffershizzle.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Jeffershizzle. v.0.2
-        </a>
-      </nav>
-    </main>
+          <a
+            class="app-link"
+            href="/lionship/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Lionship. v.0.1
+          </a>
+          <a
+            class="app-link"
+            href="/perihelion/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Perihelion. v.0.3
+          </a>
+          <a
+            class="app-link"
+            href="https://dookydetective.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Dooky Detective. v.0.2
+          </a>
+          <a
+            class="app-link"
+            href="https://jeffershizzle.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Jeffershizzle. v.0.2
+          </a>
+        </nav>
+      </main>
+
+      <aside class="widget" aria-label="Homepage widget">
+        <section class="widget-panel" id="home-widget">
+          <button class="widget-location" id="widget-location" type="button" title="Refresh widget">San Francisco, California</button>
+          <button class="widget-time" id="widget-time" type="button" title="Toggle 12/24 hour format">--:--</button>
+          <div class="widget-date" id="widget-date">Loading date</div>
+          <button class="widget-event" id="widget-event" type="button" hidden></button>
+          <button class="widget-weather" id="widget-weather" type="button" title="Show next-hour weather">
+            <span class="widget-weather-icon" id="widget-weather-icon">•</span>
+            <span class="widget-weather-temp" id="widget-weather-temp">--°F</span>
+          </button>
+          <div class="widget-words" id="widget-words"></div>
+          <div class="widget-events-popup" id="widget-events-popup" hidden>
+            <div class="widget-events-shell">
+              <div class="widget-events-header">
+                <button class="widget-events-close" id="widget-events-close" type="button">Close List</button>
+              </div>
+              <div class="widget-events-list" id="widget-events-list"></div>
+              <div class="widget-events-footer">
+                <button class="widget-events-action" id="widget-events-add" type="button">Add Event</button>
+              </div>
+            </div>
+            <form class="widget-events-editor" id="widget-events-editor" hidden>
+              <div class="widget-events-editor-card">
+                <h3 class="widget-events-editor-title" id="widget-events-editor-title">Edit Event</h3>
+                <div class="widget-events-field">
+                  <label for="widget-event-name">Name</label>
+                  <input id="widget-event-name" name="name" type="text" maxlength="255" required />
+                </div>
+                <div class="widget-events-field">
+                  <label for="widget-event-description">Description</label>
+                  <textarea id="widget-event-description" name="description" rows="2"></textarea>
+                </div>
+                <div class="widget-events-date-grid">
+                  <div class="widget-events-field">
+                    <label for="widget-event-date">Date</label>
+                    <input id="widget-event-date" name="date" type="date" required />
+                  </div>
+                  <div class="widget-events-field">
+                    <label for="widget-event-end-date">End Date (Optional)</label>
+                    <input id="widget-event-end-date" name="end_date" type="date" />
+                  </div>
+                </div>
+                <div class="widget-events-editor-actions">
+                  <button class="widget-events-action widget-events-action--danger" id="widget-events-delete" type="button" hidden>Delete</button>
+                  <div class="widget-events-editor-buttons">
+                    <button class="widget-events-action widget-events-action--ghost" id="widget-events-cancel" type="button">Cancel</button>
+                    <button class="widget-events-action" id="widget-events-save" type="submit">Save Changes</button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <script>
+      (() => {
+        const WIDGET_API_BASE = 'https://api-lionship.jeffersonwm.com/api/widget';
+        const WEATHER_API_URL = 'https://api.open-meteo.com/v1/forecast?latitude=37.7811&longitude=-122.4883&current_weather=true&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&forecast_days=2';
+        const WORD_SOURCES = [
+          {
+            key: 'merriam',
+            fallbackLabel: 'Merriam-Webster',
+            fallbackHref: 'https://www.merriam-webster.com/word-of-the-day',
+            hrefForWord: word => `https://www.merriam-webster.com/dictionary/${encodeURIComponent(word)}`
+          },
+          {
+            key: 'wiktionary',
+            fallbackLabel: 'Wiktionary',
+            fallbackHref: 'https://en.wiktionary.org/wiki/Wiktionary:Word_of_the_day',
+            hrefForWord: word => `https://en.wiktionary.org/wiki/${encodeURIComponent(word)}`
+          }
+        ];
+        const FALLBACK_WORDS = WORD_SOURCES.reduce((acc, source) => {
+          acc[source.key] = source.fallbackLabel;
+          return acc;
+        }, {});
+        const elements = {
+          location: document.getElementById('widget-location'),
+          time: document.getElementById('widget-time'),
+          date: document.getElementById('widget-date'),
+          event: document.getElementById('widget-event'),
+          weather: document.getElementById('widget-weather'),
+          weatherIcon: document.getElementById('widget-weather-icon'),
+          weatherTemp: document.getElementById('widget-weather-temp'),
+          words: document.getElementById('widget-words'),
+          panel: document.getElementById('home-widget'),
+          eventsPopup: document.getElementById('widget-events-popup'),
+          eventsList: document.getElementById('widget-events-list'),
+          eventsClose: document.getElementById('widget-events-close'),
+          eventsAdd: document.getElementById('widget-events-add'),
+          eventsEditor: document.getElementById('widget-events-editor'),
+          eventNameInput: document.getElementById('widget-event-name'),
+          eventDescriptionInput: document.getElementById('widget-event-description'),
+          eventDateInput: document.getElementById('widget-event-date'),
+          eventEndDateInput: document.getElementById('widget-event-end-date'),
+          eventsDelete: document.getElementById('widget-events-delete'),
+          eventsCancel: document.getElementById('widget-events-cancel'),
+          eventsEditorTitle: document.getElementById('widget-events-editor-title')
+        };
+
+        let is24Hour = true;
+        let showNextHour = false;
+        let weatherState = null;
+        let widgetEvents = [];
+        let eventsLoaded = false;
+        let editingEventId = null;
+        const getWeatherIcon = code => {
+          if (code === 0) return '\u2600';
+          if (code > 0 && code < 50) return '\u2601';
+          if (code >= 50 && code < 80) return '\u2614';
+          if (code >= 80) return '\u26c8';
+          return '\u2601';
+        };
+
+        const renderTime = () => {
+          const now = new Date();
+          const timeFormatter = new Intl.DateTimeFormat('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: !is24Hour
+          });
+          const dateFormatter = new Intl.DateTimeFormat('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric'
+          });
+          elements.time.textContent = timeFormatter.format(now);
+          elements.date.textContent = dateFormatter.format(now);
+        };
+
+        const renderWeather = () => {
+          if (!weatherState) {
+            return;
+          }
+
+          const view = showNextHour && weatherState.next ? weatherState.next : weatherState.current;
+          if (!view) {
+            return;
+          }
+
+          let weatherColor = '#111827';
+          let weatherHoverColor = '#6b7280';
+
+          if (showNextHour && weatherState.next) {
+            if (weatherState.next.temp < weatherState.current.temp) {
+              weatherColor = '#a14b4b';
+              weatherHoverColor = '#8f3d3d';
+            } else {
+              weatherColor = '#5b7ea3';
+              weatherHoverColor = '#4e6f92';
+            }
+          }
+
+          elements.weatherIcon.textContent = getWeatherIcon(view.code);
+          elements.weatherTemp.textContent = `${Math.round(view.temp)}\u00b0F`;
+          elements.weather.style.setProperty('--weather-hover-color', weatherHoverColor);
+          elements.weather.style.color = weatherColor;
+          elements.weather.title = showNextHour && weatherState.next
+            ? 'Showing next-hour weather. Click to return to current weather.'
+            : 'Showing current weather. Click to preview the next hour.';
+          elements.weather.setAttribute('aria-pressed', showNextHour ? 'true' : 'false');
+        };
+
+        const renderWords = words => {
+          const sources = WORD_SOURCES.map(source => {
+            const label = String(words?.[source.key] || source.fallbackLabel).trim() || source.fallbackLabel;
+            const isFallback = label.localeCompare(source.fallbackLabel, undefined, { sensitivity: 'base' }) === 0;
+            return {
+              key: source.key,
+              label,
+              href: isFallback ? source.fallbackHref : source.hrefForWord(label)
+            };
+          });
+
+          elements.words.innerHTML = sources.map(source => `
+            <a class="widget-word" href="${source.href}" target="_blank" rel="noopener noreferrer">${source.label}</a>
+          `).join('');
+        };
+
+        const formatEventDate = dateStr => {
+          const date = new Date(dateStr);
+          const weekday = date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+          const month = date.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
+          const day = date.getUTCDate();
+          return `${weekday}, ${month} ${day}`;
+        };
+
+        const getDaysSince = (dateStr, endDateStr) => {
+          const targetDate = new Date(endDateStr || dateStr);
+          const now = new Date();
+          const d1 = Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate());
+          const d2 = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+          const diff = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
+          return diff >= 0 ? ` (${diff})` : '';
+        };
+
+        const renderEvent = event => {
+          if (!event || !event.name || !event.date) {
+            elements.event.hidden = true;
+            return;
+          }
+
+          elements.event.hidden = false;
+          elements.event.textContent = `${formatEventDate(event.date)}${getDaysSince(event.date, event.end_date)} - ${event.name}`;
+          elements.event.title = 'Show all special dates.';
+        };
+
+        const escapeHtml = value => String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
+        const normaliseDateInputValue = value => {
+          if (!value) return '';
+          return new Date(value).toISOString().split('T')[0];
+        };
+
+        const closeEventEditor = () => {
+          editingEventId = null;
+          elements.eventsEditor.hidden = true;
+          elements.eventsDelete.hidden = true;
+          elements.eventsEditorTitle.textContent = 'Edit Event';
+          elements.eventNameInput.value = '';
+          elements.eventDescriptionInput.value = '';
+          elements.eventDateInput.value = '';
+          elements.eventEndDateInput.value = '';
+        };
+
+        const openEventEditor = sourceEvent => {
+          editingEventId = sourceEvent?.id ?? null;
+          elements.eventsEditorTitle.textContent = editingEventId === null ? 'New Event' : 'Edit Event';
+          elements.eventNameInput.value = sourceEvent?.name ?? '';
+          elements.eventDescriptionInput.value = sourceEvent?.description ?? '';
+          elements.eventDateInput.value = normaliseDateInputValue(sourceEvent?.date) || new Date().toISOString().split('T')[0];
+          elements.eventEndDateInput.value = normaliseDateInputValue(sourceEvent?.end_date);
+          elements.eventsDelete.hidden = editingEventId === null;
+          elements.eventsEditor.hidden = false;
+        };
+
+        const renderEventItemMarkup = event => {
+          const dateLabel = `${formatEventDate(event.date)}${getDaysSince(event.date, event.end_date)} - ${event.name}`;
+          const description = event.description?.trim();
+          return `
+            <div class="widget-events-item-text">
+              <div class="widget-events-item">${escapeHtml(dateLabel)}</div>
+              ${description ? `<div class="widget-events-item-description">${escapeHtml(description)}</div>` : ''}
+            </div>
+          `;
+        };
+
+        const renderEventsPopup = () => {
+          if (!widgetEvents.length) {
+            elements.eventsList.innerHTML = '<div class="widget-events-empty">No dates available yet.</div>';
+            return;
+          }
+
+          elements.eventsList.innerHTML = widgetEvents.map(event => {
+            return `
+              <div class="widget-events-item widget-events-item--row">
+                <button class="widget-events-label" type="button" data-event-edit="${event.id}">
+                  ${renderEventItemMarkup(event)}
+                </button>
+              </div>
+            `;
+          }).join('');
+
+          elements.eventsList.querySelectorAll('[data-event-edit]').forEach(button => {
+            button.addEventListener('click', async clickEvent => {
+              const id = Number(clickEvent.currentTarget.getAttribute('data-event-edit'));
+              const event = widgetEvents.find(entry => Number(entry.id) === id);
+              if (event) {
+                openEventEditor(event);
+              }
+            });
+          });
+        };
+
+        const closeEventsPopup = () => {
+          closeEventEditor();
+          elements.eventsPopup.hidden = true;
+          elements.event.setAttribute('aria-expanded', 'false');
+        };
+
+        const openEventsPopup = async () => {
+          if (!eventsLoaded) {
+            widgetEvents = await fetchJson(`${WIDGET_API_BASE}/all-events`, []);
+            eventsLoaded = true;
+            renderEventsPopup();
+          }
+
+          elements.eventsPopup.hidden = false;
+          elements.event.setAttribute('aria-expanded', 'true');
+        };
+
+        const reloadEvents = async () => {
+          const [allEvents, nextEvent] = await Promise.all([
+            fetchJson(`${WIDGET_API_BASE}/all-events`, []),
+            fetchJson(`${WIDGET_API_BASE}/next-event`, null)
+          ]);
+
+          widgetEvents = allEvents;
+          eventsLoaded = true;
+          renderEventsPopup();
+          renderEvent(nextEvent);
+        };
+
+        const fetchJson = async (url, fallback) => {
+          try {
+            const response = await fetch(url);
+            if (!response.ok) {
+              return fallback;
+            }
+            return await response.json();
+          } catch (_error) {
+            return fallback;
+          }
+        };
+
+        const fetchDailyWords = async () => {
+          const words = await fetchJson(`${WIDGET_API_BASE}/wotd`, FALLBACK_WORDS);
+          return words || FALLBACK_WORDS;
+        };
+
+        const requestJson = async (url, options) => {
+          const response = await fetch(url, options);
+          if (!response.ok) {
+            throw new Error(`Request failed: ${response.status}`);
+          }
+          if (response.status === 204) {
+            return null;
+          }
+          return response.json().catch(() => null);
+        };
+
+        const applyRandomFont = fonts => {
+          if (!Array.isArray(fonts) || fonts.length === 0) {
+            return;
+          }
+
+          const font = fonts[Math.floor(Math.random() * fonts.length)];
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = `https://fonts.googleapis.com/css2?family=${font.replace(/ /g, '+')}&display=swap`;
+          document.head.appendChild(link);
+          elements.panel.style.fontFamily = `"${font}", "IBM Plex Sans Condensed", system-ui, sans-serif`;
+        };
+
+        const refreshWidgetData = async () => {
+          const [fonts, words, nextEvent, weather] = await Promise.all([
+            fetchJson(`${WIDGET_API_BASE}/fonts`, []),
+            fetchDailyWords(),
+            fetchJson(`${WIDGET_API_BASE}/next-event`, null),
+            fetchJson(WEATHER_API_URL, null)
+          ]);
+
+          applyRandomFont(fonts);
+          renderWords(words || FALLBACK_WORDS);
+          renderEvent(nextEvent);
+
+          if (weather && weather.current_weather && weather.hourly) {
+            const currentTime = weather.current_weather.time;
+            const nextIndex = weather.hourly.time.findIndex(time => time > currentTime);
+            weatherState = {
+              current: {
+                temp: weather.current_weather.temperature,
+                code: weather.current_weather.weathercode
+              },
+              next: nextIndex !== -1 ? {
+                temp: weather.hourly.temperature_2m[nextIndex],
+                code: weather.hourly.weathercode[nextIndex]
+              } : null
+            };
+            renderWeather();
+          }
+        };
+
+        const loadWidget = async () => {
+          renderTime();
+          setInterval(renderTime, 1000);
+
+          elements.location.addEventListener('click', async () => {
+            await refreshWidgetData();
+          });
+
+          elements.time.addEventListener('click', () => {
+            is24Hour = !is24Hour;
+            renderTime();
+          });
+
+          elements.event.addEventListener('click', async event => {
+            event.preventDefault();
+            if (elements.eventsPopup.hidden) {
+              await openEventsPopup();
+            } else {
+              closeEventsPopup();
+            }
+          });
+
+          elements.eventsClose.addEventListener('click', closeEventsPopup);
+
+          elements.eventsAdd.addEventListener('click', () => {
+            openEventEditor(null);
+          });
+
+          elements.eventsCancel.addEventListener('click', () => {
+            closeEventEditor();
+          });
+
+          elements.eventsEditor.addEventListener('click', event => {
+            if (event.target === elements.eventsEditor) {
+              closeEventEditor();
+            }
+          });
+
+          elements.eventsDelete.addEventListener('click', async () => {
+            if (editingEventId === null) {
+              return;
+            }
+
+            try {
+              await requestJson(`${WIDGET_API_BASE}/events/${editingEventId}`, {
+                method: 'DELETE'
+              });
+              closeEventEditor();
+              await reloadEvents();
+            } catch (_error) {
+              // Keep the interface quiet for now; the popup remains open.
+            }
+          });
+
+          elements.eventsEditor.addEventListener('submit', async event => {
+            event.preventDefault();
+
+            const payload = {
+              name: elements.eventNameInput.value.trim(),
+              description: elements.eventDescriptionInput.value.trim(),
+              date: elements.eventDateInput.value,
+              end_date: elements.eventEndDateInput.value
+            };
+
+            if (!payload.name || !payload.date) {
+              return;
+            }
+
+            try {
+              if (editingEventId === null) {
+                await requestJson(`${WIDGET_API_BASE}/events`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload)
+                });
+              } else {
+                await requestJson(`${WIDGET_API_BASE}/events/${editingEventId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload)
+                });
+              }
+
+              closeEventEditor();
+              await reloadEvents();
+            } catch (_error) {
+              // Keep the interface quiet for now; the form stays open.
+            }
+          });
+
+          document.addEventListener('click', event => {
+            if (elements.eventsPopup.hidden) {
+              return;
+            }
+
+            if (!elements.panel.contains(event.target)) {
+              closeEventsPopup();
+            }
+          });
+
+          elements.weather.addEventListener('click', () => {
+            showNextHour = !showNextHour;
+            renderWeather();
+          });
+
+          await refreshWidgetData();
+        };
+
+        renderWords(FALLBACK_WORDS);
+        loadWidget();
+      })();
+    </script>
   </body>
 </html>
