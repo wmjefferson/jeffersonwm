@@ -1,0 +1,14 @@
+{
+  "sort_by": "First 2 characters",
+  "distribution_mode": "Exact count per folder",
+  "distribution_count": 200,
+  "structure": "Flat  (SD-01, SD-02)",
+  "append_range": true,
+  "reorganize": true,
+  "operation": "copy",
+  "conflict": "auto_rename",
+  "recursive": true,
+  "merge": true,
+  "rename_enabled": false,
+  "separator": "Underscore (_)"
+}
