@@ -678,7 +678,9 @@ export default function App() {
     try {
       const response = await fetch(usesCentralAuth ? `${authBaseUrl}/api/auth/logout` : `${API_PATH}/auth/logout`, {
         method: 'POST',
+        headers: usesCentralAuth ? { 'Content-Type': 'application/json' } : undefined,
         credentials: 'include',
+        body: usesCentralAuth ? JSON.stringify({ siteContext: window.location.href }) : undefined,
       });
       const data = await response.json();
       if (!response.ok) {
@@ -738,8 +740,13 @@ export default function App() {
   const usesCentralAuth = authStatus?.provider === 'central';
   const authBaseUrl = authStatus?.authBaseUrl || 'https://auth.jeffersonwm.com';
 
-  const openCentralAuth = () => {
-    window.open(authBaseUrl, '_blank', 'noopener,noreferrer');
+  const openCentralAuth = (mode: 'login' | 'register' = 'login') => {
+    const url = new URL(authBaseUrl);
+    url.searchParams.set('returnTo', window.location.href);
+    if (mode === 'register') {
+      url.searchParams.set('mode', 'register');
+    }
+    window.location.assign(url.toString());
   };
 
   const accountPanelTitle = accountPanel === 'user'
@@ -1268,7 +1275,7 @@ export default function App() {
                       <div className="text-[10px] font-bold uppercase tracking-widest text-black">Auth JeffersonWM</div>
                       <p className="text-[11px] font-sans text-[#666] leading-relaxed">
                         Perihelion now uses the central account system at <span className="font-bold">{authBaseUrl}</span>.
-                        Sign in there, request access there, and make sure your account has Perihelion access before coming back here.
+                        Sign in there, request access there, and make sure your account has Perihelion access. After sign-in, you’ll come right back here.
                       </p>
                     </div>
                     <div className="flex items-center gap-3 justify-end">
@@ -1279,7 +1286,7 @@ export default function App() {
                         Close
                       </button>
                       <button
-                        onClick={openCentralAuth}
+                        onClick={() => openCentralAuth()}
                         className="bg-black text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors"
                       >
                         Open Auth
@@ -1414,7 +1421,7 @@ export default function App() {
                         Sign Out
                       </button>
                       <button
-                        onClick={openCentralAuth}
+                        onClick={() => openCentralAuth()}
                         className="bg-black text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors"
                       >
                         Open Account
@@ -1563,7 +1570,7 @@ export default function App() {
                         Close
                       </button>
                       <button
-                        onClick={openCentralAuth}
+                        onClick={() => openCentralAuth()}
                         className="bg-black text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors"
                       >
                         Open Dashboard
