@@ -1,104 +1,214 @@
 # Deployment Workflow
 
-This monorepo deploys to the `jeffersonwm.com` hosting space on ASO.
+This document reflects the current live split between ASO-hosted frontends, home-server backends, and the standalone auth service.
 
-## Hosted Paths
+## JeffersonWM Monorepo Scope
 
-Each app is built locally and its `dist` output is uploaded to the matching folder on the server:
+This repo currently contains:
 
-- `apps/perihelion/dist` -> `/home2/jeffers4/jeffersonwm.com/perihelion/`
-- `apps/bullion/dist` -> `/home2/jeffers4/jeffersonwm.com/bullion/`
-- `apps/lionship/dist` -> `/home2/jeffers4/jeffersonwm.com/lionship/`
-- `apps/jeffersonwm/dist` -> `/home2/jeffers4/jeffersonwm.com/jeffersonwm/`
+- `apps/feed`
+- `apps/jeffersonwm`
+- `apps/perihelion`
+- `apps/lionship`
+- `apps/bullion`
+- `apps/vermilion`
+- `apps/battalion` placeholder
 
-## Build Commands
+Not every app in the repo is deployed the same way.
+
+## Frontend Deploy Targets On ASO
+
+These apps are built locally and uploaded to ASO as static frontend assets.
+
+- `apps/feed/dist`
+  - live frontend path:
+    - `https://jeffersonwm.com/feed/`
+- `apps/jeffersonwm/dist`
+  - live homepage root:
+    - `https://jeffersonwm.com`
+- `apps/perihelion/dist`
+  - live frontend path:
+    - `https://jeffersonwm.com/perihelion/`
+- `apps/lionship/dist`
+  - live frontend path:
+    - `https://jeffersonwm.com/lionship/`
+- `apps/bullion/dist`
+  - live frontend path:
+    - `https://jeffersonwm.com/bullion/`
+
+Upload the **contents** of each `dist` folder, not the `dist` folder itself.
+
+## Local Build Commands
 
 From the monorepo root:
 
 ```powershell
+npm run build:feed
 npm run build:perihelion
 npm run build:bullion
 npm run build:lionship
 npm run build:jeffersonwm
 ```
 
-To build everything:
+To build the monorepo apps together:
 
 ```powershell
 npm run build
 ```
 
-To reinstall dependencies and verify all apps:
+To reinstall dependencies and verify the currently wired frontend apps:
 
 ```powershell
 npm run verify
 ```
 
-## Upload Rule
-
-Upload the **contents** of each app's `dist` folder into the matching ASO directory.
-
-Example:
-
-- upload `apps/bullion/dist/index.html` to `/home2/jeffers4/jeffersonwm.com/bullion/index.html`
-- upload `apps/bullion/dist/assets/*` to `/home2/jeffers4/jeffersonwm.com/bullion/assets/*`
-
-Do not upload the `dist` folder itself as a nested folder on the server.
-
-## App Notes
+## Current Live Backend Split
 
 ### Perihelion
 
-Perihelion's frontend is hosted on ASO, but its API/media backend lives on the home server through:
+- frontend:
+  - ASO
+- backend:
+  - home server
+- live API:
+  - `https://api.jeffersonwm.com`
 
-- `https://api.jeffersonwm.com`
+Deploy pattern:
 
-Deploying Perihelion on ASO means uploading the built frontend only:
-
-- `index.html`
-- `assets/*`
-
-The Python API and Cloudflare Tunnel are maintained separately on the home server.
-
-### Bullion
-
-Bullion is a frontend-only app. Deploy the built files from `apps/bullion/dist`.
+1. build frontend locally
+2. upload `apps/perihelion/dist` to ASO
+3. update the live Python backend script on the home server
+4. restart the Perihelion backend process
 
 ### Lionship
 
-Lionship now has two possible deployment modes.
+- frontend:
+  - ASO
+- backend:
+  - home server
+- live API:
+  - `https://api-lionship.jeffersonwm.com`
 
-#### Frontend-only mode
+Deploy pattern:
 
-Deploy the built files from `apps/lionship/dist`.
+1. build frontend locally
+2. upload `apps/lionship/dist` to ASO
+3. copy or pull backend source to:
+   - `E:\lionship\backend`
+4. restart the live Node process
 
-This keeps the app static and relies on browser local storage.
+### JeffersonWM Homepage
 
-#### Backend-backed mode
+- frontend:
+  - ASO root
+- data dependencies:
+  - Lionship widget endpoints
+  - Auth JeffersonWM when account links are used later
 
-Lionship also includes:
+Deploy pattern:
 
-- `apps/lionship/server.ts`
-- Express API routes
-- optional MySQL-backed persistence
+1. update `apps/jeffersonwm`
+2. if needed, build locally
+3. upload the resulting frontend files to the JeffersonWM root on ASO
 
-If you want centralized saved links across devices, this backend must run in a Node-capable environment with the `MYSQL_` variables configured.
+### Feed
 
-If you stay on ASO static hosting only, use the frontend-only mode.
+- frontend:
+  - ASO
+- backend:
+  - intended to stay its own service entity
+- suggested live API:
+  - `https://api-feed.jeffersonwm.com`
+- suggested home-server runtime:
+  - `E:\feed\backend`
+- suggested port:
+  - `8050`
 
-### JeffersonWM
+Deploy pattern:
 
-JeffersonWM is configured for the hosted path:
+1. build locally
+2. upload `apps/feed/dist` to the live `/feed/` path
+3. point the frontend at the live backend with:
+   - `VITE_API_BASE_URL`
+4. restart the feed backend if its API changed
 
-- `https://jeffersonwm.com/jeffersonwm/`
+Recommended data shape for cross-site updates:
 
-Deploy the built files from `apps/jeffersonwm/dist`.
+- expose small changelog JSON feeds or endpoints per site
+- or push release entries into the feed backend with:
+  - `POST /api/feed/changelog`
 
-## Recommended Deployment Checklist
+### Bullion
 
-- run the app build locally
-- verify the generated `dist` looks current
-- replace `index.html` on the host
-- replace the `assets` folder contents on the host
-- hard refresh the live site after upload
-- test the app in production
+Bullion is currently frontend-only in this repo.
+
+Deploy pattern:
+
+1. build locally
+2. upload `apps/bullion/dist`
+
+## Services Outside This Monorepo
+
+### Auth JeffersonWM
+
+Auth is no longer part of this monorepo.
+
+- source repo:
+  - `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\auth-jeffersonwm`
+- live runtime:
+  - `E:\auth-jeffersonwm\backend`
+- live site:
+  - `https://auth.jeffersonwm.com`
+
+Deploy auth by updating the auth repo/runtime separately.
+
+### Dooky Detective
+
+Dooky is maintained from its own repo/runtime.
+
+- local repo:
+  - `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\dookydetective`
+- live backend:
+  - `E:\dookydetective\backend`
+
+### Jeffershizzle
+
+Jeffershizzle is maintained separately.
+
+- local repo:
+  - `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\jeffershizzle`
+- live backend script:
+  - `E:\scripts\jeffershizzle_images_api.py`
+
+## Recommended Deploy Rules
+
+### For ASO-hosted frontends
+
+- build locally
+- upload fresh frontend assets
+- hard refresh the live site
+
+### For home-server backends
+
+- update the live backend source
+- restart the matching process
+- verify the API locally and publicly
+
+### For Auth JeffersonWM
+
+Because auth serves both frontend and backend from the home server, the cleanest pattern is:
+
+1. update source locally
+2. sync source to the live runtime
+3. build there or copy the updated `dist`
+4. restart auth
+
+## Recommended Release Checklist
+
+- confirm which repo owns the change
+- build locally if frontend assets changed
+- sync backend files if runtime code changed
+- restart the affected service
+- verify the public site
+- verify the public API when relevant
+- verify cross-app auth behavior if the change touches central auth

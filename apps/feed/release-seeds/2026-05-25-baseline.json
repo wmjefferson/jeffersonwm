@@ -1,0 +1,113 @@
+{
+  "source": "release",
+  "entries": [
+    {
+      "id": "jeffersonwm-v1.0.0-baseline",
+      "appName": "JeffersonWM",
+      "version": "1.0.0",
+      "url": "https://jeffersonwm.com",
+      "createdAt": "2026-05-09T22:15:59-07:00",
+      "highlights": [
+        "Established the JeffersonWM homepage as the live hub for the site network.",
+        "Integrated the right-side widget flow with cleaner weather, clock, and word-of-the-day behavior.",
+        "Set the groundwork for app links, deployment notes, and the new feed entry point."
+      ]
+    },
+    {
+      "id": "dookydetective-v0.1.0-baseline",
+      "appName": "Dooky Detective",
+      "version": "0.1.0",
+      "url": "https://dookydetective.com",
+      "createdAt": "2026-05-11T14:00:00-07:00",
+      "highlights": [
+        "Restored the preferred live version of the frontend experience.",
+        "Moved image delivery back onto the home-server model through the dedicated API.",
+        "Cleaned up reveal behavior, board sizing, and footer visibility."
+      ]
+    },
+    {
+      "id": "jeffershizzle-v0.1.0-baseline",
+      "appName": "Jeffershizzle",
+      "version": "0.1.0",
+      "url": "https://jeffershizzle.com",
+      "createdAt": "2026-05-12T14:00:00-07:00",
+      "highlights": [
+        "Converted the placeholder starter into the real archive site.",
+        "Split the stack into a static ASO frontend and a home-server image API.",
+        "Brought the archive image flow online through api.jeffershizzle.com."
+      ]
+    },
+    {
+      "id": "lionship-v0.1.0-baseline",
+      "appName": "Lionship",
+      "version": "0.1.0",
+      "url": "https://jeffersonwm.com/lionship/",
+      "createdAt": "2026-05-13T21:38:28-07:00",
+      "highlights": [
+        "Normalized the service around port 8040 and api-lionship.jeffersonwm.com.",
+        "Stabilized the database-backed links flow and status endpoints.",
+        "Became the canonical backend for JeffersonWM widget events and daily word data."
+      ]
+    },
+    {
+      "id": "battalion-v0.1.0-foundation",
+      "appName": "Battalion",
+      "version": "0.1.0",
+      "url": "https://github.com/wmjefferson/jeffersonwm/issues/33",
+      "createdAt": "2026-05-20T12:00:00-07:00",
+      "highlights": [
+        "Completed the v0.1 foundation with the Vite plus Express runtime and SQLite data model.",
+        "Built the core RPG loop with XP, HP, gold, stats, streaks, and achievement tracking.",
+        "Shipped the admin board, public dashboard, and three playable mini-games as the first working gameplay surface."
+      ]
+    },
+    {
+      "id": "vermilion-v0.1.0-baseline",
+      "appName": "Vermilion",
+      "version": "0.1.0",
+      "url": "https://github.com/wmjefferson/jeffersonwm/tree/main/apps/vermilion",
+      "createdAt": "2026-05-23T18:22:10-07:00",
+      "highlights": [
+        "Added Vermilion as a desktop file organizer for sorting and batch-renaming large image directories.",
+        "Documented preset-driven distribution workflows and preview tooling.",
+        "Included Windows Explorer integration and no-dependency Python setup."
+      ]
+    },
+    {
+      "id": "perihelion-v1.0.0-baseline",
+      "appName": "Perihelion",
+      "version": "1.0.0",
+      "url": "https://jeffersonwm.com/perihelion/",
+      "createdAt": "2026-05-24T11:03:04-07:00",
+      "highlights": [
+        "Expanded the archive from an image-only browser into a mixed file and media explorer.",
+        "Added optional folder thumbnails, richer file handling, and metadata foundations.",
+        "Connected the private archive flow to the shared Auth JeffersonWM account system."
+      ]
+    },
+    {
+      "id": "auth-jeffersonwm-v0.1.0-launch",
+      "appName": "Auth JeffersonWM",
+      "version": "0.1.0",
+      "url": "https://auth.jeffersonwm.com",
+      "createdAt": "2026-05-24T11:12:27-07:00",
+      "highlights": [
+        "Launched the standalone central auth service for the JeffersonWM network.",
+        "Added request approval, app memberships, admin notes, and filtered account history.",
+        "Enabled shared jeffersonwm.com sessions so protected apps can trust one login."
+      ]
+    },
+    {
+      "id": "feed-v0.1.0-launch",
+      "appName": "Feed",
+      "version": "0.1.0",
+      "url": "https://jeffersonwm.com/feed/",
+      "createdAt": "2026-05-25T20:35:00-07:00",
+      "highlights": [
+        "Launched the standalone JeffersonWM feed page and api-feed.jeffersonwm.com service.",
+        "Mixed manual release notes into the live GitHub timeline chronologically.",
+        "Added a dedicated changelog view so semantic version updates can be read as their own lane."
+      ]
+    }
+  ]
+}

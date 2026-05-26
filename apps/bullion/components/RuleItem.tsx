@@ -1,6 +1,6 @@
 import React from 'react';
+import { GripVertical, X } from 'lucide-react';
 import { Rule, RuleType } from '../types';
-import { X, GripVertical } from 'lucide-react';
 
 interface RuleItemProps {
   rule: Rule;
@@ -9,8 +9,28 @@ interface RuleItemProps {
   onRemove: (id: string) => void;
 }
 
-export const RuleItem: React.FC<RuleItemProps> = ({ rule, onUpdate, onRemove }) => {
-  
+function getRuleLabel(type: RuleType) {
+  switch (type) {
+    case RuleType.TEXT:
+      return 'Text';
+    case RuleType.SEQUENCE:
+      return 'Sequence';
+    case RuleType.ORIGINAL:
+      return 'Original';
+    case RuleType.DATE:
+      return 'Date';
+    case RuleType.REPLACE:
+      return 'Replace';
+    default:
+      return type;
+  }
+}
+
+export const RuleItem: React.FC<RuleItemProps> = ({ rule, index, onUpdate, onRemove }) => {
+  const inputClass =
+    'w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition-colors focus:border-stone-500';
+  const microLabelClass = 'mb-1 block text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-500';
+
   const renderInputs = () => {
     switch (rule.type) {
       case RuleType.TEXT:
@@ -19,29 +39,29 @@ export const RuleItem: React.FC<RuleItemProps> = ({ rule, onUpdate, onRemove }) 
             type="text"
             value={rule.value || ''}
             onChange={(e) => onUpdate(rule.id, { value: e.target.value })}
-            placeholder="Enter text..."
-            className="flex-1 bg-slate-800 border border-slate-700 text-white text-sm rounded px-2 py-1 focus:ring-1 focus:ring-otis-accent focus:border-otis-accent outline-none"
+            placeholder="Prefix, suffix, marker"
+            className={inputClass}
           />
         );
-      
+
       case RuleType.SEQUENCE:
         return (
-          <div className="flex gap-2 items-center">
-            <div className="flex flex-col">
-              <label className="text-[10px] text-slate-500 uppercase font-bold">Start</label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className={microLabelClass}>Start</label>
               <input
                 type="number"
                 value={rule.startNumber}
-                onChange={(e) => onUpdate(rule.id, { startNumber: parseInt(e.target.value) || 1 })}
-                className="w-20 bg-slate-800 border border-slate-700 text-white text-sm rounded px-2 py-1 outline-none"
+                onChange={(e) => onUpdate(rule.id, { startNumber: parseInt(e.target.value, 10) || 1 })}
+                className={inputClass}
               />
             </div>
-            <div className="flex flex-col">
-              <label className="text-[10px] text-slate-500 uppercase font-bold">Digits</label>
+            <div>
+              <label className={microLabelClass}>Digits</label>
               <select
                 value={rule.padding}
-                onChange={(e) => onUpdate(rule.id, { padding: parseInt(e.target.value) || 1 })}
-                className="w-24 bg-slate-800 border border-slate-700 text-white text-sm rounded px-2 py-1 outline-none"
+                onChange={(e) => onUpdate(rule.id, { padding: parseInt(e.target.value, 10) || 1 })}
+                className={inputClass}
               >
                 <option value={1}>1</option>
                 <option value={2}>2 (01)</option>
@@ -56,11 +76,12 @@ export const RuleItem: React.FC<RuleItemProps> = ({ rule, onUpdate, onRemove }) 
 
       case RuleType.DATE:
         return (
-          <div className="flex flex-col w-full">
+          <div>
+            <label className={microLabelClass}>Format</label>
             <select
               value={rule.dateFormat}
               onChange={(e) => onUpdate(rule.id, { dateFormat: e.target.value })}
-              className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded px-2 py-1 outline-none"
+              className={inputClass}
             >
               <option value="yyyyMMdd">YYYYMMDD</option>
               <option value="yyMMdd">YYMMDD</option>
@@ -68,15 +89,15 @@ export const RuleItem: React.FC<RuleItemProps> = ({ rule, onUpdate, onRemove }) 
               <option value="ddMMyy">DDMMYY</option>
               <option value="dd-MM-yy">DD-MM-YY</option>
               <option value="MMddyy">MMDDYY</option>
-              <option value="HHmmss">HHMMSS (Time)</option>
+              <option value="HHmmss">HHMMSS</option>
             </select>
           </div>
         );
 
       case RuleType.ORIGINAL:
         return (
-          <div className="text-slate-500 text-sm italic px-2">
-            Using original filename
+          <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-3 py-3 text-sm text-stone-500">
+            Keep the original filename in the pattern at this position.
           </div>
         );
 
@@ -86,28 +107,31 @@ export const RuleItem: React.FC<RuleItemProps> = ({ rule, onUpdate, onRemove }) 
   };
 
   return (
-    <div className="flex items-center gap-3 bg-slate-900/50 p-3 rounded-lg border border-slate-800 group hover:border-slate-700 transition-all">
-      <div className="cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400">
-        <GripVertical size={16} />
-      </div>
-      
-      <div className="w-32 flex-shrink-0">
-        <span className="text-xs font-mono font-semibold text-otis-accent uppercase tracking-wider block mb-1">
-          {rule.type}
-        </span>
+    <div className="rounded-[1.4rem] border border-stone-200 bg-white p-4 shadow-[0_10px_30px_rgba(28,25,23,0.05)]">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="rounded-full border border-stone-200 bg-stone-50 p-2 text-stone-400">
+            <GripVertical size={14} />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400">
+              Block {index + 1}
+            </p>
+            <h3 className="font-serif text-lg text-stone-900">{getRuleLabel(rule.type)}</h3>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onRemove(rule.id)}
+          className="rounded-full border border-stone-200 bg-white p-2 text-stone-400 transition-colors hover:border-red-200 hover:text-red-600"
+          title="Remove block"
+        >
+          <X size={14} />
+        </button>
       </div>
 
-      <div className="flex-1 flex items-center">
-        {renderInputs()}
-      </div>
-
-      <button
-        onClick={() => onRemove(rule.id)}
-        className="text-slate-600 hover:text-red-500 p-1 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-        title="Remove Rule"
-      >
-        <X size={16} />
-      </button>
+      {renderInputs()}
     </div>
   );
 };

@@ -1,98 +1,207 @@
 # Current Architecture Snapshot
 
-This is the current working shape of the active sites and services.
+This is the current working shape of the active sites, services, and supporting repos.
 
-## Local Source Repos
+## Primary Local Source Repos
 
-- JeffersonWM: `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\jeffersonwm`
-- Dooky Detective: `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\dookydetective`
-- JeffersonWM legacy: `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\jeffersonwm-legacy`
-- WmJefferson: `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\wmjefferson`
-- Jeffershizzle: `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\jeffershizzle`
+- JeffersonWM monorepo:
+  - `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\jeffersonwm`
+- Auth JeffersonWM:
+  - `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\auth-jeffersonwm`
+- Dooky Detective:
+  - `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\dookydetective`
+- Jeffershizzle:
+  - `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\jeffershizzle`
+- Multimillion template:
+  - `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\multimillion`
 
-## Home Server Layout
+## JeffersonWM Monorepo Apps
 
+- `apps/jeffersonwm`
+  - live homepage and widget hub
+- `apps/feed`
+  - JeffersonWM feed page and release timeline
+- `apps/perihelion`
+  - live frontend client for the Perihelion archive
+- `apps/lionship`
+  - live frontend plus backend source for the links service
+- `apps/bullion`
+  - static app in the JeffersonWM family
+- `apps/vermilion`
+  - local Python project now tracked in the monorepo
+- `apps/battalion`
+  - placeholder folder inside the monorepo; current live runtime is still maintained separately on the home server
+
+## Home Server Runtime Layout
+
+- Shared scripts workspace:
+  - `E:\scripts`
 - Perihelion:
   - backend script: `E:\scripts\perihelion_images_api.py`
   - images: `E:\perihelion\images`
   - shares: `E:\perihelion\shares`
   - port: `8010`
+  - auth mode: central auth via `auth.jeffersonwm.com`
 - Dooky Detective:
-  - backend repo/runtime: `E:\dookydetective\backend`
+  - backend runtime: `E:\dookydetective\backend`
   - images: `E:\dookydetective\images`
   - port: `8020`
 - Jeffershizzle:
-  - frontend root on ASO: `public_html`
-  - image API script: `jeffershizzle_images_api.py`
+  - backend script: `E:\scripts\jeffershizzle_images_api.py`
   - images: `E:\jeffershizzle\images`
   - port: `8030`
 - Lionship:
-  - backend: `E:\lionship\backend`
-  - data/config/logs under `E:\lionship\...`
-  - next clean port: `8040` (to avoid Jeffershizzle on `8030`)
+  - backend runtime: `E:\lionship\backend`
+  - data cache:
+    - `E:\lionship\data`
+  - port: `8040`
+- Auth JeffersonWM:
+  - backend runtime: `E:\auth-jeffersonwm\backend`
+  - SQLite store:
+    - `E:\auth-jeffersonwm\backend\data\auth-jeffersonwm.sqlite3`
+  - port: `8060`
+- Feed:
+  - suggested backend runtime:
+    - `E:\feed\backend`
+  - suggested port:
+    - `8050`
+- Battalion:
+  - backend runtime: `E:\battalion`
+  - current production start command:
+    - `npm run prod`
+  - port: `8070`
 
 ## Public Frontends
 
-- JeffersonWM homepage: `https://jeffersonwm.com`
-- Perihelion frontend: `https://jeffersonwm.com/perihelion/`
-- Dooky Detective frontend: `https://dookydetective.com`
-- Jeffershizzle frontend: `https://jeffershizzle.com`
+- JeffersonWM homepage:
+  - `https://jeffersonwm.com`
+- Feed page:
+  - `https://jeffersonwm.com/feed/`
+- Perihelion frontend:
+  - `https://jeffersonwm.com/perihelion/`
+- Lionship frontend:
+  - `https://jeffersonwm.com/lionship/`
+- Auth JeffersonWM:
+  - `https://auth.jeffersonwm.com`
+- Dooky Detective:
+  - `https://dookydetective.com`
+- Jeffershizzle:
+  - `https://jeffershizzle.com`
 
 ## Public APIs
 
-- Perihelion API: `https://api.jeffersonwm.com`
-- Dooky Detective API: `https://api.dookydetective.com`
-- Jeffershizzle API: `https://api.jeffershizzle.com`
-- Lionship API: `https://api-lionship.jeffersonwm.com`
+- Perihelion API:
+  - `https://api.jeffersonwm.com`
+- Lionship API:
+  - `https://api-lionship.jeffersonwm.com`
+- Auth JeffersonWM app + API root:
+  - `https://auth.jeffersonwm.com`
+- Feed API:
+  - suggested:
+    - `https://api-feed.jeffersonwm.com`
+- Dooky Detective API:
+  - `https://api.dookydetective.com`
+- Jeffershizzle API:
+  - `https://api.jeffershizzle.com`
 
 ## Cloudflare Tunnels
 
 - `api-perihelion`
   - hostname: `api.jeffersonwm.com`
-  - service: `http://localhost:8010`
+  - service: `http://127.0.0.1:8010`
 - `api-dookydetective`
   - hostname: `api.dookydetective.com`
-  - service: `http://localhost:8020`
+  - service: `http://127.0.0.1:8020`
 - `api-jeffershizzle`
   - hostname: `api.jeffershizzle.com`
-  - service: `http://localhost:8030`
+  - service: `http://127.0.0.1:8030`
 - `api-lionship`
   - hostname: `api-lionship.jeffersonwm.com`
-  - service: `http://localhost:8040`
+  - service: `http://127.0.0.1:8040`
+- `api-auth-jeffersonwm`
+  - hostname: `auth.jeffersonwm.com`
+  - service: `http://127.0.0.1:8060`
+- `api-feed`
+  - suggested hostname: `api-feed.jeffersonwm.com`
+  - suggested service: `http://127.0.0.1:8050`
+- `api-battalion`
+  - tunnel token currently tracked operationally as:
+    - `api-battalion.token`
+  - live runtime service:
+    - `http://127.0.0.1:8070`
 
 ## Deployment Split
 
 ### Local development
 
-Use the local repos as the source of truth for code.
+Use the laptop repos as the source of truth for code.
 
 - edit locally
-- test locally
-- push to GitHub
+- test locally when practical
+- commit and push from the source repo
 
 ### Production frontend deploy
 
+Use ASO for the static/public frontends that are not served directly from the home server.
+
 - build locally
-- upload build output to ASO for the public site
+- upload the built frontend to ASO
+
+This applies to:
+
+- JeffersonWM homepage
+- Feed page
+- Perihelion frontend
+- Lionship frontend
+- Bullion
 
 ### Production backend deploy
 
-- pull/update code on the home server only for the live runtime copy
-- restart the live backend there
+Use the home server for live Node and Python runtimes.
 
-## Share Pages
+- update the live runtime copy on the home server
+- restart the matching process
+- keep Cloudflare tunnels pointed at `127.0.0.1` services
 
-### Perihelion
+### Central auth deployment
 
-- shared galleries are served by the API
-- the frontend now supports path-style share URLs:
-  - `https://jeffersonwm.com/perihelion/abcd`
-- legacy query-style URLs can still be read:
-  - `https://jeffersonwm.com/perihelion/?share=abcd`
+`auth-jeffersonwm` is now its own repo and service.
+
+- source repo:
+  - `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\auth-jeffersonwm`
+- live runtime:
+  - `E:\auth-jeffersonwm\backend`
+- session cookie scope:
+  - `.jeffersonwm.com`
+
+## Central Auth Status
+
+`auth.jeffersonwm.com` is now the first shared account system for the JeffersonWM network.
+
+Current features:
+
+- request / approval / block account flow
+- admin dashboard
+- per-app memberships
+- account history
+- shared session handling for JeffersonWM subdomains
+
+Current active client:
+
+- Perihelion
+  - requires:
+    - valid central auth session
+    - `perihelion` app membership
 
 ## Source Of Truth Summary
 
-- code source of truth: local repos on the laptop
-- live backend runtime: home server
-- live static frontend hosting: ASO
-- public routing and exposure: Cloudflare DNS + Tunnel
+- code source of truth:
+  - local repos on the laptop
+- live backend runtime:
+  - home server
+- live static frontend hosting:
+  - ASO
+- public routing and exposure:
+  - Cloudflare DNS + Tunnel
+- shared identity layer:
+  - `auth.jeffersonwm.com`

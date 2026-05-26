@@ -1,117 +1,120 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { 
-  FilePlus, 
-  Download, 
-  Trash2, 
-  ArrowUpDown, 
-  RefreshCw,
-  Plus,
+import {
+  AlertCircle,
+  Archive,
+  ArrowUpDown,
+  Download,
+  FilePlus,
   FolderOpen,
-  LayoutGrid,
-  List as ListIcon,
-  Archive
+  Hash,
+  ListFilter,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { Rule, RuleType, FileData, SortConfig } from './types';
-import { generateNewNames, createZip, formatBytes } from './utils/fileHelpers';
+import { createZip, formatBytes, generateNewNames } from './utils/fileHelpers';
 import { Button } from './components/Button';
 import { RuleItem } from './components/RuleItem';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
 
-// We need file-saver for client side downloading from blobs effectively
-// Since I can't npm install in this environment description, I will implement a simple download helper or use the native anchor tag method if file-saver is strictly external.
-// Actually, standard anchor download is fine for modern browsers.
+const DEFAULT_RULE: Rule = { id: uuidv4(), type: RuleType.ORIGINAL };
+
+const sortFiles = (fileList: FileData[], config: SortConfig) => {
+  return [...fileList].sort((a, b) => {
+    if (config.field === 'name') {
+      const comparison = a.originalName.localeCompare(b.originalName, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+      return config.direction === 'asc' ? comparison : -comparison;
+    }
+
+    const left = config.field === 'date' ? a.lastModified : a.size;
+    const right = config.field === 'date' ? b.lastModified : b.size;
+
+    if (left < right) {
+      return config.direction === 'asc' ? -1 : 1;
+    }
+    if (left > right) {
+      return config.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+};
+
+function describeRule(rule: Rule) {
+  switch (rule.type) {
+    case RuleType.TEXT:
+      return rule.value?.trim() ? `"${rule.value.trim()}"` : 'Custom text';
+    case RuleType.SEQUENCE:
+      return `Start ${rule.startNumber || 1}, ${rule.padding || 1} digit${(rule.padding || 1) > 1 ? 's' : ''}`;
+    case RuleType.DATE:
+      return rule.dateFormat || 'yyyyMMdd';
+    case RuleType.ORIGINAL:
+      return 'Keep original filename';
+    default:
+      return rule.type;
+  }
+}
 
 const App: React.FC = () => {
-  // State
   const [files, setFiles] = useState<FileData[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'name', direction: 'asc' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  
-  // Initialize with a default rule
+
   useEffect(() => {
     if (rules.length === 0) {
-      setRules([{ id: uuidv4(), type: RuleType.ORIGINAL }]);
+      setRules([DEFAULT_RULE]);
     }
-  }, []);
+  }, [rules.length]);
 
-  // Helper to sort files
-  const sortFiles = (fileList: FileData[], config: SortConfig) => {
-    return [...fileList].sort((a, b) => {
-      if (config.field === 'name') {
-        // Use localeCompare with numeric: true for natural sorting (e.g., 2 follows 1, 10 follows 9)
-        const comparison = a.originalName.localeCompare(b.originalName, undefined, { numeric: true, sensitivity: 'base' });
-        return config.direction === 'asc' ? comparison : -comparison;
-      }
-
-      let valA: number = 0;
-      let valB: number = 0;
-
-      if (config.field === 'date') {
-        valA = a.lastModified;
-        valB = b.lastModified;
-      } else if (config.field === 'size') {
-        valA = a.size;
-        valB = b.size;
-      }
-
-      if (valA < valB) return config.direction === 'asc' ? -1 : 1;
-      if (valA > valB) return config.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-  };
-
-  // Shared file processing logic
   const processFiles = (uploadedFiles: File[]) => {
-    const newFiles: FileData[] = uploadedFiles.map(file => {
+    const nextFiles = uploadedFiles.map((file) => {
       const lastDot = file.name.lastIndexOf('.');
-      const name = lastDot !== -1 ? file.name.substring(0, lastDot) : file.name;
-      const ext = lastDot !== -1 ? file.name.substring(lastDot + 1) : '';
+      const extension = lastDot !== -1 ? file.name.substring(lastDot + 1) : '';
 
       return {
         id: uuidv4(),
         file,
         originalName: file.name,
-        newName: file.name, // Initial placeholder
-        extension: ext,
+        newName: file.name,
+        extension,
         size: file.size,
-        lastModified: file.lastModified
+        lastModified: file.lastModified,
       };
     });
 
-    setFiles(prev => sortFiles([...prev, ...newFiles], sortConfig));
+    setFiles((current) => sortFiles([...current, ...nextFiles], sortConfig));
   };
 
-  // Handlers
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
+    if (event.target.files?.length) {
       processFiles(Array.from(event.target.files));
     }
     event.target.value = '';
   };
 
-  // Drag and Drop Handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
     setIsDragging(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    // Check if we're actually leaving the container and not just entering a child
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+  const handleDragLeave = (event: React.DragEvent) => {
+    event.preventDefault();
+    if (event.currentTarget.contains(event.relatedTarget as Node)) {
+      return;
+    }
     setIsDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
     setIsDragging(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processFiles(Array.from(e.dataTransfer.files));
+
+    if (event.dataTransfer.files?.length) {
+      processFiles(Array.from(event.dataTransfer.files));
     }
   };
 
@@ -122,244 +125,341 @@ const App: React.FC = () => {
       value: '',
       startNumber: 1,
       padding: 2,
-      dateFormat: 'yyyyMMdd'
+      dateFormat: 'yyyyMMdd',
     };
-    setRules(prev => [...prev, newRule]);
+    setRules((current) => [...current, newRule]);
   };
 
   const handleUpdateRule = (id: string, updates: Partial<Rule>) => {
-    setRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+    setRules((current) => current.map((rule) => (rule.id === id ? { ...rule, ...updates } : rule)));
   };
 
   const handleRemoveRule = (id: string) => {
-    setRules(prev => prev.filter(r => r.id !== id));
+    setRules((current) => current.filter((rule) => rule.id !== id));
   };
 
   const handleSort = (field: 'name' | 'date' | 'size') => {
-    const isSameField = sortConfig.field === field;
-    const direction = isSameField && sortConfig.direction === 'asc' ? 'desc' : 'asc';
-    const config: SortConfig = { field, direction };
-    setSortConfig(config);
-    setFiles(prev => sortFiles(prev, config));
+    const direction =
+      sortConfig.field === field && sortConfig.direction === 'asc' ? 'desc' : 'asc';
+    const nextConfig: SortConfig = { field, direction };
+    setSortConfig(nextConfig);
+    setFiles((current) => sortFiles(current, nextConfig));
   };
 
-  // Derived state: Preview
-  const previewFiles = useMemo(() => {
-    return generateNewNames(files, rules);
-  }, [files, rules]);
+  const previewFiles = useMemo(() => generateNewNames(files, rules), [files, rules]);
+
+  const duplicateCount = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const file of previewFiles) {
+      seen.set(file.newName, (seen.get(file.newName) || 0) + 1);
+    }
+    return Array.from(seen.values()).filter((count) => count > 1).length;
+  }, [previewFiles]);
+
+  const totalSize = useMemo(() => previewFiles.reduce((sum, file) => sum + file.size, 0), [previewFiles]);
+
+  const newestDate = useMemo(() => {
+    if (previewFiles.length === 0) {
+      return null;
+    }
+    return new Date(Math.max(...previewFiles.map((file) => file.lastModified)));
+  }, [previewFiles]);
+
+  const patternSummary = useMemo(
+    () => rules.map((rule) => describeRule(rule)).filter(Boolean).join(' -> '),
+    [rules],
+  );
 
   const handleClearFiles = () => setFiles([]);
 
   const handleDownloadZip = async () => {
-    if (previewFiles.length === 0) return;
+    if (previewFiles.length === 0) {
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const blob = await createZip(previewFiles);
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'renamed_files_otis856.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'bullion-export.zip';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Zip failed", err);
-      alert("Failed to create ZIP file.");
+    } catch (error) {
+      console.error(error);
+      alert('Bullion could not package the archive.');
     } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-slate-300">
-      {/* Header */}
-      <header className="h-16 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-otis-accent rounded flex items-center justify-center text-slate-900 font-bold font-mono">
-            8
-          </div>
+    <div className="min-h-screen bg-[linear-gradient(to_bottom,rgba(41,37,36,0.04),rgba(41,37,36,0.01)),#f7f4ee] text-stone-900">
+      <div className="mx-auto flex min-h-screen max-w-[1440px] flex-col px-5 py-6 lg:px-8">
+        <header className="mb-6 flex flex-col gap-6 border-b border-stone-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-sm font-bold text-white tracking-wide uppercase">Bullion</h1>
-            <p className="text-[10px] text-slate-500 font-mono">BATCH RENAME UTILITY</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <a href="#" className="text-xs text-slate-500 hover:text-white transition-colors">Documentation</a>
-          <div className="h-4 w-px bg-slate-700"></div>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-green-500"></span>
-            System Ready
-          </div>
-        </div>
-      </header>
-
-      {/* Main Layout */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        
-        {/* LEFT PANEL: CONFIGURATION */}
-        <aside className="w-full lg:w-[420px] bg-slate-900 border-r border-slate-800 flex flex-col z-20 shadow-xl">
-          <div className="p-5 border-b border-slate-800 flex justify-between items-center">
-             <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Naming Rules</h2>
-             <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{rules.length} Active</span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-5 space-y-3">
-            {rules.map((rule, idx) => (
-              <RuleItem
-                key={rule.id}
-                rule={rule}
-                index={idx}
-                onUpdate={handleUpdateRule}
-                onRemove={handleRemoveRule}
-              />
-            ))}
-            
-            {rules.length === 0 && (
-              <div className="text-center py-10 border-2 border-dashed border-slate-800 rounded-lg">
-                <p className="text-slate-500 text-sm">No active rules.</p>
-                <p className="text-slate-600 text-xs mt-1">Files will remain unchanged.</p>
+            <a
+              href="https://jeffersonwm.com"
+              className="mb-3 inline-block text-[11px] uppercase tracking-[0.22em] text-stone-500 no-underline transition-colors hover:text-stone-900"
+            >
+              JeffersonWM
+            </a>
+            <div className="flex items-start gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-stone-300 bg-white font-mono text-xs tracking-[0.24em] text-stone-700">
+                AU
               </div>
-            )}
-          </div>
-
-          <div className="p-5 border-t border-slate-800 bg-slate-900">
-            <p className="text-xs font-bold text-slate-500 mb-3 uppercase">Add Rule Block</p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button size="sm" variant="secondary" onClick={() => handleAddRule(RuleType.TEXT)} icon={<Plus size={14}/>}>Text</Button>
-              <Button size="sm" variant="secondary" onClick={() => handleAddRule(RuleType.DATE)} icon={<Plus size={14}/>}>Date</Button>
-              <Button size="sm" variant="secondary" onClick={() => handleAddRule(RuleType.SEQUENCE)} icon={<Plus size={14}/>}>Sequence</Button>
-              <Button size="sm" variant="secondary" onClick={() => handleAddRule(RuleType.ORIGINAL)} icon={<Plus size={14}/>}>Original Name</Button>
-            </div>
-          </div>
-        </aside>
-
-        {/* RIGHT PANEL: PREVIEW & FILES */}
-        <section 
-          className="flex-1 flex flex-col bg-slate-950 relative overflow-hidden"
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          {/* Drag Overlay */}
-          {isDragging && (
-            <div className="absolute inset-0 z-50 bg-slate-900/90 border-4 border-dashed border-otis-accent m-4 rounded-xl flex items-center justify-center backdrop-blur-sm transition-all animate-in fade-in duration-200">
-              <div className="text-center pointer-events-none">
-                <FolderOpen size={64} className="mx-auto text-otis-accent mb-4 animate-bounce" />
-                <h3 className="text-2xl font-bold text-white mb-2">Drop files to add</h3>
-                <p className="text-slate-400">Release to add them to the queue</p>
-              </div>
-            </div>
-          )}
-          
-          {/* Toolbar */}
-          <div className="h-14 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-950/80">
-            <div className="flex items-center gap-2">
-               <label className="cursor-pointer">
-                  <input type="file" multiple className="hidden" onChange={handleFileUpload} />
-                  <Button variant="secondary" size="sm" icon={<FolderOpen size={16} />}>Add Files</Button>
-               </label>
-               {files.length > 0 && (
-                 <Button variant="ghost" size="sm" onClick={handleClearFiles} icon={<Trash2 size={16} />} className="text-red-400 hover:text-red-300 hover:bg-red-900/20">
-                   Clear All
-                 </Button>
-               )}
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1 bg-slate-900 rounded-lg p-1 border border-slate-800">
-                <button 
-                  onClick={() => handleSort('name')}
-                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${sortConfig.field === 'name' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-                >
-                  Name
-                </button>
-                <button 
-                  onClick={() => handleSort('date')}
-                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${sortConfig.field === 'date' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-                >
-                  Date
-                </button>
-                 <button 
-                   onClick={() => handleSort('name')} 
-                   className="px-2 text-slate-500 hover:text-white"
-                   title="Toggle Direction"
-                 >
-                   <ArrowUpDown size={14} className={sortConfig.direction === 'desc' ? 'transform rotate-180' : ''} />
-                 </button>
+              <div>
+                <h1 className="font-serif text-[clamp(2.4rem,5vw,4.4rem)] font-normal leading-none text-stone-950">
+                  Bullion
+                </h1>
+                <p className="mt-3 max-w-2xl text-[15px] leading-7 text-stone-600">
+                  A batch rename studio for building filename patterns, previewing the outcome, and exporting
+                  the whole set as a clean archive.
+                </p>
               </div>
             </div>
           </div>
 
-          {/* File Table Header */}
-          <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/30">
-             <div className="col-span-4">Original Filename</div>
-             <div className="col-span-1"></div>
-             <div className="col-span-4 text-otis-accent">New Filename</div>
-             <div className="col-span-2 text-right">Size</div>
-             <div className="col-span-1 text-right">Ext</div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[1.5rem] border border-stone-200 bg-white px-4 py-4 shadow-[0_18px_40px_rgba(28,25,23,0.05)]">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-stone-400">Queued</p>
+              <p className="mt-2 font-serif text-3xl">{previewFiles.length}</p>
+              <p className="mt-1 text-xs text-stone-500">Files ready for preview</p>
+            </div>
+            <div className="rounded-[1.5rem] border border-stone-200 bg-white px-4 py-4 shadow-[0_18px_40px_rgba(28,25,23,0.05)]">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-stone-400">Pattern</p>
+              <p className="mt-2 font-serif text-3xl">{rules.length}</p>
+              <p className="mt-1 text-xs text-stone-500">Active naming blocks</p>
+            </div>
+            <div className="rounded-[1.5rem] border border-stone-200 bg-white px-4 py-4 shadow-[0_18px_40px_rgba(28,25,23,0.05)]">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-stone-400">Archive</p>
+              <p className="mt-2 font-serif text-3xl">{formatBytes(totalSize, 1)}</p>
+              <p className="mt-1 text-xs text-stone-500">Projected ZIP payload</p>
+            </div>
           </div>
+        </header>
 
-          {/* File List */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
-            {files.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50">
-                 <Archive size={64} strokeWidth={1} className="mb-4" />
-                 <p className="text-lg font-medium">No files loaded</p>
-                 <p className="text-sm">Drag and drop files here or click "Add Files"</p>
+        <main className="grid flex-1 gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
+          <aside className="flex min-h-0 flex-col gap-5">
+            <section className="rounded-[1.8rem] border border-stone-200 bg-white p-5 shadow-[0_18px_40px_rgba(28,25,23,0.05)]">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.22em] text-stone-400">Rename Pattern</p>
+                  <h2 className="mt-1 font-serif text-2xl text-stone-950">Naming Blocks</h2>
+                </div>
+                <div className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-500">
+                  {rules.length} active
+                </div>
               </div>
-            ) : (
-              <ul className="divide-y divide-slate-800/50">
-                {previewFiles.map((file) => (
-                  <li key={file.id} className="grid grid-cols-12 gap-4 px-6 py-3 hover:bg-slate-900/40 transition-colors items-center group">
-                    <div className="col-span-4 text-sm text-slate-400 truncate font-mono" title={file.originalName}>
-                      {file.originalName}
-                    </div>
-                    
-                    <div className="col-span-1 flex justify-center text-slate-700">
-                      →
-                    </div>
 
-                    <div className="col-span-4 text-sm text-white truncate font-mono font-medium" title={file.newName}>
-                       {file.newName}
-                    </div>
-
-                    <div className="col-span-2 text-right text-xs text-slate-500 font-mono">
-                      {formatBytes(file.size)}
-                    </div>
-
-                    <div className="col-span-1 text-right text-xs text-slate-600 font-bold uppercase">
-                      {file.extension}
-                    </div>
-                  </li>
+              <div className="space-y-3">
+                {rules.map((rule, index) => (
+                  <RuleItem
+                    key={rule.id}
+                    rule={rule}
+                    index={index}
+                    onUpdate={handleUpdateRule}
+                    onRemove={handleRemoveRule}
+                  />
                 ))}
-              </ul>
+              </div>
+            </section>
+
+            <section className="rounded-[1.8rem] border border-stone-200 bg-white p-5 shadow-[0_18px_40px_rgba(28,25,23,0.05)]">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-stone-400">Add Block</p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <Button size="sm" variant="secondary" icon={<FilePlus size={14} />} onClick={() => handleAddRule(RuleType.TEXT)}>
+                  Text
+                </Button>
+                <Button size="sm" variant="secondary" icon={<Hash size={14} />} onClick={() => handleAddRule(RuleType.SEQUENCE)}>
+                  Sequence
+                </Button>
+                <Button size="sm" variant="secondary" icon={<Archive size={14} />} onClick={() => handleAddRule(RuleType.ORIGINAL)}>
+                  Original
+                </Button>
+                <Button size="sm" variant="secondary" icon={<RefreshCw size={14} />} onClick={() => handleAddRule(RuleType.DATE)}>
+                  Date
+                </Button>
+              </div>
+            </section>
+
+            <section className="rounded-[1.8rem] border border-stone-200 bg-[linear-gradient(180deg,rgba(250,250,249,0.95),rgba(245,245,244,0.95))] p-5 shadow-[0_18px_40px_rgba(28,25,23,0.04)]">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-stone-400">Pattern Readout</p>
+              <p className="mt-3 font-mono text-xs leading-6 text-stone-600">
+                {patternSummary || 'Original filename'}
+              </p>
+              <div className="mt-4 space-y-2 text-sm text-stone-600">
+                <p>
+                  Bullion keeps the existing extension and only rebuilds the base filename.
+                </p>
+                <p>
+                  Use <strong>Original</strong> when you want the current filename preserved inside the pattern.
+                </p>
+              </div>
+            </section>
+          </aside>
+
+          <section
+            className="relative flex min-h-0 flex-col gap-5"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {isDragging && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[2rem] border-2 border-dashed border-stone-700 bg-[rgba(28,25,23,0.78)] backdrop-blur-sm">
+                <div className="text-center text-stone-50">
+                  <FolderOpen size={58} className="mx-auto mb-4" />
+                  <h3 className="font-serif text-3xl">Drop files into Bullion</h3>
+                  <p className="mt-2 text-sm uppercase tracking-[0.18em] text-stone-300">
+                    They will be added to the current queue
+                  </p>
+                </div>
+              </div>
             )}
-          </div>
 
-          {/* Action Bar */}
-          <div className="h-20 border-t border-slate-800 bg-slate-900 flex items-center justify-between px-8">
-            <div className="flex flex-col">
-              <span className="text-xs text-slate-500 uppercase tracking-wider font-bold">Total Files</span>
-              <span className="text-2xl font-mono text-white">{files.length}</span>
-            </div>
-            
-            <div className="flex gap-4">
-              <Button 
-                variant="primary" 
-                size="lg" 
-                disabled={files.length === 0 || isProcessing} 
-                onClick={handleDownloadZip}
-                icon={isProcessing ? <RefreshCw size={20} className="animate-spin"/> : <Download size={20} />}
-                className="shadow-lg shadow-otis-accent/20"
-              >
-                {isProcessing ? 'Processing...' : 'Process & Download ZIP'}
-              </Button>
-            </div>
-          </div>
+            <section className="rounded-[1.9rem] border border-stone-200 bg-white p-5 shadow-[0_18px_40px_rgba(28,25,23,0.05)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.22em] text-stone-400">Working Queue</p>
+                  <h2 className="mt-1 font-serif text-2xl text-stone-950">Preview & Export</h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-7 text-stone-600">
+                    Add files, adjust the naming blocks, then export the renamed set as one archive when the preview feels right.
+                  </p>
+                </div>
 
-        </section>
-      </main>
+                <div className="flex flex-wrap gap-2">
+                  <label className="cursor-pointer">
+                    <input type="file" multiple className="hidden" onChange={handleFileUpload} />
+                    <span>
+                      <Button size="md" variant="secondary" icon={<FolderOpen size={14} />}>
+                        Add Files
+                      </Button>
+                    </span>
+                  </label>
+
+                  <Button
+                    size="md"
+                    variant="ghost"
+                    icon={<Trash2 size={14} />}
+                    onClick={handleClearFiles}
+                    disabled={files.length === 0}
+                  >
+                    Clear
+                  </Button>
+
+                  <Button
+                    size="md"
+                    variant="primary"
+                    icon={<Download size={14} />}
+                    onClick={handleDownloadZip}
+                    disabled={previewFiles.length === 0 || isProcessing}
+                  >
+                    {isProcessing ? 'Packaging' : 'Export ZIP'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                <div className="rounded-[1.3rem] border border-stone-200 bg-stone-50 px-4 py-4">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-stone-400">Newest File</p>
+                  <p className="mt-2 text-sm text-stone-700">
+                    {newestDate ? newestDate.toLocaleString() : 'No files loaded'}
+                  </p>
+                </div>
+                <div className="rounded-[1.3rem] border border-stone-200 bg-stone-50 px-4 py-4">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-stone-400">Sort</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button size="sm" variant="ghost" icon={<ArrowUpDown size={12} />} onClick={() => handleSort('name')}>
+                      Name
+                    </Button>
+                    <Button size="sm" variant="ghost" icon={<ArrowUpDown size={12} />} onClick={() => handleSort('date')}>
+                      Date
+                    </Button>
+                    <Button size="sm" variant="ghost" icon={<ArrowUpDown size={12} />} onClick={() => handleSort('size')}>
+                      Size
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-[1.3rem] border border-stone-200 bg-stone-50 px-4 py-4">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-stone-400">Collisions</p>
+                  <p className="mt-2 text-sm text-stone-700">
+                    {duplicateCount > 0
+                      ? `${duplicateCount} duplicate name group${duplicateCount > 1 ? 's' : ''} detected`
+                      : 'No duplicate names in preview'}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {duplicateCount > 0 && (
+              <div className="flex items-start gap-3 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-amber-900 shadow-[0_12px_30px_rgba(180,83,9,0.06)]">
+                <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em]">Duplicate preview names</p>
+                  <p className="mt-1 text-sm leading-6">
+                    Bullion will auto-number collisions inside the ZIP export. If you want cleaner names, adjust the pattern before downloading.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.9rem] border border-stone-200 bg-white shadow-[0_18px_40px_rgba(28,25,23,0.05)]">
+              <div className="flex items-center justify-between border-b border-stone-200 px-5 py-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.22em] text-stone-400">Preview Table</p>
+                  <h2 className="mt-1 font-serif text-2xl text-stone-950">Resulting Names</h2>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-stone-400">
+                  <ListFilter size={13} />
+                  {previewFiles.length} items
+                </div>
+              </div>
+
+              {previewFiles.length === 0 ? (
+                <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+                  <FolderOpen size={44} className="mb-4 text-stone-300" />
+                  <h3 className="font-serif text-2xl text-stone-900">Start with a file batch</h3>
+                  <p className="mt-3 max-w-xl text-sm leading-7 text-stone-600">
+                    Drop files here or use <strong>Add Files</strong>. Bullion will show the original names beside the generated pattern before anything gets exported.
+                  </p>
+                </div>
+              ) : (
+                <div className="min-h-0 flex-1 overflow-auto">
+                  <div className="min-w-[820px]">
+                    <div className="grid grid-cols-[72px_minmax(0,2fr)_minmax(0,2fr)_120px_180px] gap-4 border-b border-stone-200 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-400">
+                      <div>#</div>
+                      <div>Original</div>
+                      <div>Preview</div>
+                      <div>Size</div>
+                      <div>Modified</div>
+                    </div>
+
+                    {previewFiles.map((file, index) => (
+                      <div
+                        key={file.id}
+                        className="grid grid-cols-[72px_minmax(0,2fr)_minmax(0,2fr)_120px_180px] gap-4 border-b border-stone-100 px-5 py-4 text-sm text-stone-700 transition-colors hover:bg-stone-50"
+                      >
+                        <div className="font-mono text-xs text-stone-400">{String(index + 1).padStart(2, '0')}</div>
+                        <div className="min-w-0">
+                          <p className="truncate">{file.originalName}</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-stone-950">{file.newName}</p>
+                        </div>
+                        <div className="text-stone-500">{formatBytes(file.size, 1)}</div>
+                        <div className="text-stone-500">{new Date(file.lastModified).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          </section>
+        </main>
+      </div>
     </div>
   );
 };
