@@ -1,0 +1,174 @@
+[
+  {
+    "category": "Angry / Annoyed",
+    "emotions": [
+      {
+        "name": "Agitated",
+        "brief_description": "You feel a restless, anxious irritability and physical impatience.",
+        "extended_description": "Agitation is a state of high physical and mental arousal that makes it difficult to sit still or focus. It often serves as a warning sign of mounting stress, frustration, or sensory overload. It leaves you feeling on edge, making you more prone to quick or sharp reactions.",
+        "related_emotions": ["Irritated", "Edgy", "On edge", "Restless", "Anxious"]
+      },
+      {
+        "name": "Aggravated",
+        "brief_description": "You feel a heightened, sharp annoyance and irritation, often at a repeating problem.",
+        "extended_description": "Aggravation is an active, prickling feeling that occurs when an existing irritation is worsened or prolonged. It is characterized by a low tolerance for disturbances and a strong urge to push away or stop the source of stress. It can quickly escalate into full anger if not addressed.",
+        "related_emotions": ["Irritated", "Frustrated", "Agitated", "Grouchy", "Bitter"]
+      },
+      {
+        "name": "Bitter",
+        "brief_description": "You feel a lingering, sour resentment and hostility over perceived unfairness or past hurt.",
+        "extended_description": "Bitterness is a slow-burning, complex emotion that develops when anger and disappointment are not expressed or resolved. It involves a sense of grievance and can color how you see others, making it hard to trust or feel happy for them. It signals a deep need for closure and emotional healing.",
+        "related_emotions": ["Resentful", "Cynical", "Disdain", "Pissed", "Aggravated"]
+      },
+      {
+        "name": "Contempt",
+        "brief_description": "You feel a cold, mocking dislike and a sense of superiority toward someone or their actions.",
+        "extended_description": "Contempt is a powerful social emotion that involves looking down on someone as worthless or inferior. It combines anger with disgust and is highly destructive to relationships and communication. It often signals a complete breakdown of respect and empathy.",
+        "related_emotions": ["Disdain", "Cynical", "Bitter", "Hostile", "Resentful"]
+      },
+      {
+        "name": "Cynical",
+        "brief_description": "You feel a distrustful, mocking attitude toward the motives and sincerity of others.",
+        "extended_description": "Cynicism is a protective mental stance that assumes people are motivated purely by self-interest. It often develops as a shield against disappointment, protecting you from vulnerability by expecting the worst. While it feels safe, it can block genuine connection and hope.",
+        "related_emotions": ["Contempt", "Bitter", "Disdain", "Skeptical", "Suspicious"]
+      },
+      {
+        "name": "Disdain",
+        "brief_description": "You feel a strong, aloof contempt and refusal to respect someone or something.",
+        "extended_description": "Disdain is the active feeling that someone or something is unworthy of your consideration or respect. It is marked by a cold, distancing attitude and proud superiority. It differs from hot anger by being quiet, dismissive, and judgmental.",
+        "related_emotions": ["Contempt", "Cynical", "Bitter", "Hostile", "Rejecting"]
+      },
+      {
+        "name": "Disgruntled",
+        "brief_description": "You feel a grumbling, dissatisfied annoyance at a situation or service.",
+        "extended_description": "Disgruntlement is a low-arousal form of anger mixed with disappointment. It is the feeling of being let down or treated unfairly, which manifests as muttering, complaining, and a cooperative but unhappy attitude. It signals a mismatch between expectations and reality.",
+        "related_emotions": ["Dissatisfied", "Frustrated", "Irritated", "Grouchy", "Upset"]
+      },
+      {
+        "name": "Disturbed",
+        "brief_description": "You feel emotionally unsettled, shocked, or deeply bothered by something wrong or strange.",
+        "extended_description": "Being disturbed is a state where your sense of order, decency, or safety is violated by an external event or image. It leaves you feeling uneasy, anxious, and mentally preoccupied as your brain struggles to digest and accept what you witnessed. It signals that a boundary of comfort has been crossed.",
+        "related_emotions": ["Shocked", "Uneasy", "Unsettled", "Concerned", "Rattled"]
+      },
+      {
+        "name": "Edgy",
+        "brief_description": "You feel tense, irritable, and close to losing your temper or control.",
+        "extended_description": "Edginess is a state of high nervous sensitivity where physical fatigue and mental stress leave you with very little emotional buffer. Even minor noises or demands can feel grating, prompting a sharp response. It is a sign that your nervous system is overloaded and needs rest.",
+        "related_emotions": ["On edge", "Agitated", "Irritated", "Restless", "Anxious"]
+      },
+      {
+        "name": "Exasperated",
+        "brief_description": "You feel an intense, weary irritation at a situation or behavior that you cannot change.",
+        "extended_description": "Exasperation is a peak mixture of anger and exhaustion. It happens when you have tried repeatedly to solve a problem or communicate with someone, only to meet the same resistance or failure. It often expresses itself through sighs, throwing up hands, and a feeling of giving up.",
+        "related_emotions": ["Frustrated", "Irritated", "Aggravated", "Weary", "Upset"]
+      },
+      {
+        "name": "Frustrated",
+        "brief_description": "You feel annoyed and blocked from achieving a goal or satisfying a desire.",
+        "extended_description": "Frustration is an energetic emotion that arises when an obstacle stands between you and what you want to accomplish. It provides a surge of energy intended to help you break through the barrier, but if the obstacle remains, it can turn into anger or helplessness. It signals a need to adjust your approach or expectations.",
+        "related_emotions": ["Exasperated", "Aggravated", "Irritated", "Dissatisfied", "Pissed"]
+      },
+      {
+        "name": "Furious",
+        "brief_description": "You feel an intense, hot rage and explosive anger.",
+        "extended_description": "Fury is a high-intensity, high-arousal emotion where anger takes full control of your mind and body. It triggers a massive adrenaline rush, preparing you for physical or verbal conflict. In this state, rational thinking is suppressed, making immediate self-regulation and cooling down essential.",
+        "related_emotions": ["Irate", "Outraged", "Pissed", "Hostile", "Resentful"]
+      },
+      {
+        "name": "Grouchy",
+        "brief_description": "You feel a grumpy, bad-tempered irritability over minor annoyances.",
+        "extended_description": "Grouchiness is a low-energy, irritable state often caused by physical discomforts like lack of sleep, hunger, or minor illness. It makes you focus on the negative aspects of your surroundings and snap at small inconveniences. It is usually temporary and easily resolved by addressing physical needs.",
+        "related_emotions": ["Cranky", "Irritated", "Agitated", "Disgruntled", "Edgy"]
+      },
+      {
+        "name": "Hostile",
+        "brief_description": "You feel a cold or hot antagonism, enmity, and readiness to fight.",
+        "extended_description": "Hostility is an aggressive, unfriendly attitude toward others. Unlike a passing moment of anger, it involves a lasting stance of opposition and distrust, making you see others as adversaries. It blocks cooperation and creates a tense, defensive social environment.",
+        "related_emotions": ["Furious", "Contempt", "Disdain", "Resentful", "Vindictive"]
+      },
+      {
+        "name": "Impatient",
+        "brief_description": "You feel an irritated restlessness and intolerance for delays or slow progress.",
+        "extended_description": "Impatience is a high-arousal emotion that occurs when the pace of your environment does not match your internal urgency. It creates a physical urge to rush or force things to happen faster, causing friction with others and self-imposed stress. It signals a struggle to accept the present timeline.",
+        "related_emotions": ["Frustrated", "Agitated", "Restless", "Edgy", "Aggravated"]
+      },
+      {
+        "name": "Irritated",
+        "brief_description": "You feel a sharp, prickly annoyance at something bothersome.",
+        "extended_description": "Irritation is a common, low-to-medium arousal emotion that signals your boundaries are being nudged or your focus is being interrupted. It makes you sensitive to minor disturbances and is often the first step on the path to anger. Recognizing irritation early allows you to address the cause before it escalates.",
+        "related_emotions": ["Aggravated", "Agitated", "Grouchy", "Frustrated", "Edgy"]
+      },
+      {
+        "name": "Irate",
+        "brief_description": "You feel a highly incensed, deep anger and indignation.",
+        "extended_description": "Being irate is a state of intense, focused anger, often fueled by a clear sense of injustice or direct insult. It is less explosive than fury but carries a strong, burning demand for correction or retribution. It requires careful channeling to avoid destructive conflict.",
+        "related_emotions": ["Furious", "Outraged", "Pissed", "Resentful", "Bitter"]
+      },
+      {
+        "name": "Moody",
+        "brief_description": "You feel unpredictable, shifting emotions, often leaning toward irritability or sadness.",
+        "extended_description": "Moodiness is characterized by rapid or unexplained changes in your emotional state. It often indicates that you are processing underlying stress, hormonal shifts, or unresolved feelings. During these times, you may feel sensitive and struggle to maintain a consistent outlook.",
+        "related_emotions": ["Irritated", "Unhappy", "Edgy", "Cranky", "Unsettled"]
+      },
+      {
+        "name": "On edge",
+        "brief_description": "You feel highly sensitive, tense, and alert, expecting something bad or annoying to happen.",
+        "extended_description": "Being on edge is a state of hyper-vigilance where your nervous system is prepped for action. It is often a combination of anxiety and irritability, making you jumpy and quick to snap at others. It suggests that you have been carrying stress for too long without relief.",
+        "related_emotions": ["Edgy", "Anxious", "Agitated", "Rattled", "Frazzled"]
+      },
+      {
+        "name": "Outraged",
+        "brief_description": "You feel a powerful, righteous anger and shock at a violation of justice or decency.",
+        "extended_description": "Outrage is a moral emotion sparked by witnessing or experiencing a severe breach of fairness, human rights, or personal values. It combines anger with disgust and is often a driving force for social change, motivating collective action against wrongdoing. It feels intense and urgent.",
+        "related_emotions": ["Furious", "Irate", "Pissed", "Hostile", "Bitter"]
+      },
+      {
+        "name": "Pissed",
+        "brief_description": "You feel a direct, hot annoyance and anger at a person or event.",
+        "extended_description": "Pissed is a common, informal term for active anger that ranges from strong irritation to rage. It usually occurs when someone crosses your boundaries, lets you down, or disrupts your plans. It demands release, whether through venting, active problem solving, or physical movement.",
+        "related_emotions": ["Furious", "Irate", "Outraged", "Irritated", "Frustrated"]
+      },
+      {
+        "name": "Resentful",
+        "brief_description": "You feel a persistent, bitter anger toward someone you believe treated you unfairly.",
+        "extended_description": "Resentment is a slow, toxic emotion that forms when you hold onto anger from a real or perceived injustice. It is often fueled by a feeling of powerlessness, where you felt unable to speak up or protect yourself at the time. It acts as a mental loop, replaying the hurt and blocking reconciliation.",
+        "related_emotions": ["Bitter", "Contempt", "Hostile", "Pissed", "Jealous"]
+      },
+      {
+        "name": "Upset",
+        "brief_description": "You feel emotionally shaken, disappointed, and hurt by an unhappy event.",
+        "extended_description": "Being upset is a broad emotional state that mixes sadness, disappointment, and mild anger. It occurs when your expectations are shattered by bad news, a conflict, or a loss. It leaves you feeling unsettled and in need of time to process your feelings and regain balance.",
+        "related_emotions": ["Sad", "Disappointed", "Hurt", "Agitated", "Rattled"]
+      },
+      {
+        "name": "Vindictive",
+        "brief_description": "You feel a spiteful desire to hurt, punish, or get revenge on someone who wronged you.",
+        "extended_description": "Vindictiveness is an aggressive emotion driven by a desire to balance the scales after feeling hurt or humiliated. It focuses your energy on causing harm or distress to another, under the belief that their pain will cure your own. However, acting on it rarely brings lasting relief and often escalates conflict.",
+        "related_emotions": ["Hostile", "Bitter", "Resentful", "Furious", "Malicious"]
+      }
+    ]
+  },
+  {
+    "category": "Guilt",
+    "emotions": [
+      {
+        "name": "Regret",
+        "brief_description": "You feel a sad, wishful longing that you had acted differently in the past.",
+        "extended_description": "Regret is a cognitive-emotional state where you look back at a decision you made and wish you had made a different choice because of the negative outcome. It involves self-blame and a focus on what could have been. While painful, it can help you learn and make better decisions in the future.",
+        "related_emotions": ["Remorseful", "Sorry", "Sad", "Disappointed", "Ashamed"]
+      },
+      {
+        "name": "Remorseful",
+        "brief_description": "You feel a deep, painful guilt and regret for having done something wrong or hurtful.",
+        "extended_description": "Remorse goes deeper than regret, involving a painful awareness of the suffering your actions caused to others. It is accompanied by a strong desire to apologize, make amends, and change your behavior. It is a crucial emotion for repairing relationships and personal moral growth.",
+        "related_emotions": ["Sorry", "Regret", "Ashamed", "Humiliated", "Sad"]
+      },
+      {
+        "name": "Sorry",
+        "brief_description": "You feel a sympathetic regret, apology, and sadness for a mistake or someone else's misfortune.",
+        "extended_description": "Feeling sorry is an empathetic and relational emotion. It can express personal responsibility for a mistake (apology) or shared sadness for someone else's pain (sympathy). It acts as a social glue, signaling a desire for connection, repair, and mutual care.",
+        "related_emotions": ["Remorseful", "Regret", "Sad", "Compassion", "Humbled"]
+      }
+    ]
+  }
+]

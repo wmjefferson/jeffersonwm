@@ -1,0 +1,203 @@
+[
+  {
+    "category": "Despair / Sad",
+    "emotions": [
+      {
+        "name": "Anguish",
+        "brief_description": "You feel an excruciating, deep mental or emotional pain and torment.",
+        "extended_description": "Anguish is an intense, high-arousal state of suffering, often triggered by severe loss, tragedy, or betrayal. It feels overwhelming and physical, crushing your immediate ability to find comfort or hope. It represents a raw crisis of pain that requires gentle, slow processing and support.",
+        "related_emotions": ["Grief", "Heartbroken", "Depressed", "Hopeless", "Sorrow"]
+      },
+      {
+        "name": "Depressed",
+        "brief_description": "You feel a heavy, persistent flat sadness, low energy, and loss of interest in life.",
+        "extended_description": "Depressed as an emotional state (distinct from clinical depression, though related) is characterized by a dampening of all emotions and physical vitality. You feel weighed down, empty of motivation, and disconnected from things that usually bring pleasure. It is a sign of deep emotional depletion and exhaustion.",
+        "related_emotions": ["Despondent", "Gloomy", "Hopeless", "Empty", "Lethargic"]
+      },
+      {
+        "name": "Despondent",
+        "brief_description": "You feel deeply discouraged, dejected, and listless, losing hope in any positive change.",
+        "extended_description": "Despondency is a low-energy state of sadness where you feel defeated by circumstances. It combines a sense of failure with the belief that effort is pointless, causing you to withdraw and quiet your actions. It signals a deep need to find small, manageable footholds of agency.",
+        "related_emotions": ["Hopeless", "Depressed", "Discouraged", "Forlorn", "Resigned"]
+      },
+      {
+        "name": "Disappointed",
+        "brief_description": "You feel a sad, deflated unhappiness when your expectations or hopes are not met.",
+        "extended_description": "Disappointment occurs when there is a painful gap between what you hoped would happen and the actual outcome. It deflates your energy, forcing you to adjust to a less desirable reality. While uncomfortable, it helps calibrate your expectations and highlight what truly matters to you.",
+        "related_emotions": ["Dissatisfied", "Sad", "Regret", "Upset", "Discouraged"]
+      },
+      {
+        "name": "Discouraged",
+        "brief_description": "You feel a loss of confidence, enthusiasm, and courage to continue a path.",
+        "extended_description": "Discouragement arises when obstacles or setbacks make your goals seem too difficult or out of reach. It weakens your resolve and fills you with self-doubt, temptng you to give up. It is a state of lowered emotional energy that benefits from encouragement and small successes.",
+        "related_emotions": ["Despondent", "Hopeless", "Incapable", "Dissatisfied", "Weak"]
+      },
+      {
+        "name": "Forlorn",
+        "brief_description": "You feel pitifully lonely, abandoned, and miserable.",
+        "extended_description": "Forlornness is a sad, quiet emotion that combines loneliness with a sense of being forgotten or neglected by others. It carries a heavy feeling of isolation and empty surroundings, making you feel small and disconnected. It is a poignant signal of your need for belonging and shelter.",
+        "related_emotions": ["Lonely", "Despondent", "Grief", "Isolated", "Heartbroken"]
+      },
+      {
+        "name": "Gloomy",
+        "brief_description": "You feel a dark, shadowy sadness and pessimistic outlook on things.",
+        "extended_description": "Gloominess is like a gray cloud over your thoughts, making you focus on the negative and expect poor outcomes. It is a low-arousal state where everything feels slow, dull, and unappealing. It represents a temporary lack of emotional sunshine and vitality.",
+        "related_emotions": ["Depressed", "Melancholy", "Sad", "Bored", "Listless"]
+      },
+      {
+        "name": "Grief",
+        "brief_description": "You feel a deep, complex, and painful sorrow in response to a significant loss.",
+        "extended_description": "Grief is a profound, messy, and non-linear process of adjusting to life after losing someone or something vital to you. It involves waves of sadness, anger, yearning, and numbness. It is a testament to the value of what was lost and requires patience, self-compassion, and time.",
+        "related_emotions": ["Anguish", "Heartbroken", "Sorrow", "Lonely", "Teary"]
+      },
+      {
+        "name": "Heartbroken",
+        "brief_description": "You feel a crushing, intense emotional ache and grief from shattered love or trust.",
+        "extended_description": "Heartbreak is a visceral, deeply painful reaction to romantic rejection, loss of a loved one, or severe betrayal. It feels physically raw, as if your chest is hollow or aching. It disrupts your sense of safety and requires a slow, supportive rebuilding of your trust and self-worth.",
+        "related_emotions": ["Anguish", "Grief", "Sorrow", "Lonely", "Forlorn"]
+      },
+      {
+        "name": "Hopeless",
+        "brief_description": "You feel a dark certainty that things will not get better and that you are powerless to change them.",
+        "extended_description": "Hopelessness is a dangerous and heavy emotional state where you see no positive future possibilities and feel completely without agency. It shuts down motivation and draws you into deep withdrawal. Finding even tiny, immediate actions of control is vital to breaking its grip.",
+        "related_emotions": ["Despondent", "Depressed", "Discouraged", "Powerless", "Helpless"]
+      },
+      {
+        "name": "Lonely",
+        "brief_description": "You feel a painful, empty longing for connection and a sense of being isolated from others.",
+        "extended_description": "Loneliness is the distress we feel when our social connections do not meet our need for intimacy and belonging. You can feel lonely even when surrounded by people if those relationships lack depth or understanding. It acts as an emotional hunger, prompting you to seek meaningful bonds.",
+        "related_emotions": ["Isolated", "Forlorn", "Distant", "Heartbroken", "Sad"]
+      },
+      {
+        "name": "Longing",
+        "brief_description": "You feel a strong, aching desire for something or someone that is out of reach.",
+        "extended_description": "Longing is a bittersweet emotion that combines love or desire with the pain of absence. It focuses your mind on what is missing—be it a person, place, past time, or future dream. It can drive you to seek connection or create art, but it can also keep you stuck in what is not here.",
+        "related_emotions": ["Yearning", "Melancholy", "Lonely", "Sad", "Homesick"]
+      },
+      {
+        "name": "Melancholy",
+        "brief_description": "You feel a gentle, pensive, and sometimes sweet sadness or contemplation.",
+        "extended_description": "Melancholy is a reflective, low-arousal sadness that is not entirely unpleasant. It is often accompanied by a sense of beauty, nostalgia, or appreciation for the passing nature of life. It inspires creativity, introspection, and a deeper connection to the human experience.",
+        "related_emotions": ["Gloomy", "Longing", "Sad", "Reflective", "Pensive"]
+      },
+      {
+        "name": "Sorrow",
+        "brief_description": "You feel a deep, quiet sadness and mourning over a loss, misfortune, or disappointment.",
+        "extended_description": "Sorrow is a classic, heavy emotion that sits quietly in your chest. It is a natural response to the painful aspects of life, allowing you to slow down, process hurt, and eventually heal. Sharing sorrow with others can build deep empathy and support.",
+        "related_emotions": ["Grief", "Sad", "Teary", "Heartbroken", "Anguish"]
+      },
+      {
+        "name": "Teary",
+        "brief_description": "You feel a mounting wave of emotion that brings tears to your eyes, ready to cry.",
+        "extended_description": "Being teary is a state of emotional overflow where your feelings—whether sadness, frustration, relief, or even joy—exceed your capacity to contain them. Tears serve as a physical release, helping lower stress hormones and signaling to others that you are in need of comfort or space.",
+        "related_emotions": ["Sad", "Sorrow", "Upset", "Vulnerable", "Sensitive"]
+      },
+      {
+        "name": "Unhappy",
+        "brief_description": "You feel a basic, persistent lack of joy, satisfaction, or pleasure with your situation.",
+        "extended_description": "Unhappiness is a general state of emotional discomfort or discontent. It suggests that your current circumstances, relationships, or actions are not meeting your emotional needs or aligning with your values. It serves as a broad signal that something in your life needs attention and change.",
+        "related_emotions": ["Sad", "Dissatisfied", "Disappointed", "Gloomy", "Upset"]
+      },
+      {
+        "name": "Upset",
+        "brief_description": "You feel emotionally shaken, disappointed, and hurt by an unhappy event.",
+        "extended_description": "Being upset is a broad emotional state that mixes sadness, disappointment, and mild anger. It occurs when your expectations are shattered by bad news, a conflict, or a loss. It leaves you feeling unsettled and in need of time to process your feelings and regain balance.",
+        "related_emotions": ["Sad", "Disappointed", "Hurt", "Agitated", "Rattled"]
+      },
+      {
+        "name": "Weary",
+        "brief_description": "You feel physically and emotionally exhausted, making it hard to carry on.",
+        "extended_description": "Weariness is a deep fatigue that goes beyond simple sleepiness; it is the exhaustion of your spirit and resilience after enduring long stress, sorrow, or effort. It makes tasks feel heavy and decisions difficult, signaling that you need deep rest, boundary setting, and support.",
+        "related_emotions": ["Exhausted", "Burned out", "Depleted", "Lethargic", "Despondent"]
+      },
+      {
+        "name": "Yearning",
+        "brief_description": "You feel an intense, urgent, and focused longing for someone or something missing.",
+        "extended_description": "Yearning is a high-energy form of longing that feels active and demanding. It drives you to search, reach out, or strive to close the gap between yourself and the object of your desire. It can be a powerful motivator for change or a source of deep ache if the gap cannot be bridged.",
+        "related_emotions": ["Longing", "Melancholy", "Lonely", "Sad", "Heartbroken"]
+      }
+    ]
+  },
+  {
+    "category": "Fragile",
+    "emotions": [
+      {
+        "name": "Helpless",
+        "brief_description": "You feel completely unable to defend yourself, solve a problem, or change your situation.",
+        "extended_description": "Helplessness is a highly distressing, low-agency state where you feel as though your choices and actions have no effect. It can lead to freezing, anxiety, or surrender. Rebuilding a sense of power requires identifying tiny, immediate steps of control and asking for external support.",
+        "related_emotions": ["Powerless", "Impotent", "Hopeless", "Weak", "Vulnerable"]
+      },
+      {
+        "name": "Sensitive",
+        "brief_description": "You feel highly open and reactive to emotional inputs, comments, or your environment.",
+        "extended_description": "Being sensitive means your emotional skin is thin, making you absorb and react strongly to both positive and negative stimuli. While it allows for deep empathy, creativity, and connection, it also makes you easily overwhelmed, hurt, or defensive. It requires careful boundary setting and self-soothing.",
+        "related_emotions": ["Vulnerable", "Tender", "Agitated", "Uneasy", "Helpless"]
+      }
+    ]
+  },
+  {
+    "category": "Grateful",
+    "emotions": [
+      {
+        "name": "Appreciative",
+        "brief_description": "You feel a warm, mindful recognition of the value and goodness in someone, something, or life.",
+        "extended_description": "Appreciation is the cognitive and emotional act of noticing and valuing the positive details around you. It helps shift your focus away from lack or stress, building contentment and connection. It is a quiet, low-arousal emotion that strengthens relationships when expressed.",
+        "related_emotions": ["Thankful", "Grateful", "Blessed", "Content", "Touched"]
+      },
+      {
+        "name": "Blessed",
+        "brief_description": "You feel a deep, humbling sense of fortunate favor and abundant goodness in your life.",
+        "extended_description": "Feeling blessed is a spiritual or existential form of gratitude, where you view your life's gifts not just as luck, but as a profound grace. It brings a deep sense of security, peace, and humility, encouraging a desire to share your fortune and act generously toward others.",
+        "related_emotions": ["Grateful", "Appreciative", "Humbled", "Fortunate", "Content"]
+      },
+      {
+        "name": "Delighted",
+        "brief_description": "You feel a bright, bubbling sense of pleasure and satisfaction from something pleasant.",
+        "extended_description": "Delight is a cheerful, highly positive emotion that arises in response to pleasant surprises, beauty, or positive interactions. It brings a lighthearted warmth and often expresses itself through smiles, laughter, and high energy. It helps elevate your mood and strengthens interpersonal connection.",
+        "related_emotions": ["Happy", "Thrilled", "Bliss", "Excited", "Appreciative"]
+      },
+      {
+        "name": "Fortunate",
+        "brief_description": "You feel lucky and favored by circumstances, recognizing that things have gone well for you.",
+        "extended_description": "Feeling fortunate is a realistic and grateful acknowledgment of good luck or favorable conditions. It helps you appreciate your successes and comfort, reminding you that many factors in life are outside your direct control. It fosters a healthy humility and reduces entitlement.",
+        "related_emotions": ["Lucky", "Blessed", "Grateful", "Appreciative", "Thankful"]
+      },
+      {
+        "name": "Grace",
+        "brief_description": "You feel a serene, elegant sense of unearned favor, forgiveness, and peace.",
+        "extended_description": "Grace as an emotion is the feeling of receiving kindness, forgiveness, or beauty when you did not expect it or feel you deserved it. It melts defensiveness and guilt, replacing them with a quiet, spacious gratitude and a desire to extend the same kindness to others.",
+        "related_emotions": ["Humbled", "Blessed", "Relieved", "Peaceful", "Sorry"]
+      },
+      {
+        "name": "Humbled",
+        "brief_description": "You feel a gentle lowering of self-importance and a deep respect for something greater or kinder than you.",
+        "extended_description": "Being humbled occurs when you are confronted with vast beauty, great kindness, or your own limitations. It is not humiliation, but rather a healthy reduction of ego that makes you feel connected and receptive. It fosters learning, gratitude, and a supportive connection to others.",
+        "related_emotions": ["Blessed", "Grace", "Moved", "Touched", "Appreciative"]
+      },
+      {
+        "name": "Lucky",
+        "brief_description": "You feel that chance has worked in your favor, bringing you unexpected benefits or safety.",
+        "extended_description": "Feeling lucky is the lighthearted acknowledgment of positive random events. It brings a brief spike of excitement and relief, helping you appreciate the unpredictable nature of life. It makes you feel favored by fortune, boosting your optimism for future events.",
+        "related_emotions": ["Fortunate", "Blessed", "Grateful", "Thrilled", "Happy"]
+      },
+      {
+        "name": "Moved",
+        "brief_description": "You feel a tender, teary emotional stirring in response to goodness, tragedy, or beauty.",
+        "extended_description": "Being moved is a complex, high-impact emotion that often mixes joy and sadness. It occurs when you witness profound acts of love, human connection, sacrifice, or artistic brilliance. It softens your defenses, bringing a sense of shared humanity and deep empathy.",
+        "related_emotions": ["Touched", "Humbled", "Awe", "Inspired", "Tender"]
+      },
+      {
+        "name": "Thankful",
+        "brief_description": "You feel a warm, expressive gratitude toward someone for a benefit or kindness they provided.",
+        "extended_description": "Thankfulness is a relational emotion focused on acknowledging a gift, favor, or kind act. It motivates you to say thank you and return the kindness, strengthening social bonds and mutual support. It is a key practice for maintaining positive connections.",
+        "related_emotions": ["Appreciative", "Grateful", "Blessed", "Fortunate", "Touched"]
+      },
+      {
+        "name": "Touched",
+        "brief_description": "You feel a soft, warm gratitude and emotional connection because of someone's kindness.",
+        "extended_description": "Feeling touched is a gentle, intimate form of being moved. It occurs when someone goes out of their way to show they care, understand, or value you. It makes you feel seen and safe, melting isolation and filling you with a quiet, appreciative warmth.",
+        "related_emotions": ["Moved", "Appreciative", "Thankful", "Humbled", "Warm"]
+      }
+    ]
+  }
+]

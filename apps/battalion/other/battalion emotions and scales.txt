@@ -1,0 +1,229 @@
+Here is the single sorted list of all Hoffman list emotions and their respective categories, followed by the explanation of the action columns.
+
+List of Emotions and Categories
+Emotion	Category
+Accepting	Connected / Loving
+Adventurous	Courageous / Powerful
+Affectionate	Connected / Loving
+Afraid	Fear
+Aggravated	Angry / Annoyed
+Agitated	Angry / Annoyed
+Aloof	Disconnected / Numb
+Amazed	Aliveness / Joy
+Anguish	Despair / Sad
+Anxious	Fear
+Anxious	Stressed / Tense
+Appreciative	Grateful
+Apprehensive	Fear
+Apprehensive	Unsettled / Doubt
+Ashamed	Embarrassed / Shame
+Awe	Aliveness / Joy
+Bitter	Angry / Annoyed
+Blessed	Grateful
+Bliss	Aliveness / Joy
+Bored	Disconnected / Numb
+Brave	Courageous / Powerful
+Burned out	Stressed / Tense
+Calm	Accepting / Open
+Calm	Tender
+Capable	Courageous / Powerful
+Caring	Connected / Loving
+Caring	Tender
+Centered	Accepting / Open
+Compassion	Connected / Loving
+Concerned	Unsettled / Doubt
+Confident	Courageous / Powerful
+Confused	Disconnected / Numb
+Contempt	Angry / Annoyed
+Content	Accepting / Open
+Cranky	Stressed / Tense
+Cynical	Angry / Annoyed
+Daring	Courageous / Powerful
+Delighted	Aliveness / Joy
+Delighted	Grateful
+Depleted	Stressed / Tense
+Depressed	Despair / Sad
+Despondent	Despair / Sad
+Determined	Courageous / Powerful
+Disappointed	Despair / Sad
+Discouraged	Despair / Sad
+Disdain	Angry / Annoyed
+Disgruntled	Angry / Annoyed
+Dissatisfied	Unsettled / Doubt
+Distant	Disconnected / Numb
+Disturbed	Angry / Annoyed
+Disturbed	Unsettled / Doubt
+Eager	Aliveness / Joy
+Ecstatic	Aliveness / Joy
+Edgy	Angry / Annoyed
+Edgy	Stressed / Tense
+Empathy	Connected / Loving
+Empty	Disconnected / Numb
+Enchanted	Aliveness / Joy
+Encouraged	Hopeful
+Energized	Aliveness / Joy
+Engaged	Curious
+Engaged	Aliveness / Joy
+Enthusiastic	Aliveness / Joy
+Exasperated	Angry / Annoyed
+Excited	Aliveness / Joy
+Exhausted	Stressed / Tense
+Expectant	Hopeful
+Exploring	Curious
+Fascinated	Curious
+Forlorn	Despair / Sad
+Fortunate	Grateful
+Frazzled	Stressed / Tense
+Free	Aliveness / Joy
+Free	Courageous / Powerful
+Frightened	Fear
+Frustrated	Angry / Annoyed
+Fulfilled	Accepting / Open
+Fulfilled	Connected / Loving
+Furious	Angry / Annoyed
+Gloomy	Despair / Sad
+Grace	Grateful
+Grief	Despair / Sad
+Grouchy	Angry / Annoyed
+Grouchy	Unsettled / Doubt
+Grounded	Courageous / Powerful
+Happy	Aliveness / Joy
+Heartbroken	Despair / Sad
+Helpless	Fragile
+Hesitant	Fear
+Hesitant	Unsettled / Doubt
+Hopeless	Despair / Sad
+Hostile	Angry / Annoyed
+Humbled	Grateful
+Humiliated	Embarrassed / Shame
+Impatient	Angry / Annoyed
+Impotent	Powerless
+Incapable	Powerless
+Indifferent	Disconnected / Numb
+Inhibited	Embarrassed / Shame
+Inhibited	Unsettled / Doubt
+Inspired	Aliveness / Joy
+Interested	Curious
+Intrigued	Curious
+Invigorated	Aliveness / Joy
+Involved	Curious
+Irate	Angry / Annoyed
+Irritated	Angry / Annoyed
+Isolated	Disconnected / Numb
+Lethargic	Disconnected / Numb
+Listless	Disconnected / Numb
+Lively	Aliveness / Joy
+Lonely	Despair / Sad
+Longing	Despair / Sad
+Loving	Tender
+Lucky	Grateful
+Melancholy	Despair / Sad
+Moody	Angry / Annoyed
+Mortified	Embarrassed / Shame
+Moved	Grateful
+Nervous	Fear
+On edge	Angry / Annoyed
+Optimistic	Hopeful
+Outraged	Angry / Annoyed
+Overwhelm	Stressed / Tense
+Panic	Fear
+Paralyzed	Fear
+Passionate	Aliveness / Joy
+Patient	Accepting / Open
+Peaceful	Accepting / Open
+Perplexed	Unsettled / Doubt
+Pissed	Angry / Annoyed
+Playful	Aliveness / Joy
+Present	Accepting / Open
+Present	Connected / Loving
+Proud	Courageous / Powerful
+Questioning	Unsettled / Doubt
+Radiant	Aliveness / Joy
+Rattled	Stressed / Tense
+Reflective	Tender
+Refreshed	Aliveness / Joy
+Regret	Guilt
+Rejecting	Stressed / Tense
+Rejecting	Unsettled / Doubt
+Rejuvenated	Aliveness / Joy
+Relaxed	Accepting / Open
+Reluctant	Unsettled / Doubt
+Remorseful	Guilt
+Removed	Disconnected / Numb
+Renewed	Aliveness / Joy
+Resentful	Angry / Annoyed
+Resigned	Powerless
+Resistant	Disconnected / Numb
+Restless	Stressed / Tense
+Safe	Connected / Loving
+Satisfied	Aliveness / Joy
+Scared	Fear
+Self-conscious	Embarrassed / Shame
+Self-loving	Tender
+Sensitive	Fragile
+Serene	Accepting / Open
+Serene	Tender
+Shaken	Stressed / Tense
+Shocked	Unsettled / Doubt
+Shut Down	Disconnected / Numb
+Skeptical	Unsettled / Doubt
+Sorrow	Despair / Sad
+Sorry	Guilt
+Stimulated	Curious
+Strong	Courageous / Powerful
+Suspicious	Unsettled / Doubt
+Teary	Despair / Sad
+Terrified	Fear
+Thankful	Grateful
+Thrilled	Aliveness / Joy
+Tight	Stressed / Tense
+Touched	Grateful
+Trapped	Powerless
+Trusting	Accepting / Open
+Trusting	Hopeful
+Uneasy	Disconnected / Numb
+Ungrounded	Unsettled / Doubt
+Unhappy	Despair / Sad
+Unsure	Unsettled / Doubt
+Upset	Angry / Annoyed
+Upset	Despair / Sad
+Useless	Embarrassed / Shame
+Valiant	Courageous / Powerful
+Vibrant	Aliveness / Joy
+Victim	Powerless
+Vindictive	Angry / Annoyed
+Vulnerable	Tender
+Warm	Connected / Loving
+Warm	Tender
+Weak	Embarrassed / Shame
+Weary	Despair / Sad
+Weary	Stressed / Tense
+Withdrawn	Disconnected / Numb
+Worn out	Stressed / Tense
+Worried	Fear
+Worried	Unsettled / Doubt
+Worthless	Embarrassed / Shame
+Worthy	Connected / Loving
+Worthy	Courageous / Powerful
+Yearning	Despair / Sad
+Actions Column Analysis
+Based on the game definitions inside 
+everyday-life-rpg-systems.json
+:
+
+What is MIN?
+
+MIN represents Minutes (time_minutes), which is the duration required to perform that specific action in the game loop.
+Example: "Wake Up" has a MIN of 1, while a full work shift or full sleep cycle has a MIN of 480 (8 hours).
+What is the number scale of the actions?
+
+The Time scale (time_minutes) runs from 1 to 480 minutes.
+The Money scale (money_delta) runs from -500 to +15 (negative numbers represent costs/payments like paying rent, and positive numbers represent income or tips).
+All other character delta metrics (discipline, energy, stress, fun, hygiene, social, and health) are small integer values ranging generally from -20 to +10 per action:
+Energy delta: -20 to +10
+Stress delta: -10 to +8
+Social delta: -1 to +10
+Health delta: -1 to +7
+Hygiene delta: -2 to +10
+Fun delta: -3 to +9
+Discipline delta: -3 to +8

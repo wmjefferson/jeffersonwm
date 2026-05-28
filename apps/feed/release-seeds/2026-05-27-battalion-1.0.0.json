@@ -1,0 +1,19 @@
+{
+  "source": "release",
+  "entries": [
+    {
+      "id": "battalion-v1.0.0",
+      "appName": "Battalion",
+      "version": "1.0.0",
+      "url": "https://jeffersonwm.com/battalion/",
+      "createdAt": "2026-05-27T18:00:00-07:00",
+      "highlights": [
+        "Replaced scattered admin tools with a unified Settings Hub that groups General Settings, Analytics, and Data Editors.",
+        "Added a dedicated Emotions editor with sorting, live search, and JSON or CSV import and export support.",
+        "Expanded the mood system to a 10-point scale with updated emoji display, hover tooltips, and calibrated XP multipliers.",
+        "Added local browser reminders plus fast in-place filtering for Feelings and Actions without breaking focus or flow.",
+        "Polished the day-to-day interface with accordion layouts, quest card spacing, and stronger mobile behavior on smaller screens."
+      ]
+    }
+  ]
+}

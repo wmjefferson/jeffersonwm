@@ -1,0 +1,109 @@
+[
+  {
+    "category": "Unsettled / Doubt",
+    "emotions": [
+      {
+        "name": "Apprehensive",
+        "brief_description": "You feel a quiet, cautious worry that something bad or unpleasant is going to happen.",
+        "extended_description": "Apprehension is a mild-to-moderate form of fear marked by anticipation and vigilance. It makes you approach situations slowly and with guard rails up, scanning for potential problems. It serves as a protective warning system before you commit to action.",
+        "related_emotions": ["Anxious", "Worried", "Hesitant", "Uneasy", "Concerned"]
+      },
+      {
+        "name": "Concerned",
+        "brief_description": "You feel a mindful attention and mild anxiety for the safety or success of someone or something.",
+        "extended_description": "Concern is a warm, relational emotion that combines empathy with a sense of responsibility. It drives you to check on others, monitor situations, and offer help when needed. It keeps you connected and attentive to the needs of your community and environment.",
+        "related_emotions": ["Apprehensive", "Worried", "Caring", "Uneasy", "Unsettled"]
+      },
+      {
+        "name": "Dissatisfied",
+        "brief_description": "You feel a lack of satisfaction, disappointment, and discontent with an outcome or condition.",
+        "extended_description": "Dissatisfaction arises when the reality of a situation does not live up to your standards, goals, or expectations. It leaves you feeling restless and complaining, but it can also act as a useful driver, motivating you to improve, create, or seek better options.",
+        "related_emotions": ["Disappointed", "Unhappy", "Frustrated", "Disgruntled", "Restless"]
+      },
+      {
+        "name": "Disturbed",
+        "brief_description": "You feel emotionally unsettled, shocked, or deeply bothered by something wrong or strange.",
+        "extended_description": "Being disturbed is a state where your sense of order, decency, or safety is violated by an external event or image. It leaves you feeling uneasy, anxious, and mentally preoccupied as your brain struggles to digest and accept what you witnessed. It signals that a boundary of comfort has been crossed.",
+        "related_emotions": ["Shocked", "Uneasy", "Unsettled", "Concerned", "Rattled"]
+      },
+      {
+        "name": "Grouchy",
+        "brief_description": "You feel a grumpy, bad-tempered irritability over minor annoyances.",
+        "extended_description": "Grouchiness is a low-energy, irritable state often caused by physical discomforts like lack of sleep, hunger, or minor illness. It makes you focus on the negative aspects of your surroundings and snap at small inconveniences. It is usually temporary and easily resolved by addressing physical needs.",
+        "related_emotions": ["Cranky", "Irritated", "Agitated", "Disgruntled", "Edgy"]
+      },
+      {
+        "name": "Hesitant",
+        "brief_description": "You feel a slow, cautious reluctance to act or make a decision due to uncertainty.",
+        "extended_description": "Hesitation is an active pause driven by doubt, fear of mistake, or lack of information. It holds you back from taking a step, allowing your mind to calculate risks and assess options. It acts as an emotional brake to prevent reckless action.",
+        "related_emotions": ["Reluctant", "Apprehensive", "Inhibited", "Unsure", "Skeptical"]
+      },
+      {
+        "name": "Inhibited",
+        "brief_description": "You feel self-consciously restrained, shy, and unable to act naturally or express yourself.",
+        "extended_description": "Inhibition is the feeling of being blocked from acting freely due to fear of judgment, mistake, or ridicule. It causes you to monitor your behavior excessively, making your actions feel stiff and awkward. It signals a lack of safety in your current social environment.",
+        "related_emotions": ["Self-conscious", "Hesitant", "Reluctant", "Uneasy", "Ashamed"]
+      },
+      {
+        "name": "Perplexed",
+        "brief_description": "You feel completely baffled, puzzled, and unable to make sense of something.",
+        "extended_description": "Perplexity is a state of deep cognitive confusion when faced with something highly contradictory, illogical, or complicated. It stops you in your tracks, focusing your attention on the puzzle as you try to find a logical explanation. It stimulates thinking and a seek for information.",
+        "related_emotions": ["Confused", "Intrigued", "Skeptical", "Unsettled", "Questioning"]
+      },
+      {
+        "name": "Questioning",
+        "brief_description": "You feel a state of doubt and inquiry, examining the truth or validity of something.",
+        "extended_description": "Questioning is an active, exploring state of mind where you refuse to accept things at face value. It is driven by a need for truth, clarity, or proof, making you seek answers and analyze information. It is essential for learning, growth, and critical thinking.",
+        "related_emotions": ["Skeptical", "Perplexed", "Confused", "Suspicious", "Curious"]
+      },
+      {
+        "name": "Rejecting",
+        "brief_description": "You feel a cold, defensive urge to push away people, ideas, or offers.",
+        "extended_description": "Rejecting is a protective emotion that arises when you feel threatened, overwhelmed, or critical of something. By pushing the source away, you protect your boundaries and control. However, when done out of fear, it can block connection and new opportunities.",
+        "related_emotions": ["Defensive", "Resistant", "Disdainful", "Distant", "Hostile"]
+      },
+      {
+        "name": "Reluctant",
+        "brief_description": "You feel an unwilling, hesitant resistance to doing something.",
+        "extended_description": "Reluctance is a mild form of opposition where you agree to or contemplate an action but with a heavy, unwilling heart. It signals that the task does not align with your current desires, comfort, or values, making you drag your feet.",
+        "related_emotions": ["Hesitant", "Resistant", "Inhibited", "Uneasy", "Unsure"]
+      },
+      {
+        "name": "Shocked",
+        "brief_description": "You feel a sudden, intense surprise and disbelief that disrupts your composure.",
+        "extended_description": "Shock occurs when you encounter an event that is completely outside your expectations, whether positive or highly negative. It causes a physical gasp, a temporary freeze, and a rush of adrenaline as your brain struggles to register the new reality. It requires time to digest and adapt.",
+        "related_emotions": ["Amazed", "Disturbed", "Rattled", "Shaken", "Frightened"]
+      },
+      {
+        "name": "Skeptical",
+        "brief_description": "You feel a doubting, questioning attitude, requiring proof before believing.",
+        "extended_description": "Skepticism is a cautious, analytical posture that protects you from being deceived or making mistakes based on incomplete data. It keeps your mind open but critical, prompting you to ask for evidence and logic before accepting a claim. It is key for sound decision-making.",
+        "related_emotions": ["Questioning", "Suspicious", "Perplexed", "Confused", "Cynical"]
+      },
+      {
+        "name": "Suspicious",
+        "brief_description": "You feel a cautious distrust and belief that someone is hiding something or acting dishonestly.",
+        "extended_description": "Suspicion is a defensive, highly vigilant state where you interpret others' actions as potential threats or lies. It keeps you guarded, scanning for clues and hidden motives to protect yourself from betrayal. When chronic, it makes trust and open connection impossible.",
+        "related_emotions": ["Skeptical", "Questioning", "Cynical", "Uneasy", "Apprehensive"]
+      },
+      {
+        "name": "Ungrounded",
+        "brief_description": "You feel spacey, disconnected, and mentally unstable or drifting.",
+        "extended_description": "Being ungrounded is a state of distraction and lack of focus where you feel detached from your body and the physical present. It often happens during times of high stress or intellectual overload, leaving you feeling floaty, forgetful, and easily knocked off balance.",
+        "related_emotions": ["Confused", "Uneasy", "Unsettled", "Rattled", "Frazzled"]
+      },
+      {
+        "name": "Unsure",
+        "brief_description": "You feel a lack of certainty, confidence, or decision about a path or truth.",
+        "extended_description": "Being unsure is a state of hesitation where you lack the clarity or confidence to commit to an opinion or action. It prompts you to seek more information, check with others, or delay decisions to avoid mistakes. It is a natural part of weighing options.",
+        "related_emotions": ["Hesitant", "Reluctant", "Confused", "Skeptical", "Doubtful"]
+      },
+      {
+        "name": "Worried",
+        "brief_description": "You feel a persistent, uneasy mental preoccupation with potential problems or negative outcomes.",
+        "extended_description": "Worry is a cognitive form of anxiety where your mind repeatedly plays out negative future scenarios in an attempt to solve them. While intended to prepare you, it often creates a loop of stress that drains your energy and disturbs your peace. It signals a need for reassurance or plan-making.",
+        "related_emotions": ["Anxious", "Apprehensive", "Concerned", "Unsettled", "Uneasy"]
+      }
+    ]
+  }
+]

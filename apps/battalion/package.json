@@ -1,0 +1,30 @@
+{
+  "name": "battalion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Battalion - A gamified life-tracker RPG",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd backend && node --watch index.js",
+    "dev:client": "cd client && npx vite --host",
+    "setup": "cd backend && node db/seed.js",
+    "build": "cd client && npx vite build",
+    "server": "cd backend && node index.js",
+    "start": "cd backend && node index.js",
+    "prod": "set NODE_ENV=production && cd backend && node index.js",
+    "tunnel": "cloudflared tunnel run --token %BATALLION_TUNNEL_TOKEN%"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.7.0",
+    "concurrently": "^9.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.0",
+    "express-session": "^1.18.1",
+    "mysql2": "^3.22.3"
+  },
+  "devDependencies": {
+    "vite": "^6.3.0"
+  }
+}

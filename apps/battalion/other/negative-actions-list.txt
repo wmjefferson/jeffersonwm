@@ -1,0 +1,350 @@
+1. Wake up too late.
+2. Hit snooze repeatedly.
+3. Sleep through an alarm.
+4. Wake up groggy.
+5. Feel unrested after sleeping.
+6. Have trouble getting out of bed.
+7. Start the day in a bad mood.
+8. Forget what day it is.
+9. Lose track of time in the morning.
+10. Run late for everything.
+11. Spill water on clothes.
+12. Drop something important.
+13. Forget an essential item at home.
+14. Leave the house without keys.
+15. Leave the house without a wallet.
+16. Leave the house without a phone.
+17. Leave the house without lunch.
+18. Lock yourself out.
+19. Misplace your shoes.
+20. Wear uncomfortable clothes.
+21. Wear the wrong outfit for the weather.
+22. Forget deodorant.
+23. Forget to brush teeth.
+24. Skip showering.
+25. Feel physically unclean.
+26. Have bad breath.
+27. Have messy hair.
+28. Cut yourself shaving.
+29. Use too much soap or shampoo.
+30. Run out of hot water.
+31. Feel too tired to get ready.
+32. Take too long getting ready.
+33. Miss a meal.
+34. Skip breakfast.
+35. Eat too little.
+36. Eat too much.
+37. Eat junk food out of stress.
+38. Burn breakfast.
+39. Burn dinner.
+40. Spill food while cooking.
+41. Burn your hand cooking.
+42. Cut a finger while chopping.
+43. Drop food on the floor.
+44. Realize you’re out of an ingredient.
+45. Forget to thaw something.
+46. Order expensive takeout.
+47. Spend too much on snacks.
+48. Forget to pack lunch.
+49. Let food go bad.
+50. Throw out spoiled food.
+51. Run out of coffee.
+52. Drink too much coffee.
+53. Get a stomach ache.
+54. Get heartburn.
+55. Feel hungry all day.
+56. Feel dehydrated.
+57. Forget to drink water.
+58. Feel shaky from low blood sugar.
+59. Lose your appetite.
+60. Have no energy after eating.
+61. Feel bloated.
+62. Overeat because of stress.
+63. Forget to take medication.
+64. Take medication late.
+65. Take the wrong dose.
+66. Misplace vitamins or pills.
+67. Feel a headache coming on.
+68. Get a migraine.
+69. Catch a cold.
+70. Develop a sore throat.
+71. Feel achy.
+72. Wake up with back pain.
+73. Pull a muscle.
+74. Twist an ankle.
+75. Feel dizzy.
+76. Feel nauseous.
+77. Get a small cut.
+78. Get a minor burn.
+79. Get a paper cut.
+80. Get soap in your eyes.
+81. Trip over something.
+82. Slip on a wet floor.
+83. Stub your toe.
+84. Drop your phone.
+85. Crack your phone screen.
+86. Drain your phone battery.
+87. Lose internet connection.
+88. Forget your charger.
+89. Have a slow device.
+90. Crash an app or program.
+91. Lose unsaved work.
+92. Corrupt a file.
+93. Send the wrong message.
+94. Text the wrong person.
+95. Leave someone on read.
+96. Miss a call.
+97. Miss an important notification.
+98. Misread an email.
+99. Forget a deadline.
+100. Miss a meeting.
+101. Arrive late to work.
+102. Arrive late to school.
+103. Get stuck in traffic.
+104. Miss the bus.
+105. Miss the train.
+106. Get delayed by weather.
+107. Get lost on the way.
+108. Take the wrong route.
+109. Run out of gas.
+110. Forget to charge the car.
+111. Forget where you parked.
+112. Get a parking ticket.
+113. Get a speeding ticket.
+114. Get stopped for a minor issue.
+115. Fail to find a parking spot.
+116. Get separated from someone.
+117. End up waiting in line too long.
+118. Find the store closed.
+119. Find a product sold out.
+120. Buy the wrong item.
+121. Spend more money than planned.
+122. Forget to budget.
+123. Overspend on groceries.
+124. Lose a receipt.
+125. Get charged a fee.
+126. Miss a bill payment.
+127. Pay a bill late.
+128. Get an overdraft fee.
+129. Realize your balance is low.
+130. Have a surprise expense.
+131. Need to replace something expensive.
+132. Damage a household item.
+133. Break a dish.
+134. Break a glass.
+135. Spill something on the floor.
+136. Leave a mess behind.
+137. Make a room dirtier while cleaning.
+138. Forget to take out the trash.
+139. Trash starts to smell.
+140. Recycling piles up.
+141. Laundry sits too long.
+142. Clothes get wrinkled.
+143. Clothes smell bad.
+144. Shrink clothing in the wash.
+145. Bleach or stain clothes.
+146. Forget laundry in the washer.
+147. Forget laundry in the dryer.
+148. Mix colors and whites.
+149. Tear clothing.
+150. Lose a button.
+151. Break a zipper.
+152. Lose a sock.
+153. Misplace a jacket.
+154. Run out of clean clothes.
+155. Forget to put something away.
+156. Let clutter build up.
+157. Let dishes pile up.
+158. Let counters get sticky.
+159. Let the bathroom get gross.
+160. Let the sink clog.
+161. Spill something sticky.
+162. Forget to wipe surfaces.
+163. Get a pest problem.
+164. Discover a leak.
+165. Discover a broken appliance.
+166. Realize the light bulb is out.
+167. Have a power outage.
+168. Have the heat stop working.
+169. Have the AC stop working.
+170. Find the toilet clogged.
+171. Find the shower drain blocked.
+172. Break a vacuum or cleaning tool.
+173. Run out of cleaning supplies.
+174. Forget to replace toilet paper.
+175. Forget to refill soap.
+176. Get behind on chores.
+177. Feel overwhelmed by chores.
+178. Procrastinate on cleaning.
+179. Give up halfway through cleaning.
+180. Start cleaning but get distracted.
+181. Get interrupted while working.
+182. Lose focus.
+183. Zone out while studying.
+184. Forget what you were doing.
+185. Open the wrong tab or file.
+186. Make a simple mistake at work.
+187. Miss a detail.
+188. Submit something with errors.
+189. Misread instructions.
+190. Re-read the same thing repeatedly.
+191. Forget to save progress.
+192. Have to redo work.
+193. Get tired during a task.
+194. Work slower than expected.
+195. Feel unmotivated.
+196. Feel burned out.
+197. Get frustrated easily.
+198. Have a bad meeting.
+199. Say the wrong thing.
+200. Feel embarrassed in public.
+201. Get nervous talking to someone.
+202. Forget someone’s name.
+203. Miss a social cue.
+204. Interrupt someone accidentally.
+205. Get ignored in conversation.
+206. Get left out of plans.
+207. Have a friend cancel.
+208. Cancel plans yourself.
+209. Have an awkward silence.
+210. Argue with a roommate.
+211. Argue with a partner.
+212. Argue with a family member.
+213. Hold a grudge too long.
+214. Apologize badly.
+215. Misunderstand a text.
+216. Get the wrong tone in a message.
+217. Feel lonely.
+218. Feel rejected.
+219. Feel unsupported.
+220. Feel misunderstood.
+221. Compare yourself to others.
+222. Get jealous.
+223. Feel insecure about appearance.
+224. Feel insecure about work.
+225. Feel insecure about money.
+226. Feel anxious about the future.
+227. Worry about chores piling up.
+228. Worry about a bill.
+229. Worry about a deadline.
+230. Worry about someone’s opinion.
+231. Get distracted by social media.
+232. Doomscroll too long.
+233. Waste time online.
+234. Fall behind on goals.
+235. Skip exercise.
+236. Forget to stretch.
+237. Feel stiff.
+238. Feel sore after exercise.
+239. Overdo exercise.
+240. Feel discouraged by slow progress.
+241. Lose a streak.
+242. Break a habit.
+243. Miss a workout.
+244. Skip a study session.
+245. Skip journaling.
+246. Forget a planner entry.
+247. Fail to follow through.
+248. Start too many tasks at once.
+249. Feel scattered.
+250. Feel overwhelmed.
+251. Get pulled into an emergency.
+252. Have a family crisis.
+253. Handle a pet accident.
+254. Clean up a child’s mess.
+255. Deal with a tantrum.
+256. Get interrupted by caregiving duties.
+257. Lose patience.
+258. Feel guilty.
+259. Forget an appointment.
+260. Miss a doctor visit.
+261. Miss a dentist visit.
+262. Need a prescription refill.
+263. Discover you’re out of supplies.
+264. Run low on groceries.
+265. Run low on toilet paper.
+266. Run low on gas.
+267. Run low on cash.
+268. Discover a subscription charge.
+269. Get a declined card.
+270. Lose an important document.
+271. Forget where you filed something.
+272. Misplace paperwork.
+273. Drop mail on the floor.
+274. Miss the mailbox pickup.
+275. Receive an unexpected letter.
+276. Get a confusing notice.
+277. Deal with spam email.
+278. Get too many notifications.
+279. Ignore a warning too long.
+280. Ignore a maintenance issue.
+281. Notice a strange smell.
+282. Hear a weird noise in the house.
+283. Spot mold or mildew.
+284. Find bugs inside.
+285. Realize something is broken.
+286. Realize something is missing.
+287. Make a repair worse.
+288. Use the wrong tool.
+289. Strip a screw.
+290. Overtighten something.
+291. Under-tighten something.
+292. Break a small part.
+293. Lose screws or nails.
+294. Fail to finish a repair.
+295. Delay maintenance too long.
+296. Create more mess while fixing something.
+297. Paint the wrong area.
+298. Scratch a surface.
+299. Knock over supplies.
+300. Spill paint, glue, or cleaner.
+301. Need to start over.
+302. Get splashed by dirty water.
+303. Feel physically exhausted.
+304. Get emotionally drained.
+305. Have trouble sleeping.
+306. Wake up in the night.
+307. Have weird dreams.
+308. Sleep too long.
+309. Sleep too little.
+310. Wake up with a dry mouth.
+311. Wake up with a headache.
+312. Forget to set an alarm.
+313. Hit snooze and regret it.
+314. Rush through the morning.
+315. Start the day behind schedule.
+316. Skip self-care.
+317. Ignore hygiene.
+318. Forget to eat on time.
+319. Forget to rest.
+320. Get overstimulated.
+321. Get under-stimulated.
+322. Feel bored.
+323. Feel restless.
+324. Feel trapped in routine.
+325. Feel stuck.
+326. Lose confidence.
+327. Feel ashamed.
+328. Feel ashamed of mess.
+329. Feel ashamed of mistakes.
+330. Get judged by others.
+331. Get criticized.
+332. Take criticism badly.
+333. Overreact to a minor issue.
+334. Underreact to a serious issue.
+335. Freeze up.
+336. Shut down.
+337. Cry unexpectedly.
+338. Get irritated easily.
+339. Snap at someone.
+340. Say something you regret.
+341. Forget an anniversary.
+342. Forget a birthday.
+343. Miss a holiday plan.
+344. Forget to respond to someone.
+345. Miss a chance to help.
+346. Ignore a small problem until it grows.
+347. Ignore a warning sign.
+348. Make a poor decision while tired.
+349. Make a poor decision while stressed.
+350. End the day feeling like nothing got done.

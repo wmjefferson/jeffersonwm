@@ -1,0 +1,253 @@
+{
+  "emotion_core": {
+    "project": null,
+    "version": "3.0.0-emotion-core",
+    "schema_notes": {},
+    "counts": {},
+    "categories": [],
+    "motives": [],
+    "actions": [],
+    "emotion_system": {
+      "tag_taxonomy": [
+        "routine",
+        "restorative",
+        "social",
+        "creative",
+        "administrative",
+        "risky",
+        "conflict",
+        "identity",
+        "escape",
+        "care",
+        "achievement",
+        "comfort",
+        "discipline_building",
+        "health_support",
+        "hygiene",
+        "financial",
+        "learning",
+        "mobility",
+        "domestic",
+        "stimulation"
+      ],
+      "emotion_category_affinities": {
+        "Aliveness / Joy": {
+          "favored_tags": [
+            "social",
+            "stimulation",
+            "creative",
+            "achievement",
+            "nature"
+          ],
+          "avoided_tags": [
+            "administrative"
+          ],
+          "notes": "Amplifies rewarding, expressive, and celebratory actions."
+        },
+        "Accepting / Open": {
+          "favored_tags": [
+            "restorative",
+            "health_support",
+            "discipline_building",
+            "nature"
+          ],
+          "avoided_tags": [
+            "conflict"
+          ],
+          "notes": "Supports regulated, grounding, and recovery-oriented actions."
+        },
+        "Angry / Annoyed": {
+          "favored_tags": [
+            "conflict",
+            "stimulation"
+          ],
+          "avoided_tags": [
+            "social",
+            "care",
+            "administrative"
+          ],
+          "notes": "Can intensify conflict and impulsive release while harming cooperation."
+        },
+        "Connected / Loving": {
+          "favored_tags": [
+            "social",
+            "care",
+            "comfort"
+          ],
+          "avoided_tags": [
+            "conflict"
+          ],
+          "notes": "Improves bonding, support, and intimacy-related actions."
+        },
+        "Courageous / Powerful": {
+          "favored_tags": [
+            "achievement",
+            "risky",
+            "mobility",
+            "discipline_building"
+          ],
+          "avoided_tags": [
+            "escape"
+          ],
+          "notes": "Boosts decisive, effortful, and challenge-facing actions."
+        },
+        "Curious": {
+          "favored_tags": [
+            "learning",
+            "creative",
+            "mobility",
+            "stimulation"
+          ],
+          "avoided_tags": [
+            "routine"
+          ],
+          "notes": "Supports exploration, discovery, and novelty-seeking actions."
+        },
+        "Despair / Sad": {
+          "favored_tags": [
+            "restorative",
+            "comfort"
+          ],
+          "avoided_tags": [
+            "achievement",
+            "social",
+            "risky"
+          ],
+          "notes": "Pushes inward toward recovery and away from demanding or exposing actions."
+        },
+        "Disconnected / Numb": {
+          "favored_tags": [
+            "escape",
+            "routine"
+          ],
+          "avoided_tags": [
+            "social",
+            "creative",
+            "care"
+          ],
+          "notes": "Flattens engagement and favors low-effort disengaged actions."
+        },
+        "Embarrassed / Shame": {
+          "favored_tags": [
+            "hygiene",
+            "identity",
+            "escape"
+          ],
+          "avoided_tags": [
+            "social",
+            "risky"
+          ],
+          "notes": "Can increase self-protective maintenance while reducing exposed actions."
+        },
+        "Fear": {
+          "favored_tags": [
+            "escape",
+            "administrative",
+            "routine"
+          ],
+          "avoided_tags": [
+            "risky",
+            "conflict",
+            "social"
+          ],
+          "notes": "Increases avoidance and caution while hurting exposed or uncertain actions."
+        },
+        "Fragile": {
+          "favored_tags": [
+            "restorative",
+            "comfort",
+            "care"
+          ],
+          "avoided_tags": [
+            "risky",
+            "conflict",
+            "achievement"
+          ],
+          "notes": "Needs buffering, safety, and low-pressure recovery actions."
+        },
+        "Grateful": {
+          "favored_tags": [
+            "social",
+            "care",
+            "restorative",
+            "health_support"
+          ],
+          "avoided_tags": [
+            "conflict"
+          ],
+          "notes": "Stabilizes generous, healthy, and connective actions."
+        },
+        "Guilt": {
+          "favored_tags": [
+            "care",
+            "administrative",
+            "discipline_building"
+          ],
+          "avoided_tags": [
+            "stimulation"
+          ],
+          "notes": "Can drive repair, apology, and making-things-right behaviors."
+        },
+        "Hopeful": {
+          "favored_tags": [
+            "achievement",
+            "learning",
+            "mobility",
+            "discipline_building"
+          ],
+          "avoided_tags": [
+            "escape"
+          ],
+          "notes": "Improves future-oriented and improvement-focused actions."
+        },
+        "Powerless": {
+          "favored_tags": [
+            "escape",
+            "routine"
+          ],
+          "avoided_tags": [
+            "achievement",
+            "risky",
+            "conflict"
+          ],
+          "notes": "Suppresses agency-heavy actions and favors passive ones."
+        },
+        "Stressed / Tense": {
+          "favored_tags": [
+            "escape",
+            "comfort"
+          ],
+          "avoided_tags": [
+            "achievement",
+            "social",
+            "administrative"
+          ],
+          "notes": "Makes relief-seeking more attractive while reducing efficiency of effortful actions."
+        },
+        "Tender": {
+          "favored_tags": [
+            "care",
+            "social",
+            "comfort",
+            "restorative"
+          ],
+          "avoided_tags": [
+            "conflict"
+          ],
+          "notes": "Supports nurturing, intimate, and emotionally open actions."
+        },
+        "Unsettled / Doubt": {
+          "favored_tags": [
+            "administrative",
+            "routine"
+          ],
+          "avoided_tags": [
+            "risky",
+            "social"
+          ],
+          "notes": "Can lean toward checking, planning, and hesitation-heavy actions."
+        }
+      }
+    }
+  }
+}

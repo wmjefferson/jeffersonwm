@@ -466,7 +466,7 @@ export default function App() {
       const message = err instanceof Error ? err.message : 'Failed to fetch images';
       if (/authentication required/i.test(message)) {
         if (authStatus?.provider === 'central') {
-          setAccessError('Perihelion is private right now. Sign in through Auth JeffersonWM and make sure your account has Perihelion access.');
+          setAccessError('Perihelion is private right now. Sign in through Multimillion and make sure your account has Perihelion access.');
         } else {
           setAccessError('Perihelion is private right now. Sign in with an approved account to browse files.');
         }
@@ -692,7 +692,7 @@ export default function App() {
       resetAuthForm();
       resetPasswordForm();
       resetUsernameForm();
-      setAuthMessage(usesCentralAuth ? 'Signed out of Auth JeffersonWM.' : '');
+      setAuthMessage(usesCentralAuth ? 'Signed out of Multimillion.' : '');
       await loadAuthStatus();
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Failed to sign out');
@@ -1272,7 +1272,7 @@ export default function App() {
                 usesCentralAuth ? (
                   <>
                     <div className="border-[2px] border-[#666] bg-[#F7F7F7] px-4 py-4 flex flex-col gap-3">
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-black">Auth JeffersonWM</div>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-black">Multimillion</div>
                       <p className="text-[11px] font-sans text-[#666] leading-relaxed">
                         Perihelion now uses the central account system at <span className="font-bold">{authBaseUrl}</span>.
                         Sign in there, request access there, and make sure your account has Perihelion access. After sign-in, you’ll come right back here.
@@ -1410,7 +1410,7 @@ export default function App() {
                         Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' • Admin' : ''}
                       </div>
                       <p className="text-[11px] font-sans text-[#666] leading-relaxed">
-                        Your settings, history, approvals, and password changes now live in Auth JeffersonWM. Sign out here if you want to switch to a different account. If this archive still stays locked, ask for Perihelion access in the central dashboard.
+                        Your settings, history, approvals, and password changes now live in Multimillion. Sign out here if you want to switch to a different account. If this archive still stays locked, ask for Perihelion access in the central dashboard.
                       </p>
                     </div>
                     <div className="flex items-center gap-3 justify-end">
@@ -1559,7 +1559,7 @@ export default function App() {
                     <div className="border-[2px] border-[#666] bg-[#F7F7F7] px-4 py-4 flex flex-col gap-3">
                       <div className="text-[10px] font-bold uppercase tracking-widest text-black">Central Dashboard</div>
                       <p className="text-[11px] font-sans text-[#666] leading-relaxed">
-                        Account approvals, blocking, deletions, per-site access, and audit history now live in Auth JeffersonWM so one dashboard can eventually serve all the sites.
+                        Account approvals, blocking, deletions, per-site access, and audit history now live in Multimillion so one dashboard can eventually serve all the sites.
                       </p>
                     </div>
                     <div className="flex items-center gap-3 justify-end">

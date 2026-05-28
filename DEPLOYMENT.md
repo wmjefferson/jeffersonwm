@@ -12,7 +12,7 @@ This repo currently contains:
 - `apps/lionship`
 - `apps/bullion`
 - `apps/vermilion`
-- `apps/battalion` placeholder
+- `apps/battalion`
 
 Not every app in the repo is deployed the same way.
 

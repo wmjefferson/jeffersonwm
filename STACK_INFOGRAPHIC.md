@@ -134,7 +134,7 @@ Main local repo roots:
 | Dooky Detective | `https://dookydetective.com` | `https://api.dookydetective.com` | separate repo | `E:\dookydetective\backend` | `8020` | home-server images |
 | Jeffershizzle | `https://jeffershizzle.com` | `https://api.jeffershizzle.com` | separate repo | `E:\scripts\jeffershizzle_images_api.py` | `8030` | archive API |
 | Auth JeffersonWM | `https://auth.jeffersonwm.com` | same host | separate repo | `E:\auth-jeffersonwm\backend` | `8060` | shared account system |
-| Battalion | not yet finalized | tunnel-backed runtime | separate server copy + monorepo placeholder | `E:\battalion` | `8070` | `npm run prod` |
+| Battalion | `https://jeffersonwm.com/battalion/` | tunnel-backed runtime | `apps/battalion` + home server runtime | `E:\battalion` | `8070` | `npm run prod` |
 | Vermilion | local app | none | `apps/vermilion` | local only | n/a | Python desktop organizer |
 
 ---
@@ -483,15 +483,21 @@ Check:
 - `https://api.jeffersonwm.com/api/auth/status`
 - `perihelion` app membership in auth dashboard
 
-### Battalion says `Missing script: server`
+### Battalion behaves differently between dev notes and server notes
 
-Use:
+The imported repo copy now exposes both:
+
+```powershell
+npm run server
+```
+
+and:
 
 ```powershell
 npm run prod
 ```
 
-not `npm run server`
+Use `npm run prod` for the live home-server runtime when you want `NODE_ENV=production` set inline.
 
 ---
 

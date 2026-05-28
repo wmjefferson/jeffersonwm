@@ -49,6 +49,18 @@ const inferredFeedApiBase =
     ? 'https://api-feed.jeffersonwm.com'
     : '';
 const FEED_API_BASE = (import.meta.env.VITE_API_BASE_URL || inferredFeedApiBase).replace(/\/$/, '');
+const FEED_TIMEZONE = 'America/Los_Angeles';
+const feedDateFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: FEED_TIMEZONE,
+  month: 'short',
+  day: 'numeric',
+});
+const feedTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: FEED_TIMEZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
 const defaultPostState = (): PostFormState => ({
   title: '',
   content: '',
@@ -61,6 +73,13 @@ const defaultPostState = (): PostFormState => ({
 
 function apiUrl(path: string) {
   return `${FEED_API_BASE}${path}`;
+}
+
+function parseFeedDate(value: string) {
+  const trimmed = value.trim();
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmed);
+  const normalized = hasTimezone ? trimmed : `${trimmed.replace(' ', 'T')}Z`;
+  return new Date(normalized);
 }
 
 function escapeHtml(value: string) {
@@ -280,12 +299,8 @@ export default function App() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const day = date.getDate();
-    const month = date.toLocaleDateString(undefined, { month: 'short' });
-    return `${month} ${day}, ${hours}:${minutes}`;
+    const date = parseFeedDate(dateStr);
+    return `${feedDateFormatter.format(date)}, ${feedTimeFormatter.format(date)}`;
   };
 
   const getGitHubRepo = (item: FeedItem): string | null => {
@@ -332,7 +347,7 @@ export default function App() {
 
   const groupFeedItems = (rawItems: FeedItem[]) => {
     const sortedRaw = [...rawItems].sort(
-      (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
+      (left, right) => parseFeedDate(right.created_at).getTime() - parseFeedDate(left.created_at).getTime(),
     );
     const groups: ConsolidatedFeedItem[] = [];
 
@@ -360,7 +375,7 @@ export default function App() {
         getActionType(lastGroup.items[0].title, repo) === actionType
       ) {
         lastGroup.items.push(item);
-        if (new Date(item.created_at) > new Date(lastGroup.created_at)) {
+        if (parseFeedDate(item.created_at) > parseFeedDate(lastGroup.created_at)) {
           lastGroup.created_at = item.created_at;
         }
       } else {
@@ -374,7 +389,9 @@ export default function App() {
       }
     }
 
-    return groups.sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+    return groups.sort(
+      (left, right) => parseFeedDate(right.created_at).getTime() - parseFeedDate(left.created_at).getTime(),
+    );
   };
 
   const releaseCount = items.filter(isReleaseItem).length;

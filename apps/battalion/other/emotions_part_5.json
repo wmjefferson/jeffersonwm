@@ -1,0 +1,208 @@
+[
+  {
+    "category": "Disconnected / Numb",
+    "emotions": [
+      {
+        "name": "Aloof",
+        "brief_description": "You feel emotionally distant, detached, and disinclined to associate with others.",
+        "extended_description": "Aloofness is a protective posture of social coolness and reservation. You choose to stay on the sidelines of interactions, keeping your feelings private and avoiding involvement. While it shields you from social stress, it can be perceived by others as coldness or arrogance, limiting intimacy.",
+        "related_emotions": ["Distant", "Isolated", "Indifferent", "Removed", "Withdrawn"]
+      },
+      {
+        "name": "Bored",
+        "brief_description": "You feel weary, restless, and unsatisfied due to a lack of interesting activity or meaning.",
+        "extended_description": "Boredom is a low-arousal, uncomfortable emotion that signals your current environment is not engaging your mind. It serves as an evolutionary nudge to seek novelty, challenge, or creative pursuits. When stuck in boredom, you feel a heavy drain on your motivation and time.",
+        "related_emotions": ["Listless", "Lethargic", "Empty", "Indifferent", "Aloof"]
+      },
+      {
+        "name": "Confused",
+        "brief_description": "You feel a lack of clarity, order, or understanding about a situation or your own thoughts.",
+        "extended_description": "Confusion occurs when you receive conflicting information or when your brain is struggling to process a complex event. It leaves you feeling disoriented, hesitant, and unable to make decisions. It signals that your mind needs to slow down, ask questions, and organize inputs.",
+        "related_emotions": ["Perplexed", "Uneasy", "Rattled", "Unsettled", "Doubtful"]
+      },
+      {
+        "name": "Distant",
+        "brief_description": "You feel far away and disconnected from the people or events around you.",
+        "extended_description": "Being distant is a state of emotional withdrawal where you are physically present but mentally or emotionally unreachable. It often happens when you are distracted, overwhelmed, or protecting yourself from conflict. It makes interactions feel shallow and formal.",
+        "related_emotions": ["Aloof", "Isolated", "Removed", "Withdrawn", "Empty"]
+      },
+      {
+        "name": "Empty",
+        "brief_description": "You feel a hollow, flat lack of emotion, purpose, or connection.",
+        "extended_description": "Emptiness is a heavy, quiet state of numbness where nothing seems to matter or register. It is often a defense mechanism against overwhelming pain or the result of severe depletion and burnout. It represents a temporary shutdown of your emotional signaling system.",
+        "related_emotions": ["Numb", "Lonely", "Depressed", "Distant", "Lethargic"]
+      },
+      {
+        "name": "Indifferent",
+        "brief_description": "You feel a complete lack of interest, concern, or preference about a matter.",
+        "extended_description": "Indifference is a flat emotional state where you do not feel pulled toward or away from anything. It can be a peaceful neutrality or a defensive barrier against caring too much. When chronic, it drains the color and motivation from your decisions.",
+        "related_emotions": ["Aloof", "Bored", "Indifferent", "Removed", "Distant"]
+      },
+      {
+        "name": "Isolated",
+        "brief_description": "You feel cut off, alone, and separated from support and connection.",
+        "extended_description": "Isolation is the painful sense of being physically or emotionally walled off from others. It is characterized by a lack of shared experiences and a belief that no one is there to help or understand you. It intensifies stress and highlights a deep need for reconnection.",
+        "related_emotions": ["Lonely", "Forlorn", "Distant", "Withdrawn", "Aloof"]
+      },
+      {
+        "name": "Lethargic",
+        "brief_description": "You feel a heavy, sluggish lack of physical energy and mental drive.",
+        "extended_description": "Lethargy is a state of low arousal and drowsiness, often caused by physical exhaustion, illness, or emotional burnout. It makes even simple actions feel like a massive effort and slows your cognitive processing. It is your body's direct command to stop, rest, and recover.",
+        "related_emotions": ["Weary", "Exhausted", "Depleted", "Listless", "Bored"]
+      },
+      {
+        "name": "Listless",
+        "brief_description": "You feel a limp, indifferent lack of interest, energy, and enthusiasm.",
+        "extended_description": "Listlessness is a state of apathy where you lack the spirit or desire to engage in any activity. Unlike active sadness, it is a flat, unmotivated state where you feel drifted and disconnected. It signals that your emotional batteries are running extremely low.",
+        "related_emotions": ["Lethargic", "Bored", "Empty", "Indifferent", "Depressed"]
+      },
+      {
+        "name": "Removed",
+        "brief_description": "You feel detached, separated, and looking at things from a distance.",
+        "extended_description": "Being removed is a state of psychological distance, where you observe your situation or emotions as an outsider rather than a participant. It can be useful for objective analysis but can leave you feeling disconnected and unfeeling in personal interactions.",
+        "related_emotions": ["Aloof", "Distant", "Isolated", "Withdrawn", "Numb"]
+      },
+      {
+        "name": "Resistant",
+        "brief_description": "You feel an internal opposition, reluctance, and refusal to go along with a change.",
+        "extended_description": "Resistance is an active emotional defense that arises when a situation threatens your comfort, control, or beliefs. It shows as hesitation, stubbornness, or arguing, acting as a shield against potential risk or discomfort. It signals a need to explore the underlying fear of change.",
+        "related_emotions": ["Hesitant", "Reluctant", "Uneasy", "Defensive", "Skeptical"]
+      },
+      {
+        "name": "Shut Down",
+        "brief_description": "You feel emotionally closed, numb, and unable to process or express feelings.",
+        "extended_description": "Shutting down is an automatic threat response when your emotional load exceeds what your system can handle. Your brain temporarily silences your feelings to protect you from overload, leaving you feeling flat, quiet, and unresponsive. It requires patience, safety, and time to gently thaw.",
+        "related_emotions": ["Numb", "Empty", "Withdrawn", "Lethargic", "Distant"]
+      },
+      {
+        "name": "Uneasy",
+        "brief_description": "You feel a restless, quiet discomfort and apprehension, as if something is not right.",
+        "extended_description": "Uneasiness is a low-level, vague anxiety that hovers in the background of your awareness. It is your intuition flagging a potential problem or misalignment before you can logically pinpoint it. It keeps you slightly vigilant and hesitant to fully relax.",
+        "related_emotions": ["Unsettled", "Anxious", "Concerned", "Apprehensive", "Restless"]
+      },
+      {
+        "name": "Withdrawn",
+        "brief_description": "You feel a desire to retreat, go quiet, and pull inward away from social contact.",
+        "extended_description": "Withdrawal is the action and feeling of retreating into yourself, often to recover from overwhelm, hurt, or shame. It is a protective pause where you limit communication and social exposure to conserve emotional energy. It becomes problematic when it hardens into long-term isolation.",
+        "related_emotions": ["Isolated", "Aloof", "Distant", "Shut Down", "Lonely"]
+      }
+    ]
+  },
+  {
+    "category": "Embarrassed / Shame",
+    "emotions": [
+      {
+        "name": "Ashamed",
+        "brief_description": "You feel a painful, heavy belief that you are inherently flawed, bad, or a failure.",
+        "extended_description": "Shame is a powerful, self-conscious emotion directed at your entire self, rather than just an action. It makes you want to hide, shrink, or disappear, creating a painful sense of worthlessness. Healing from shame requires self-compassion, vulnerability, and sharing with safe people.",
+        "related_emotions": ["Humiliated", "Worthless", "Self-conscious", "Guilty", "Weak"]
+      },
+      {
+        "name": "Humiliated",
+        "brief_description": "You feel a painful, public loss of dignity, pride, and self-respect.",
+        "extended_description": "Humiliation is a sharp, distressing emotion experienced when your dignity is damaged, often in front of others. It combines elements of shame and anger, leaving you feeling small, exposed, and rejected by a group. It can leave lasting emotional scars and a high sensitivity to criticism.",
+        "related_emotions": ["Ashamed", "Mortified", "Self-conscious", "Worthless", "Victim"]
+      },
+      {
+        "name": "Inhibited",
+        "brief_description": "You feel self-consciously restrained, shy, and unable to act naturally or express yourself.",
+        "extended_description": "Inhibition is the feeling of being blocked from acting freely due to fear of judgment, mistake, or ridicule. It causes you to monitor your behavior excessively, making your actions feel stiff and awkward. It signals a lack of safety in your current social environment.",
+        "related_emotions": ["Self-conscious", "Hesitant", "Reluctant", "Uneasy", "Ashamed"]
+      },
+      {
+        "name": "Mortified",
+        "brief_description": "You feel an extreme, shocking embarrassment that makes you want to disappear.",
+        "extended_description": "Mortification is a peak state of embarrassment, typically triggered by a major social blunder or exposure. It causes an intense physical reaction, such as blushing, a racing heart, and a strong urge to escape. It leaves you feeling deeply vulnerable and wishing to rewrite the past moment.",
+        "related_emotions": ["Humiliated", "Ashamed", "Self-conscious", "Shocked", "Regretful"]
+      },
+      {
+        "name": "Self-conscious",
+        "brief_description": "You feel an uncomfortable, acute awareness of being observed and judged by others.",
+        "extended_description": "Self-consciousness occurs when you turn your attention fully outward, imagining how you look, speak, or act through the eyes of others. It increases anxiety and makes natural behavior difficult, leading to hesitation. It is a common reaction to unfamiliar social groups or scrutiny.",
+        "related_emotions": ["Inhibited", "Ashamed", "Humiliated", "Anxious", "Uneasy"]
+      },
+      {
+        "name": "Useless",
+        "brief_description": "You feel as though you have no value, capability, or helpful purpose.",
+        "extended_description": "Feeling useless is a painful state of low self-worth where you believe you are a burden or contribute nothing of value. It often arises when you cannot perform a task, lose a role, or are rejected. It blocks motivation and requires reframing your worth away from mere utility.",
+        "related_emotions": ["Worthless", "Incapable", "Helpless", "Powerless", "Depressed"]
+      },
+      {
+        "name": "Weak",
+        "brief_description": "You feel a lack of strength, resolve, or ability to cope with demands.",
+        "extended_description": "Weakness as an emotion is the feeling of being fragile and easily broken by stress, criticism, or effort. It leads to self-doubt and fear of failure, making you feel dependent on others for safety. It signals that your emotional resilience is currently depleted.",
+        "related_emotions": ["Helpless", "Powerless", "Incapable", "Sensitive", "Ashamed"]
+      },
+      {
+        "name": "Worthless",
+        "brief_description": "You feel a deep, painful belief that you have no value or deservingness of love.",
+        "extended_description": "Worthlessness is a severe form of shame and sadness where you feel entirely without merit or utility. It strips away self-esteem and makes you feel invisible or unwanted. Reclaiming worth requires decoupling your self-image from achievements and practicing self-acceptance.",
+        "related_emotions": ["Ashamed", "Useless", "Depressed", "Helpless", "Incapable"]
+      }
+    ]
+  },
+  {
+    "category": "Powerless",
+    "emotions": [
+      {
+        "name": "Impotent",
+        "brief_description": "You feel completely lacking in power, strength, or ability to make an impact.",
+        "extended_description": "Impotence as an emotional state is the frustrating feeling of having no influence over a situation or your own life. It is marked by a build-up of blocked energy that can manifest as quiet despair or sudden, reactive anger. It signals a direct threat to your autonomy and agency.",
+        "related_emotions": ["Powerless", "Helpless", "Incapable", "Resigned", "Weak"]
+      },
+      {
+        "name": "Incapable",
+        "brief_description": "You feel unable to perform a task, handle a challenge, or succeed.",
+        "extended_description": "Incapability is a state of self-doubt where you feel you lack the skills, energy, or intelligence to meet demands. It often leads to hesitation, avoidance, and reliance on others. It represents a temporary or perceived drop in your self-efficacy.",
+        "related_emotions": ["Weak", "Helpless", "Useless", "Powerless", "Impotent"]
+      },
+      {
+        "name": "Resigned",
+        "brief_description": "You feel a passive acceptance of an unpleasant situation, believing nothing can be done.",
+        "extended_description": "Resignation is the quiet surrender to circumstances after struggling to change them has failed. It reduces active stress by ending the fight, but it replaces hope with a flat, unmotivated compliance. It is a low-energy state that protects you from further disappointment.",
+        "related_emotions": ["Powerless", "Helpless", "Despondent", "Indifferent", "Sad"]
+      },
+      {
+        "name": "Trapped",
+        "brief_description": "You feel confined, restricted, and unable to escape a difficult situation or relationship.",
+        "extended_description": "Being trapped is a highly distressing, high-arousal emotion where you feel all paths of escape or choice are blocked. It triggers a claustrophobic panic or deep frustration, prompting a strong urge to break free. It signals a severe restriction of your freedom and boundaries.",
+        "related_emotions": ["Powerless", "Helpless", "Anxious", "Frustrated", "Panic"]
+      },
+      {
+        "name": "Victim",
+        "brief_description": "You feel targeted, mistreated, and helpless under someone else's power or bad luck.",
+        "extended_description": "Feeling like a victim is a state of mind where you focus entirely on the harm done to you and your inability to prevent it. While validating of actual hurt, staying in this state can block you from recognizing your remaining agency and taking active steps to heal or set boundaries.",
+        "related_emotions": ["Powerless", "Helpless", "Humiliated", "Resentful", "Hurt"]
+      }
+    ]
+  },
+  {
+    "category": "Hopeful",
+    "emotions": [
+      {
+        "name": "Encouraged",
+        "brief_description": "You feel a renewed confidence, hope, and determination to proceed.",
+        "extended_description": "Encouragement is the positive lift you feel when you receive support, validation, or see progress in your efforts. It acts as an emotional wind at your back, restoring your resolve and making challenges feel manageable. It directly counters discouragement and doubt.",
+        "related_emotions": ["Hopeful", "Optimistic", "Confident", "Inspired", "Capable"]
+      },
+      {
+        "name": "Expectant",
+        "brief_description": "You feel a state of waiting with anticipation, ready for something to happen.",
+        "extended_description": "Expectancy is a forward-looking emotion that keeps you alert and focused on the future. It can carry a positive thrill (anticipation) or a tense caution (suspense), preparing your mind and body to react quickly when the expected event unfolds. It keeps you active and engaged.",
+        "related_emotions": ["Eager", "Excited", "Hopeful", "Optimistic", "Anxious"]
+      },
+      {
+        "name": "Optimistic",
+        "brief_description": "You feel a hopeful confidence about the future and the success of your efforts.",
+        "extended_description": "Optimism is a mental attitude and emotion that looks for positive outcomes and opportunities, even during setbacks. It encourages resilience by framing difficulties as temporary and solvable. It provides the energy and hope needed to invest effort in future goals.",
+        "related_emotions": ["Hopeful", "Encouraged", "Trusting", "Expectant", "Happy"]
+      },
+      {
+        "name": "Trusting",
+        "brief_description": "You feel a secure belief in the reliability, honesty, and safety of others or your path.",
+        "extended_description": "Trust is a core emotion that involves vulnerability and the willingness to rely on someone or something. It lowers your defensiveness, creating a space for genuine connection and intimacy. When trusting, you feel a sense of safety that reduces anxiety about the future.",
+        "related_emotions": ["Safe", "Accepting", "Caring", "Comfortable", "Optimistic"]
+      }
+    ]
+  }
+]

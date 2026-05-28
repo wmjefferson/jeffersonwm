@@ -1,0 +1,234 @@
+[
+  {
+    "category": "Aliveness / Joy",
+    "emotions": [
+      {
+        "name": "Amazed",
+        "brief_description": "You feel a sudden, wonderful surprise and wonder at something unexpected or extraordinary.",
+        "extended_description": "Amazement is a state of astonishment and awe triggered by encountering something that challenges your expectations or displays remarkable qualities. It causes a temporary pause in your thoughts as you take in the novelty and scale of the experience. It leaves you feeling inspired and cognitively expanded.",
+        "related_emotions": ["Awe", "Fascinated", "Excited", "Enchanted", "Shocked"]
+      },
+      {
+        "name": "Awe",
+        "brief_description": "You feel a profound sense of reverence, wonder, and smallness in the presence of something vast or sublime.",
+        "extended_description": "Awe is a powerful, high-impact emotion sparked by vastness—whether it is the grand scale of nature, brilliant art, or a deep philosophical truth. It temporarily dissolves your self-focus, making you feel connected to something much larger than yourself. It can induce a sense of quiet humility and deep curiosity.",
+        "related_emotions": ["Amazed", "Fascinated", "Inspired", "Humbled", "Touched"]
+      },
+      {
+        "name": "Bliss",
+        "brief_description": "You feel an intense, radiant state of complete happiness and serene joy.",
+        "extended_description": "Bliss is an ecstatic emotion characterized by a feeling of ultimate satisfaction and spiritual or physical harmony. It represents a peak experience where all wants, worries, and fears completely melt away. It fills your entire awareness with pure, tranquil joy.",
+        "related_emotions": ["Ecstatic", "Delighted", "Peaceful", "Serene", "Happy"]
+      },
+      {
+        "name": "Delighted",
+        "brief_description": "You feel a bright, bubbling sense of pleasure and satisfaction from something pleasant.",
+        "extended_description": "Delight is a cheerful, highly positive emotion that arises in response to pleasant surprises, beauty, or positive interactions. It brings a lighthearted warmth and often expresses itself through smiles, laughter, and high energy. It helps elevate your mood and strengthens interpersonal connection.",
+        "related_emotions": ["Happy", "Thrilled", "Bliss", "Excited", "Appreciative"]
+      },
+      {
+        "name": "Eager",
+        "brief_description": "You feel a keen, impatient desire and readiness to do or experience something positive.",
+        "extended_description": "Eagerness is a forward-looking emotion that combines anticipation with enthusiastic energy. It motivates you to take action and engage with upcoming opportunities. When eager, you focus on positive expectations, which primes your mind and body for learning and effort.",
+        "related_emotions": ["Excited", "Enthusiastic", "Interested", "Exploring", "Expectant"]
+      },
+      {
+        "name": "Ecstatic",
+        "brief_description": "You feel an overwhelming, vibrant rush of joy and excitement that carries you away.",
+        "extended_description": "Ecstasy is a peak state of emotional arousal where you feel flooded with happiness and energy. It is often accompanied by a sense of self-transcendence, where your immediate environment and concerns are eclipsed by the intensity of your joy. It provides a powerful boost of vitality and connection.",
+        "related_emotions": ["Bliss", "Thrilled", "Excited", "Vibrant", "Enchanted"]
+      },
+      {
+        "name": "Enchanted",
+        "brief_description": "You feel deeply charmed, fascinated, and captured by a sense of magical beauty or delight.",
+        "extended_description": "Enchantment is a soft, dreamlike emotion of being captivated by something beautifully unusual, artistic, or intimate. It makes the world feel full of wonder and magic, encouraging a state of playful appreciation and relaxed attentiveness. It acts as a source of creative inspiration.",
+        "related_emotions": ["Fascinated", "Awe", "Delighted", "Inspired", "Intrigued"]
+      },
+      {
+        "name": "Energized",
+        "brief_description": "You feel a surge of physical and mental vitality, leaving you ready to take action.",
+        "extended_description": "Being energized is a state of high physical and mental arousal that banishes fatigue and hesitation. It is often triggered by excitement, inspiration, or a sense of purpose, driving you to tackle challenges and express yourself dynamically. It makes tasks feel lighter and more achievable.",
+        "related_emotions": ["Stimulated", "Invigorated", "Lively", "Enthusiastic", "Vibrant"]
+      },
+      {
+        "name": "Engaged",
+        "brief_description": "You feel highly focused, involved, and absorbed in an activity or relationship.",
+        "extended_description": "Engagement is an active state of attention and interest where your mind is fully occupied by what you are doing. It often leads to a state of flow, where time seems to pass quickly and distractions fade away. It brings energy and a sense of participation to life.",
+        "related_emotions": ["Interested", "Fascinated", "Inspired", "Excited", "Present"]
+      },
+      {
+        "name": "Enthusiastic",
+        "brief_description": "You feel a strong, positive excitement and passion for a subject, activity, or goal.",
+        "extended_description": "Enthusiasm is an active, high-arousal emotion that communicates joy and commitment. It generates the drive needed to pursue projects, inspire others, and overcome difficulties. When enthusiastic, you approach tasks with a willing heart and a focus on positive possibilities.",
+        "related_emotions": ["Eager", "Excited", "Passionate", "Energized", "Lively"]
+      },
+      {
+        "name": "Excited",
+        "brief_description": "You feel an energetic, anticipatory thrill of joy and high expectation.",
+        "extended_description": "Excitement is a high-activation emotion characterized by physiological arousal, such as a racing heart or butterflies. It occurs in anticipation of positive events, rewards, or novel experiences. While positive, it can sometimes mimic the physical signs of anxiety, requiring cognitive reframing to enjoy fully.",
+        "related_emotions": ["Eager", "Enthusiastic", "Thrilled", "Delighted", "Ecstatic"]
+      },
+      {
+        "name": "Free",
+        "brief_description": "You feel an unburdened sense of liberty, lightness, and choice in your life.",
+        "extended_description": "Freedom as an emotion is the feeling of being unrestricted by external pressures, anxiety, or self-doubt. It allows you to express your true self and make choices aligned with your values. It brings a profound sense of relief, spaciousness, and agency to your mind.",
+        "related_emotions": ["Peaceful", "Adventurous", "Grounded", "Confident", "Lively"]
+      },
+      {
+        "name": "Happy",
+        "brief_description": "You feel a bright, satisfying sense of well-being, pleasure, and contentment.",
+        "extended_description": "Happiness is a versatile positive emotion that can range from quiet contentment to active joy. It typically arises when our needs are met, our goals are progressing, or we feel connected to others. It acts as an internal indicator that our lives are aligned with what we value and enjoy.",
+        "related_emotions": ["Delighted", "Content", "Satisfied", "Bliss", "Cheerful"]
+      },
+      {
+        "name": "Inspired",
+        "brief_description": "You feel a creative or emotional elevation that fills you with new ideas and the drive to create.",
+        "extended_description": "Inspiration is a transformative emotion that pulls you out of routine thinking and connects you to new possibilities. It often arises when you witness beauty, excellence, or profound ideas, leaving you with a strong urge to express yourself or make a difference. It provides energy and direction.",
+        "related_emotions": ["Awe", "Energized", "Enthusiastic", "Refreshed", "Moved"]
+      },
+      {
+        "name": "Invigorated",
+        "brief_description": "You feel refreshed, revitalized, and filled with renewed physical or mental strength.",
+        "extended_description": "Invigorating feelings arise when you shake off staleness or fatigue, often due to fresh air, exercise, success, or positive interactions. It is a clean, physical energy that makes you feel alive and robust, ready to meet the demands of the day with enthusiasm.",
+        "related_emotions": ["Refreshed", "Rejuvenated", "Energized", "Vibrant", "Lively"]
+      },
+      {
+        "name": "Lively",
+        "brief_description": "You feel full of life, active energy, and playful spirits.",
+        "extended_description": "Liveliness is an expressive, high-spirited emotion that makes you want to move, interact, and play. It is infectious and social, encouraging lighthearted communication and dynamic activity. It keeps your interactions feeling fresh, engaging, and joyful.",
+        "related_emotions": ["Vibrant", "Playful", "Energized", "Enthusiastic", "Cheerful"]
+      },
+      {
+        "name": "Passionate",
+        "brief_description": "You feel an intense, burning devotion, desire, and excitement for a person, idea, or activity.",
+        "extended_description": "Passion is a concentrated emotion that directs a large amount of your energy and focus toward a specific target. It combines deep love with intense arousal and commitment, making you willing to make sacrifices and work hard for what you care about. It gives life a powerful sense of drive.",
+        "related_emotions": ["Enthusiastic", "Loving", "Excited", "Inspired", "Dedicated"]
+      },
+      {
+        "name": "Playful",
+        "brief_description": "You feel lighthearted, mischievous, and eager to have fun without serious stakes.",
+        "extended_description": "Playfulness is a creative, social emotion that encourages experimentation, humor, and joy. It allows you to explore ideas and actions in a safe, low-risk way, relieving stress and strengthening relationships through shared laughter and fun. It helps maintain cognitive flexibility.",
+        "related_emotions": ["Lively", "Vibrant", "Happy", "Delighted", "Adventuresome"]
+      },
+      {
+        "name": "Radiant",
+        "brief_description": "You feel a glowing, expansive joy that shines outward and warms those around you.",
+        "extended_description": "Radiance is an expression of deep, overflowing happiness that cannot be contained. It manifests as a warm energy, bright smiles, and positive presence that naturally influences and uplifts others. It signals a state of harmony and high emotional health.",
+        "related_emotions": ["Vibrant", "Happy", "Bliss", "Delighted", "Warm"]
+      },
+      {
+        "name": "Refreshed",
+        "brief_description": "You feel restored, clear-headed, and rested after a period of fatigue or stress.",
+        "extended_description": "Being refreshed is the restorative state that follows sleep, relaxation, or a change of pace. It marks the recovery of your mental clarity and physical reserves, allowing you to return to activities with a clean slate and renewed attention.",
+        "related_emotions": ["Renewed", "Rejuvenated", "Invigorated", "Calm", "Relaxed"]
+      },
+      {
+        "name": "Rejuvenated",
+        "brief_description": "You feel youthful, restored, and filled with a fresh lease of energy and life.",
+        "extended_description": "Rejuvenation goes deep, making you feel as though your core energy has been repaired and renewed. It often follows significant self-care, a long vacation, or a profound emotional release. It returns a sense of youthful capability and optimism to your system.",
+        "related_emotions": ["Renewed", "Refreshed", "Invigorated", "Vibrant", "Energized"]
+      },
+      {
+        "name": "Renewed",
+        "brief_description": "You feel a fresh start, with old burdens or fatigue cleared away.",
+        "extended_description": "Renewal is the emotional sensation of beginning again, with a clean slate. It replaces burnout or boredom with a fresh perspective, hope, and ready energy. It allows you to approach old situations with new optimism and strength.",
+        "related_emotions": ["Refreshed", "Rejuvenated", "Optimistic", "Inspired", "Grounded"]
+      },
+      {
+        "name": "Satisfied",
+        "brief_description": "You feel a comfortable completion, having fulfilled a need, desire, or goal.",
+        "extended_description": "Satisfaction is the quiet fulfillment that comes after finishing a task, satisfying a hunger, or achieving a goal. It brings a temporary halt to striving, allowing you to appreciate what has been accomplished. It builds a sense of confidence and competence.",
+        "related_emotions": ["Content", "Fulfilled", "Happy", "Proud", "Appreciative"]
+      },
+      {
+        "name": "Thrilled",
+        "brief_description": "You feel a sudden, intense wave of excitement and delight at a wonderful outcome.",
+        "extended_description": "Thrilled is a peak state of positive excitement, usually triggered by a specific piece of good news, a victory, or a sudden positive turn of events. It is loud, energetic, and demands expression through celebration, movement, or sharing with others.",
+        "related_emotions": ["Excited", "Delighted", "Ecstatic", "Amazed", "Proud"]
+      },
+      {
+        "name": "Vibrant",
+        "brief_description": "You feel pulsing with life, energy, and radiant health.",
+        "extended_description": "Vibrancy is a state of high emotional and physical vitality, where you feel completely plugged into life. It shows in your posture, voice, and attitude, expressing a strong connection to your surroundings and self. It is a highly resilient and attractive emotional state.",
+        "related_emotions": ["Lively", "Energized", "Radiant", "Invigorated", "Playful"]
+      }
+    ]
+  },
+  {
+    "category": "Courageous / Powerful",
+    "emotions": [
+      {
+        "name": "Adventurous",
+        "brief_description": "You feel a bold, exciting desire to seek new and challenging experiences.",
+        "extended_description": "Adventurousness is the willingness to embrace risk, novelty, and the unknown for the sake of growth and discovery. It replaces caution with curiosity, encouraging you to explore unfamiliar physical or mental spaces. It builds confidence and adaptability by testing your limits.",
+        "related_emotions": ["Brave", "Daring", "Exploring", "Free", "Curious"]
+      },
+      {
+        "name": "Brave",
+        "brief_description": "You feel the willingness to face fear, pain, or difficulty despite feeling afraid.",
+        "extended_description": "Bravery is not the absence of fear, but rather the decision that something else is more important than that fear. It involves stepping forward into vulnerability or danger when your instincts urge you to retreat. It develops strength of character and self-trust.",
+        "related_emotions": ["Daring", "Determined", "Valiant", "Capable", "Strong"]
+      },
+      {
+        "name": "Capable",
+        "brief_description": "You feel a confident sense of competence, ability, and readiness to handle tasks.",
+        "extended_description": "Capableness is the quiet, reliable feeling that you possess the skills, intelligence, and resources to deal with what lies ahead. It acts as an antidote to helplessness, giving you the agency to act, solve problems, and stand on your own two feet.",
+        "related_emotions": ["Confident", "Strong", "Determined", "Grounded", "Worthy"]
+      },
+      {
+        "name": "Confident",
+        "brief_description": "You feel a secure belief in your own abilities, judgment, and worth.",
+        "extended_description": "Confidence is a steady trust in yourself and your capacity to navigate life's challenges and opportunities. It is not based on arrogance or knowing all the answers, but on the calm assurance that you can learn, adapt, and handle the outcome of your efforts.",
+        "related_emotions": ["Capable", "Strong", "Proud", "Worthy", "Brave"]
+      },
+      {
+        "name": "Daring",
+        "brief_description": "You feel a bold, audacious willingness to take risks and challenge boundaries.",
+        "extended_description": "Daring is a high-energy form of courage that pushes beyond conventional limits and expectations. It carries a sense of defiance and excitement, urging you to try what seems difficult or unlikely. It can lead to breakthrough discoveries and personal growth.",
+        "related_emotions": ["Brave", "Adventurous", "Valiant", "Free", "Excited"]
+      },
+      {
+        "name": "Determined",
+        "brief_description": "You feel a firm, unwavering resolve to achieve a goal, regardless of obstacles.",
+        "extended_description": "Determination is the focused concentration of your willpower toward a specific outcome. It helps you push through fatigue, setback, and doubt, turning intentions into consistent actions. It provides a sense of drive that can overcome external and internal resistance.",
+        "related_emotions": ["Brave", "Capable", "Strong", "Confident", "Focused"]
+      },
+      {
+        "name": "Free",
+        "brief_description": "You feel an unburdened sense of liberty, lightness, and choice in your life.",
+        "extended_description": "Freedom as an emotion is the feeling of being unrestricted by external pressures, anxiety, or self-doubt. It allows you to express your true self and make choices aligned with your values. It brings a profound sense of relief, spaciousness, and agency to your mind.",
+        "related_emotions": ["Peaceful", "Adventurous", "Grounded", "Confident", "Lively"]
+      },
+      {
+        "name": "Grounded",
+        "brief_description": "You feel stable, connected, and solid within yourself, free from mental flightiness.",
+        "extended_description": "Groundedness is a state of psychological and physical balance where you feel firmly connected to the earth, your body, and the present moment. It keeps your thoughts clear and your emotions stable, allowing you to absorb shocks and stress without losing your footing.",
+        "related_emotions": ["Centered", "Calm", "Peaceful", "Present", "Capable"]
+      },
+      {
+        "name": "Proud",
+        "brief_description": "You feel a satisfying sense of achievement and self-respect for your own or others' actions.",
+        "extended_description": "Pride is a self-evaluative emotion that arises when you live up to your values or achieve something meaningful. When healthy, it reinforces your self-esteem and motivates you to maintain high standards. It is a key building block of self-respect and dignity.",
+        "related_emotions": ["Confident", "Fulfilled", "Worthy", "Satisfied", "Thrilled"]
+      },
+      {
+        "name": "Strong",
+        "brief_description": "You feel an inner robustness, resilience, and power to handle emotional or physical weight.",
+        "extended_description": "Strength as an emotion is the feeling of being sturdy and durable under pressure. It is not just about force, but about the capacity to endure, protect, and stand firm in your values. It gives you the confidence to carry burdens for yourself and others.",
+        "related_emotions": ["Capable", "Brave", "Confident", "Grounded", "Determined"]
+      },
+      {
+        "name": "Worthy",
+        "brief_description": "You feel a solid, quiet belief in your inherent value, goodness, and deservingness of love.",
+        "extended_description": "Worthiness is the deep-seated conviction that you are enough, exactly as you are, without needing to prove your value through achievements. It acts as a protective shield against shame and rejection, allowing you to accept love and appreciation from others and extend compassion to yourself.",
+        "related_emotions": ["Confident", "Proud", "Accepting", "Grounded", "Loved"]
+      },
+      {
+        "name": "Valiant",
+        "brief_description": "You feel an honorable, heroic courage driven by noble intent to protect or serve.",
+        "extended_description": "Valiancy is a form of bravery that is tied to high moral purpose, honor, or duty. It involves facing significant danger or adversity on behalf of others or a cause. It carries a heavy but noble sense of responsibility and selflessness.",
+        "related_emotions": ["Brave", "Daring", "Strong", "Determined", "Dedicated"]
+      }
+    ]
+  }
+]

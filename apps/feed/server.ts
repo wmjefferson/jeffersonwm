@@ -47,6 +47,7 @@ const pool = mysql.createPool({
   user: process.env.MYSQL_USER || "root",
   password: process.env.MYSQL_PASSWORD || "",
   database: process.env.MYSQL_DATABASE || "feed_db",
+  timezone: "Z",
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -320,16 +321,24 @@ async function fetchFeeds(throwOnError: boolean = false) {
     
     for (const item of feed.items) {
       const sql = `
-        INSERT IGNORE INTO feed_items (title, content, url, source, external_id)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO feed_items (title, content, url, source, external_id, created_at)
+        VALUES (?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+        ON DUPLICATE KEY UPDATE
+          title = VALUES(title),
+          content = VALUES(content),
+          url = VALUES(url),
+          source = VALUES(source),
+          created_at = COALESCE(VALUES(created_at), created_at)
       `;
-      // Atom feeds use item.id or item.guid as the external_id
+      // Atom feeds use item.id or item.guid as the external_id.
+      // Upserting lets edited GitHub items refresh in place on later polls.
       await pool.execute(sql, [
         item.title || "Untitled GitHub Event",
         item.content || item.contentSnippet || null,
         item.link || null,
         "github",
-        item.id || item.guid || item.link
+        item.id || item.guid || item.link,
+        item.isoDate || item.pubDate || null,
       ]);
     }
     console.log(`Updated GitHub feed: ${feed.items.length} items processed.`);

@@ -3,18 +3,20 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
+    "install:battalion": "npm --prefix apps/battalion install",
     "install:perihelion": "npm --prefix apps/perihelion install",
     "install:bullion": "npm --prefix apps/bullion install",
     "install:feed": "npm --prefix apps/feed install",
     "install:lionship": "npm --prefix apps/lionship install",
     "install:jeffersonwm": "npm --prefix apps/jeffersonwm install",
-    "install:all": "npm run install:perihelion && npm run install:bullion && npm run install:feed && npm run install:lionship && npm run install:jeffersonwm",
+    "install:all": "npm run install:battalion && npm run install:perihelion && npm run install:bullion && npm run install:feed && npm run install:lionship && npm run install:jeffersonwm",
+    "build:battalion": "npm --prefix apps/battalion run build",
     "build:perihelion": "npm --prefix apps/perihelion run build",
     "build:bullion": "npm --prefix apps/bullion run build",
     "build:feed": "npm --prefix apps/feed run build",
     "build:lionship": "npm --prefix apps/lionship run build",
     "build:jeffersonwm": "npm --prefix apps/jeffersonwm run build",
-    "build": "npm run build:perihelion && npm run build:bullion && npm run build:feed && npm run build:lionship && npm run build:jeffersonwm",
+    "build": "npm run build:battalion && npm run build:perihelion && npm run build:bullion && npm run build:feed && npm run build:lionship && npm run build:jeffersonwm",
     "verify": "npm run install:all && npm run build",
     "deploy:prepare": "npm run build"
   }

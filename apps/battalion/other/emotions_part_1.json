@@ -1,0 +1,232 @@
+[
+  {
+    "category": "Accepting / Open",
+    "emotions": [
+      {
+        "name": "Calm",
+        "brief_description": "You feel a quiet sense of peace and ease, free from worry or agitation.",
+        "extended_description": "Calm is a state of mental and physical serenity where your nervous system is settled. It often arises when you feel safe and content in the present moment, allowing your thoughts to slow down and your body to relax. It signals that there are no immediate threats to respond to.",
+        "related_emotions": ["Peaceful", "Relaxed", "Serene", "Centered", "Grounded"]
+      },
+      {
+        "name": "Centered",
+        "brief_description": "You feel emotionally stable, balanced, and connected to your inner self.",
+        "extended_description": "Centeredness is the state of being grounded and focused, even in the midst of external chaos. When centered, you are aware of your thoughts and feelings without being swept away by them. It provides a steady anchor that allows you to respond to situations mindfully rather than reacting impulsively.",
+        "related_emotions": ["Calm", "Grounded", "Present", "Peaceful", "Serene"]
+      },
+      {
+        "name": "Content",
+        "brief_description": "You feel a gentle, satisfying sense of adequacy and peaceful completion with things as they are.",
+        "extended_description": "Contentment is a quiet, comfortable emotion marked by a lack of craving for something different or more. It arises from recognizing that your current circumstances and self are enough. Unlike intense joy, it is low-arousal, bringing a restful satisfaction with the present moment.",
+        "related_emotions": ["Satisfied", "Calm", "Peaceful", "Blessed", "Appreciative"]
+      },
+      {
+        "name": "Fulfilled",
+        "brief_description": "You feel deeply satisfied and complete, experiencing a sense of purpose and achievement.",
+        "extended_description": "Fulfillment is a profound emotion that comes from realizing your potential or achieving something meaningful. It connects deeply with your core values and the sense that your actions and life have worth. It provides a lasting satisfaction that goes beyond temporary happiness.",
+        "related_emotions": ["Satisfied", "Worthy", "Proud", "Inspired", "Blessed"]
+      },
+      {
+        "name": "Patient",
+        "brief_description": "You feel a calm tolerance and acceptance of delays, challenges, or waiting without irritation.",
+        "extended_description": "Patience is the ability to endure difficult or slow circumstances with a quiet, open mind. It involves managing your expectations and self-regulating frustration or anger. Experiencing patience allows you to remain steady and constructive when facing obstacles.",
+        "related_emotions": ["Calm", "Centered", "Peaceful", "Grounded", "Accepting"]
+      },
+      {
+        "name": "Peaceful",
+        "brief_description": "You feel a tranquil, undisturbed sense of harmony and quiet safety in your body and mind.",
+        "extended_description": "Peacefulness is characterized by a low state of arousal and a deep, harmonious feeling of security. It allows you to exist quietly in the present moment without conflict or worry. This emotion helps restore emotional balance and supports physical relaxation.",
+        "related_emotions": ["Calm", "Serene", "Relaxed", "Content", "Present"]
+      },
+      {
+        "name": "Present",
+        "brief_description": "You feel fully engaged and attentive to the here and now, free from distractions of the past or future.",
+        "extended_description": "Being present is a state of active attention on the current moment, both internally and externally. You observe your experiences without judgment or preoccupation with what has happened or what might happen. It creates a rich connection to your immediate surroundings and relationships.",
+        "related_emotions": ["Centered", "Calm", "Peaceful", "Grounded", "Engaged"]
+      },
+      {
+        "name": "Relaxed",
+        "brief_description": "You feel a soothing release of physical and mental tension, allowing you to rest easy.",
+        "extended_description": "Relaxation is the easing of physical tightness and cognitive pressure. It occurs when your body shifts away from the fight-or-flight stress response into a state of recovery and rest. It signals to your system that it is safe to let go of alertness and recharge.",
+        "related_emotions": ["Calm", "Peaceful", "Serene", "Content", "Refreshed"]
+      },
+      {
+        "name": "Serene",
+        "brief_description": "You feel an exceptionally clear, tranquil, and untroubled state of deep peace.",
+        "extended_description": "Serenity is a refined form of peace that feels steady and spacious, like a clear sky. It is often accompanied by a sense of spiritual or emotional clarity and acceptance of the flow of life. It provides a deep buffer against stress and emotional turbulence.",
+        "related_emotions": ["Calm", "Peaceful", "Relaxed", "Centered", "Grounded"]
+      },
+      {
+        "name": "Trusting",
+        "brief_description": "You feel a secure belief in the reliability, honesty, and safety of others or your path.",
+        "extended_description": "Trust is a core emotion that involves vulnerability and the willingness to rely on someone or something. It lowers your defensiveness, creating a space for genuine connection and intimacy. When trusting, you feel a sense of safety that reduces anxiety about the future.",
+        "related_emotions": ["Safe", "Accepting", "Caring", "Comfortable", "Optimistic"]
+      }
+    ]
+  },
+  {
+    "category": "Connected / Loving",
+    "emotions": [
+      {
+        "name": "Accepting",
+        "brief_description": "You feel a gentle willingness to receive people, situations, or yourself just as they are.",
+        "extended_description": "Acceptance is the act of recognizing reality without attempting to fight, resist, or judge it. It is not approval or surrender, but rather a starting point of clarity from which you can relate to the world and yourself. It brings relief by ending the struggle against what is.",
+        "related_emotions": ["Trusting", "Calm", "Compassion", "Caring", "Safe"]
+      },
+      {
+        "name": "Affectionate",
+        "brief_description": "You feel a warm, tender fondness and liking toward someone or something.",
+        "extended_description": "Affection is a positive emotion that drives you to express warmth, closeness, and care, often through physical touch or kind words. It fosters attachment and strengthens social bonds between friends, family, or partners. Experiencing affection reinforces feelings of mutual safety and belonging.",
+        "related_emotions": ["Loving", "Caring", "Warm", "Tender", "Compassion"]
+      },
+      {
+        "name": "Caring",
+        "brief_description": "You feel a genuine concern for the well-being, safety, and happiness of someone else or yourself.",
+        "extended_description": "Caring is an active emotion focused on protecting, supporting, or nurturing others. It motivates kind actions and a desire to help or relieve suffering. Caring forms the bedrock of strong, empathetic relationships and community connections.",
+        "related_emotions": ["Compassion", "Loving", "Affectionate", "Empathy", "Warm"]
+      },
+      {
+        "name": "Compassion",
+        "brief_description": "You feel a deep warmth and understanding for the suffering of others, coupled with a desire to help.",
+        "extended_description": "Compassion is a powerful emotion that connects you to another person's pain while maintaining a supportive, non-judgmental stance. It goes beyond empathy by actively motivating you to take steps to ease that distress. It brings a sense of shared humanity and kindness to relationships.",
+        "related_emotions": ["Empathy", "Caring", "Loving", "Affectionate", "Tender"]
+      },
+      {
+        "name": "Empathy",
+        "brief_description": "You feel a shared understanding and resonance with the emotions and experiences of another person.",
+        "extended_description": "Empathy is the capacity to mentally and emotionally step into someone else's shoes, feeling a version of what they are feeling. It acts as an emotional bridge, validating the other person's reality and lowering barriers between individuals. It requires openness and active listening to feel fully.",
+        "related_emotions": ["Compassion", "Caring", "Connected", "Understanding", "Tender"]
+      },
+      {
+        "name": "Fulfilled",
+        "brief_description": "You feel deeply satisfied and complete, experiencing a sense of purpose and achievement.",
+        "extended_description": "Fulfillment is a profound emotion that comes from realizing your potential or achieving something meaningful. It connects deeply with your core values and the sense that your actions and life have worth. It provides a lasting satisfaction that goes beyond temporary happiness.",
+        "related_emotions": ["Satisfied", "Worthy", "Proud", "Inspired", "Blessed"]
+      },
+      {
+        "name": "Present",
+        "brief_description": "You feel fully engaged and attentive to the here and now, free from distractions of the past or future.",
+        "extended_description": "Being present is a state of active attention on the current moment, both internally and externally. You observe your experiences without judgment or preoccupation with what has happened or what might happen. It creates a rich connection to your immediate surroundings and relationships.",
+        "related_emotions": ["Centered", "Calm", "Peaceful", "Grounded", "Engaged"]
+      },
+      {
+        "name": "Safe",
+        "brief_description": "You feel free from danger, threat, or harm, experiencing a secure sense of protection.",
+        "extended_description": "Safety is a foundational emotional state where you feel secure enough to let down your guard. It allows your nervous system to rest and digest, promoting vulnerability and open connection with others. Without safety, it is difficult to experience complex positive emotions.",
+        "related_emotions": ["Trusting", "Calm", "Peaceful", "Grounded", "Warm"]
+      },
+      {
+        "name": "Warm",
+        "brief_description": "You feel a cozy, gentle glow of kindness, friendliness, and emotional closeness.",
+        "extended_description": "Warmth is an approachable, comforting emotion that makes you and those around you feel accepted and valued. It manifests as friendly openness, soft expressions, and a desire for pleasant connection. It helps melt social tension and fosters an inviting environment.",
+        "related_emotions": ["Loving", "Caring", "Affectionate", "Tender", "Connected"]
+      },
+      {
+        "name": "Worthy",
+        "brief_description": "You feel a solid, quiet belief in your inherent value, goodness, and deservingness of love.",
+        "extended_description": "Worthiness is the deep-seated conviction that you are enough, exactly as you are, without needing to prove your value through achievements. It acts as a protective shield against shame and rejection, allowing you to accept love and appreciation from others and extend compassion to yourself.",
+        "related_emotions": ["Confident", "Proud", "Accepting", "Grounded", "Loved"]
+      }
+    ]
+  },
+  {
+    "category": "Curious",
+    "emotions": [
+      {
+        "name": "Engaged",
+        "brief_description": "You feel highly focused, involved, and absorbed in an activity or relationship.",
+        "extended_description": "Engagement is an active state of attention and interest where your mind is fully occupied by what you are doing. It often leads to a state of flow, where time seems to pass quickly and distractions fade away. It brings energy and a sense of participation to life.",
+        "related_emotions": ["Interested", "Fascinated", "Inspired", "Excited", "Present"]
+      },
+      {
+        "name": "Exploring",
+        "brief_description": "You feel a keen desire to discover, learn, and investigate new ideas, places, or experiences.",
+        "extended_description": "Exploring is an active, seeking emotion driven by the thrill of discovery and learning. It encourages you to step outside your comfort zone, ask questions, and test boundaries. It is essential for growth, adaptability, and expanding your understanding of the world.",
+        "related_emotions": ["Interested", "Curious", "Adventuresome", "Fascinated", "Intrigued"]
+      },
+      {
+        "name": "Fascinated",
+        "brief_description": "You feel intensely interested and captivated by something unique, mysterious, or beautiful.",
+        "extended_description": "Fascination is a high-focus emotion that draws your attention completely to an object, idea, or person. It is accompanied by a sense of wonder and a strong urge to understand or contemplate what has grabbed your focus. It temporarily pushes away other concerns.",
+        "related_emotions": ["Intrigued", "Interested", "Amazed", "Awe", "Curious"]
+      },
+      {
+        "name": "Interested",
+        "brief_description": "You feel a quiet pull of attention and desire to learn more about a topic, event, or person.",
+        "extended_description": "Interest is one of our primary motivating emotions, acting as a beacon that guides our attention and learning. It makes us want to investigate, ask questions, and spend energy exploring something. It is the vital spark that precedes deeper curiosity and engagement.",
+        "related_emotions": ["Curious", "Engaged", "Intrigued", "Exploring", "Fascinated"]
+      },
+      {
+        "name": "Intrigued",
+        "brief_description": "You feel a combination of curiosity and fascination, drawn by something puzzling or compelling.",
+        "extended_description": "Intrigue is sparked by a hint of mystery, complexity, or uniqueness. It creates a strong desire to solve a puzzle, gather information, or figure out the hidden details of a situation. It keeps your mind active and seeking answers.",
+        "related_emotions": ["Fascinated", "Interested", "Curious", "Exploring", "Perplexed"]
+      },
+      {
+        "name": "Involved",
+        "brief_description": "You feel connected to and actively participating in an event, group, or process.",
+        "extended_description": "Involvement is the feeling of being part of something larger than yourself, where your actions and thoughts matter to the outcome. It brings a sense of responsibility and connection, making you feel integrated and valued within a community or project.",
+        "related_emotions": ["Engaged", "Connected", "Interested", "Valued", "Present"]
+      },
+      {
+        "name": "Stimulated",
+        "brief_description": "You feel mentally or creatively energized, alert, and ready to engage with ideas or activities.",
+        "extended_description": "Stimulation occurs when your mind or senses are excited by interesting, challenging, or novel inputs. It banishes boredom and lethargy, filling you with mental momentum and curiosity. It drives you to think, create, and interact dynamically.",
+        "related_emotions": ["Energized", "Inspired", "Interested", "Excited", "Lively"]
+      }
+    ]
+  },
+  {
+    "category": "Tender",
+    "emotions": [
+      {
+        "name": "Calm",
+        "brief_description": "You feel a quiet sense of peace and ease, free from worry or agitation.",
+        "extended_description": "Calm is a state of mental and physical serenity where your nervous system is settled. It often arises when you feel safe and content in the present moment, allowing your thoughts to slow down and your body to relax. It signals that there are no immediate threats to respond to.",
+        "related_emotions": ["Peaceful", "Relaxed", "Serene", "Centered", "Grounded"]
+      },
+      {
+        "name": "Caring",
+        "brief_description": "You feel a genuine concern for the well-being, safety, and happiness of someone else or yourself.",
+        "extended_description": "Caring is an active emotion focused on protecting, supporting, or nurturing others. It motivates kind actions and a desire to help or relieve suffering. Caring forms the bedrock of strong, empathetic relationships and community connections.",
+        "related_emotions": ["Compassion", "Loving", "Affectionate", "Empathy", "Warm"]
+      },
+      {
+        "name": "Loving",
+        "brief_description": "You feel a deep, warm attachment, affection, and care for a person, yourself, or life itself.",
+        "extended_description": "Love is a profound, multifaceted emotion that involves deep connection, care, and vulnerability. It can manifest as romantic passion, familial bonding, self-compassion, or a broad appreciation for humanity. It fosters trust, selflessness, and a powerful sense of unity.",
+        "related_emotions": ["Affectionate", "Caring", "Warm", "Tender", "Connected"]
+      },
+      {
+        "name": "Reflective",
+        "brief_description": "You feel a quiet, thoughtful mood, turning your attention inward to contemplate your experiences.",
+        "extended_description": "Reflection is a introspective emotion characterized by low physical arousal and deep cognitive engagement. It involves looking back on events, feelings, or choices to gain understanding, meaning, or self-awareness. It provides a peaceful pause that helps process life's complexity.",
+        "related_emotions": ["Calm", "Centered", "Grounded", "Quiet", "Pensive"]
+      },
+      {
+        "name": "Self-loving",
+        "brief_description": "You feel a warm, accepting kindness and appreciation for who you are, flaws and all.",
+        "extended_description": "Self-love is the practice and feeling of holding yourself in high regard, treating yourself with the same compassion and respect you would offer a dear friend. It involves setting boundaries, forgiving your mistakes, and honoring your needs. It forms the foundation of true emotional resilience.",
+        "related_emotions": ["Worthy", "Accepting", "Grounded", "Confident", "Tender"]
+      },
+      {
+        "name": "Serene",
+        "brief_description": "You feel an exceptionally clear, tranquil, and untroubled state of deep peace.",
+        "extended_description": "Serenity is a refined form of peace that feels steady and spacious, like a clear sky. It is often accompanied by a sense of spiritual or emotional clarity and acceptance of the flow of life. It provides a deep buffer against stress and emotional turbulence.",
+        "related_emotions": ["Calm", "Peaceful", "Relaxed", "Centered", "Grounded"]
+      },
+      {
+        "name": "Vulnerable",
+        "brief_description": "You feel emotionally exposed, open, and uncertain, but willing to show your true self.",
+        "extended_description": "Vulnerability is the feeling we get during times of uncertainty, risk, and emotional exposure. While it can feel uncomfortable or scary, it is the birthplace of connection, courage, and authenticity. Being vulnerable means showing up and letting yourself be seen.",
+        "related_emotions": ["Tender", "Sensitive", "Open", "Apprehensive", "Trusting"]
+      },
+      {
+        "name": "Warm",
+        "brief_description": "You feel a cozy, gentle glow of kindness, friendliness, and emotional closeness.",
+        "extended_description": "Warmth is an approachable, comforting emotion that makes you and those around you feel accepted and valued. It manifests as friendly openness, soft expressions, and a desire for pleasant connection. It helps melt social tension and fosters an inviting environment.",
+        "related_emotions": ["Loving", "Caring", "Affectionate", "Tender", "Connected"]
+      }
+    ]
+  }
+]

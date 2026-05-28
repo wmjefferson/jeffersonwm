@@ -30,7 +30,7 @@ This is the current working shape of the active sites, services, and supporting 
 - `apps/vermilion`
   - local Python project now tracked in the monorepo
 - `apps/battalion`
-  - placeholder folder inside the monorepo; current live runtime is still maintained separately on the home server
+  - tracked source for the live Battalion app; current runtime still deploys from the home server copy
 
 ## Home Server Runtime Layout
 

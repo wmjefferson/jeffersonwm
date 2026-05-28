@@ -725,7 +725,7 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/history/downloads":
                 if central_auth_enabled():
-                    self._send_json({"error": "Download history now lives in Auth JeffersonWM.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
+                    self._send_json({"error": "Download history now lives in Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 user = current_user_from_handler(self)
                 if not user:
@@ -762,7 +762,7 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/admin/users":
                 if central_auth_enabled():
-                    self._send_json({"error": "Account administration now lives in Auth JeffersonWM.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
+                    self._send_json({"error": "Account administration now lives in Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 user = self._require_admin()
                 if not user:
@@ -962,7 +962,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/auth/register":
                 if central_auth_enabled():
-                    self._send_json({"error": "Registration is handled by Auth JeffersonWM.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
+                    self._send_json({"error": "Registration is handled by Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 payload = load_json_body(self)
                 username = (payload.get("username") or "").strip()
@@ -1006,7 +1006,7 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/auth/login":
                 if central_auth_enabled():
-                    self._send_json({"error": "Sign-in is handled by Auth JeffersonWM.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
+                    self._send_json({"error": "Sign-in is handled by Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 payload = load_json_body(self)
                 username = (payload.get("username") or "").strip()
@@ -1042,7 +1042,7 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/auth/logout":
                 if central_auth_enabled():
-                    self._send_json({"error": "Sign-out is handled by Auth JeffersonWM.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
+                    self._send_json({"error": "Sign-out is handled by Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 destroy_session(cookie_map(self).get(SESSION_COOKIE_NAME))
                 self._send_json({"ok": True}, 200, extra_headers=[self._clear_session_cookie()])
@@ -1050,7 +1050,7 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/auth/change-password":
                 if central_auth_enabled():
-                    self._send_json({"error": "Password changes are handled by Auth JeffersonWM.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
+                    self._send_json({"error": "Password changes are handled by Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 user = current_user_from_handler(self)
                 if not user:
@@ -1090,7 +1090,7 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/auth/change-username":
                 if central_auth_enabled():
-                    self._send_json({"error": "Username changes are handled by Auth JeffersonWM.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
+                    self._send_json({"error": "Username changes are handled by Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 user = current_user_from_handler(self)
                 if not user:
@@ -1144,7 +1144,7 @@ class Handler(BaseHTTPRequestHandler):
             match = re.fullmatch(r"/api/admin/users/(\d+)/(approve|block|delete)", path)
             if match:
                 if central_auth_enabled():
-                    self._send_json({"error": "Account administration now lives in Auth JeffersonWM.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
+                    self._send_json({"error": "Account administration now lives in Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 admin = self._require_admin()
                 if not admin:

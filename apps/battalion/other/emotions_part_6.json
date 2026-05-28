@@ -1,0 +1,168 @@
+[
+  {
+    "category": "Fear",
+    "emotions": [
+      {
+        "name": "Afraid",
+        "brief_description": "You feel a basic, unpleasant sense of danger, threat, or harm.",
+        "extended_description": "Fear is an essential survival emotion triggered by a perceived threat to your safety or well-being. It activates the fight-or-flight response, raising your heart rate and focusing your attention entirely on the danger. It motivates you to seek safety, protect yourself, or escape.",
+        "related_emotions": ["Frightened", "Scared", "Terrified", "Anxious", "Nervous"]
+      },
+      {
+        "name": "Anxious",
+        "brief_description": "You feel a persistent, uneasy worry and tension about future uncertainties or potential threats.",
+        "extended_description": "Anxiety is a state of apprehension about what might happen, rather than an immediate threat. It keeps your mind spinning with 'what-ifs' and your body in a state of low-level tension or vigilance. It signals a need to seek safety, clarity, or control over future events.",
+        "related_emotions": ["Nervous", "Worried", "Apprehensive", "Uneasy", "Edgy"]
+      },
+      {
+        "name": "Apprehensive",
+        "brief_description": "You feel a quiet, cautious worry that something bad or unpleasant is going to happen.",
+        "extended_description": "Apprehension is a mild-to-moderate form of fear marked by anticipation and vigilance. It makes you approach situations slowly and with guard rails up, scanning for potential problems. It serves as a protective warning system before you commit to action.",
+        "related_emotions": ["Anxious", "Worried", "Hesitant", "Uneasy", "Concerned"]
+      },
+      {
+        "name": "Frightened",
+        "brief_description": "You feel a sudden, sharp fear or shock in response to an immediate threat.",
+        "extended_description": "Fright is a quick-activation, high-intensity fear response. It is often triggered by sudden noises, movements, or surprises, causing a physical jump and a rush of adrenaline. It prepares your body for immediate self-preservation.",
+        "related_emotions": ["Afraid", "Scared", "Terrified", "Shocked", "Rattled"]
+      },
+      {
+        "name": "Hesitant",
+        "brief_description": "You feel a slow, cautious reluctance to act or make a decision due to uncertainty.",
+        "extended_description": "Hesitation is an active pause driven by doubt, fear of mistake, or lack of information. It holds you back from taking a step, allowing your mind to calculate risks and assess options. It acts as an emotional brake to prevent reckless action.",
+        "related_emotions": ["Reluctant", "Apprehensive", "Inhibited", "Unsure", "Skeptical"]
+      },
+      {
+        "name": "Nervous",
+        "brief_description": "You feel a restless, jittery tension and apprehension about an upcoming event or challenge.",
+        "extended_description": "Nervousness is a common, low-to-medium arousal emotion that arises when you face a situation with uncertain stakes, like a speech or test. It shows as butterflies in the stomach, fidgeting, and a racing mind. It signals that you care about the outcome and are priming your system to perform.",
+        "related_emotions": ["Anxious", "Agitated", "Jittery", "Apprehensive", "Edgy"]
+      },
+      {
+        "name": "Panic",
+        "brief_description": "You feel a sudden, overwhelming wave of terror and uncontrollable anxiety that disables clear thinking.",
+        "extended_description": "Panic is a peak fear state where your rational mind is completely bypassed by a severe fight, flight, or freeze response. It manifests with physical symptoms like shortness of breath, a racing heart, and a feeling of impending doom. It demands immediate grounding and safety.",
+        "related_emotions": ["Terrified", "Scared", "Frightened", "Trapped", "Rattled"]
+      },
+      {
+        "name": "Paralyzed",
+        "brief_description": "You feel frozen and completely unable to move, act, or think due to overwhelming fear.",
+        "extended_description": "Being paralyzed (emotionally) is a freeze response, where your nervous system is so overloaded by threat or choice that it shuts down active output. You feel stuck and unable to escape or defend yourself, trapped in your own body or mind. Breaking it requires safety and small, micro-movements.",
+        "related_emotions": ["Terrified", "Helpless", "Powerless", "Scared", "Trapped"]
+      },
+      {
+        "name": "Scared",
+        "brief_description": "You feel a common, sharp sense of fear and alarm at a potential danger.",
+        "extended_description": "Being scared is a direct, active state of fear. It makes you feel vulnerable and prompts you to seek shelter, protection, or the comfort of others. It is a natural response to threats that signals you need support or a change of environment.",
+        "related_emotions": ["Afraid", "Frightened", "Terrified", "Anxious", "Vulnerable"]
+      },
+      {
+        "name": "Terrified",
+        "brief_description": "You feel an extreme, intense, and consuming fear that fills you with dread.",
+        "extended_description": "Terror is the highest level of fear, where you feel completely vulnerable and exposed to extreme danger. It shuts down all non-essential thinking, focusing your entire survival machinery on escape or survival. It leaves a deep imprint on your memory and nervous system.",
+        "related_emotions": ["Panic", "Frightened", "Scared", "Afraid", "Paralyzed"]
+      },
+      {
+        "name": "Worried",
+        "brief_description": "You feel a persistent, uneasy mental preoccupation with potential problems or negative outcomes.",
+        "extended_description": "Worry is a cognitive form of anxiety where your mind repeatedly plays out negative future scenarios in an attempt to solve them. While intended to prepare you, it often creates a loop of stress that drains your energy and disturbs your peace. It signals a need for reassurance or plan-making.",
+        "related_emotions": ["Anxious", "Apprehensive", "Concerned", "Unsettled", "Uneasy"]
+      }
+    ]
+  },
+  {
+    "category": "Stressed / Tense",
+    "emotions": [
+      {
+        "name": "Anxious",
+        "brief_description": "You feel a persistent, uneasy worry and tension about future uncertainties or potential threats.",
+        "extended_description": "Anxiety is a state of apprehension about what might happen, rather than an immediate threat. It keeps your mind spinning with 'what-ifs' and your body in a state of low-level tension or vigilance. It signals a need to seek safety, clarity, or control over future events.",
+        "related_emotions": ["Nervous", "Worried", "Apprehensive", "Uneasy", "Edgy"]
+      },
+      {
+        "name": "Burned out",
+        "brief_description": "You feel a state of chronic physical and emotional exhaustion, cynicism, and low efficacy.",
+        "extended_description": "Burnout is the result of prolonged exposure to high stress without adequate recovery. It leaves you feeling completely drained of energy, detached from your work or relationships, and believing your efforts are useless. It is a severe signal that your lifestyle and boundaries require radical change.",
+        "related_emotions": ["Exhausted", "Depleted", "Weary", "Lethargic", "Despondent"]
+      },
+      {
+        "name": "Cranky",
+        "brief_description": "You feel a quick-tempered, petty irritability and low tolerance for annoyances.",
+        "extended_description": "Crankiness is a low-energy, irritable state similar to grouchiness. It is frequently tied to physical deficits like lack of sleep, hunger, or overwork. It makes small inconveniences feel like major offenses, causing you to snap. It is a sign that your self-regulation resources are dry.",
+        "related_emotions": ["Grouchy", "Irritated", "Edgy", "Agitated", "Restless"]
+      },
+      {
+        "name": "Depleted",
+        "brief_description": "You feel completely emptied of emotional, mental, and physical reserves.",
+        "extended_description": "Depletion occurs when you have given too much energy to tasks, stress, or others without refilling your own tank. You feel hollow, fragile, and unable to meet further demands. It demands immediate, restorative rest and self-care.",
+        "related_emotions": ["Burned out", "Exhausted", "Weary", "Empty", "Lethargic"]
+      },
+      {
+        "name": "Edgy",
+        "brief_description": "You feel tense, irritable, and close to losing your temper or control.",
+        "extended_description": "Edginess is a state of high nervous sensitivity where physical fatigue and mental stress leave you with very little emotional buffer. Even minor noises or demands can feel grating, prompting a sharp response. It is a sign that your nervous system is overloaded and needs rest.",
+        "related_emotions": ["On edge", "Agitated", "Irritated", "Restless", "Anxious"]
+      },
+      {
+        "name": "Exhausted",
+        "brief_description": "You feel a profound, heavy drain of all physical and mental strength.",
+        "extended_description": "Exhaustion is the state of having completely spent your energy reserves. It affects your thinking, emotional control, and body, making any effort feel monumental. It is an urgent signal that your system must rest and sleep to recover.",
+        "related_emotions": ["Weary", "Depleted", "Burned out", "Lethargic", "Frazzled"]
+      },
+      {
+        "name": "Frazzled",
+        "brief_description": "You feel messy, disorganized, and highly stressed by too many demands at once.",
+        "extended_description": "Being frazzled is a state of mental disarray caused by multitasking under pressure. Your thoughts feel scattered, you make simple mistakes, and you feel close to panic or tears. It signals that your cognitive capacity is overloaded and you need to simplify and slow down.",
+        "related_emotions": ["Overwhelm", "Rattled", "On edge", "Edgy", "Exhausted"]
+      },
+      {
+        "name": "Overwhelm",
+        "brief_description": "You feel completely flooded and buried by the weight of emotions or tasks.",
+        "extended_description": "Overwhelm is the feeling that the demands upon you exceed your capacity to process or handle them. It can cause you to freeze, panic, or feel emotionally flooded, making clear thinking difficult. It signals a need to halt, break tasks into tiny parts, and ask for help.",
+        "related_emotions": ["Frazzled", "Rattled", "Anxious", "Trapped", "Helpless"]
+      },
+      {
+        "name": "Rattled",
+        "brief_description": "You feel shaken, nervous, and temporarily disorganized by an unexpected disturbance.",
+        "extended_description": "Being rattled is a state of sudden disorientation following a mistake, scare, or confrontation. It disrupts your composure, making your heart race and your hands shake, and leaves you struggling to find your focus. It requires a brief pause to take deep breaths and center yourself.",
+        "related_emotions": ["Shaken", "Frazzled", "Disturbed", "Uneasy", "Shocked"]
+      },
+      {
+        "name": "Rejecting",
+        "brief_description": "You feel a cold, defensive urge to push away people, ideas, or offers.",
+        "extended_description": "Rejecting is a protective emotion that arises when you feel threatened, overwhelmed, or critical of something. By pushing the source away, you protect your boundaries and control. However, when done out of fear, it can block connection and new opportunities.",
+        "related_emotions": ["Defensive", "Resistant", "Disdainful", "Distant", "Hostile"]
+      },
+      {
+        "name": "Restless",
+        "brief_description": "You feel a nervous, unsettled energy that makes it hard to be still or satisfied.",
+        "extended_description": "Restlessness is a state of active but unfocused energy, where you feel a constant urge to move, change tasks, or seek something else. It often covers up underlying anxiety, boredom, or dissatisfaction. It is a sign of lack of ease in your current state.",
+        "related_emotions": ["Agitated", "Edgy", "Uneasy", "Unsettled", "Anxious"]
+      },
+      {
+        "name": "Shaken",
+        "brief_description": "You feel emotionally unstable, shocked, and unsteady after a disturbing event.",
+        "extended_description": "Being shaken is the lingering impact of a sudden emotional shock or scare. It leaves you feeling physically weak or trembling, with a fragile grasp on your usual confidence. It signals that your sense of safety has been temporarily disrupted.",
+        "related_emotions": ["Rattled", "Shocked", "Disturbed", "Frightened", "Vulnerable"]
+      },
+      {
+        "name": "Tight",
+        "brief_description": "You feel a rigid, constricted physical and mental tension.",
+        "extended_description": "Tightness as an emotion is the feeling of holding yourself rigidly against stress, fear, or anger. Your body clinches (shoulders, jaw, chest) and your mind struggles to be flexible or open. It signals a state of high defensiveness that needs physical release.",
+        "related_emotions": ["Tense", "Edgy", "On edge", "Restless", "Anxious"]
+      },
+      {
+        "name": "Weary",
+        "brief_description": "You feel physically and emotionally exhausted, making it hard to carry on.",
+        "extended_description": "Weariness is a deep fatigue that goes beyond simple sleepiness; it is the exhaustion of your spirit and resilience after enduring long stress, sorrow, or effort. It makes tasks feel heavy and decisions difficult, signaling that you need deep rest, boundary setting, and support.",
+        "related_emotions": ["Exhausted", "Burned out", "Depleted", "Lethargic", "Despondent"]
+      },
+      {
+        "name": "Worn out",
+        "brief_description": "You feel heavily eroded, tired, and depleted by long-term demands.",
+        "extended_description": "Being worn out is the feeling of physical and emotional wear and tear over time. Your energy feels thin, your patience is short, and your body feels heavy. It signals a long-overdue need to step away from stressors and rebuild your reserves.",
+        "related_emotions": ["Exhausted", "Depleted", "Weary", "Burned out", "Lethargic"]
+      }
+    ]
+  }
+]

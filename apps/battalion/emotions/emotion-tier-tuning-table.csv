@@ -1,0 +1,7 @@
+Tier,XP,HP,Stress,Direct Loss Allowed
+Neutral,1.00,1.00,1.00,false
+Mild Positive,1.03,1.02,0.97,false
+Strong Positive,1.08,1.06,0.92,false
+Mild Negative,0.96,0.97,1.04,false
+Strong Negative,0.90,0.92,1.10,true
+Extreme Negative,0.82,0.86,1.18,true

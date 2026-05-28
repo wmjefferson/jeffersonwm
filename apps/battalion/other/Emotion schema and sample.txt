@@ -1,0 +1,105 @@
+Absolutely — the merged JSON is the right move, and I’ve already assembled the merged structure plus the override samples.
+
+What the merged JSON contains
+The merged file combines:
+
+Your original RPG system data.
+
+Per-action emotion tags.
+
+Per-action sensitivity bands.
+
+Emotion category affinities.
+
+The runtime formula spec for multiplier calculation.
+
+That means you now have one master JSON that can support the whole emotion pipeline instead of spreading it across separate files.
+
+Override table sample 1
+Here’s a high-intensity risky-action override you can use as a pattern:
+
+json
+{
+  "override_name": "high_intensity_risky_actions",
+  "applies_to_tags": ["risky", "conflict", "escape"],
+  "applies_to_emotions": ["Fear", "Angry / Annoyed", "Stressed / Tense", "Powerless"],
+  "rule": {
+    "if_emotion_tier_gte": 4,
+    "multiplier_floor": 0.72,
+    "multiplier_ceiling": 1.32,
+    "stress_bonus_on_failure": 2,
+    "social_penalty": -1,
+    "time_multiplier": 1.08
+  },
+  "examples": [
+    {
+      "action": "Smoke Cigarette",
+      "expected_effect": "Fear and stress can make it more appealing, but also increase the later stress cost."
+    },
+    {
+      "action": "Argue With Friend",
+      "expected_effect": "Anger pushes intensity up, fear or shame pushes avoidance or failure risk up."
+    },
+    {
+      "action": "Quit Job",
+      "expected_effect": "Powerless and fear bias toward hesitation; courage can reduce the penalty."
+    }
+  ]
+}
+Override table sample 2
+And here’s a restorative/social override for the opposite kind of behavior:
+
+json
+{
+  "override_name": "social_restoration_actions",
+  "applies_to_tags": ["social", "restorative", "care", "comfort"],
+  "applies_to_emotions": ["Connected / Loving", "Tender", "Grateful", "Accepting / Open", "Hopeful"],
+  "rule": {
+    "if_emotion_tier_gte": 3,
+    "multiplier_floor": 0.88,
+    "multiplier_ceiling": 1.24,
+    "social_bonus": 2,
+    "stress_reduction_bonus": 1,
+    "health_bonus": 1,
+    "fun_bonus": 1
+  },
+  "examples": [
+    {
+      "action": "Call Family",
+      "expected_effect": "Connected and tender states should lift social value and reduce stress more strongly."
+    },
+    {
+      "action": "Take Shower",
+      "expected_effect": "Open or grateful states make recovery feel more effective and less costly."
+    },
+    {
+      "action": "Pet Dog",
+      "expected_effect": "Care-oriented states amplify calm support and bonding effects."
+    }
+  ]
+}
+How to use these
+These override tables should sit above the normal formula as special-case rules. A good pattern is:
+
+Check for an override match first.
+
+If one exists, apply its tighter or looser caps.
+
+Then let the standard tag-and-tier formula finish the calculation.
+
+That gives you a layered system where most actions use the general formula, but emotionally loaded actions can have handcrafted behavior when needed.
+
+Best interpretation
+Your model is now in a good place for Antigravity-style formulation because it has:
+
+one master JSON,
+
+a general multiplier engine,
+
+action tagging,
+
+sensitivity bands,
+
+and override hooks for special cases.
+
+So the remaining work is mostly about identifying the handful of actions that deserve explicit overrides, rather than trying to hand-author everything.

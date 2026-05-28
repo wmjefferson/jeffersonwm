@@ -5,10 +5,10 @@ This repository contains the Jefferson Wm web apps:
 - `apps/feed`
 - `apps/perihelion`
 - `apps/bullion`
+- `apps/battalion`
 - `apps/lionship`
 - `apps/jeffersonwm`
 - `apps/vermilion`
-- `apps/battalion` placeholder
 
 Legacy standalone repos are preserved separately and this monorepo is the new active workspace.
 
@@ -19,7 +19,9 @@ them into a shared npm workspace.
 ## Useful Commands
 
 - `npm run install:feed`
+- `npm run install:battalion`
 - `npm run install:all`
+- `npm run build:battalion`
 - `npm run build:feed`
 - `npm run build`
 - `npm run verify`
