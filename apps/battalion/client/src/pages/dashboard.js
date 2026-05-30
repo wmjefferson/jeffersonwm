@@ -59,7 +59,7 @@ function connectSSE() {
   try {
     const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const sseBase = isDev ? '' : 'https://api-battalion.jeffersonwm.com';
-    eventSource = new EventSource(`${sseBase}/api/events/stream`, { withCredentials: true });
+    eventSource = new EventSource(`${sseBase}/api/events/stream`);
     eventSource.onmessage = (e) => {
       try {
         const event = JSON.parse(e.data);
