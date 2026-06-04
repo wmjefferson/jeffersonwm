@@ -549,7 +549,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            Feed. v.0.1.0
+            Feed. v.0.2.0
           </a>
           <a
             class="app-link"
@@ -565,7 +565,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            Battalion. v.1.0.0
+            Battalion. v.1.1.0
           </a>
 
           <a
@@ -574,7 +574,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            Lionship. v.0.1
+            Lionship. v.0.1.0
           </a>
           <a
             class="app-link"
@@ -582,7 +582,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            Perihelion. v.1.0.0
+            Perihelion. v.1.3.0
           </a>
           <a
             class="app-link"
@@ -590,7 +590,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            Dooky Detective. v.0.2
+            Dooky Detective. v.0.1.0
           </a>
           <a
             class="app-link"
@@ -598,7 +598,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            Jeffershizzle. v.0.2
+            Jeffershizzle. v.0.1.0
           </a>
         </nav>
       </main>
@@ -946,12 +946,41 @@
             return;
           }
 
-          const font = fonts[Math.floor(Math.random() * fonts.length)];
+          const normalizedFonts = fonts
+            .map(font => {
+              if (typeof font === 'string') {
+                return { name: font.trim(), weight: 2 };
+              }
+              if (font && typeof font.name === 'string') {
+                const parsedWeight = Number(font.weight);
+                return {
+                  name: font.name.trim(),
+                  weight: Number.isFinite(parsedWeight)
+                    ? Math.min(3, Math.max(1, Math.round(parsedWeight)))
+                    : 2
+                };
+              }
+              return null;
+            })
+            .filter(font => Boolean(font && font.name));
+
+          if (normalizedFonts.length === 0) {
+            return;
+          }
+
+          const totalWeight = normalizedFonts.reduce((sum, font) => sum + font.weight, 0);
+          let threshold = Math.random() * totalWeight;
+          const font =
+            normalizedFonts.find(candidate => {
+              threshold -= candidate.weight;
+              return threshold < 0;
+            }) || normalizedFonts[normalizedFonts.length - 1];
+
           const link = document.createElement('link');
           link.rel = 'stylesheet';
-          link.href = `https://fonts.googleapis.com/css2?family=${font.replace(/ /g, '+')}&display=swap`;
+          link.href = `https://fonts.googleapis.com/css2?family=${font.name.replace(/ /g, '+')}&display=swap`;
           document.head.appendChild(link);
-          elements.panel.style.fontFamily = `"${font}", "IBM Plex Sans Condensed", system-ui, sans-serif`;
+          elements.panel.style.fontFamily = `"${font.name}", "IBM Plex Sans Condensed", system-ui, sans-serif`;
         };
 
         const refreshWidgetData = async () => {

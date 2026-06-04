@@ -1,0 +1,39 @@
+RewriteEngine On
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Redirect 4-character short URLs to perihelion share page
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([a-zA-Z0-9]{4})/?$ /perihelion/?share=$1 [R=302,L]
+
+# Redirect root to /jeffersonwm (landing page)
+RewriteCond %{REQUEST_URI} ^/$
+RewriteRule ^(.*)$ /jeffersonwm/ [L]
+
+# Jeffersonwm landing page SPA routing (if needed)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^jeffersonwm(/.*)?$ /jeffersonwm/index.html [L]
+
+# Bullion app routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^bullion(/.*)?$ /bullion/index.html [L]
+
+# Lionship app routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^lionship(/.*)?$ /lionship/index.html [L]
+
+# Perihelion app routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^perihelion(/.*)?$ /perihelion/index.html [L]
+
+# Serve assets directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]

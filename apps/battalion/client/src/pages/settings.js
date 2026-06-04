@@ -106,6 +106,9 @@ export async function renderSettings(container) {
 
               <button class="btn btn--primary" type="submit" style="align-self:flex-start; padding:6px 16px; cursor:pointer;">Save Settings</button>
             </form>
+
+            <h2 class="section__title" style="margin-top:24px; margin-bottom:8px;">Background Color</h2>
+            <div id="bg-color-picker" style="display:flex; flex-wrap:wrap; gap:6px; max-width:400px; background:#fafafa; padding:12px; border:1px solid #eee;"></div>
           </div>
 
           <!-- Analytics Pane -->
@@ -221,6 +224,56 @@ export async function renderSettings(container) {
       showToast('Failed to save settings: ' + err.message, 'error');
     }
   });
+
+  // ─── Background Color Picker ──────────────────────────────────────
+  const BG_COLORS = [
+    { value: '#ffffff', label: 'White' },
+    { value: '#fafafa', label: 'Snow' },
+    { value: '#f5f5f5', label: 'Smoke' },
+    { value: '#f0f4f8', label: 'Mist' },
+    { value: '#eef2ff', label: 'Lavender' },
+    { value: '#eff6ff', label: 'Ice' },
+    { value: '#f0fdf4', label: 'Mint' },
+    { value: '#fefce8', label: 'Cream' },
+    { value: '#fff7ed', label: 'Peach' },
+    { value: '#fdf2f8', label: 'Blush' },
+    { value: '#f5f3ff', label: 'Lilac' },
+    { value: '#ecfeff', label: 'Frost' },
+  ];
+
+  const pickerEl = document.getElementById('bg-color-picker');
+  const savedBg = localStorage.getItem('battalion_bg_color') || '#ffffff';
+
+  if (pickerEl) {
+    pickerEl.innerHTML = BG_COLORS.map(c => {
+      const isActive = c.value === savedBg;
+      return `<button type="button" class="bg-swatch" data-bg="${c.value}" title="${c.label}" style="
+        width:36px; height:36px; border-radius:4px; cursor:pointer;
+        border:2px solid ${isActive ? '#333' : '#ccc'};
+        background:${c.value};
+        display:flex; align-items:center; justify-content:center;
+        font-size:14px; transition: border-color 0.15s;
+      ">${isActive ? '✓' : ''}</button>`;
+    }).join('');
+
+    pickerEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.bg-swatch');
+      if (!btn) return;
+      const color = btn.dataset.bg;
+      localStorage.setItem('battalion_bg_color', color);
+      document.body.style.backgroundColor = color;
+      // Update swatch visuals
+      pickerEl.querySelectorAll('.bg-swatch').forEach(s => {
+        const active = s.dataset.bg === color;
+        s.style.borderColor = active ? '#333' : '#ccc';
+        s.textContent = active ? '✓' : '';
+      });
+      showToast(`Background set to ${btn.title}`, 'info');
+    });
+  }
+
+  // Apply saved bg color
+  document.body.style.backgroundColor = savedBg;
 }
 
 async function loadPlayerSettings() {

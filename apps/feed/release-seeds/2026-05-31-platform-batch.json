@@ -1,0 +1,41 @@
+{
+  "source": "release",
+  "entries": [
+    {
+      "id": "jeffersonwm-v1.0.1-platform",
+      "appName": "JeffersonWM",
+      "version": "1.0.1",
+      "url": "https://jeffersonwm.com",
+      "createdAt": "2026-05-31T10:30:00-07:00",
+      "highlights": [
+        "Expanded the homepage hub with live links and clearer version labels for Feed, Bullion, Battalion, and Perihelion.",
+        "Tightened the service launcher and VS Code task stack so the active APIs and tunnels start with cleaner names and fewer dead terminals.",
+        "Continued turning the network into a documented platform with stronger runbooks, architecture notes, and cross-machine workflow guidance."
+      ]
+    },
+    {
+      "id": "multimillion-v0.1.0-surface",
+      "appName": "Multimillion",
+      "version": "0.1.0",
+      "url": "https://auth.jeffersonwm.com",
+      "createdAt": "2026-05-31T10:35:00-07:00",
+      "highlights": [
+        "Promoted the shared auth system under the visible Multimillion name while keeping the stable JeffersonWM host and session plumbing underneath.",
+        "Kept the regular user experience simpler while preserving the fuller admin flow for approvals, notes, memberships, and account history.",
+        "Strengthened the cross-app identity layer that Perihelion and future apps can plug into without rebuilding account logic from scratch."
+      ]
+    },
+    {
+      "id": "clionidae-v0.1.0-launch",
+      "appName": "Clionidae",
+      "version": "0.1.0",
+      "url": "https://jeffersonwm.com/clionidae/",
+      "createdAt": "2026-05-31T10:40:00-07:00",
+      "highlights": [
+        "Established Clionidae as the new reusable JeffersonWM template with its own port range, standards contract, and integrated frontend-backend shell.",
+        "Added a live visual specimen with core UI primitives and basic card families so future apps start from a concrete design system instead of a blank page.",
+        "Fixed subfolder deployment for /clionidae/ and aligned the starter around Multimillion-aware auth, feed-ready conventions, and documented data options."
+      ]
+    }
+  ]
+}

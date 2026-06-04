@@ -34,6 +34,7 @@ async function startServer() {
 
   let pool: mysql.Pool | null = null;
   let widgetEventsSchemaReady: Promise<void> | null = null;
+  let widgetFontsSchemaReady: Promise<void> | null = null;
   const FALLBACK_FONTS = ['Inter', 'Roboto', 'Open Sans', 'Playfair Display', 'Outfit'];
   const FALLBACK_WOTD = [
     {
@@ -130,15 +131,57 @@ async function startServer() {
     return widgetEventsSchemaReady;
   };
 
+  const ensureWidgetFontsSchema = async () => {
+    const db = initDb();
+    if (!db) return;
+    if (widgetFontsSchemaReady) {
+      return widgetFontsSchemaReady;
+    }
+
+    widgetFontsSchemaReady = (async () => {
+      try {
+        const [rows] = await db.query(
+          `SELECT COUNT(*) AS count
+           FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = 'jeffers4_fonts'
+             AND TABLE_NAME = 'fonts'
+             AND COLUMN_NAME = 'weight'`
+        );
+        const count = Number((rows as Array<{ count?: number }>)[0]?.count || 0);
+        if (count === 0) {
+          await db.execute(
+            'ALTER TABLE jeffers4_fonts.fonts ADD COLUMN weight TINYINT NOT NULL DEFAULT 2'
+          );
+          console.log('Widget fonts schema updated with weight column.');
+        }
+      } catch (error) {
+        console.error('Widget fonts schema check failed:', error);
+      }
+    })();
+
+    return widgetFontsSchemaReady;
+  };
+
   const getWidgetFonts = async () => {
     const db = initDb();
     if (!db) return FALLBACK_FONTS;
+    await ensureWidgetFontsSchema();
 
     try {
-      const [rows] = await db.query('SELECT name FROM jeffers4_fonts.fonts');
-      const fonts = (rows as Array<{ name?: string }>)
-        .map(row => row.name?.trim())
-        .filter((name): name is string => Boolean(name));
+      const [rows] = await db.query('SELECT name, weight FROM jeffers4_fonts.fonts');
+      const fonts = (rows as Array<{ name?: string; weight?: number | string | null }>)
+        .map(row => {
+          const name = row.name?.trim();
+          if (!name) return null;
+
+          const parsedWeight = Number(row.weight);
+          const weight = Number.isFinite(parsedWeight)
+            ? Math.min(3, Math.max(1, Math.round(parsedWeight)))
+            : 2;
+
+          return { name, weight };
+        })
+        .filter((font): font is { name: string; weight: number } => Boolean(font));
       return fonts.length > 0 ? fonts : FALLBACK_FONTS;
     } catch (error) {
       console.error('Widget fonts query failed:', error);

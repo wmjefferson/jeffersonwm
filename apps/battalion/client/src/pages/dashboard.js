@@ -1,4 +1,4 @@
-import { publicDashboard } from '../utils/api.js';
+import { publicDashboard, auth } from '../utils/api.js';
 import { registerInterval } from '../main.js';
 
 let eventSource = null;
@@ -93,7 +93,6 @@ async function loadDashboard() {
 
     // Check auth silently
     try {
-      const { auth } = await import('../utils/api.js');
       const res = await auth.check();
       const authLink = document.getElementById('dash-auth-link');
       if (authLink && res.authenticated) {

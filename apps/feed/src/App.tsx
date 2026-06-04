@@ -75,6 +75,24 @@ function apiUrl(path: string) {
   return `${FEED_API_BASE}${path}`;
 }
 
+function formatRefreshErrorMessage(details: string) {
+  const normalized = details.trim();
+  if (!normalized) {
+    return 'Could not refresh GitHub feed right now.';
+  }
+
+  const lower = normalized.toLowerCase();
+  if (lower.includes('gateway time-out') || lower.includes('timed out') || lower.includes('timeout')) {
+    return 'Could not refresh GitHub feed right now. GitHub timed out upstream.';
+  }
+
+  if (lower.includes('unreachable')) {
+    return 'Could not refresh GitHub feed right now. GitHub was unreachable upstream.';
+  }
+
+  return `Could not refresh GitHub feed right now. ${normalized}`;
+}
+
 function parseFeedDate(value: string) {
   const trimmed = value.trim();
   const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmed);
@@ -173,12 +191,12 @@ export default function App() {
       const response = await fetch(apiUrl('/api/feed/refresh'), { method: 'POST' });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.details || errorData.error || 'Refresh failed');
+        throw new Error(formatRefreshErrorMessage(errorData.details || errorData.error || ''));
       }
 
       await fetchFeed();
     } catch (err: any) {
-      setError(`Could not refresh GitHub feed: ${err.message || err}`);
+      setError(err?.message || 'Could not refresh GitHub feed right now.');
       console.error(err);
     } finally {
       setRefreshing(false);

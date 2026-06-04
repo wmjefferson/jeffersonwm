@@ -246,6 +246,10 @@ function triggerCheckInNotification() {
 
 window.addEventListener('hashchange', route);
 window.addEventListener('DOMContentLoaded', () => {
+  // Apply saved background color
+  const savedBg = localStorage.getItem('battalion_bg_color');
+  if (savedBg) document.body.style.backgroundColor = savedBg;
+
   route();
   startNotificationScheduler();
 });

@@ -20,6 +20,8 @@ let currentEmotion = null;
 let selectedEmoCat = null;
 let emotionSearchQuery = '';
 let actionSearchQuery = '';
+let actionsSort = 'category';  // 'category' | 'az' | 'za' | 'recent' | 'oldest' | 'pos-neg' | 'neg-pos'
+let emotionsSort = 'category';
 
 const CATEGORY_ICONS = {
   basic_needs: '🏠', food_cooking: '🍳', home_care: '🧹', work_study: '💼',
@@ -89,6 +91,27 @@ const CATEGORIES = ['discipline', 'vitality', 'social', 'intellect', 'creativity
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'epic'];
 
 const HABIT_EMOJIS = ['💪', '📖', '🏃', '🧘', '💧', '🥗', '😴', '🎯', '✍️', '🎵', '🎮', '📱', '🍺', '🚬', '🍫', '☕', '⏰', '🧹', '💊', '🌿'];
+
+// Compute a background tint color for an action/emotion based on net stat impact.
+// Positive impact → blue tint, negative → red tint, neutral → gray.
+// Uses a squared curve so most items stay pastel; only extreme scores get vivid.
+function getImpactTint(deltas) {
+  const score = (deltas.energy || 0) + (deltas.health || 0) + (deltas.social || 0)
+    + (deltas.hygiene || 0) + (deltas.fun || 0) + (deltas.discipline || 0)
+    + (deltas.money || 0) - (deltas.stress || 0);
+  if (score === 0) return { bg: '#f5f5f5', border: '#ddd', score };
+  const raw = Math.min(Math.abs(score), 50) / 50; // 0..1 linear
+  const t = raw * raw; // squared: keeps most values very low (pastel)
+  if (score > 0) {
+    const sat = Math.round(15 + t * 55);   // 15‑70%
+    const light = Math.round(97 - t * 12);  // 97‑85%
+    return { bg: `hsl(215, ${sat}%, ${light}%)`, border: `hsl(215, ${sat}%, ${light - 8}%)`, score };
+  } else {
+    const sat = Math.round(15 + t * 60);   // 15‑75%
+    const light = Math.round(97 - t * 12);  // 97‑85%
+    return { bg: `hsl(0, ${sat}%, ${light}%)`, border: `hsl(0, ${sat}%, ${light - 8}%)`, score };
+  }
+}
 
 // ─── Render ─────────────────────────────────────────────────────────
 
@@ -212,38 +235,71 @@ export async function renderAdmin(container) {
       </div>
 
       <!-- Emotion Picker Section -->
-      <div class="section accordion" id="emotion-section" style="border-left:3px solid #7c3aed; padding-left:12px;">
-        <div class="section__header accordion__header" style="cursor:pointer;">
-          <h2 class="section__title">💭 How I Feel <span class="accordion__icon">▼</span></h2>
-          <span id="current-emotion-badge" style="font-size:13px; padding:2px 10px; border-radius:12px; background:#f3f0ff; color:#7c3aed; font-weight:600;">None set</span>
+      <div class="section section--wide accordion section--collapsed" id="emotion-section">
+        <div class="section__header accordion__header">
+          <div class="accordion__meta">
+            <span id="emotion-count" class="accordion__count">0</span>
+          </div>
+          <div class="accordion__title-group">
+            <h2 class="section__title">💭 How I Feel <span class="accordion__icon">▼</span></h2>
+            <span id="current-emotion-badge" class="accordion__badge">None set</span>
+          </div>
+          <div class="accordion__controls">
+            <input class="form-input accordion__search" type="text" id="emotion-search" placeholder="🔍 Search emotions..." />
+          </div>
         </div>
 
         <div class="accordion__content">
-          <div style="margin-bottom:8px;">
-            <input class="form-input" type="text" id="emotion-search" placeholder="🔍 Search emotions..." style="max-width:240px; font-size:11px; padding:4px 8px;" />
+          <div class="accordion__toolbar">
+            <div class="sort-controls" id="emotions-sort-controls">
+              <label style="font-size:11px; opacity:0.6;">Sort:</label>
+              <select id="emotions-sort" class="sort-select" title="Sort emotions">
+                <option value="category">Category</option>
+                <option value="az">A → Z</option>
+                <option value="za">Z → A</option>
+                <option value="pos-neg">Best → Worst</option>
+                <option value="neg-pos">Worst → Best</option>
+              </select>
+            </div>
           </div>
-          <div id="emotions-grid" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
+          <div id="emotions-grid" class="accordion__grid">
             <span style="opacity:0.5">Loading emotions...</span>
           </div>
         </div>
       </div>
 
       <!-- Actions Section (RPG System) -->
-      <div class="section accordion" id="actions-section">
-        <div class="section__header accordion__header" style="cursor:pointer;">
-          <h2 class="section__title">▸ Actions <span class="accordion__icon">▼</span></h2>
-          <span id="actions-count" style="font-size:12px; opacity:0.6"></span>
+      <div class="section section--wide accordion section--collapsed" id="actions-section">
+        <div class="section__header accordion__header">
+          <div class="accordion__title-group">
+            <h2 class="section__title">▸ Actions <span class="accordion__icon">▼</span></h2>
+            <span id="actions-count" class="accordion__count"></span>
+          </div>
+          <div class="accordion__controls">
+            <input class="form-input accordion__search" type="text" id="action-search" placeholder="🔍 Search actions..." />
+          </div>
         </div>
 
         <div class="accordion__content">
-          <div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-            <input class="form-input" type="text" id="action-search" placeholder="🔍 Search actions..." style="max-width:240px; font-size:11px; padding:4px 8px;" />
+          <div class="accordion__toolbar">
             <div class="filter-tabs" id="actions-filter-tabs" style="margin-bottom:0;">
               <button class="filter-tab filter-tab--active" data-actions-filter="all">All</button>
             </div>
+            <div class="sort-controls" id="actions-sort-controls">
+              <label style="font-size:11px; opacity:0.6;">Sort:</label>
+              <select id="actions-sort" class="sort-select" title="Sort actions">
+                <option value="category">Category</option>
+                <option value="az">A → Z</option>
+                <option value="za">Z → A</option>
+                <option value="recent">Recent First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="pos-neg">Best → Worst</option>
+                <option value="neg-pos">Worst → Best</option>
+              </select>
+            </div>
           </div>
 
-          <div id="actions-grid" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
+          <div id="actions-grid" class="accordion__grid">
             <span style="opacity:0.5">Loading actions...</span>
           </div>
         </div>
@@ -333,11 +389,135 @@ export async function renderAdmin(container) {
     <div id="modal-container"></div>
   `;
 
+  setupAccordionShell();
   attachEventListeners();
   await loadAllData();
 
   const refreshId = setInterval(loadAllData, 30000);
   registerInterval(refreshId);
+}
+
+function setupAccordionShell() {
+  configureAccordionSection('emotion-section', {
+    titleText: '💭 How I Feel',
+    countId: 'emotion-count',
+    searchResultsId: 'emotion-search-results',
+    ariaLabel: 'Toggle How I Feel'
+  });
+
+  configureAccordionSection('actions-section', {
+    titleText: 'Actions',
+    countId: 'actions-count',
+    searchResultsId: 'action-search-results',
+    ariaLabel: 'Toggle Actions'
+  });
+}
+
+function configureAccordionSection(sectionId, { titleText, countId, searchResultsId, ariaLabel }) {
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+
+  const header = section.querySelector('.accordion__header');
+  const title = header?.querySelector('.section__title');
+  const titleGroup = header?.querySelector('.accordion__title-group');
+  const controls = header?.querySelector('.accordion__controls');
+  const searchInput = controls?.querySelector('.accordion__search');
+  if (!header || !title || !titleGroup || !controls) return;
+
+  title.textContent = titleText;
+
+  let meta = header.querySelector('.accordion__meta');
+  if (!meta) {
+    meta = document.createElement('div');
+    meta.className = 'accordion__meta';
+    header.insertBefore(meta, titleGroup);
+  }
+
+  let countEl = section.querySelector(`#${countId}`);
+  if (!countEl) {
+    countEl = document.createElement('span');
+    countEl.id = countId;
+    countEl.className = 'accordion__count';
+    countEl.textContent = '0';
+  }
+  meta.replaceChildren(countEl);
+
+  let toggle = header.querySelector('.accordion__toggle');
+  if (!toggle) {
+    toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'accordion__toggle';
+    toggle.setAttribute('aria-label', ariaLabel);
+    header.appendChild(toggle);
+  }
+
+  let icon = toggle.querySelector('.accordion__icon');
+  if (!icon) {
+    icon = document.createElement('span');
+    icon.className = 'accordion__icon';
+    icon.textContent = '▼';
+    toggle.appendChild(icon);
+  }
+
+  let searchResults = section.querySelector(`#${searchResultsId}`);
+  if (!searchResults) {
+    searchResults = document.createElement('div');
+    searchResults.id = searchResultsId;
+    searchResults.className = 'accordion__search-results';
+    header.insertAdjacentElement('afterend', searchResults);
+  }
+
+  if (searchInput && !controls.querySelector('.accordion__search-wrap')) {
+    const wrap = document.createElement('div');
+    wrap.className = 'accordion__search-wrap';
+    searchInput.parentNode.insertBefore(wrap, searchInput);
+    wrap.appendChild(searchInput);
+
+    const clearButton = document.createElement('button');
+    clearButton.type = 'button';
+    clearButton.className = 'accordion__clear';
+    clearButton.setAttribute('aria-label', `Clear ${titleText} search`);
+    clearButton.textContent = '×';
+    clearButton.hidden = !searchInput.value;
+    wrap.appendChild(clearButton);
+
+    searchInput.addEventListener('input', () => {
+      clearButton.hidden = !searchInput.value;
+    });
+
+    clearButton.addEventListener('click', () => {
+      searchInput.value = '';
+      clearButton.hidden = true;
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      searchInput.focus();
+    });
+  }
+}
+
+function renderGroupedAccordionMarkup(entries, getCategoryLabel, getCategoryMeta = () => ({})) {
+  if (entries.length === 0) {
+    return '<span style="opacity:0.5">No matching results found.</span>';
+  }
+
+  const grouped = {};
+  entries.forEach(entry => {
+    if (!grouped[entry.category]) grouped[entry.category] = [];
+    grouped[entry.category].push(entry);
+  });
+
+  return Object.entries(grouped).map(([category, items]) => {
+    const meta = getCategoryMeta(category) || {};
+    return `
+    <div style="width:100%; margin-bottom:8px;">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; opacity:0.6; margin-bottom:4px; ${meta.style || ''}" ${meta.title ? `title="${meta.title}"` : ''}>
+        ${getCategoryLabel(category)}
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:3px;">
+        ${items.map(item => item.markup).join('')}
+      </div>
+    </div>
+  `;
+  }).join('');
 }
 
 // ─── Data Loading ───────────────────────────────────────────────────
@@ -537,6 +717,90 @@ function renderActions() {
   const tabsEl = document.getElementById('actions-filter-tabs');
   if (!grid) return;
 
+  const searchResultsEl = document.getElementById('action-search-results');
+
+  if (tabsEl && categoriesList.length > 0) {
+    tabsEl.innerHTML = `
+      <button class="filter-tab ${actionsFilter === 'all' ? 'filter-tab--active' : ''}" data-actions-filter="all">All</button>
+      ${categoriesList.map(c => `<button class="filter-tab ${actionsFilter === c ? 'filter-tab--active' : ''}" data-actions-filter="${c}">${CATEGORY_ICONS[c] || '▸'} ${c.replace(/_/g, ' ')}</button>`).join('')}
+    `;
+  }
+
+  let filteredActions = actionsFilter === 'all' ? [...actionsList] : actionsList.filter(a => a.category === actionsFilter);
+
+  if (actionSearchQuery) {
+    const q = actionSearchQuery.toLowerCase();
+    filteredActions = filteredActions.filter(a => a.label.toLowerCase().includes(q));
+  }
+
+  // Apply sorting
+  if (actionsSort !== 'category') {
+    filteredActions = [...filteredActions];
+    if (actionsSort === 'az') filteredActions.sort((a, b) => a.label.localeCompare(b.label));
+    else if (actionsSort === 'za') filteredActions.sort((a, b) => b.label.localeCompare(a.label));
+    else if (actionsSort === 'recent') filteredActions.sort((a, b) => {
+      const da = a.last_performed ? new Date(a.last_performed).getTime() : 0;
+      const db = b.last_performed ? new Date(b.last_performed).getTime() : 0;
+      return db - da;
+    });
+    else if (actionsSort === 'oldest') filteredActions.sort((a, b) => {
+      const da = a.last_performed ? new Date(a.last_performed).getTime() : 0;
+      const db = b.last_performed ? new Date(b.last_performed).getTime() : 0;
+      return da - db;
+    });
+    else if (actionsSort === 'pos-neg' || actionsSort === 'neg-pos') {
+      const getScore = a => (a.energy_delta||0) + (a.health_delta||0) + (a.social_delta||0) + (a.hygiene_delta||0) + (a.fun_delta||0) + (a.discipline_delta||0) + (a.money_delta||0) - (a.stress_delta||0);
+      filteredActions.sort((a, b) => actionsSort === 'pos-neg' ? getScore(b) - getScore(a) : getScore(a) - getScore(b));
+    }
+  }
+
+  if (countEl) countEl.textContent = `${actionsList.length}`;
+
+  const actionEntries = filteredActions.map(a => {
+    const deltas = [];
+    if (a.energy_delta) deltas.push(`⚡${a.energy_delta > 0 ? '+' : ''}${a.energy_delta}`);
+    if (a.health_delta) deltas.push(`❤${a.health_delta > 0 ? '+' : ''}${a.health_delta}`);
+    if (a.stress_delta) deltas.push(`😰${a.stress_delta > 0 ? '+' : ''}${a.stress_delta}`);
+    if (a.discipline_delta) deltas.push(`🎯${a.discipline_delta > 0 ? '+' : ''}${a.discipline_delta}`);
+    if (a.fun_delta) deltas.push(`🎮${a.fun_delta > 0 ? '+' : ''}${a.fun_delta}`);
+    if (a.money_delta) deltas.push(`$${a.money_delta > 0 ? '+' : ''}${a.money_delta}`);
+    const tip = deltas.join(' ') || 'no stat change';
+
+    const tint = getImpactTint({
+      energy: a.energy_delta, health: a.health_delta, stress: a.stress_delta,
+      social: a.social_delta, hygiene: a.hygiene_delta, fun: a.fun_delta,
+      discipline: a.discipline_delta, money: a.money_delta
+    });
+
+    return {
+      category: a.category,
+      markup: `<button class="action-btn" data-action-id="${a.action_id}" title="${tip}" style="
+        padding:3px 8px; font-size:12px; cursor:pointer; border:1px solid ${tint.border};
+        background:${tint.bg}; border-radius:2px; white-space:nowrap;
+      ">${a.label}</button>`
+    };
+  });
+
+  const isSorted = actionsSort !== 'category';
+  const actionMarkup = isSorted
+    ? `<div style="display:flex; flex-wrap:wrap; gap:3px;">${actionEntries.map(e => e.markup).join('')}</div>`
+    : renderGroupedAccordionMarkup(
+        actionEntries,
+        (cat) => `${CATEGORY_ICONS[cat] || '▸'} ${cat.replace(/_/g, ' ')}`
+      );
+
+  grid.innerHTML = actionEntries.length ? actionMarkup : '<span style="opacity:0.5">No actions found.</span>';
+
+  if (searchResultsEl) {
+    const showSearchResults = Boolean(actionSearchQuery);
+    searchResultsEl.classList.toggle('accordion__search-results--visible', showSearchResults);
+    searchResultsEl.innerHTML = showSearchResults
+      ? (actionEntries.length ? actionMarkup : '<span style="opacity:0.5">No matching actions found.</span>')
+      : '';
+  }
+
+  return;
+
   // Build category tabs (only once, or when categories change)
   if (tabsEl && categoriesList.length > 0) {
     tabsEl.innerHTML = `
@@ -665,6 +929,11 @@ function renderEmotionPicker() {
   const badgeEl = document.getElementById('current-emotion-badge');
   if (!grid) return;
 
+  const countEl = document.getElementById('emotion-count');
+  const searchResultsEl = document.getElementById('emotion-search-results');
+
+  if (countEl) countEl.textContent = `${emotionsList.length}`;
+
   // Update current emotion badge
   if (badgeEl) {
     if (currentEmotion?.emotion) {
@@ -677,6 +946,107 @@ function renderEmotionPicker() {
       badgeEl.style.color = '#94a3b8';
     }
   }
+
+  if (emotionCategories.length === 0 || emotionsList.length === 0) {
+    grid.innerHTML = '<span style="opacity:0.5">No emotions loaded.</span>';
+    if (searchResultsEl) {
+      searchResultsEl.classList.toggle('accordion__search-results--visible', Boolean(emotionSearchQuery));
+      searchResultsEl.innerHTML = emotionSearchQuery ? '<span style="opacity:0.5">No matching emotions found.</span>' : '';
+    }
+    return;
+  }
+
+  let filteredEntries = [...emotionsList];
+  if (emotionSearchQuery) {
+    const q = emotionSearchQuery.toLowerCase();
+    filteredEntries = filteredEntries.filter(e =>
+      e.name.toLowerCase().includes(q) ||
+      (e.brief_description && e.brief_description.toLowerCase().includes(q))
+    );
+  }
+
+  const emotionCategoryMap = new Map(emotionCategories.map(cat => [cat.category_id, cat]));
+
+  // Apply sorting
+  if (emotionsSort !== 'category') {
+    if (emotionsSort === 'az') filteredEntries.sort((a, b) => a.name.localeCompare(b.name));
+    else if (emotionsSort === 'za') filteredEntries.sort((a, b) => b.name.localeCompare(a.name));
+    else if (emotionsSort === 'pos-neg' || emotionsSort === 'neg-pos') {
+      const getScore = e => {
+        const cat = emotionCategoryMap.get(e.category_id);
+        return (cat?.energy_flat||0) + (cat?.health_flat||0) + (cat?.social_flat||0) + (cat?.fun_flat||0) + (cat?.discipline_flat||0) - (cat?.stress_flat||0);
+      };
+      filteredEntries.sort((a, b) => emotionsSort === 'pos-neg' ? getScore(b) - getScore(a) : getScore(a) - getScore(b));
+    }
+  }
+
+  const entries = filteredEntries.map(e => {
+    const cat = emotionCategoryMap.get(e.category_id);
+    const color = EMO_CAT_COLORS[e.category_id] || '#888';
+    const modifiers = [];
+    if (cat?.energy_flat) modifiers.push(`⚡${cat.energy_flat > 0 ? '+' : ''}${cat.energy_flat}`);
+    if (cat?.health_flat) modifiers.push(`❤${cat.health_flat > 0 ? '+' : ''}${cat.health_flat}`);
+    if (cat?.stress_flat) modifiers.push(`😰${cat.stress_flat > 0 ? '+' : ''}${cat.stress_flat}`);
+    if (cat?.discipline_flat) modifiers.push(`🎯${cat.discipline_flat > 0 ? '+' : ''}${cat.discipline_flat}`);
+    if (cat?.fun_flat) modifiers.push(`🎮${cat.fun_flat > 0 ? '+' : ''}${cat.fun_flat}`);
+    if (cat?.social_flat) modifiers.push(`🤝${cat.social_flat > 0 ? '+' : ''}${cat.social_flat}`);
+    const catTip = modifiers.join(' ') || 'No stat effects';
+    const isActive = currentEmotion?.emotion === e.name && currentEmotion?.category_id === e.category_id;
+
+    const tint = getImpactTint({
+      energy: cat?.energy_flat, health: cat?.health_flat, stress: cat?.stress_flat,
+      social: cat?.social_flat, fun: cat?.fun_flat, discipline: cat?.discipline_flat,
+      money: 0, hygiene: 0
+    });
+
+    return {
+      category: e.category_id,
+      markup: `<button class="emo-btn" data-emo-name="${e.name}" data-emo-cat="${e.category_id}" title="${e.brief_description || ''} \n\nGrants: ${catTip}" style="
+        padding:3px 8px; font-size:12px; cursor:pointer; border-radius:12px; white-space:nowrap;
+        border:1px solid ${isActive ? color : tint.border};
+        background:${isActive ? color : tint.bg};
+        color:${isActive ? '#fff' : '#444'};
+        font-weight:${isActive ? '600' : '400'};
+        transition:all 0.15s;
+      ">${e.name}</button>`
+    };
+  });
+
+  const isEmoSorted = emotionsSort !== 'category';
+  const markup = isEmoSorted
+    ? `<div style="display:flex; flex-wrap:wrap; gap:3px;">${entries.map(e => e.markup).join('')}</div>`
+    : renderGroupedAccordionMarkup(
+        entries,
+        (catId) => emotionCategoryMap.get(catId)?.label || catId,
+        (catId) => {
+          const color = EMO_CAT_COLORS[catId] || '#888';
+          const cat = emotionCategoryMap.get(catId);
+          const modifiers = [];
+          if (cat?.energy_flat) modifiers.push(`⚡${cat.energy_flat > 0 ? '+' : ''}${cat.energy_flat}`);
+          if (cat?.health_flat) modifiers.push(`❤${cat.health_flat > 0 ? '+' : ''}${cat.health_flat}`);
+          if (cat?.stress_flat) modifiers.push(`😰${cat.stress_flat > 0 ? '+' : ''}${cat.stress_flat}`);
+          if (cat?.discipline_flat) modifiers.push(`🎯${cat.discipline_flat > 0 ? '+' : ''}${cat.discipline_flat}`);
+          if (cat?.fun_flat) modifiers.push(`🎮${cat.fun_flat > 0 ? '+' : ''}${cat.fun_flat}`);
+          if (cat?.social_flat) modifiers.push(`🤝${cat.social_flat > 0 ? '+' : ''}${cat.social_flat}`);
+          const catTip = modifiers.join(' ') || 'No stat effects';
+          return {
+            style: `color:${color}; font-weight:700;`,
+            title: `Base stats: ${catTip}`
+          };
+        }
+      );
+
+  grid.innerHTML = entries.length ? markup : '<span style="opacity:0.5">No matching emotions found.</span>';
+
+  if (searchResultsEl) {
+    const showSearchResults = Boolean(emotionSearchQuery);
+    searchResultsEl.classList.toggle('accordion__search-results--visible', showSearchResults);
+    searchResultsEl.innerHTML = showSearchResults
+      ? (entries.length ? markup : '<span style="opacity:0.5">No matching emotions found.</span>')
+      : '';
+  }
+
+  return;
 
   if (emotionCategories.length === 0 || emotionsList.length === 0) {
     grid.innerHTML = '<span style="opacity:0.5">No emotions loaded.</span>';
@@ -746,9 +1116,96 @@ function renderEmotionPicker() {
 
 // ─── Event Listeners ───────────────────────────────────────────────
 
+async function handleEmotionSelection(e) {
+  const btn = e.target.closest('.emo-btn');
+  if (!btn) return;
+
+  const emotionName = btn.dataset.emoName;
+  const catId = btn.dataset.emoCat;
+  if (!emotionName || !catId) return;
+
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+
+  try {
+    const result = await emotionsApi.log(emotionName, catId, 3, '');
+    currentEmotion = {
+      emotion: result.emotion,
+      category_id: result.category_id,
+      category_label: result.category_label,
+      tier: result.tier
+    };
+
+    if (result.player) {
+      playerData = result.player;
+    }
+    currentMood = result.mood;
+    updateMoodUI();
+    updateStatusBar();
+
+    const xp = result.xpEarned || 0;
+    const gold = result.goldEarned || 0;
+    let msg = `💭 ${emotionName}`;
+    if (xp > 0) msg += ` ⚡+${xp} XP`;
+    if (gold > 0) msg += ` 💰+${gold} G`;
+
+    showToast(msg, 'success');
+
+    if (result.leveledUp) {
+      showToast('🎉 LEVEL UP! Level ' + (result.newLevel || '??'), 'levelup');
+    }
+
+    renderEmotionPicker();
+  } catch (err) {
+    showToast('Failed to log emotion: ' + err.message, 'error');
+  }
+
+  btn.disabled = false;
+  btn.style.opacity = '1';
+}
+
+async function handleActionSelection(e) {
+  const btn = e.target.closest('.action-btn');
+  if (!btn) return;
+
+  const actionId = btn.dataset.actionId;
+  if (!actionId) return;
+  btn.disabled = true;
+  btn.style.opacity = '0.4';
+
+  try {
+    const result = await actionsApi.perform(actionId);
+    const xp = result?.xpEarned || 0;
+    const gold = result?.goldEarned || 0;
+    let msg = `${result?.action || 'Action'} done!`;
+    if (xp) msg += ` ⚡+${xp} XP`;
+    if (gold) msg += ` 💰+${gold} G`;
+    showToast(msg, 'success');
+
+    if (result?.leveledUp) {
+      showToast('🎉 LEVEL UP! Level ' + (result.newLevel || '??'), 'levelup');
+    }
+
+    if (result?.player) {
+      playerData = result.player;
+      updateStatusBar();
+    }
+
+    setTimeout(() => { btn.disabled = false; btn.style.opacity = '1'; }, 500);
+    loadAllData().catch(() => {});
+  } catch (err) {
+    showToast('Failed: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+}
+
 function attachEventListeners() {
   const container = document.querySelector('.admin-content');
   if (!container) return;
+
+  document.getElementById('emotion-search-results')?.addEventListener('click', handleEmotionSelection);
+  document.getElementById('action-search-results')?.addEventListener('click', handleActionSelection);
 
   // ─── Logout ─────────────────────────────────────────────────
   document.getElementById('btn-logout')?.addEventListener('click', async () => {
@@ -1077,6 +1534,7 @@ function attachEventListeners() {
   container.addEventListener('click', (e) => {
     const header = e.target.closest('.accordion__header');
     if (!header) return;
+    if (e.target.closest('.accordion__controls')) return;
     const section = header.closest('.section');
     if (section) {
       section.classList.toggle('section--collapsed');
@@ -1092,6 +1550,17 @@ function attachEventListeners() {
   document.getElementById('action-search')?.addEventListener('input', (e) => {
     actionSearchQuery = e.target.value;
     renderActions();
+  });
+
+  // ─── Sort Dropdowns ─────────────────────────────────────────
+  document.getElementById('actions-sort')?.addEventListener('change', (e) => {
+    actionsSort = e.target.value;
+    renderActions();
+  });
+
+  document.getElementById('emotions-sort')?.addEventListener('change', (e) => {
+    emotionsSort = e.target.value;
+    renderEmotionPicker();
   });
 }
 
