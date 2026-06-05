@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Trillions integration checkpoint",
+  "content": "<p>We explored blending Trillions into Perihelion as a Google Keep viewer and export tool, and got far enough to validate the UI shell, Firebase wiring, and the route-level integration shape inside Peri.</p><p>The useful outcome was architectural: Trillions belongs inside Peri rather than as a separate app, and the Peri-side scaffolding now has a clear holding path for when we revisit it.</p><p>We paused implementation after confirming that consumer Google accounts hit an <code>invalid_scope</code> wall with the Keep API path we tested. The remaining viable directions are either a Google Workspace-backed integration or a different notes source entirely.</p><p>What we kept for later:</p><ul><li>Saved the Peri + Trillions experiment into a dedicated holding folder for reuse.</li><li>Restored Peri to its previous live/dev state so the archive app stays clean and stable.</li><li>Commented the Firebase values in Peri with an explanation so the future context is preserved instead of looking like stray config.</li></ul>",
+  "url": "https://jeffersonwm.com/perihelion/",
+  "source": "milestone",
+  "external_id": "trillions-integration-checkpoint-2026-06-04"
+}
