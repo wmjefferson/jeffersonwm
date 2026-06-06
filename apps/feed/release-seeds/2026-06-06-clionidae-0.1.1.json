@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Clionidae v0.1.1",
+  "content": "<p>Clionidae took a meaningful step from static template notes toward a real planning and interaction surface. This pass focused on making the specimen more useful when choosing what should belong in the shared baseline and what should stay app-specific.</p><p>What changed:</p><ul><li>Turned many of the specimen controls into real sample interactions so quick actions, section headers, dashboard tools, content actions, and settings controls now behave like a functioning site instead of decorative placeholders.</li><li>Added pastel-coded visual families and thin debug framing so shell regions, sections, component groups, form/table areas, and support modules are easier to distinguish while planning.</li><li>Expanded the standards layer with a dedicated routing standard, plus refresh/history/back-forward guidance that will support a later network-wide URL sweep across Clionidae, Feed, Peri, Battalion, and related apps.</li></ul><p>The result is a stronger template checkpoint: Clionidae now works better as both a reusable app skeleton and a planning surface for future site architecture.</p>",
+  "url": "https://jeffersonwm.com/clionidae/",
+  "source": "release",
+  "external_id": "clionidae-v0.1.1-2026-06-06"
+}
