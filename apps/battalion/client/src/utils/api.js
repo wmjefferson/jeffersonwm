@@ -24,6 +24,11 @@ async function api(endpoint, options = {}) {
   const res = await fetch(url, config);
 
   if (!res.ok) {
+    // Auto-logout on expired/invalid session (skip for auth check itself)
+    if (res.status === 401 && !endpoint.includes('/auth/')) {
+      window.location.hash = '#login';
+      return;
+    }
     let errorMessage = `Request failed: ${res.status}`;
     try {
       const errData = await res.json();

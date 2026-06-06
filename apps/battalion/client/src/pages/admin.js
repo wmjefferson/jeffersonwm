@@ -23,6 +23,15 @@ let actionSearchQuery = '';
 let actionsSort = 'category';  // 'category' | 'az' | 'za' | 'recent' | 'oldest' | 'pos-neg' | 'neg-pos'
 let emotionsSort = 'category';
 
+// ─── Favorites (localStorage) ───────────────────────────────────────
+let favoriteActions = new Set(JSON.parse(localStorage.getItem('battalion_fav_actions') || '[]'));
+function saveFavorites() { localStorage.setItem('battalion_fav_actions', JSON.stringify([...favoriteActions])); }
+function toggleFavorite(actionId) {
+  if (favoriteActions.has(actionId)) favoriteActions.delete(actionId);
+  else favoriteActions.add(actionId);
+  saveFavorites();
+}
+
 const CATEGORY_ICONS = {
   basic_needs: '🏠', food_cooking: '🍳', home_care: '🧹', work_study: '💼',
   money_admin: '💵', health_fitness: '💪', social_relationships: '🤝',
@@ -306,21 +315,32 @@ export async function renderAdmin(container) {
       </div>
 
       <!-- Tasks Section -->
-      <div class="section" id="tasks-section">
-        <div class="section__header">
-          <h2 class="section__title">⚔️ Daily Quests</h2>
-          <button class="btn btn--primary btn--sm" id="btn-add-task">+ New Quest</button>
+      <div class="section accordion" id="tasks-section">
+        <div class="section__header accordion__header">
+          <div class="accordion__meta">
+            <span id="tasks-count" class="accordion__count">0</span>
+          </div>
+          <div class="accordion__title-group">
+            <h2 class="section__title">⚔️ Daily Quests <span class="accordion__icon">▼</span></h2>
+          </div>
+          <div class="accordion__controls">
+            <button class="btn btn--primary btn--sm" id="btn-add-task">+ New Quest</button>
+          </div>
         </div>
 
-        <div class="filter-tabs" id="filter-tabs">
-          <button class="filter-tab filter-tab--active" data-filter="all">All</button>
-          ${CATEGORIES.map(c => `<button class="filter-tab" data-filter="${c}">${STAT_META[c].icon} ${STAT_META[c].name}</button>`).join('')}
-        </div>
+        <div class="accordion__content">
+          <div class="accordion__toolbar">
+            <div class="filter-tabs" id="filter-tabs" style="margin-bottom:0;">
+              <button class="filter-tab filter-tab--active" data-filter="all">All</button>
+              ${CATEGORIES.map(c => `<button class="filter-tab" data-filter="${c}">${STAT_META[c].icon} ${STAT_META[c].name}</button>`).join('')}
+            </div>
+          </div>
 
-        <div class="tasks-grid" id="tasks-grid">
-          <div class="empty-state" style="grid-column:1/-1">
-            <span class="empty-state__icon">⚔️</span>
-            <p class="empty-state__text">Loading quests...</p>
+          <div class="tasks-grid" id="tasks-grid">
+            <div class="empty-state" style="grid-column:1/-1">
+              <span class="empty-state__icon">⚔️</span>
+              <p class="empty-state__text">Loading quests...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -622,6 +642,9 @@ function renderTasks() {
   const grid = document.getElementById('tasks-grid');
   if (!grid) return;
 
+  const countEl = document.getElementById('tasks-count');
+  if (countEl) countEl.textContent = `${tasksList.length}`;
+
   let filtered = tasksList;
   if (activeFilter !== 'all') {
     filtered = tasksList.filter(t => t.category === activeFilter);
@@ -722,11 +745,14 @@ function renderActions() {
   if (tabsEl && categoriesList.length > 0) {
     tabsEl.innerHTML = `
       <button class="filter-tab ${actionsFilter === 'all' ? 'filter-tab--active' : ''}" data-actions-filter="all">All</button>
+      <button class="filter-tab ${actionsFilter === 'favorites' ? 'filter-tab--active' : ''}" data-actions-filter="favorites">⭐ Favorites${favoriteActions.size ? ` (${favoriteActions.size})` : ''}</button>
       ${categoriesList.map(c => `<button class="filter-tab ${actionsFilter === c ? 'filter-tab--active' : ''}" data-actions-filter="${c}">${CATEGORY_ICONS[c] || '▸'} ${c.replace(/_/g, ' ')}</button>`).join('')}
     `;
   }
 
-  let filteredActions = actionsFilter === 'all' ? [...actionsList] : actionsList.filter(a => a.category === actionsFilter);
+  let filteredActions = actionsFilter === 'favorites'
+    ? actionsList.filter(a => favoriteActions.has(a.action_id))
+    : actionsFilter === 'all' ? [...actionsList] : actionsList.filter(a => a.category === actionsFilter);
 
   if (actionSearchQuery) {
     const q = actionSearchQuery.toLowerCase();
@@ -772,12 +798,13 @@ function renderActions() {
       discipline: a.discipline_delta, money: a.money_delta
     });
 
+    const isFav = favoriteActions.has(a.action_id);
     return {
       category: a.category,
       markup: `<button class="action-btn" data-action-id="${a.action_id}" title="${tip}" style="
         padding:3px 8px; font-size:12px; cursor:pointer; border:1px solid ${tint.border};
         background:${tint.bg}; border-radius:2px; white-space:nowrap;
-      ">${a.label}</button>`
+      "><span class="fav-star" data-fav-id="${a.action_id}" style="cursor:pointer; opacity:${isFav ? '1' : '0.25'}; margin-right:2px; font-size:10px;" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">⭐</span>${a.label}</button>`
     };
   });
 
@@ -993,11 +1020,14 @@ function renderEmotionPicker() {
     const catTip = modifiers.join(' ') || 'No stat effects';
     const isActive = currentEmotion?.emotion === e.name && currentEmotion?.category_id === e.category_id;
 
-    const tint = getImpactTint({
-      energy: cat?.energy_flat, health: cat?.health_flat, stress: cat?.stress_flat,
-      social: cat?.social_flat, fun: cat?.fun_flat, discipline: cat?.discipline_flat,
-      money: 0, hygiene: 0
-    });
+    // Simple 3-tier emotion coloring: green = positive, amber = negative, gray = neutral
+    const emoScore = (cat?.energy_flat||0) + (cat?.health_flat||0) + (cat?.social_flat||0) + (cat?.fun_flat||0) + (cat?.discipline_flat||0) - (cat?.stress_flat||0);
+    const emoTint = emoScore > 0
+      ? { bg: 'hsl(152, 30%, 94%)', border: 'hsl(152, 30%, 84%)' }   // soft green
+      : emoScore < 0
+        ? { bg: 'hsl(35, 40%, 94%)', border: 'hsl(35, 40%, 84%)' }   // soft amber
+        : { bg: '#f5f5f5', border: '#ddd' };                          // neutral gray
+    const tint = emoTint;
 
     return {
       category: e.category_id,
@@ -1373,6 +1403,15 @@ function attachEventListeners() {
 
   // ─── Action Perform (event delegation) ──────────────────────
   document.getElementById('actions-grid')?.addEventListener('click', async (e) => {
+    // Handle favorite star toggle
+    const star = e.target.closest('.fav-star');
+    if (star) {
+      e.stopPropagation();
+      toggleFavorite(star.dataset.favId);
+      renderActions();
+      return;
+    }
+
     const btn = e.target.closest('.action-btn');
     if (!btn) return;
 
@@ -1514,6 +1553,8 @@ function attachEventListeners() {
       const sbMood = document.getElementById('sb-mood');
       if (sbMood) { sbMood.textContent = getMoodEmoji(moodVal); sbMood.classList.add('anim-pulse'); setTimeout(() => sbMood.classList.remove('anim-pulse'), 400); }
       showToast(`Mood set to ${moodVal} ${getMoodEmoji(moodVal)}`, 'info');
+      const noteInput = document.getElementById('mood-note-input');
+      if (noteInput) noteInput.value = '';
     } catch (err) {
       showToast('Failed to set mood: ' + err.message, 'error');
     }

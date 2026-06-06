@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Clionidae interaction pass + Battalion admin polish",
+  "content": "<p>We pushed Clionidae further from a static specimen into a real interactive template surface. The goal was to make it easier to feel how controls, regions, and UI patterns actually behave before deciding what belongs in the baseline skeleton.</p><p>At the same time, Battalion got a small quality-of-life polish pass focused on admin flow and day-to-day use rather than major structural change.</p><p>What changed in this checkpoint:</p><ul><li>Clionidae now has working sample controls for quick actions, section headers, content actions, dashboard actions, and settings actions so the template can be explored like a functioning site.</li><li>Clionidae also gained pastel-coded visual families and 1px debug framing so shell regions, sections, form areas, and support modules are easier to distinguish while planning future apps.</li><li>Battalion added favorite actions with local persistence, a favorites filter, cleaner task accordion structure with visible counts, softer emotion tinting, mood-note clearing after submit, and an automatic bounce back to login when a session expires.</li></ul><p>This is a strong template-and-operations checkpoint: Clionidae is becoming more useful as a planning and selection surface, while Battalion keeps getting sharper in the practical admin details.</p>",
+  "url": "https://jeffersonwm.com/clionidae/",
+  "source": "milestone",
+  "external_id": "clionidae-battalion-milestone-2026-06-05"
+}
