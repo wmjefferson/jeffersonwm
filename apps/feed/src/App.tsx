@@ -525,9 +525,6 @@ export default function App() {
     <div className="feed-shell">
       <header className="feed-topbar">
         <div>
-          <a className="feed-backlink" href="https://jeffersonwm.com" rel="noreferrer">
-            JeffersonWM
-          </a>
           <h1 className="feed-title">Feed</h1>
           <p className="feed-subtitle">Version notes, public logs, and code movement in one running line.</p>
         </div>

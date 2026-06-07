@@ -467,6 +467,74 @@ app.post("/api/feed", async (req, res) => {
   }
 });
 
+app.put("/api/feed/:id", async (req, res) => {
+  const { id } = req.params;
+  const { secret, title, content, url, source } = req.body || {};
+
+  if (secret !== process.env.FEED_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!title) {
+    return res.status(400).json({ error: "Title is required" });
+  }
+
+  try {
+    const [rows] = await pool.query("SELECT id, source FROM feed_items WHERE id = ? LIMIT 1", [id]);
+    const entry = Array.isArray(rows) ? rows[0] as { id: number; source: string } | undefined : undefined;
+
+    if (!entry) {
+      return res.status(404).json({ error: "Feed item not found" });
+    }
+
+    if ((entry.source || "").toLowerCase() === "github") {
+      return res.status(403).json({ error: "GitHub feed items cannot be edited here" });
+    }
+
+    await pool.execute(
+      `
+        UPDATE feed_items
+        SET title = ?, content = ?, url = ?, source = ?
+        WHERE id = ?
+      `,
+      [title, content || null, url || null, source || entry.source || "manual", id],
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update feed item" });
+  }
+});
+
+app.delete("/api/feed/:id", async (req, res) => {
+  const { id } = req.params;
+  const { secret } = req.body || {};
+
+  if (secret !== process.env.FEED_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const [rows] = await pool.query("SELECT id, source FROM feed_items WHERE id = ? LIMIT 1", [id]);
+    const entry = Array.isArray(rows) ? rows[0] as { id: number; source: string } | undefined : undefined;
+
+    if (!entry) {
+      return res.status(404).json({ error: "Feed item not found" });
+    }
+
+    if ((entry.source || "").toLowerCase() === "github") {
+      return res.status(403).json({ error: "GitHub feed items cannot be deleted here" });
+    }
+
+    await pool.execute("DELETE FROM feed_items WHERE id = ?", [id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete feed item" });
+  }
+});
+
 app.post("/api/feed/changelog", async (req, res) => {
   const { secret, source, entries: bodyEntries, ...singleEntry } = req.body || {};
 

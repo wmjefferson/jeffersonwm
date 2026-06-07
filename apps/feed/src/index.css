@@ -38,20 +38,10 @@ a {
   max-width: 1080px;
 }
 
-.feed-backlink {
-  display: inline-block;
-  margin-bottom: 0.9rem;
-  font-size: 0.8rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  text-decoration: none;
-  color: rgba(17, 24, 39, 0.56);
-}
-
 .feed-title {
   margin: 0;
   font-family: "Young Serif", serif;
-  font-size: clamp(2.4rem, 4vw, 4rem);
+  font-size: clamp(2rem, 3vw, 2.4rem);
   font-weight: 400;
 }
 
@@ -423,8 +413,7 @@ a {
 
 .feed-html a,
 .entry-link,
-.feed-link-button,
-.feed-backlink {
+.feed-link-button {
   transition: color 160ms ease;
 }
 
@@ -436,8 +425,7 @@ a {
 
 .feed-html a:hover,
 .entry-link:hover,
-.feed-link-button:hover,
-.feed-backlink:hover {
+.feed-link-button:hover {
   color: #111827;
 }
 
