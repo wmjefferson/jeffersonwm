@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: rgba(245, 158, 11, 0.4);
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.1);
+  }
+  50% {
+    border-color: rgba(245, 158, 11, 1.0);
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.4);
+  }
+}
+
+.animate-pulse-border {
+  animation: pulse-border 3s infinite ease-in-out;
+}
+
+.fixed.inset-y-0.right-0 {
+  animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
