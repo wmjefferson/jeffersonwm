@@ -121,6 +121,68 @@ a {
   align-items: end;
 }
 
+.feed-weekbar,
+.feed-weekbar-actions,
+.feed-weekbar-copy {
+  display: flex;
+}
+
+.feed-weekbar {
+  justify-content: space-between;
+  gap: 1.25rem;
+  align-items: center;
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.03);
+  border-color: rgba(17, 24, 39, 0.16);
+  box-shadow: none;
+  padding: 1rem 1.1rem;
+}
+
+.feed-weekbar-copy {
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.feed-weekbar-actions {
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.feed-week-title {
+  margin: 0;
+  font-family: "IBM Plex Sans Condensed", system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.feed-week-range {
+  margin: 0;
+  color: rgba(17, 24, 39, 0.58);
+  line-height: 1.45;
+  font-size: 0.88rem;
+}
+
+.feed-weekbar .eyebrow {
+  margin-bottom: 0.2rem;
+}
+
+.feed-weekbar .feed-button {
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(17, 24, 39, 0.14);
+}
+
+.feed-weekbar .feed-button:hover {
+  background: rgba(17, 24, 39, 0.06);
+}
+
+.feed-weekbar .feed-button:disabled {
+  background: rgba(17, 24, 39, 0.03);
+}
+
 .eyebrow,
 .field-label,
 .feed-source-tag,
@@ -482,7 +544,8 @@ a {
   }
 
   .feed-topbar,
-  .feed-hero {
+  .feed-hero,
+  .feed-weekbar {
     flex-direction: column;
     align-items: stretch;
   }

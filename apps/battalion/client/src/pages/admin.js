@@ -33,7 +33,7 @@ function toggleFavorite(actionId) {
 }
 
 const CATEGORY_ICONS = {
-  basic_needs: '🏠', food_cooking: '🍳', home_care: '🧹', work_study: '💼',
+  personal: '👤', basic_needs: '🏠', food_cooking: '🍳', home_care: '🧹', work_study: '💼',
   money_admin: '💵', health_fitness: '💪', social_relationships: '🤝',
   leisure_growth: '🎮', errands_mobility: '🚗', caregiving_parenting: '👶',
   maintenance_repair: '🔧'
@@ -104,13 +104,23 @@ const HABIT_EMOJIS = ['💪', '📖', '🏃', '🧘', '💧', '🥗', '😴', '�
 // Compute a background tint color for an action/emotion based on net stat impact.
 // Positive impact → blue tint, negative → red tint, neutral → gray.
 // Uses a squared curve so most items stay pastel; only extreme scores get vivid.
-function getImpactTint(deltas) {
+function getImpactTint(deltas, category) {
   const score = (deltas.energy || 0) + (deltas.health || 0) + (deltas.social || 0)
     + (deltas.hygiene || 0) + (deltas.fun || 0) + (deltas.discipline || 0)
     + (deltas.money || 0) - (deltas.stress || 0);
+  
+  const absScore = Math.min(Math.abs(score), 50) / 50; // 0..1 linear
+  const t = absScore * absScore; // squared curve
+  
+  if (category === 'personal') {
+    // Shade of green (HSL hue 145) for custom personal actions
+    const sat = Math.round(15 + t * 45);   // 15‑60%
+    const light = Math.round(96 - t * 10);  // 96‑86%
+    return { bg: `hsl(145, ${sat}%, ${light}%)`, border: `hsl(145, ${sat}%, ${light - 8}%)`, score };
+  }
+  
+  // Otherwise, standard blue/red/gray gradient styling
   if (score === 0) return { bg: '#f5f5f5', border: '#ddd', score };
-  const raw = Math.min(Math.abs(score), 50) / 50; // 0..1 linear
-  const t = raw * raw; // squared: keeps most values very low (pastel)
   if (score > 0) {
     const sat = Math.round(15 + t * 55);   // 15‑70%
     const light = Math.round(97 - t * 12);  // 97‑85%
@@ -567,7 +577,11 @@ async function loadAllData() {
 
     // Build categories from actions
     const catSet = new Set(actionsList.map(a => a.category));
-    categoriesList = [...catSet].sort();
+    categoriesList = [...catSet].sort((a, b) => {
+      if (a === 'personal') return -1;
+      if (b === 'personal') return 1;
+      return a.localeCompare(b);
+    });
 
     updateStatusBar();
     renderTasks();
@@ -778,6 +792,16 @@ function renderActions() {
       const getScore = a => (a.energy_delta||0) + (a.health_delta||0) + (a.social_delta||0) + (a.hygiene_delta||0) + (a.fun_delta||0) + (a.discipline_delta||0) + (a.money_delta||0) - (a.stress_delta||0);
       filteredActions.sort((a, b) => actionsSort === 'pos-neg' ? getScore(b) - getScore(a) : getScore(a) - getScore(b));
     }
+  } else {
+    // Default sorting when grouped by category: category first (with 'personal' at the top), then label
+    filteredActions = [...filteredActions].sort((a, b) => {
+      if (a.category === 'personal' && b.category !== 'personal') return -1;
+      if (a.category !== 'personal' && b.category === 'personal') return 1;
+      if (a.category === b.category) {
+        return a.label.localeCompare(b.label);
+      }
+      return a.category.localeCompare(b.category);
+    });
   }
 
   if (countEl) countEl.textContent = `${actionsList.length}`;
@@ -796,15 +820,15 @@ function renderActions() {
       energy: a.energy_delta, health: a.health_delta, stress: a.stress_delta,
       social: a.social_delta, hygiene: a.hygiene_delta, fun: a.fun_delta,
       discipline: a.discipline_delta, money: a.money_delta
-    });
+    }, a.category);
 
     const isFav = favoriteActions.has(a.action_id);
     return {
       category: a.category,
       markup: `<button class="action-btn" data-action-id="${a.action_id}" title="${tip}" style="
-        padding:3px 8px; font-size:12px; cursor:pointer; border:1px solid ${tint.border};
-        background:${tint.bg}; border-radius:2px; white-space:nowrap;
-      "><span class="fav-star" data-fav-id="${a.action_id}" style="cursor:pointer; opacity:${isFav ? '1' : '0.25'}; margin-right:2px; font-size:10px;" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">⭐</span>${a.label}</button>`
+        padding:6px 12px; font-size:14px; cursor:pointer; border:1px solid ${tint.border};
+        background:${tint.bg}; border-radius:4px; white-space:nowrap; display:inline-flex; align-items:center; gap:4px;
+      "><span class="fav-star" data-fav-id="${a.action_id}" style="cursor:pointer; opacity:${isFav ? '1' : '0.25'}; font-size:16px; padding:2px 4px; display:inline-block;" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">⭐</span>${a.label}</button>`
     };
   });
 
@@ -1195,6 +1219,15 @@ async function handleEmotionSelection(e) {
 }
 
 async function handleActionSelection(e) {
+  // Handle favorite star toggle in search results
+  const star = e.target.closest('.fav-star');
+  if (star) {
+    e.stopPropagation();
+    toggleFavorite(star.dataset.favId);
+    renderActions();
+    return;
+  }
+
   const btn = e.target.closest('.action-btn');
   if (!btn) return;
 

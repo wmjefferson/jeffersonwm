@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
@@ -34,6 +34,15 @@ interface ConsolidatedFeedItem {
   items: FeedItem[];
 }
 
+interface FeedWeekGroup {
+  key: string;
+  weekNumber: number;
+  weekYear: number;
+  start: Date;
+  end: Date;
+  items: FeedItem[];
+}
+
 interface PostFormState {
   title: string;
   content: string;
@@ -60,6 +69,17 @@ const feedTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit',
   minute: '2-digit',
   hour12: false,
+});
+const feedPacificDatePartsFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: FEED_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const feedWeekRangeFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'UTC',
+  month: 'short',
+  day: 'numeric',
 });
 const defaultPostState = (): PostFormState => ({
   title: '',
@@ -98,6 +118,50 @@ function parseFeedDate(value: string) {
   const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmed);
   const normalized = hasTimezone ? trimmed : `${trimmed.replace(' ', 'T')}Z`;
   return new Date(normalized);
+}
+
+function getPacificCalendarDate(value: string) {
+  const date = parseFeedDate(value);
+  const parts = Object.fromEntries(
+    feedPacificDatePartsFormatter.formatToParts(date).map((part) => [part.type, part.value]),
+  );
+  const year = Number(parts.year);
+  const month = Number(parts.month);
+  const day = Number(parts.day);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function getWeekStart(date: Date) {
+  const start = new Date(date);
+  const weekday = (start.getUTCDay() + 6) % 7;
+  start.setUTCDate(start.getUTCDate() - weekday);
+  start.setUTCHours(0, 0, 0, 0);
+  return start;
+}
+
+function getWeekMetadata(value: string) {
+  const calendarDate = getPacificCalendarDate(value);
+  const start = getWeekStart(calendarDate);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+
+  const isoAnchor = new Date(start);
+  isoAnchor.setUTCDate(start.getUTCDate() + 3);
+  const weekYear = isoAnchor.getUTCFullYear();
+  const firstWeekStart = getWeekStart(new Date(Date.UTC(weekYear, 0, 4)));
+  const weekNumber = Math.round((start.getTime() - firstWeekStart.getTime()) / 604800000) + 1;
+
+  return {
+    key: `${weekYear}-W${String(weekNumber).padStart(2, '0')}`,
+    start,
+    end,
+    weekYear,
+    weekNumber,
+  };
+}
+
+function formatWeekRange(start: Date, end: Date) {
+  return `${feedWeekRangeFormatter.format(start)} – ${feedWeekRangeFormatter.format(end)}`;
 }
 
 function escapeHtml(value: string) {
@@ -164,6 +228,7 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [newPost, setNewPost] = useState<PostFormState>(defaultPostState);
   const [posting, setPosting] = useState(false);
+  const [activeWeekKey, setActiveWeekKey] = useState<string | null>(null);
 
   const fetchFeed = async () => {
     try {
@@ -413,8 +478,48 @@ export default function App() {
   };
 
   const releaseCount = items.filter(isReleaseItem).length;
-  const visibleItems = view === 'releases' ? items.filter(isReleaseItem) : items;
-  const groupedItems = groupFeedItems(visibleItems);
+  const visibleItems = useMemo(() => {
+    const filtered = view === 'releases' ? items.filter(isReleaseItem) : items;
+    return [...filtered].sort(
+      (left, right) => parseFeedDate(right.created_at).getTime() - parseFeedDate(left.created_at).getTime(),
+    );
+  }, [items, view]);
+
+  const weeks = useMemo<FeedWeekGroup[]>(() => {
+    const buckets = new Map<string, FeedWeekGroup>();
+
+    for (const item of visibleItems) {
+      const meta = getWeekMetadata(item.created_at);
+      const existing = buckets.get(meta.key);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        buckets.set(meta.key, {
+          key: meta.key,
+          weekNumber: meta.weekNumber,
+          weekYear: meta.weekYear,
+          start: meta.start,
+          end: meta.end,
+          items: [item],
+        });
+      }
+    }
+
+    return [...buckets.values()].sort((left, right) => right.start.getTime() - left.start.getTime());
+  }, [visibleItems]);
+
+  useEffect(() => {
+    if (weeks.length === 0) {
+      setActiveWeekKey(null);
+      return;
+    }
+
+    setActiveWeekKey((current) => (current && weeks.some((week) => week.key === current) ? current : weeks[0].key));
+  }, [weeks]);
+
+  const activeWeekIndex = weeks.findIndex((week) => week.key === activeWeekKey);
+  const activeWeek = activeWeekIndex >= 0 ? weeks[activeWeekIndex] : weeks[0] || null;
+  const groupedItems = groupFeedItems(activeWeek?.items || []);
 
   return (
     <div className="feed-shell">
@@ -573,6 +678,52 @@ export default function App() {
             >
               <RefreshCw size={14} className={refreshing ? 'spin' : ''} />
               {refreshing ? 'Syncing' : 'Sync GitHub'}
+            </button>
+          </div>
+        </section>
+
+        <section className="feed-weekbar feed-card">
+          <div className="feed-weekbar-copy">
+            <span className="eyebrow">Calendar Week</span>
+            {activeWeek ? (
+              <>
+                <h2 className="feed-week-title">Week {activeWeek.weekNumber}, {activeWeek.weekYear}</h2>
+                <p className="feed-week-range">
+                  {formatWeekRange(activeWeek.start, activeWeek.end)} · {activeWeek.items.length} entr{activeWeek.items.length === 1 ? 'y' : 'ies'}
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="feed-week-title">No entries yet</h2>
+                <p className="feed-week-range">Once the stream has posts, they will be grouped here by calendar week.</p>
+              </>
+            )}
+          </div>
+
+          <div className="feed-weekbar-actions">
+            <button
+              type="button"
+              className="feed-button"
+              onClick={() => {
+                if (activeWeekIndex >= 0 && activeWeekIndex < weeks.length - 1) {
+                  setActiveWeekKey(weeks[activeWeekIndex + 1].key);
+                }
+              }}
+              disabled={activeWeekIndex === -1 || activeWeekIndex >= weeks.length - 1}
+            >
+              Prev Week
+            </button>
+            <button
+              type="button"
+              className="feed-button"
+              onClick={() => {
+                if (activeWeekIndex > 0) {
+                  setActiveWeekKey(weeks[activeWeekIndex - 1].key);
+                }
+              }}
+              disabled={activeWeekIndex <= 0}
+            >
+              Next Week
             </button>
           </div>
         </section>

@@ -85,8 +85,25 @@ async function startServer() {
           acronym VARCHAR(50),
           category VARCHAR(100)
         )
-      `).then(() => {
+      `).then(async () => {
         console.log('Links table ready.');
+        try {
+          const [columns] = await pool!.query(
+            `SELECT COUNT(*) AS count
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = ?
+               AND TABLE_NAME = 'links'
+               AND COLUMN_NAME = 'tags'`,
+             [process.env.MYSQL_DATABASE]
+          );
+          const count = Number((columns as Array<{ count?: number }>)[0]?.count || 0);
+          if (count === 0) {
+            await pool!.execute('ALTER TABLE links ADD COLUMN tags TEXT NULL');
+            console.log('Added tags column to links table.');
+          }
+        } catch (colErr) {
+          console.error('Error checking or adding tags column:', colErr);
+        }
       }).catch(err => {
         console.error('Error creating table:', err);
       });
@@ -590,8 +607,8 @@ async function startServer() {
       if (!Array.isArray(links)) return res.status(400).json({ error: 'Expected an array of links' });
       for (const link of links) {
         await db.execute(
-          'INSERT IGNORE INTO links (id, title, url, acronym, category) VALUES (?, ?, ?, ?, ?)',
-          [link.id, link.title, link.url, link.acronym, link.category]
+          'INSERT IGNORE INTO links (id, title, url, acronym, category, tags) VALUES (?, ?, ?, ?, ?, ?)',
+          [link.id, link.title, link.url, link.acronym, link.category, link.tags || '']
         );
       }
       res.status(201).json({ success: true });
@@ -603,11 +620,11 @@ async function startServer() {
   // CREATE a new link
   app.post('/api/links', async (req, res) => {
     try {
-      const { id, title, url, acronym, category } = req.body;
+      const { id, title, url, acronym, category, tags } = req.body;
       const db = initDb()!;
       await db.execute(
-        'INSERT INTO links (id, title, url, acronym, category) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title=VALUES(title), url=VALUES(url), acronym=VALUES(acronym), category=VALUES(category)',
-        [id, title, url, acronym, category]
+        'INSERT INTO links (id, title, url, acronym, category, tags) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title=VALUES(title), url=VALUES(url), acronym=VALUES(acronym), category=VALUES(category), tags=VALUES(tags)',
+        [id, title, url, acronym, category, tags || '']
       );
       res.status(201).json({ success: true });
     } catch (error: any) {
@@ -619,11 +636,11 @@ async function startServer() {
   app.put('/api/links/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const { title, url, acronym, category } = req.body;
+      const { title, url, acronym, category, tags } = req.body;
       const db = initDb()!;
       await db.execute(
-        'UPDATE links SET title = ?, url = ?, acronym = ?, category = ? WHERE id = ?',
-        [title, url, acronym, category, id]
+        'UPDATE links SET title = ?, url = ?, acronym = ?, category = ?, tags = ? WHERE id = ?',
+        [title, url, acronym, category, tags || '', id]
       );
       res.json({ success: true });
     } catch (error: any) {
