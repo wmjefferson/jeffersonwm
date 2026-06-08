@@ -227,6 +227,7 @@ app.get("/health", async (_req, res) => {
 // Initialize table (MySQL syntax)
 async function initDb() {
   try {
+    await pool.query(`SET time_zone = '+00:00'`);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS feed_items (
         id INT PRIMARY KEY AUTO_INCREMENT,
@@ -442,9 +443,10 @@ app.post("/api/feed", async (req, res) => {
   }
 
   try {
+    const createdAt = new Date().toISOString().slice(0, 19).replace("T", " ");
     const sql = `
-      INSERT INTO feed_items (title, content, url, source, external_id)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO feed_items (title, content, url, source, external_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         title=VALUES(title),
         content=VALUES(content),
@@ -457,7 +459,8 @@ app.post("/api/feed", async (req, res) => {
       content || null, 
       url || null, 
       source || "manual", 
-      external_id || null
+      external_id || null,
+      createdAt
     ]);
     
     res.json({ success: true });
