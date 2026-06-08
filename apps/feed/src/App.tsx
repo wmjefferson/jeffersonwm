@@ -5,6 +5,7 @@ import {
   Briefcase,
   Clock,
   Code,
+  Pencil,
   ExternalLink,
   FileText,
   Github,
@@ -12,10 +13,11 @@ import {
   Linkedin,
   MessageSquare,
   RefreshCw,
+  Trash2,
   Trophy,
 } from 'lucide-react';
 
-type FeedView = 'all' | 'releases';
+type FeedView = 'all' | 'releases' | 'manual';
 
 interface FeedItem {
   id: number;
@@ -69,6 +71,10 @@ const feedTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit',
   minute: '2-digit',
   hour12: false,
+});
+const feedTimezoneFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: FEED_TIMEZONE,
+  timeZoneName: 'short',
 });
 const feedPacificDatePartsFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: FEED_TIMEZONE,
@@ -213,6 +219,92 @@ function isReleaseItem(item: FeedItem) {
   return item.source.toLowerCase() === 'release';
 }
 
+function isManualItem(item: FeedItem) {
+  const source = item.source.toLowerCase();
+  return source !== 'github' && source !== 'release';
+}
+
+function isEditableItem(item: FeedItem) {
+  return item.source.toLowerCase() !== 'github';
+}
+
+function decodeHtmlText(value: string) {
+  if (typeof window === 'undefined') {
+    return value;
+  }
+
+  const parser = new DOMParser();
+  return parser.parseFromString(value, 'text/html').documentElement.textContent || '';
+}
+
+function htmlToEditorText(html: string | null) {
+  if (!html) {
+    return '';
+  }
+
+  const normalized = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+    .replace(/<\/li>\s*<li[^>]*>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '')
+    .replace(/<\/?(p|div|ul|ol)>/gi, '');
+
+  return decodeHtmlText(normalized).replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function releaseHtmlToHighlights(html: string | null) {
+  if (!html) {
+    return '';
+  }
+
+  if (typeof window !== 'undefined') {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const bullets = [...doc.querySelectorAll('li')]
+      .map((node) => node.textContent?.trim() || '')
+      .filter(Boolean);
+
+    if (bullets.length > 0) {
+      return bullets.join('\n');
+    }
+  }
+
+  return htmlToEditorText(html);
+}
+
+function parseReleaseTitle(title: string) {
+  const match = title.trim().match(/^(.*?)(?:\s+v([^\s]+))?$/i);
+  return {
+    appName: match?.[1]?.trim() || title.trim(),
+    version: match?.[2]?.trim() || '',
+  };
+}
+
+function buildPostStateFromItem(item: FeedItem): PostFormState {
+  if (isReleaseItem(item)) {
+    const parsedTitle = parseReleaseTitle(item.title);
+    return {
+      title: '',
+      content: '',
+      source: 'release',
+      url: item.url || '',
+      appName: parsedTitle.appName,
+      version: parsedTitle.version,
+      highlights: releaseHtmlToHighlights(item.content),
+    };
+  }
+
+  return {
+    title: item.title,
+    content: htmlToEditorText(item.content),
+    source: item.source,
+    url: item.url || '',
+    appName: '',
+    version: '',
+    highlights: '',
+  };
+}
+
 export default function App() {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [view, setView] = useState<FeedView>('all');
@@ -229,6 +321,13 @@ export default function App() {
   const [newPost, setNewPost] = useState<PostFormState>(defaultPostState);
   const [posting, setPosting] = useState(false);
   const [activeWeekKey, setActiveWeekKey] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+
+  const resetComposer = () => {
+    setNewPost(defaultPostState());
+    setEditingItemId(null);
+    setShowCompose(false);
+  };
 
   const fetchFeed = async () => {
     try {
@@ -301,6 +400,7 @@ export default function App() {
     setIsLoggedIn(false);
     setShowCompose(false);
     setShowSetup(false);
+    setEditingItemId(null);
   };
 
   const handlePost = async (event: FormEvent) => {
@@ -323,8 +423,9 @@ export default function App() {
     setError(null);
 
     try {
-      const response = await fetch(apiUrl('/api/feed'), {
-        method: 'POST',
+      const isEditing = editingItemId !== null;
+      const response = await fetch(apiUrl(isEditing ? `/api/feed/${editingItemId}` : '/api/feed'), {
+        method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: resolvedTitle,
@@ -332,7 +433,7 @@ export default function App() {
           url: newPost.url || null,
           source: newPost.source,
           secret: secretInput,
-          external_id: `${newPost.source}-${Date.now()}`,
+          ...(isEditing ? {} : { external_id: `${newPost.source}-${Date.now()}` }),
         }),
       });
 
@@ -341,14 +442,58 @@ export default function App() {
       }
 
       if (!response.ok) {
-        throw new Error('Failed to post');
+        throw new Error(isEditing ? 'Failed to update entry' : 'Failed to post');
       }
 
-      setNewPost(defaultPostState());
-      setShowCompose(false);
+      resetComposer();
       await fetchFeed();
     } catch (err: any) {
-      setError(err.message || 'Failed to create entry');
+      setError(err.message || (editingItemId !== null ? 'Failed to update entry' : 'Failed to create entry'));
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handleEdit = (item: FeedItem) => {
+    setEditingItemId(item.id);
+    setNewPost(buildPostStateFromItem(item));
+    setShowCompose(true);
+    setError(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (item: FeedItem) => {
+    const confirmed = window.confirm(`Delete "${item.title}" from the feed?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setPosting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(apiUrl(`/api/feed/${item.id}`), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: secretInput }),
+      });
+
+      if (response.status === 401) {
+        throw new Error('Invalid secret');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to delete entry');
+      }
+
+      if (editingItemId === item.id) {
+        resetComposer();
+      }
+
+      await fetchFeed();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete entry');
     } finally {
       setPosting(false);
     }
@@ -383,7 +528,12 @@ export default function App() {
 
   const formatDate = (dateStr: string) => {
     const date = parseFeedDate(dateStr);
-    return `${feedDateFormatter.format(date)}, ${feedTimeFormatter.format(date)}`;
+    const timezonePart =
+      feedTimezoneFormatter
+        .formatToParts(date)
+        .find((part) => part.type === 'timeZoneName')
+        ?.value || 'PT';
+    return `${feedDateFormatter.format(date)}, ${feedTimeFormatter.format(date)} ${timezonePart}`;
   };
 
   const getGitHubRepo = (item: FeedItem): string | null => {
@@ -478,8 +628,10 @@ export default function App() {
   };
 
   const releaseCount = items.filter(isReleaseItem).length;
+  const manualCount = items.filter(isManualItem).length;
   const visibleItems = useMemo(() => {
-    const filtered = view === 'releases' ? items.filter(isReleaseItem) : items;
+    const filtered =
+      view === 'releases' ? items.filter(isReleaseItem) : view === 'manual' ? items.filter(isManualItem) : items;
     return [...filtered].sort(
       (left, right) => parseFeedDate(right.created_at).getTime() - parseFeedDate(left.created_at).getTime(),
     );
@@ -527,27 +679,6 @@ export default function App() {
         <div>
           <h1 className="feed-title">Feed</h1>
           <p className="feed-subtitle">Version notes, public logs, and code movement in one running line.</p>
-        </div>
-
-        <div className="feed-toolbar">
-          {isLoggedIn && (
-            <button
-              type="button"
-              onClick={() => setShowSetup((current) => !current)}
-              className="feed-button"
-            >
-              <Code size={14} />
-              Setup
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={isLoggedIn ? handleLogout : () => setShowLogin(true)}
-            className="feed-button"
-          >
-            {isLoggedIn ? 'Log Out' : 'Editor Login'}
-          </button>
         </div>
       </header>
 
@@ -655,9 +786,28 @@ export default function App() {
                 Changelog
                 <span>{releaseCount}</span>
               </button>
+              <button
+                type="button"
+                className={`feed-pill ${view === 'manual' ? 'feed-pill--active' : ''}`}
+                onClick={() => setView('manual')}
+                aria-pressed={view === 'manual'}
+              >
+                Manual
+                <span>{manualCount}</span>
+              </button>
             </div>
           </div>
           <div className="feed-hero-actions">
+            {isLoggedIn && (
+              <button
+                type="button"
+                onClick={() => setShowSetup((current) => !current)}
+                className="feed-button"
+              >
+                <Code size={14} />
+                Setup
+              </button>
+            )}
             {isLoggedIn && (
               <button
                 type="button"
@@ -675,6 +825,13 @@ export default function App() {
             >
               <RefreshCw size={14} className={refreshing ? 'spin' : ''} />
               {refreshing ? 'Syncing' : 'Sync GitHub'}
+            </button>
+            <button
+              type="button"
+              onClick={isLoggedIn ? handleLogout : () => setShowLogin(true)}
+              className="feed-button"
+            >
+              {isLoggedIn ? 'Log Out' : 'Editor Login'}
             </button>
           </div>
         </section>
@@ -734,6 +891,20 @@ export default function App() {
               className="feed-card composer-card"
             >
               <form className="stack-form" onSubmit={handlePost}>
+                <div className="composer-head">
+                  <div>
+                    <span className="eyebrow">{editingItemId !== null ? 'Edit Entry' : 'Add Entry'}</span>
+                    <p className="helper-copy">
+                      {editingItemId !== null
+                        ? 'Update this manual or changelog entry in place.'
+                        : 'Release entries are designed to sit chronologically beside the GitHub feed.'}
+                    </p>
+                  </div>
+                  <button type="button" className="feed-link-button" onClick={resetComposer}>
+                    Cancel
+                  </button>
+                </div>
+
                 <div className="form-row">
                   <div>
                     <label className="field-label" htmlFor="feed-source">
@@ -846,9 +1017,8 @@ export default function App() {
                 )}
 
                 <div className="composer-actions">
-                  <p className="helper-copy">Release entries are designed to sit chronologically beside the GitHub feed.</p>
                   <button type="submit" className="feed-button feed-button--primary" disabled={posting}>
-                    {posting ? 'Posting' : 'Post to Feed'}
+                    {posting ? (editingItemId !== null ? 'Saving' : 'Posting') : editingItemId !== null ? 'Save Changes' : 'Post to Feed'}
                   </button>
                 </div>
               </form>
@@ -874,7 +1044,13 @@ export default function App() {
             <AnimatePresence initial={false}>
               {groupedItems.length === 0 ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="feed-card empty-card">
-                  <p>{view === 'releases' ? 'No release notes yet.' : 'The stream is quiet right now.'}</p>
+                  <p>
+                    {view === 'releases'
+                      ? 'No release notes yet.'
+                      : view === 'manual'
+                        ? 'No manual entries yet.'
+                        : 'The stream is quiet right now.'}
+                  </p>
                 </motion.div>
               ) : (
                 groupedItems.map((group) => (
@@ -931,9 +1107,23 @@ export default function App() {
                               {getSourceIcon(item.source)}
                               <span>{item.source}</span>
                             </div>
-                            <div className="feed-time">
-                              <Clock size={12} />
-                              <span>{formatDate(item.created_at)}</span>
+                            <div className="entry-head-actions">
+                              {isLoggedIn && isEditableItem(item) && (
+                                <div className="entry-actions">
+                                  <button type="button" className="feed-link-button" onClick={() => handleEdit(item)}>
+                                    <Pencil size={12} />
+                                    Edit
+                                  </button>
+                                  <button type="button" className="feed-link-button feed-link-button--danger" onClick={() => handleDelete(item)}>
+                                    <Trash2 size={12} />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                              <div className="feed-time">
+                                <Clock size={12} />
+                                <span>{formatDate(item.created_at)}</span>
+                              </div>
                             </div>
                           </div>
 

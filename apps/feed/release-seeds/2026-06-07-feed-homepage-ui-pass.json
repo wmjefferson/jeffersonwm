@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Feed v0.2.1",
+  "content": "<p>Feed moved from a long continuous archive into a more usable editorial tool and weekly log surface. This pass focused on navigation, editing, timing clarity, and better alignment with the JeffersonWM homepage rhythm.</p><p>What changed:</p><ul><li>Grouped the timeline by calendar week with week numbers and prev/next week navigation, then added a dedicated Manual view beside Full Feed and Changelog.</li><li>Added in-page editing and deletion for manual entries and changelog/release entries, while keeping GitHub-imported items read-only.</li><li>Restored explicit U.S. Pacific timestamps on the feed and moved Editor Login down beside Sync GitHub so the header stays quieter.</li><li>Aligned Feed spacing more closely with JeffersonWM, and adjusted the homepage widget to sit on the same 102px top rhythm with cleaner stacked city, time, date, event, and weather lines.</li></ul><p>Next up is continued visual work: spacing, hierarchy, and cross-site alignment are in a better place, but we are still shaping the final visual language.</p>",
+  "url": "https://jeffersonwm.com/feed/",
+  "source": "release",
+  "external_id": "feed-v0.2.1-2026-06-07"
+}

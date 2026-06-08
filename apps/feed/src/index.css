@@ -2,6 +2,7 @@
 @import "tailwindcss";
 
 :root {
+  --frame: 42px;
   color: #111827;
   background: #f8f7f4;
   font-family: "IBM Plex Sans Condensed", system-ui, sans-serif;
@@ -26,7 +27,7 @@ a {
 
 .feed-shell {
   min-height: 100vh;
-  padding: 42px;
+  padding: 102px var(--frame) var(--frame);
 }
 
 .feed-topbar {
@@ -35,7 +36,7 @@ a {
   gap: 2rem;
   align-items: flex-start;
   margin: 0 auto 3rem;
-  max-width: 1080px;
+  max-width: none;
 }
 
 .feed-title {
@@ -69,7 +70,7 @@ a {
 }
 
 .feed-main {
-  max-width: 1080px;
+  max-width: none;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -372,6 +373,36 @@ a {
   gap: 1rem;
 }
 
+.composer-head,
+.entry-head-actions,
+.entry-actions {
+  display: flex;
+  align-items: center;
+}
+
+.composer-head,
+.entry-head-actions {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.composer-head {
+  padding-bottom: 0.1rem;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.composer-head .helper-copy {
+  margin: 0.2rem 0 0;
+}
+
+.entry-head-actions {
+  flex-wrap: wrap;
+}
+
+.entry-actions {
+  gap: 0.9rem;
+}
+
 .entry-title,
 .subfeed-head h3,
 .modal-header h2,
@@ -417,6 +448,15 @@ a {
   transition: color 160ms ease;
 }
 
+.feed-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  font: inherit;
+  text-decoration: none;
+}
+
 .feed-html a,
 .entry-link,
 .feed-link-button {
@@ -427,6 +467,14 @@ a {
 .entry-link:hover,
 .feed-link-button:hover {
   color: #111827;
+}
+
+.feed-link-button--danger {
+  color: #b42318;
+}
+
+.feed-link-button--danger:hover {
+  color: #7a271a;
 }
 
 .feed-html ul {
@@ -562,7 +610,9 @@ a {
   .feed-toolbar,
   .feed-hero-actions,
   .composer-actions,
+  .composer-head,
   .feed-card-head,
+  .entry-head-actions,
   .subfeed-head,
   .modal-header {
     flex-direction: column;
