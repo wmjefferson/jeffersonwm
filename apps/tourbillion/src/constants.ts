@@ -1,3 +1,5 @@
+import type { QualityLevel } from './types';
+
 export const DEFAULT_SETTINGS = {
   speed: 1.5,
   count: 1500,
@@ -39,3 +41,5 @@ export const TRAIN_QUALITY_PROFILES = {
     historyTailBuffer: 18,
   },
 } as const;
+
+export type TrainQualityProfile = (typeof TRAIN_QUALITY_PROFILES)[QualityLevel];
