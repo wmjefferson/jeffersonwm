@@ -1,0 +1,17 @@
+{
+  "source": "release",
+  "entries": [
+    {
+      "id": "battalion-v1.2.33",
+      "appName": "Battalion",
+      "version": "1.2.33",
+      "url": "https://jeffersonwm.com/battalion/",
+      "createdAt": "2026-06-10T02:45:00.000Z",
+      "highlights": [
+        "Added introspective quotes feature to the public dashboard with 100 self-deprecating quotes ending in resigned optimism.",
+        "Fixed script syntax error in dashboard module and verified Vite build passes cleanly.",
+        "Implemented dynamic quote refresh instantly upon clicking the dashboard refresh button."
+      ]
+    }
+  ]
+}

@@ -22,7 +22,15 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-ROOT = Path(r"E:\perihelion\images").resolve()
+DEFAULT_IMAGE_ROOT = Path(r"E:\images")
+LEGACY_IMAGE_ROOT = Path(r"E:\perihelion\images")
+
+ROOT = Path(
+    os.environ.get(
+        "PERIHELION_IMAGE_ROOT",
+        str(DEFAULT_IMAGE_ROOT if DEFAULT_IMAGE_ROOT.exists() else LEGACY_IMAGE_ROOT),
+    )
+).resolve()
 HOST = "0.0.0.0"
 PORT = 8010
 SHARES_DIR = Path(r"E:\perihelion\shares").resolve()
@@ -204,6 +212,14 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
             );
+
+            CREATE TABLE IF NOT EXISTS image_details (
+                path TEXT PRIMARY KEY,
+                title TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                tags_json TEXT NOT NULL DEFAULT '[]',
+                updated_at TEXT NOT NULL
+            );
             """
         )
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
@@ -214,6 +230,248 @@ def init_db() -> None:
         if "blocked_at" not in columns:
             conn.execute("ALTER TABLE users ADD COLUMN blocked_at TEXT")
         conn.commit()
+
+
+def normalize_tags(value) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in value:
+        tag = str(item or "").strip().lower()
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        result.append(tag)
+    return result
+
+
+def serialize_image_detail_row(row: sqlite3.Row | None) -> dict:
+    if not row:
+        return {"title": "", "description": "", "tags": []}
+    try:
+        tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+    except Exception:
+        tags = []
+    return {
+        "title": row["title"] or "",
+        "description": row["description"] or "",
+        "tags": tags,
+    }
+
+
+def get_image_detail_record(rel_path: str) -> dict:
+    with db_connect() as conn:
+        row = conn.execute(
+            "SELECT path, title, description, tags_json, updated_at FROM image_details WHERE path = ?",
+            (rel_path,),
+        ).fetchone()
+    return serialize_image_detail_row(row)
+
+
+def save_image_detail_record(rel_path: str, title: str, description: str, tags: list[str]) -> dict:
+    payload = {
+        "title": str(title or "").strip(),
+        "description": str(description or "").strip(),
+        "tags": normalize_tags(tags),
+    }
+    with db_connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO image_details (path, title, description, tags_json, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(path) DO UPDATE SET
+                title = excluded.title,
+                description = excluded.description,
+                tags_json = excluded.tags_json,
+                updated_at = excluded.updated_at
+            """,
+            (rel_path, payload["title"], payload["description"], json.dumps(payload["tags"], ensure_ascii=False), iso_utc()),
+        )
+        conn.commit()
+    return payload
+
+
+def load_image_details_map(paths: list[str]) -> dict[str, dict]:
+    if not paths:
+        return {}
+    placeholders = ",".join("?" for _ in paths)
+    with db_connect() as conn:
+        rows = conn.execute(
+            f"SELECT path, title, description, tags_json, updated_at FROM image_details WHERE path IN ({placeholders})",
+            tuple(paths),
+        ).fetchall()
+    return {row["path"]: serialize_image_detail_row(row) for row in rows}
+
+
+def collect_tag_stats() -> tuple[list[str], dict[str, int]]:
+    counts: dict[str, int] = {}
+    with db_connect() as conn:
+        rows = conn.execute("SELECT tags_json FROM image_details").fetchall()
+    for row in rows:
+        try:
+            tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+        except Exception:
+            tags = []
+        for tag in tags:
+            counts[tag] = counts.get(tag, 0) + 1
+    tags = sorted(counts.keys())
+    return tags, counts
+
+
+def rewrite_tags(transform) -> None:
+    with db_connect() as conn:
+        rows = conn.execute("SELECT path, title, description, tags_json FROM image_details").fetchall()
+        now = iso_utc()
+        for row in rows:
+            try:
+                current_tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+            except Exception:
+                current_tags = []
+            next_tags = normalize_tags(transform(current_tags))
+            if next_tags == current_tags:
+                continue
+            conn.execute(
+                "UPDATE image_details SET tags_json = ?, updated_at = ? WHERE path = ?",
+                (json.dumps(next_tags, ensure_ascii=False), now, row["path"]),
+            )
+        conn.commit()
+
+
+def rename_tag_globally(old_tag: str, new_tag: str) -> None:
+    old_tag = old_tag.strip().lower()
+    new_tag = new_tag.strip().lower()
+    if not old_tag or not new_tag:
+        return
+
+    def transform(tags: list[str]) -> list[str]:
+        return [new_tag if tag == old_tag else tag for tag in tags]
+
+    rewrite_tags(transform)
+
+
+def delete_tag_globally(tag_name: str) -> None:
+    tag_name = tag_name.strip().lower()
+    if not tag_name:
+        return
+
+    def transform(tags: list[str]) -> list[str]:
+        return [tag for tag in tags if tag != tag_name]
+
+    rewrite_tags(transform)
+
+
+def bulk_update_tags(image_paths: list[str], tag_name: str, action: str) -> None:
+    clean_tag = tag_name.strip().lower()
+    if not clean_tag or action not in {"add", "remove"}:
+        return
+    unique_paths = [path for path in dict.fromkeys(str(path or "").strip() for path in image_paths) if path]
+    if not unique_paths:
+        return
+
+    with db_connect() as conn:
+        now = iso_utc()
+        for rel_path in unique_paths:
+            row = conn.execute(
+                "SELECT path, title, description, tags_json FROM image_details WHERE path = ?",
+                (rel_path,),
+            ).fetchone()
+            current = serialize_image_detail_row(row)
+            tags = current["tags"]
+            if action == "add":
+                next_tags = normalize_tags(tags + [clean_tag])
+            else:
+                next_tags = [tag for tag in tags if tag != clean_tag]
+            conn.execute(
+                """
+                INSERT INTO image_details (path, title, description, tags_json, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(path) DO UPDATE SET
+                    title = excluded.title,
+                    description = excluded.description,
+                    tags_json = excluded.tags_json,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    rel_path,
+                    current["title"],
+                    current["description"],
+                    json.dumps(next_tags, ensure_ascii=False),
+                    now,
+                ),
+            )
+        conn.commit()
+
+
+def load_share_record(share_id: str) -> dict | None:
+    share_file = SHARES_DIR / f"{share_id}.json"
+    if not share_file.is_file():
+        return None
+    data = json.loads(share_file.read_text(encoding="utf-8"))
+    images = data.get("images") or []
+    data["images"] = [str(path or "").strip() for path in images if str(path or "").strip()]
+    data["itemCount"] = len(data["images"])
+    files = []
+    missing_images = []
+    for rel_path in data["images"]:
+        info = {
+            "path": rel_path,
+            "name": Path(rel_path).name,
+            "kind": guess_kind(Path(rel_path).suffix.lower()),
+            "is_large": False,
+            "size": 0,
+            "missing": False,
+        }
+        try:
+            target = safe_path(rel_path)
+            if target.is_file():
+                info["size"] = target.stat().st_size
+            else:
+                info["missing"] = True
+                missing_images.append(rel_path)
+        except Exception:
+            info["missing"] = True
+            missing_images.append(rel_path)
+        files.append(info)
+    data["files"] = files
+    data["missingImages"] = missing_images
+    return data
+
+
+def list_share_records() -> list[dict]:
+    ensure_shares_dir()
+    shares: list[dict] = []
+    for share_file in SHARES_DIR.glob("*.json"):
+        try:
+            data = json.loads(share_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        images = [str(path or "").strip() for path in (data.get("images") or []) if str(path or "").strip()]
+        shares.append(
+            {
+                "id": data.get("id") or share_file.stem,
+                "title": (data.get("title") or "").strip(),
+                "images": images,
+                "itemCount": len(images),
+                "created_at": data.get("created_at") or "",
+            }
+        )
+    shares.sort(key=lambda share: share.get("created_at") or "", reverse=True)
+    return shares
+
+
+def save_share_record(share_id: str, title: str, images: list[str], created_at: str | None = None) -> dict:
+    ensure_shares_dir()
+    payload = {
+        "id": share_id,
+        "title": (title or "").strip(),
+        "images": [str(path or "").strip() for path in images if str(path or "").strip()],
+        "created_at": created_at or iso_utc(),
+    }
+    share_file = SHARES_DIR / f"{share_id}.json"
+    share_file.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    payload["itemCount"] = len(payload["images"])
+    return payload
 
 
 def hash_password(password: str, salt: str | None = None) -> str:
@@ -494,6 +752,10 @@ def require_access(handler: BaseHTTPRequestHandler) -> dict | None:
 
 
 def log_download(user: dict | None, action: str, file_path: str, output_name: str | None, handler: BaseHTTPRequestHandler) -> None:
+    local_user_id = None
+    if user and not central_auth_enabled():
+        local_user_id = user["id"]
+
     with db_connect() as conn:
         conn.execute(
             """
@@ -502,7 +764,7 @@ def log_download(user: dict | None, action: str, file_path: str, output_name: st
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                user["id"] if user else None,
+                local_user_id,
                 user["username"] if user else None,
                 action,
                 file_path,
@@ -788,6 +1050,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not current.exists() or not current.is_dir():
                     self._send_json({"error": "Folder not found"}, 404)
                     return
+                tag_filter = (query.get("tag", [""])[0] or "").strip().lower()
+                share_filter = (query.get("list", [""])[0] or "").strip()
+                search_filter = (query.get("search", [""])[0] or "").strip().lower()
+                page = max(1, int(query.get("page", ["1"])[0]))
+                limit = max(1, min(250, int(query.get("limit", ["25"])[0])))
 
                 folders = []
                 files = []
@@ -810,6 +1077,40 @@ class Handler(BaseHTTPRequestHandler):
                         item["url"] = f"/images/{rel_url(entry)}"
                         files.append(item)
 
+                detail_map = load_image_details_map([file["path"] for file in files])
+                share_image_set: set[str] | None = None
+                if share_filter:
+                    share = load_share_record(share_filter)
+                    if not share:
+                        self._send_json({"error": "Shared page not found"}, 404)
+                        return
+                    share_image_set = set(share["images"])
+
+                enriched_files = []
+                for item in files:
+                    detail = detail_map.get(item["path"], {"title": "", "description": "", "tags": []})
+                    item["title"] = detail["title"]
+                    item["description"] = detail["description"]
+                    item["tags"] = detail["tags"]
+                    if share_image_set is not None and item["path"] not in share_image_set:
+                        continue
+                    if tag_filter and tag_filter not in item["tags"]:
+                        continue
+                    if search_filter:
+                        haystack = " ".join(
+                            [
+                                item.get("name", ""),
+                                item.get("path", ""),
+                                item.get("title", ""),
+                                item.get("description", ""),
+                                " ".join(item.get("tags", [])),
+                            ]
+                        ).lower()
+                        if search_filter not in haystack:
+                            continue
+                    enriched_files.append(item)
+                files = enriched_files
+
                 breadcrumbs = []
                 if rel:
                     acc = []
@@ -819,24 +1120,29 @@ class Handler(BaseHTTPRequestHandler):
 
                 image_files = [f["path"] for f in files if f["kind"] == "image"]
                 directory_paths = [f["path"] for f in folders]
+                total = len(files)
+                start = (page - 1) * limit
+                end = start + limit
+                paged_files = files[start:end]
+                total_pages = max(1, (total + limit - 1) // limit)
 
                 self._send_json({
                     "root": ROOT.as_posix(),
                     "current": rel,
                     "folders": folders,
-                    "files": files,
+                    "files": paged_files,
                     "breadcrumbs": breadcrumbs,
                     "counts": {
                         "folders": len(folders),
-                        "files": len(files),
+                        "files": total,
                         "images": len(image_files),
                         "other": sum(1 for f in files if f["kind"] != "image"),
                     },
                     "images": image_files,
                     "directories": directory_paths,
-                    "page": 1,
-                    "totalPages": 1,
-                    "total": len(files),
+                    "page": page,
+                    "totalPages": total_pages,
+                    "total": total,
                 })
                 return
 
@@ -862,6 +1168,41 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(image_metadata(target))
                 return
 
+            if path.startswith("/api/image-details/"):
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                rel = unquote(path[len("/api/image-details/"):])
+                target = safe_path(rel)
+                if not target.is_file():
+                    self._send_json({"error": "File not found"}, 404)
+                    return
+                detail = get_image_detail_record(rel)
+                self._send_json({
+                    "ok": True,
+                    "path": rel,
+                    "title": detail["title"],
+                    "description": detail["description"],
+                    "tags": detail["tags"],
+                    "exif": image_metadata(target),
+                })
+                return
+
+            if path == "/api/tags":
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                tags, tag_counts = collect_tag_stats()
+                self._send_json({"ok": True, "tags": tags, "tagCounts": tag_counts})
+                return
+
+            if path == "/api/shares":
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                self._send_json({"ok": True, "shares": list_share_records()})
+                return
+
             if path.startswith("/api/download/"):
                 user = require_access(self)
                 if REQUIRE_AUTH and not user:
@@ -877,11 +1218,11 @@ class Handler(BaseHTTPRequestHandler):
                 if REQUIRE_AUTH and not user:
                     return
                 share_id = unquote(path[len("/api/share/"):]).strip("/")
-                share_file = SHARES_DIR / f"{share_id}.json"
-                if not share_file.is_file():
+                share = load_share_record(share_id)
+                if not share:
                     self._send_json({"error": "Shared page not found"}, 404)
                     return
-                self._send_json(json.loads(share_file.read_text(encoding="utf-8")))
+                self._send_json(share)
                 return
 
             if path == "/" or path == "/index.html":
@@ -1175,6 +1516,67 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "action": action, "userId": user_id})
                 return
 
+            if path.startswith("/api/image-details/"):
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                rel = unquote(path[len("/api/image-details/"):])
+                target = safe_path(rel)
+                if not target.is_file():
+                    self._send_json({"error": "File not found"}, 404)
+                    return
+                payload = load_json_body(self)
+                detail = save_image_detail_record(
+                    rel,
+                    payload.get("title") or "",
+                    payload.get("description") or "",
+                    payload.get("tags") or [],
+                )
+                self._send_json({"ok": True, "path": rel, **detail})
+                return
+
+            if path == "/api/bulk-tags":
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                payload = load_json_body(self)
+                images = payload.get("images") or []
+                tag = payload.get("tag") or ""
+                action = (payload.get("action") or "").strip().lower()
+                if not isinstance(images, list) or not images:
+                    self._send_json({"error": "Invalid images array"}, 400)
+                    return
+                bulk_update_tags(images, tag, action)
+                self._send_json({"ok": True})
+                return
+
+            if path == "/api/tags/rename":
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                payload = load_json_body(self)
+                old_tag = (payload.get("oldTag") or "").strip().lower()
+                new_tag = (payload.get("newTag") or "").strip().lower()
+                if not old_tag or not new_tag:
+                    self._send_json({"error": "Both oldTag and newTag are required"}, 400)
+                    return
+                rename_tag_globally(old_tag, new_tag)
+                self._send_json({"ok": True})
+                return
+
+            if path == "/api/tags/delete":
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                payload = load_json_body(self)
+                tag = (payload.get("tag") or "").strip().lower()
+                if not tag:
+                    self._send_json({"error": "Tag is required"}, 400)
+                    return
+                delete_tag_globally(tag)
+                self._send_json({"ok": True})
+                return
+
             if path == "/api/share":
                 user = require_access(self)
                 if REQUIRE_AUTH and not user:
@@ -1194,14 +1596,42 @@ class Handler(BaseHTTPRequestHandler):
                     share_id = make_share_id()
                     share_file = SHARES_DIR / f"{share_id}.json"
 
-                data = {
-                    "id": share_id,
-                    "images": images,
-                    "title": title,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }
-                share_file.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-                self._send_json({"id": share_id})
+                data = save_share_record(share_id, title, images, datetime.now(timezone.utc).isoformat())
+                self._send_json({"ok": True, "id": share_id, "share": data})
+                return
+
+            match = re.fullmatch(r"/api/share/([^/]+)", path)
+            if match:
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                share_id = unquote(match.group(1)).strip()
+                share = load_share_record(share_id)
+                if not share:
+                    self._send_json({"error": "Shared page not found"}, 404)
+                    return
+                payload = load_json_body(self)
+                title = payload.get("title", share.get("title") or "")
+                images = payload.get("images", share.get("images") or [])
+                if not isinstance(images, list):
+                    self._send_json({"error": "Invalid images array"}, 400)
+                    return
+                updated = save_share_record(share_id, title, images, share.get("created_at"))
+                self._send_json({"ok": True, "share": updated})
+                return
+
+            match = re.fullmatch(r"/api/share/([^/]+)/delete", path)
+            if match:
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                share_id = unquote(match.group(1)).strip()
+                share_file = SHARES_DIR / f"{share_id}.json"
+                if not share_file.is_file():
+                    self._send_json({"error": "Shared page not found"}, 404)
+                    return
+                share_file.unlink()
+                self._send_json({"ok": True, "id": share_id})
                 return
 
             if path == "/api/download":

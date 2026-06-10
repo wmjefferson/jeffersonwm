@@ -83,6 +83,15 @@ const getFileTypeTone = (filename: string) => {
 
 interface StagingViewProps {
   selectedImages: string[];
+  selectedMetadata?: Record<string, {
+    path: string;
+    name: string;
+    kind: 'image' | 'video' | 'other';
+    ext: string;
+    is_large?: boolean;
+    size?: number;
+    isMissing?: boolean;
+  }>;
   onBack: () => void;
   onDownload: (options: DownloadOptions) => void;
   isDownloading: boolean;
@@ -107,10 +116,12 @@ interface Rule {
   padding?: number;
 }
 
-export default function StagingView({ selectedImages, onBack, onDownload, isDownloading, onOpenLightbox, isLargeMap }: StagingViewProps) {
+export default function StagingView({ selectedImages, selectedMetadata, onBack, onDownload, isDownloading, onOpenLightbox, isLargeMap }: StagingViewProps) {
   const [rules, setRules] = useState<Rule[]>([{ id: '1', type: 'original', value: '' }]);
   const [enableRenaming, setEnableRenaming] = useState<boolean>(false);
-  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(new Set(selectedImages));
+  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(
+    new Set(selectedImages.filter(img => !selectedMetadata?.[img]?.isMissing))
+  );
   
   const [enableDimensions, setEnableDimensions] = useState<boolean>(false);
   const [enableFilesize, setEnableFilesize] = useState<boolean>(false);
@@ -181,6 +192,7 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
 
   const selectedItemLabel = selectedForDownload.size === 1 ? 'Item' : 'Items';
   const totalItemLabel = selectedImages.length === 1 ? 'Item' : 'Items';
+  const missingItemCount = selectedImages.filter(img => selectedMetadata?.[img]?.isMissing).length;
 
   const handleDownloadClick = () => {
     const filesToDownload = selectedImages.filter(img => selectedForDownload.has(img));
@@ -516,27 +528,44 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
           <div className="flex flex-wrap gap-4 sm:gap-6">
             
             {selectedImages.map(img => (
+              (() => {
+                const meta = selectedMetadata?.[img];
+                const isMissing = Boolean(meta?.isMissing);
+                return (
               <div 
                 key={img} 
                 className={`bg-white border-[2px] flex flex-col transition-all ${selectedForDownload.has(img) ? 'border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]' : 'border-[#666] opacity-60 hover:opacity-100'}`}
               >
                 <div 
                   className="h-[200px] border-b-[2px] border-[#666] bg-[#e0e0e0] relative flex items-center justify-center overflow-hidden cursor-pointer"
-                  onClick={() => onOpenLightbox(img)}
+                  onClick={() => {
+                    if (!isMissing) onOpenLightbox(img);
+                  }}
                 >
                   <button 
+                    disabled={isMissing}
                     className="absolute top-2 left-2 z-20 focus:outline-none"
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (isMissing) return;
                       toggleSelection(img);
                     }}
                   >
-                    <div className={`w-5 h-5 border-[2px] flex items-center justify-center transition-colors ${selectedForDownload.has(img) ? 'bg-black border-black' : 'bg-white border-[#666] hover:border-black'}`}>
+                    <div className={`w-5 h-5 border-[2px] flex items-center justify-center transition-colors ${isMissing ? 'bg-[#F3E8E2] border-[#B89D91]' : selectedForDownload.has(img) ? 'bg-black border-black' : 'bg-white border-[#666] hover:border-black'}`}>
                       {selectedForDownload.has(img) && <Check size={14} className="text-white" strokeWidth={3} />}
                     </div>
                   </button>
 
-                  {isRenderable(img) ? (
+                  {isMissing ? (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#F8F3F1] px-5 text-center text-[#8A5A44]">
+                      <div className="border-[2px] border-[#B89D91] bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em]">
+                        Missing
+                      </div>
+                      <div className="max-w-[180px] text-[11px] font-bold uppercase leading-relaxed text-[#7A5A49]">
+                        This shared file is no longer available in the live library.
+                      </div>
+                    </div>
+                  ) : isRenderable(img) ? (
                     <>
                       <img 
                         src={isLargeMap?.[img] ? `${MEDIA_PATH}/${encodeURI(img)}` : `${IMAGE_PATH}/${encodeURI(img)}`} 
@@ -563,7 +592,14 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
                     </div>
                   )}
                 </div>
+                {isMissing && (
+                  <div className="border-t-[0px] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#8A5A44]">
+                    {meta?.name || img.split('/').pop() || img}
+                  </div>
+                )}
               </div>
+                );
+              })()
             ))}
           </div>
         </div>
@@ -573,6 +609,9 @@ export default function StagingView({ selectedImages, onBack, onDownload, isDown
       <footer className="h-[36px] bg-white border-t-[3px] border-black shrink-0 flex items-center px-4 justify-between sticky bottom-0 z-40">
         <div className="font-sans text-xs font-bold uppercase tracking-wider text-[#666]">
           {selectedForDownload.size} of {selectedImages.length} {totalItemLabel} Selected
+          {missingItemCount > 0 && (
+            <span className="ml-2 text-[#8A5A44]">{missingItemCount} Missing</span>
+          )}
         </div>
         <div className="flex items-center gap-4">
         </div>

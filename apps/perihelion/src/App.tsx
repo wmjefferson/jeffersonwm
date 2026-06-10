@@ -16,6 +16,7 @@ interface MediaEntry {
   tags?: string[];
   is_large?: boolean;
   size?: number;
+  isMissing?: boolean;
 }
 
 interface FolderEntry {
@@ -88,6 +89,9 @@ const labelWithoutExtension = (filename: string) => {
   const dotIndex = name.lastIndexOf('.');
   return dotIndex > 0 ? name.slice(0, dotIndex) : name;
 };
+
+const sortSharesNewestFirst = <T extends { created_at?: string }>(shares: T[]) =>
+  [...shares].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
 
 const getFileTypeCode = (filename: string) => {
   const ext = extensionOf(filename).replace('.', '').toUpperCase();
@@ -222,6 +226,7 @@ export default function App() {
   const [selectedList, setSelectedList] = useState<string>('');
   const [shareCodeInput, setShareCodeInput] = useState('');
   const [shareCodeError, setShareCodeError] = useState('');
+  const [shareCodeNotice, setShareCodeNotice] = useState('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedImageLink, setCopiedImageLink] = useState(false);
@@ -245,6 +250,8 @@ export default function App() {
   const [tagInput, setTagInput] = useState('');
   const [showEditBox, setShowEditBox] = useState(false);
   const [page, setPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverTotalItems, setServerTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageMeta, setImageMeta] = useState<{ type: string; size: number; width: number; height: number } | null>(null);
@@ -331,10 +338,12 @@ export default function App() {
 
   const displayFolders = showSelectedOnly ? [] : folders;
 
-  const computedTotalPages = Math.max(1, Math.ceil(visibleEntries.length / limit || 1));
-  const startIndex = (page - 1) * limit;
-  const endIndex = startIndex + limit;
-  const pagedEntries = visibleEntries.slice(startIndex, endIndex);
+  const computedTotalPages = showSelectedOnly
+    ? Math.max(1, Math.ceil(visibleEntries.length / limit || 1))
+    : Math.max(1, serverTotalPages);
+  const startIndex = showSelectedOnly ? (page - 1) * limit : 0;
+  const endIndex = showSelectedOnly ? startIndex + limit : visibleEntries.length;
+  const pagedEntries = showSelectedOnly ? visibleEntries.slice(startIndex, endIndex) : visibleEntries;
   const stagedImages = Array.from(selectedImages) as string[];
 
   const isLargeMap = useMemo(() => {
@@ -361,7 +370,14 @@ export default function App() {
     }
     return (sharedImages || []).filter(item => !isRenderable(item)).map(path => ({ path, is_large: false, size: 0 }));
   }, [sharedFiles, sharedImages]);
-  const totalVisibleItems = visibleEntries.length;
+
+  const navigateToPath = (path: string) => {
+    setCurrentPath(path);
+    setSearchQuery('');
+    setPage(1);
+  };
+
+  const totalVisibleItems = showSelectedOnly ? visibleEntries.length : serverTotalItems;
   const selectedFileTone = selectedImage ? getFileTypeTone(selectedImage) : null;
 
   const resetAuthForm = () => {
@@ -466,7 +482,7 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        setAllShares(data.shares || []);
+        setAllShares(sortSharesNewestFirst(data.shares || []));
       }
     } catch (err) {
       console.error('Failed to fetch shares', err);
@@ -675,10 +691,14 @@ export default function App() {
 
       setEntries(nextEntries);
       setFolders(nextFolders);
+      setServerTotalPages(Math.max(1, Number(data.totalPages) || 1));
+      setServerTotalItems(Number(data.total) || nextEntries.length);
     } catch (err) {
       console.error('Failed to fetch images', err);
       setEntries([]);
       setFolders([]);
+      setServerTotalPages(1);
+      setServerTotalItems(0);
       const message = err instanceof Error ? err.message : 'Failed to fetch images';
       if (/authentication required/i.test(message)) {
         if (authStatus?.provider === 'central') {
@@ -880,7 +900,12 @@ export default function App() {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to create new share list');
-      fetchShares();
+      const data = await res.json();
+      if (data.share) {
+        setAllShares(prev => sortSharesNewestFirst([data.share, ...prev.filter(share => share.id !== data.share.id)]));
+      } else {
+        fetchShares();
+      }
       setListSearch('');
       setShowListsPopover(false);
     } catch (err) {
@@ -972,6 +997,7 @@ export default function App() {
     if (code.length === 4) {
       setIsValidatingCode(true);
       setShareCodeError('');
+      setShareCodeNotice('');
       try {
         const res = await fetch(`${API_PATH}/share/${encodeURIComponent(code)}`, {
           credentials: 'include',
@@ -992,6 +1018,80 @@ export default function App() {
       } finally {
         setIsValidatingCode(false);
       }
+    }
+  };
+
+  const handleLoadShareCode = async () => {
+    const code = shareCodeInput.trim().toLowerCase();
+    if (code.length !== 4) return;
+    setIsValidatingCode(true);
+    setShareCodeError('');
+    setShareCodeNotice('');
+    try {
+      const res = await fetch(`${API_PATH}/share/${encodeURIComponent(code)}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        throw new Error('Not found');
+      }
+      const data = await res.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const shareFiles = Array.isArray(data.files) ? data.files : [];
+      const fileMap = new Map<string, { size?: number; is_large?: boolean; missing?: boolean; name?: string }>(
+        shareFiles.map((file: { path: string; size?: number; is_large?: boolean; missing?: boolean; name?: string }) => [file.path, file]),
+      );
+
+      const nextSelected = new Set<string>();
+      const nextMeta: Record<string, MediaEntry> = {};
+      const missingImages: string[] = Array.isArray(data.missingImages) ? data.missingImages : [];
+
+      (Array.isArray(data.images) ? data.images : []).forEach((path: string) => {
+        if (!path) return;
+        nextSelected.add(path);
+        const existing = entries.find(entry => entry.path === path) || selectedMetadata[path];
+        const shareFile = fileMap.get(path);
+        nextMeta[path] = existing
+          ? {
+              ...existing,
+              size: shareFile?.size ?? existing.size ?? 0,
+              is_large: shareFile?.is_large ?? existing.is_large ?? false,
+              isMissing: Boolean(shareFile?.missing),
+            }
+          : {
+              path,
+              name: shareFile?.name || basename(path),
+              kind: getMediaKind(path),
+              ext: extensionOf(path),
+              title: '',
+              description: '',
+              tags: [],
+              is_large: Boolean(shareFile?.is_large),
+              size: shareFile?.size || 0,
+              isMissing: Boolean(shareFile?.missing),
+            };
+      });
+
+      setSelectedMetadata(prev => ({ ...prev, ...nextMeta }));
+      setSelectedImages(nextSelected);
+      setShowSelectedOnly(true);
+      setSelectedTag('');
+      setSelectedList('');
+      setSearchQuery('');
+      setPage(1);
+      setView('gallery');
+      setShareCodeNotice(
+        missingImages.length > 0
+          ? `Share ${code} loaded into your working selection. ${missingImages.length} missing file${missingImages.length === 1 ? '' : 's'} kept as placeholders.`
+          : `Share ${code} loaded into your working selection.`,
+      );
+      setShareCodeInput('');
+    } catch (err) {
+      setShareCodeError('Invalid Code');
+    } finally {
+      setIsValidatingCode(false);
     }
   };
 
@@ -1360,6 +1460,7 @@ export default function App() {
       {view === 'staging' ? (
         <StagingView
           selectedImages={stagedImages}
+          selectedMetadata={selectedMetadata}
           onBack={() => setView('gallery')}
           onDownload={handleDownload}
           isDownloading={isDownloading}
@@ -1556,6 +1657,7 @@ export default function App() {
                     onChange={e => {
                       setShareCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
                       if (shareCodeError) setShareCodeError('');
+                      if (shareCodeNotice) setShareCodeNotice('');
                     }}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && shareCodeInput.length === 4 && !isValidatingCode) {
@@ -1570,6 +1672,13 @@ export default function App() {
                     className="bg-black text-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] hover:bg-[#333] transition-colors disabled:opacity-50 min-w-[32px] text-center"
                   >
                     {isValidatingCode ? '...' : 'Go'}
+                  </button>
+                  <button
+                    onClick={handleLoadShareCode}
+                    disabled={shareCodeInput.length !== 4 || isValidatingCode}
+                    className="bg-white text-black border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] hover:bg-[#F3F3F3] transition-colors disabled:opacity-50 min-w-[52px] text-center"
+                  >
+                    Load
                   </button>
                 </div>
                 {shareCodeError && (
@@ -1762,25 +1871,75 @@ export default function App() {
 
         {!showPrivateGate && (
           <div className="mb-6 flex flex-col gap-2">
-            {currentPath && (
-              <button
-                onClick={() => {
-                  const parts = currentPath.split('/');
-                  parts.pop();
-                  setCurrentPath(parts.join('/'));
-                  setSearchQuery('');
-                  setPage(1);
-                }}
-                className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider hover:text-[#F27D26] transition-colors w-fit"
-              >
-                <ArrowLeft size={14} strokeWidth={2.5} />
-                Back to {currentPath.includes('/') ? currentPath.split('/').slice(0, -1).pop() : 'Root'}
-              </button>
-            )}
-            <div className="font-mono text-xs font-bold uppercase tracking-wider text-[#666]">
-              Location: <span className="text-black">root{currentPath ? ` / ${currentPath.split('/').join(' / ')}` : ''}</span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {currentPath && (
+                <button
+                  onClick={() => {
+                    const parts = currentPath.split('/');
+                    parts.pop();
+                    navigateToPath(parts.join('/'));
+                  }}
+                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider hover:text-[#F27D26] transition-colors w-fit"
+                >
+                  <ArrowLeft size={14} strokeWidth={2.5} />
+                  Back to {currentPath.includes('/') ? currentPath.split('/').slice(0, -1).pop() : 'Root'}
+                </button>
+              )}
+              {showSelectedOnly && (
+                <>
+                  <span className="text-[#DDD]">|</span>
+                  <span className="border-[2px] border-black bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-black">
+                    Selected Only
+                  </span>
+                  <button
+                    onClick={() => {
+                      setShowSelectedOnly(false);
+                      setPage(1);
+                    }}
+                    className="text-xs font-bold uppercase tracking-wider text-[#888] hover:text-black transition-colors"
+                  >
+                    Back to Full Gallery
+                  </button>
+                </>
+              )}
+            </div>
+            <div className="font-mono text-xs font-bold uppercase tracking-wider text-[#666] flex flex-wrap items-center gap-y-1">
+              <span>Location:&nbsp;</span>
+              <span className="text-black">
+                <button
+                  onClick={() => navigateToPath('')}
+                  className="hover:text-[#F27D26] transition-colors"
+                >
+                  root
+                </button>
+                {currentPath &&
+                  currentPath.split('/').map((part, index, parts) => {
+                    const path = parts.slice(0, index + 1).join('/');
+                    return (
+                      <React.Fragment key={path}>
+                        <span className="text-[#666]"> / </span>
+                        <button
+                          onClick={() => navigateToPath(path)}
+                          className="hover:text-[#F27D26] transition-colors"
+                        >
+                          {part}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+              </span>
               {debouncedSearch && <span className="text-[#8A5A44] ml-2">(Searching: "{debouncedSearch}")</span>}
             </div>
+            {shareCodeNotice && (
+              <div className="text-[10px] font-bold uppercase tracking-widest text-[#666]">
+                {shareCodeNotice}
+              </div>
+            )}
+            {showSelectedOnly && selectedImages.size > 0 && (
+              <div className="text-[10px] font-bold uppercase tracking-widest text-[#8A5A44]">
+                Working selection: {selectedImages.size} item{selectedImages.size === 1 ? '' : 's'}
+              </div>
+            )}
           </div>
         )}
 
@@ -1805,16 +1964,12 @@ export default function App() {
                   role="button"
                   tabIndex={0}
                   onClick={() => {
-                    setCurrentPath(folder.path);
-                    setSearchQuery('');
-                    setPage(1);
+                    navigateToPath(folder.path);
                   }}
                   onKeyDown={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      setCurrentPath(folder.path);
-                      setSearchQuery('');
-                      setPage(1);
+                      navigateToPath(folder.path);
                     }
                   }}
                   className="bg-white border-[2px] border-[#666] flex flex-col overflow-hidden hover:border-black hover:shadow-[0_0_0_2px_rgba(0,0,0,1)] transition-all group text-left cursor-pointer touch-manipulation"
@@ -1937,7 +2092,16 @@ export default function App() {
                   >
                     {selectedImages.has(entry.path) && <Check size={16} className="text-white" strokeWidth={3} />}
                   </button>
-                  {entry.kind === 'image' && isRenderable(entry.path) ? (
+                  {entry.isMissing ? (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#F8F3F1] px-5 text-center text-[#8A5A44]">
+                      <div className="border-[2px] border-[#B89D91] bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em]">
+                        Missing
+                      </div>
+                      <div className="max-w-[180px] text-[11px] font-bold uppercase leading-relaxed text-[#7A5A49]">
+                        This file was part of the share but is no longer available on the server.
+                      </div>
+                    </div>
+                  ) : entry.kind === 'image' && isRenderable(entry.path) ? (
                     <>
                       <img
                         src={entry.is_large ? `${MEDIA_PATH}/${encodeURI(entry.path)}` : `${IMAGE_PATH}/${encodeURI(entry.path)}`}
@@ -1975,6 +2139,11 @@ export default function App() {
                   >
                     {entry.name}
                   </p>
+                  {entry.isMissing && (
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#8A5A44]">
+                      Missing from library
+                    </p>
+                  )}
                 </div>
               </div>
             ))}

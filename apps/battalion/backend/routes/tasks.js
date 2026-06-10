@@ -374,6 +374,7 @@ router.post('/clear', requireAuth, async (req, res) => {
         await db.execute(`UPDATE player SET
           xp = 0, gold = 0, level = 1, xp_to_next = 100, title = 'Recruit',
           hp = 100, max_hp = 100,
+          health_level = 1, health_xp = 0, health_xp_to_next = 100,
           stat_energy = 50, stat_stress = 50, stat_money = 50, stat_social = 50,
           stat_health = 50, stat_hygiene = 50, stat_fun = 50, stat_discipline = 50,
           total_tasks_completed = 0, total_tasks_failed = 0, total_habits_logged = 0,

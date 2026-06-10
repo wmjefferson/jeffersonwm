@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Battalion Hotfix & Platform Auth Alignment",
+  "content": "<p>Resolved login failures on Battalion and aligned credentials across the platform identity layers.</p><p>What changed and changed back:</p><ul><li><strong>Environment Flag Reversion:</strong> Temporarily switched the live Battalion backend <code>NODE_ENV</code> to <code>production</code> to debug session cookie behavior. This caused cross-origin Secure cookie warnings on HTTP, so the environment was returned back to <code>development</code>.</li><li><strong>Codebase Sync:</strong> Synchronized the latest monorepo client/backend files from the network share to the live server at <code>E:\\battalion</code>, resolving out-of-sync built asset mismatches.</li><li><strong>Identity Alignment:</strong> Renamed the primary administrative account in the central auth system (<code>auth.jeffersonwm.com</code>) from <code>admin</code> to <code>wm</code> and updated the password to match the unified platform credentials (aligning it with the Battalion direct user) without displaying plain-text keys in public feeds.</li></ul>",
+  "url": "https://jeffersonwm.com/battalion/",
+  "source": "release",
+  "external_id": "battalion-alignment-2026-06-08"
+}

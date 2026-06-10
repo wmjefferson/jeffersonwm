@@ -303,6 +303,7 @@ textarea.form-input { resize: vertical; min-height: 60px; }
 .dash-feed__badge--xp { color: #48a; }
 .dash-feed__badge--gold { color: #a84; }
 .dash-feed__empty { color: #999; font-size: 12px; padding: 12px 0; text-align: center; }
+.dash-quote { color: #666; font-size: 11.5px; margin-bottom: 12px; line-height: 1.45; }
 
 /* ─── Accordions ─── */
 .accordion__header {

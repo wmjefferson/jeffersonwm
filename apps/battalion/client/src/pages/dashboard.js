@@ -1,5 +1,6 @@
 import { publicDashboard, auth } from '../utils/api.js';
 import { registerInterval } from '../main.js';
+import { quotes } from '../utils/quotes.js';
 
 let eventSource = null;
 
@@ -19,10 +20,13 @@ export async function renderDashboard(container) {
         <!-- Player name, level, title -->
       </div>
 
+      <div class="dash-quote" id="dash-quote">
+        <!-- Quote placeholder -->
+      </div>
+
       <div class="dash-bars" id="dash-bars">
         <!-- HP and XP bars -->
       </div>
-
       <div class="dash-inline-stats" id="dash-inline">
         <!-- Gold, mood, tasks completed today -->
       </div>
@@ -41,17 +45,20 @@ export async function renderDashboard(container) {
   `;
 
   // Initial load
-  await loadDashboard();
+  await loadDashboard(true);
 
   // SSE connection for real-time updates
   connectSSE();
 
   // Fallback: poll every 5 minutes
-  const pollId = setInterval(loadDashboard, 5 * 60 * 1000);
+  const pollId = setInterval(() => loadDashboard(false), 5 * 60 * 1000);
   registerInterval(pollId);
 
   // Refresh button
-  document.getElementById('btn-dash-refresh')?.addEventListener('click', loadDashboard);
+  document.getElementById('btn-dash-refresh')?.addEventListener('click', () => {
+    renderQuote();
+    loadDashboard(false);
+  });
 }
 
 function connectSSE() {
@@ -81,7 +88,7 @@ function connectSSE() {
   }
 }
 
-async function loadDashboard() {
+async function loadDashboard(shouldRenderQuote = false) {
   try {
     const data = await publicDashboard.get();
     renderHeader(data.player);
@@ -89,6 +96,9 @@ async function loadDashboard() {
     renderInlineStats(data.player, data.stats);
     renderStats(data.player);
     renderFeed(data.recentActivity || []);
+    if (shouldRenderQuote) {
+      renderQuote();
+    }
     document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
 
     // Check auth silently
@@ -229,4 +239,11 @@ function timeAgo(dateStr) {
   if (hrs < 24) return `${hrs}h ago`;
   if (days === 1) return 'yesterday';
   return `${days}d ago`;
+}
+
+function renderQuote() {
+  const el = document.getElementById('dash-quote');
+  if (!el) return;
+  const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+  el.textContent = `"${randomQuote}"`;
 }

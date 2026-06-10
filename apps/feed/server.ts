@@ -137,6 +137,14 @@ async function upsertReleaseEntry(entry: ChangelogEntryInput, fallbackSource: st
     return false;
   }
 
+  let createdAtVal: string | null = null;
+  if (entry.createdAt) {
+    const parsedDate = new Date(entry.createdAt);
+    if (!isNaN(parsedDate.getTime())) {
+      createdAtVal = parsedDate.toISOString().slice(0, 19).replace("T", " ");
+    }
+  }
+
   const sql = `
     INSERT INTO feed_items (title, content, url, source, external_id, created_at)
     VALUES (?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
@@ -154,7 +162,7 @@ async function upsertReleaseEntry(entry: ChangelogEntryInput, fallbackSource: st
     entry.url || null,
     source,
     externalId,
-    entry.createdAt || null,
+    createdAtVal,
   ]);
 
   return true;
