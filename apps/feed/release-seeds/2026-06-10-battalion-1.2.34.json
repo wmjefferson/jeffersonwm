@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Battalion v1.2.34",
+  "content": "<p>Battalion received a small tone pass on the public dashboard. This update keeps the rotating quote system intact while removing the passive optimistic endings that had been appended to each line.</p><p>What changed:</p><ul><li>Stripped the hopeful trailing add-ons from all 100 public quotes so the dashboard voice stays fully introspective and self-deprecating.</li><li>Kept the quote rotation system and refresh behavior from the previous dashboard update intact.</li><li>Rebuilt the client successfully after the quote-file cleanup and synced the version trail to the shared actions log.</li></ul>",
+  "url": "https://jeffersonwm.com/battalion/",
+  "source": "release",
+  "external_id": "battalion-v1.2.34-2026-06-10"
+}
