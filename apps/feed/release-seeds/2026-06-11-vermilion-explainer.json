@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Vermilion explainer page",
+  "content": "<p>Vermilion now has a lightweight public explanation page separate from the desktop app itself. This page is meant to give a quick sense of what the utility does, show the current interface, and point back to the JeffersonWM and GitHub context around it.</p><p>What changed:</p><ul><li>Added a static Vermilion explainer page with feature summary, workflow notes, project structure, and linked screenshots.</li><li>Included direct links to JeffersonWM home, the GitHub account, and the Vermilion source folder.</li><li>Added a small footer note clarifying that the page was generated from prompts and will keep evolving as Vermilion changes.</li><li>Linked the new page from the JeffersonWM homepage navigation.</li></ul>",
+  "url": "https://jeffersonwm.com/verm/",
+  "source": "manual",
+  "external_id": "vermilion-explainer-2026-06-11"
+}
