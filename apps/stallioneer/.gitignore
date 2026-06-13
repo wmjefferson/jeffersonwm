@@ -1,0 +1,15 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+*.db
+*.db-shm
+*.db-wal
+*.log
+node_modules/
+dist/
+publish/
+artifacts/
+backups/

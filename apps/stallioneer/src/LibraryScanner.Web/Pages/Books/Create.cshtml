@@ -1,0 +1,195 @@
+@page
+@model LibraryScanner.Web.Pages.Books.CreateModel
+@{
+    ViewData["Title"] = "Add book";
+}
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">ISBN / UPC lookup</p>
+        <h1>Add from code</h1>
+    </div>
+    <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.LookupMessage))
+{
+    <div class="alert @Model.LookupMessageCssClass">@Model.LookupMessage</div>
+}
+
+<form method="post" class="entry-grid">
+    <section class="panel">
+        <h2>Lookup</h2>
+        <div class="lookup-stack">
+            <input asp-for="Input.Isbn" class="form-control lookup-code-input" autocomplete="off" placeholder="Scan or enter ISBN / UPC" autofocus />
+            <div class="lookup-actions">
+                <button asp-page-handler="Lookup" class="btn btn-primary" formnovalidate>Find matches</button>
+                <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear</button>
+            </div>
+        </div>
+        <span asp-validation-for="Input.Isbn" class="text-danger"></span>
+        <p class="form-hint">Enter the code and press Enter. Then choose the matching cover or title to load the book details.</p>
+
+        @if (Model.CandidateMatches.Count > 0)
+        {
+            <div class="candidate-list">
+                @foreach (var candidate in Model.CandidateMatches)
+                {
+                    <button type="submit" asp-page-handler="ChooseCandidate" asp-route-candidateIsbn="@candidate.Isbn13" class="candidate-card" formnovalidate>
+                        @if (!string.IsNullOrWhiteSpace(candidate.CoverImageUrl))
+                        {
+                            <img class="candidate-cover" src="@candidate.CoverImageUrl" alt="" />
+                        }
+                        else
+                        {
+                            <div class="candidate-cover candidate-cover-placeholder" aria-hidden="true"></div>
+                        }
+                        <div class="candidate-copy">
+                            <h3>@candidate.Title</h3>
+                            @if (!string.IsNullOrWhiteSpace(candidate.Authors))
+                            {
+                                <p>@candidate.Authors</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(candidate.Publisher) || !string.IsNullOrWhiteSpace(candidate.PublishedDate))
+                            {
+                                <p>@candidate.Publisher @candidate.PublishedDate</p>
+                            }
+                            <p class="source-note">@candidate.Source · ISBN @candidate.Isbn13</p>
+                        </div>
+                    </button>
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.Input.CoverImageUrl))
+        {
+            <img class="cover-preview" src="@Model.Input.CoverImageUrl" alt="" />
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.Input.MetadataSource))
+        {
+            <p class="source-note">Source: @Model.Input.MetadataSource</p>
+        }
+
+        @if (Model.AvailableTags.Count > 0)
+        {
+            <div class="tag-suggestions">
+                @foreach (var tag in Model.AvailableTags.Take(18))
+                {
+                    <span class="tag-pill" style="--tag-color:@tag.Color">@tag.Name</span>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="panel">
+        <h2>Book details</h2>
+        @if (!Model.HasSelectedBook)
+        {
+            <p class="form-hint">Choose a search result to populate these fields.</p>
+        }
+        <div class="field-stack">
+            <label asp-for="Input.Title"></label>
+            <input asp-for="Input.Title" class="form-control" />
+            <span asp-validation-for="Input.Title" class="text-danger"></span>
+
+            <label asp-for="Input.Authors"></label>
+            <input asp-for="Input.Authors" class="form-control" />
+
+            <label asp-for="Input.Publisher"></label>
+            <input asp-for="Input.Publisher" class="form-control" />
+
+            <div class="field-grid">
+                <div>
+                    <label asp-for="Input.PublishedDate"></label>
+                    <input asp-for="Input.PublishedDate" class="form-control" />
+                </div>
+                <div>
+                    <label asp-for="Input.PageCount"></label>
+                    <input asp-for="Input.PageCount" class="form-control" />
+                </div>
+            </div>
+
+            <label asp-for="Input.Categories"></label>
+            <input asp-for="Input.Categories" class="form-control" />
+
+            <div class="field-grid">
+                <div>
+                    <label asp-for="Input.Language"></label>
+                    <input asp-for="Input.Language" class="form-control" />
+                </div>
+                <div>
+                    <label asp-for="Input.Isbn10"></label>
+                    <input asp-for="Input.Isbn10" class="form-control" />
+                </div>
+            </div>
+
+            <label asp-for="Input.CoverImageUrl"></label>
+            <input asp-for="Input.CoverImageUrl" class="form-control" />
+
+            <label asp-for="Input.InfoUrl"></label>
+            <input asp-for="Input.InfoUrl" class="form-control" />
+
+            <label asp-for="Input.Description"></label>
+            <textarea asp-for="Input.Description" class="form-control" rows="5"></textarea>
+
+            <input asp-for="Input.MetadataSource" type="hidden" />
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>Inventory</h2>
+        <div class="field-grid">
+            <div>
+                <label asp-for="Input.Quantity"></label>
+                <input asp-for="Input.Quantity" class="form-control" min="1" />
+            </div>
+            <div>
+                <label asp-for="Input.LocationId"></label>
+                <select asp-for="Input.LocationId" asp-items="Model.LocationOptions" class="form-select"></select>
+            </div>
+        </div>
+
+        <label asp-for="Input.NewLocationName"></label>
+        <input asp-for="Input.NewLocationName" class="form-control" placeholder="Create a location while saving" />
+
+        <label asp-for="Input.TagNames"></label>
+        <input asp-for="Input.TagNames" class="form-control" placeholder="signed, hardcover, favorites" />
+        <span class="form-hint">Separate tags with commas. New tags are created when you save.</span>
+
+        <div class="field-grid">
+            <div>
+                <label asp-for="Input.Condition"></label>
+                <select asp-for="Input.Condition" class="form-select">
+                    <option>Unspecified</option>
+                    <option>New</option>
+                    <option>Like new</option>
+                    <option>Good</option>
+                    <option>Fair</option>
+                    <option>Poor</option>
+                </select>
+            </div>
+            <div>
+                <label asp-for="Input.Status"></label>
+                <select asp-for="Input.Status" class="form-select">
+                    <option>Owned</option>
+                    <option>Reading</option>
+                    <option>Loaned</option>
+                    <option>Wishlist</option>
+                    <option>Archived</option>
+                </select>
+            </div>
+        </div>
+        <label asp-for="Input.Notes"></label>
+        <textarea asp-for="Input.Notes" class="form-control" rows="4"></textarea>
+    </section>
+
+    <div class="form-actions">
+        <button asp-page-handler="Save" class="btn btn-primary">Save book</button>
+        <button asp-page-handler="Clear" class="btn btn-outline-secondary">Clear</button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

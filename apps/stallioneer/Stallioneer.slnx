@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LibraryScanner.Web/LibraryScanner.Web.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,152 @@
+@page "{id:int}"
+@model LibraryScanner.Web.Pages.Books.EditModel
+@{
+    ViewData["Title"] = "Edit book";
+}
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">
+            @Model.Input.Isbn13
+            <button type="button" class="copy-button text-copy-button" data-copy-text="@Model.Input.Isbn13" title="Copy ISBN" aria-label="Copy ISBN">Copy</button>
+        </p>
+        <h1>Edit book</h1>
+    </div>
+    <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
+</section>
+
+<form method="post" class="entry-grid">
+    <input asp-for="Input.Id" type="hidden" />
+    <input asp-for="Input.Isbn13" type="hidden" />
+
+    <section class="panel">
+        <div class="tab-header">
+            <button type="button" class="tab-button is-active" data-tab-button data-tab-target="edit-common">Common + Inventory</button>
+            <button type="button" class="tab-button" data-tab-button data-tab-target="edit-extended">Extended details</button>
+        </div>
+
+        <div class="tab-panel is-active" data-tab-panel="edit-common">
+            <h2>Common details</h2>
+            @if (!string.IsNullOrWhiteSpace(Model.Input.CoverImageUrl))
+            {
+                <a href="@Model.Input.CoverImageUrl" target="_blank" rel="noreferrer" class="cover-preview-link">
+                    <img class="cover-preview edit-cover-preview" src="@Model.Input.CoverImageUrl" alt="Cover preview for @Model.Input.Title" />
+                </a>
+            }
+            <div class="field-stack">
+                <label asp-for="Input.Isbn13"></label>
+                <div class="copy-field">
+                    <input asp-for="Input.Isbn13" class="form-control" readonly />
+                    <button type="button" class="copy-button text-copy-button" data-copy-text="@Model.Input.Isbn13" title="Copy ISBN" aria-label="Copy ISBN">Copy</button>
+                </div>
+
+                <label asp-for="Input.Title"></label>
+                <div class="copy-field">
+                    <input asp-for="Input.Title" class="form-control" />
+                    <button type="button" class="copy-button text-copy-button" data-copy-source="#Input_Title" data-copy-secondary-source="#Input_Authors" title="Copy title and author" aria-label="Copy title and author">Copy</button>
+                </div>
+                <span asp-validation-for="Input.Title" class="text-danger"></span>
+
+                <label asp-for="Input.Authors"></label>
+                <input asp-for="Input.Authors" class="form-control" />
+
+                <label asp-for="Input.Publisher"></label>
+                <input asp-for="Input.Publisher" class="form-control" />
+
+                <div class="field-grid">
+                    <div>
+                        <label asp-for="Input.PublishedDate"></label>
+                        <input asp-for="Input.PublishedDate" class="form-control" />
+                    </div>
+                    <div>
+                        <label asp-for="Input.Quantity"></label>
+                        <input asp-for="Input.Quantity" class="form-control" min="0" />
+                    </div>
+                </div>
+
+                <label asp-for="Input.LocationId"></label>
+                <select asp-for="Input.LocationId" asp-items="Model.LocationOptions" class="form-select"></select>
+
+                <label asp-for="Input.NewLocationName"></label>
+                <input asp-for="Input.NewLocationName" class="form-control" placeholder="Create a location while saving" />
+
+                <label asp-for="Input.TagNames"></label>
+                <input asp-for="Input.TagNames" class="form-control" placeholder="signed, hardcover, favorites" id="edit-tag-input" />
+
+                @if (Model.AvailableTags.Count > 0)
+                {
+                    <div class="tag-suggestions">
+                        @foreach (var tag in Model.AvailableTags.Take(18))
+                        {
+                            <button type="button" class="tag-pill tag-suggestion-button" style="--tag-color:@tag.Color" data-tag-target="#edit-tag-input" data-tag-suggestion="@tag.Name">@tag.Name</button>
+                        }
+                    </div>
+                }
+
+                <div class="field-grid">
+                    <div>
+                        <label asp-for="Input.Condition"></label>
+                        <select asp-for="Input.Condition" class="form-select">
+                            <option>Unspecified</option>
+                            <option>New</option>
+                            <option>Like new</option>
+                            <option>Good</option>
+                            <option>Fair</option>
+                            <option>Poor</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label asp-for="Input.Status"></label>
+                        <select asp-for="Input.Status" class="form-select">
+                            <option>Owned</option>
+                            <option>Reading</option>
+                            <option>Loaned</option>
+                            <option>Wishlist</option>
+                            <option>Archived</option>
+                        </select>
+                    </div>
+                </div>
+
+                <label asp-for="Input.Notes"></label>
+                <textarea asp-for="Input.Notes" class="form-control" rows="4"></textarea>
+            </div>
+        </div>
+
+        <div class="tab-panel" data-tab-panel="edit-extended" hidden>
+            <h2>Extended details</h2>
+            <div class="field-stack">
+                <div class="field-grid">
+                    <div>
+                        <label asp-for="Input.PageCount"></label>
+                        <input asp-for="Input.PageCount" class="form-control" />
+                    </div>
+                    <div>
+                        <label asp-for="Input.Language"></label>
+                        <input asp-for="Input.Language" class="form-control" />
+                    </div>
+                </div>
+
+                <label asp-for="Input.Categories"></label>
+                <input asp-for="Input.Categories" class="form-control" />
+
+                <label asp-for="Input.CoverImageUrl"></label>
+                <input asp-for="Input.CoverImageUrl" class="form-control" />
+
+                <label asp-for="Input.InfoUrl"></label>
+                <input asp-for="Input.InfoUrl" class="form-control" />
+
+                <label asp-for="Input.Description"></label>
+                <textarea asp-for="Input.Description" class="form-control" rows="7"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <div class="form-actions">
+        <button class="btn btn-primary">Save changes</button>
+        <a class="btn btn-outline-secondary" asp-page="/Books/Edit" asp-route-id="@Model.Input.Id">Clear changes</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

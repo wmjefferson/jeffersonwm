@@ -1,0 +1,79 @@
+@page
+@model LibraryScanner.Web.Pages.Collections.IndexModel
+@{
+    ViewData["Title"] = "Collections";
+}
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Custom groups of books</p>
+        <h1>Collections</h1>
+    </div>
+    <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-info">@Model.StatusMessage</div>
+}
+
+<section class="panel">
+    <h2>Create collection</h2>
+    <form method="post" class="inline-form wide-inline-form">
+        <input asp-for="Input.Name" class="form-control" placeholder="Collection name" />
+        <input asp-for="Input.Description" class="form-control" placeholder="Optional note" />
+        <button asp-page-handler="Create" class="btn btn-primary">Create</button>
+        <a class="btn btn-outline-secondary" asp-page="/Collections/Index">Clear</a>
+    </form>
+    <span asp-validation-for="Input.Name" class="text-danger"></span>
+</section>
+
+<div class="table-wrap">
+    <table class="table inventory-table">
+        <thead>
+            <tr>
+                <th>Collection</th>
+                <th>Books</th>
+                <th>Edit</th>
+                <th>View</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var collection in Model.Collections)
+        {
+            <tr>
+                <td>
+                    <strong>@collection.Name</strong>
+                    @if (!string.IsNullOrWhiteSpace(collection.Description))
+                    {
+                        <span class="muted-block">@collection.Description</span>
+                    }
+                </td>
+                <td>@collection.BookCount</td>
+                <td>
+                    <form method="post" class="inline-form wide-inline-form">
+                        <input name="id" type="hidden" value="@collection.Id" />
+                        <input name="name" class="form-control" value="@collection.Name" />
+                        <input name="description" class="form-control" value="@collection.Description" placeholder="Optional note" />
+                        <button asp-page-handler="Update" class="btn btn-sm btn-outline-secondary">Save</button>
+                    </form>
+                </td>
+                <td>
+                    <a class="btn btn-sm btn-outline-secondary" asp-page="/Books/Index" asp-route-collectionId="@collection.Id">Open</a>
+                </td>
+                <td class="text-end">
+                    <form method="post">
+                        <input name="id" type="hidden" value="@collection.Id" />
+                        <button asp-page-handler="Delete" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
