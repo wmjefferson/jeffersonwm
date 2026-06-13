@@ -1,0 +1,22 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<section class="home-hero">
+    <div>
+        <p class="eyebrow">Self-hosted collection manager</p>
+        <h1>Stallioneer</h1>
+        <p>Look up books by ISBN, track quantities, and keep your personal collection organized from Windows now and Android scanning later.</p>
+        <div class="hero-actions">
+            <a class="btn btn-primary" asp-page="/Books/Create">Add book</a>
+            <a class="btn btn-outline-secondary" asp-page="/Books/Index">View inventory</a>
+        </div>
+    </div>
+    <div class="hero-panel">
+        <span class="stat-label">First milestone</span>
+        <strong>Web inventory</strong>
+        <p>SQLite storage, account login, ISBN lookup, quantity tracking, search, and editable records.</p>
+    </div>
+</section>

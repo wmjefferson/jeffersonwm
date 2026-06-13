@@ -1,0 +1,70 @@
+@page
+@model LibraryScanner.Web.Pages.Locations.IndexModel
+@{
+    ViewData["Title"] = "Locations";
+}
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Shelves, rooms, boxes</p>
+        <h1>Locations</h1>
+    </div>
+    <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
+</section>
+
+<section class="panel">
+    <h2>Create location</h2>
+    <form method="post" class="inline-form">
+        <input asp-for="Input.Name" class="form-control" placeholder="Location name" />
+        <input asp-for="Input.Description" class="form-control" placeholder="Optional note" />
+        <button asp-page-handler="Create" class="btn btn-primary">Create</button>
+        <a class="btn btn-outline-secondary" asp-page="/Locations/Index">Clear</a>
+    </form>
+    <span asp-validation-for="Input.Name" class="text-danger"></span>
+</section>
+
+<div class="table-wrap">
+    <table class="table inventory-table">
+        <thead>
+            <tr>
+                <th>Location</th>
+                <th>Books</th>
+                <th>Edit</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var location in Model.Locations)
+        {
+            <tr>
+                <td>
+                    <strong>@location.Name</strong>
+                    @if (!string.IsNullOrWhiteSpace(location.Description))
+                    {
+                        <span class="muted-block">@location.Description</span>
+                    }
+                </td>
+                <td>@location.BookCount</td>
+                <td>
+                    <form method="post" class="inline-form">
+                        <input name="id" type="hidden" value="@location.Id" />
+                        <input name="name" class="form-control" value="@location.Name" />
+                        <input name="description" class="form-control" value="@location.Description" />
+                        <button asp-page-handler="Update" class="btn btn-sm btn-outline-secondary">Save</button>
+                    </form>
+                </td>
+                <td class="text-end">
+                    <form method="post">
+                        <input name="id" type="hidden" value="@location.Id" />
+                        <button asp-page-handler="Delete" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
