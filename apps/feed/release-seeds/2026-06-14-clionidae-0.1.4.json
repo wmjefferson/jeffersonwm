@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Clionidae v0.1.4",
+  "content": "<div class=\"release-note-body\"><p>What's new</p><ul><li>Updated root landing page text description to align with the standardized JeffersonWM 'site seed' structure.</li><li>Clearly documented baseline features: neutral frontend, integrated backend, optional auth, and routing standards.</li><li>Highlighted platform decisions: local source of truth, static deployment, Cloudflare tunnel support, and Feed compatibility.</li></ul></div>",
+  "url": "https://jeffersonwm.com/clionidae/",
+  "source": "release",
+  "external_id": "clionidae-v0.1.4-2026-06-14"
+}
