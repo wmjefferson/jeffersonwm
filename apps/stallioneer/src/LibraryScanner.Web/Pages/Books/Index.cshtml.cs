@@ -174,6 +174,11 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
             .Prepend(new SelectListItem("All tags", string.Empty))
             .ToList();
 
+        Books = await GetFilteredBooksAsync(limitResults: true);
+    }
+
+    private async Task<List<Book>> GetFilteredBooksAsync(bool limitResults)
+    {
         IQueryable<Book> booksQuery = dbContext.Books
             .AsNoTracking()
             .Include(book => book.Location)
@@ -214,7 +219,7 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
 
         var filteredBooks = await booksQuery.ToListAsync();
 
-        Books = Sort switch
+        var sortedBooks = Sort switch
         {
             "author" => filteredBooks
                 .OrderBy(book => book.Authors ?? string.Empty)
@@ -242,6 +247,7 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
                 .ToList()
         };
 
-        Books = Books.Take(200).ToList();
+        return limitResults ? sortedBooks.Take(200).ToList() : sortedBooks;
     }
+
 }

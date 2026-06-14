@@ -17,28 +17,31 @@
     <div class="alert alert-success">@Model.StatusMessage</div>
 }
 
-<section class="stats-grid compact-stats-grid">
-    <div class="stat">
-        <span class="stat-label">Total users</span>
-        <strong>@Model.TotalUsers</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Confirmed emails</span>
-        <strong>@Model.ConfirmedUsers</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Display names</span>
-        <strong>@Model.NamedUsers</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Signed in as</span>
-        <strong>@(Model.CurrentUser?.UserName ?? "Unknown")</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Admin users</span>
-        <strong>@Model.AdminUsers</strong>
-    </div>
-</section>
+@if (Model.IsAdmin)
+{
+    <section class="stats-grid compact-stats-grid">
+        <div class="stat">
+            <span class="stat-label">Total users</span>
+            <strong>@Model.TotalUsers</strong>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Confirmed emails</span>
+            <strong>@Model.ConfirmedUsers</strong>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Display names</span>
+            <strong>@Model.NamedUsers</strong>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Signed in as</span>
+            <strong>@(Model.CurrentUser?.UserName ?? "Unknown")</strong>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Admin users</span>
+            <strong>@Model.AdminUsers</strong>
+        </div>
+    </section>
+}
 
 <section class="entry-grid">
     <section class="panel">
@@ -68,10 +71,28 @@
                     <label>Email status</label>
                     <input class="form-control" value="@(Model.CurrentUser.EmailConfirmed ? "Confirmed" : "Unconfirmed")" readonly />
                 </div>
-                <div>
-                    <label>Permissions</label>
-                    <input class="form-control" value="@(Model.CurrentUser.IsAdmin ? "Admin" : "User")" readonly />
-                </div>
+                @if (Model.IsAdmin)
+                {
+                    <div>
+                        <label>Permissions</label>
+                        <input class="form-control" value="Admin" readonly />
+                    </div>
+                }
+                @if (!Model.IsAdmin)
+                {
+                    <div>
+                        <label>Library totals</label>
+                        <p class="muted-block">
+                            Titles: @Model.Snapshot.TotalBooks
+                            <br />
+                            Items: @Model.Snapshot.TotalItems
+                            <br />
+                            Tags: @Model.Snapshot.TotalTags
+                            <br />
+                            Collections: @Model.Snapshot.TotalCollections
+                        </p>
+                    </div>
+                }
                 <div class="lookup-actions">
                     <button type="submit" class="btn btn-primary">Save profile</button>
                 </div>
@@ -79,32 +100,94 @@
         }
     </section>
 
-    <section class="panel">
-        <p class="eyebrow">App snapshot</p>
-        <h2>Local system</h2>
-        <div class="field-stack">
-            <div>
-                <label>Database path</label>
-                <input class="form-control" value="@Model.Snapshot.DatabasePath" readonly />
+    @if (Model.IsAdmin)
+    {
+        <section class="panel">
+            <p class="eyebrow">App snapshot</p>
+            <h2>Local system</h2>
+            <div class="field-stack">
+                <div>
+                    <label>Database path</label>
+                    <input class="form-control" value="@Model.Snapshot.DatabasePath" readonly />
+                </div>
+                <div>
+                    <label>Database updated</label>
+                    <input class="form-control" value="@(Model.Snapshot.DatabaseLastUpdated?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown")" readonly />
+                </div>
+                <div>
+                    <label>Backup directory</label>
+                    <input class="form-control" value="@Model.Snapshot.BackupDirectory" readonly />
+                </div>
+                <div>
+                    <label>Latest backup</label>
+                    <input class="form-control" value="@(Model.Snapshot.LatestBackupName ?? "No backup found")" readonly />
+                </div>
+                <div>
+                    <label>Latest backup updated</label>
+                    <input class="form-control" value="@(Model.Snapshot.LatestBackupUpdated?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown")" readonly />
+                </div>
             </div>
-            <div>
-                <label>Database updated</label>
-                <input class="form-control" value="@(Model.Snapshot.DatabaseLastUpdated?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown")" readonly />
+        </section>
+    }
+</section>
+
+<section class="panel bulk-panel">
+    <div class="bulk-copy">
+        <p class="eyebrow">Data tools</p>
+        <h2>Import / export</h2>
+        <span class="form-hint">CSV uses Stallioneer's fixed common field set. PDF lets you choose which fields appear in a printable inventory report.</span>
+    </div>
+    <div class="import-export-grid">
+        <form method="post" asp-page-handler="Export" class="inline-form">
+            <div class="field-stack">
+                <label>Export inventory</label>
+                <span class="form-hint">Downloads the full library as CSV.</span>
             </div>
-            <div>
-                <label>Backup directory</label>
-                <input class="form-control" value="@Model.Snapshot.BackupDirectory" readonly />
+            <button type="submit" class="btn btn-outline-secondary">Export CSV</button>
+        </form>
+
+        <form method="post" asp-page-handler="Import" enctype="multipart/form-data" class="import-form">
+            <div class="field-stack">
+                <label asp-for="ImportFile">Import CSV</label>
+                <input asp-for="ImportFile" type="file" accept=".csv,text/csv" class="form-control" />
+                <span class="form-hint">New rows need ISBN-13 and title. Duplicate ISBN-13 rows inside the same file are skipped after the first match.</span>
             </div>
-            <div>
-                <label>Latest backup</label>
-                <input class="form-control" value="@(Model.Snapshot.LatestBackupName ?? "No backup found")" readonly />
+            <div class="field-stack">
+                <label>Import mode</label>
+                <label class="radio-line">
+                    <input type="radio" asp-for="ImportMode" value="@LibraryScanner.Web.Pages.Users.IndexModel.ImportModes.MergeUpdate" checked />
+                    <span>Append new books and update matching ISBN-13 records</span>
+                </label>
+                <label class="radio-line">
+                    <input type="radio" asp-for="ImportMode" value="@LibraryScanner.Web.Pages.Users.IndexModel.ImportModes.AppendIgnore" />
+                    <span>Append new books and ignore matching ISBN-13 records</span>
+                </label>
+                <label class="radio-line">
+                    <input type="radio" asp-for="ImportMode" value="@LibraryScanner.Web.Pages.Users.IndexModel.ImportModes.Overwrite" />
+                    <span>Overwrite book inventory with this CSV</span>
+                </label>
+                <span class="form-hint">Overwrite clears books, book tags, collection links, and inventory history before importing. Accounts and reusable tag/location/collection names remain.</span>
             </div>
-            <div>
-                <label>Latest backup updated</label>
-                <input class="form-control" value="@(Model.Snapshot.LatestBackupUpdated?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown")" readonly />
+            <button type="submit" class="btn btn-primary" onclick="return confirm('Import this CSV using the selected mode? Overwrite mode clears the current book inventory first.');">Import CSV</button>
+        </form>
+
+        <form method="post" asp-page-handler="ExportPdf" class="pdf-export-form">
+            <div class="field-stack">
+                <label>Export PDF fields</label>
+                <div class="export-field-list">
+                    @foreach (var field in Model.ExportFields)
+                    {
+                        var isChecked = LibraryScanner.Web.Services.InventoryExportField.DefaultPdfKeys.Contains(field.Key);
+                        <label class="checkbox-pill">
+                            <input type="checkbox" name="PdfFieldKeys" value="@field.Key" checked="@isChecked" />
+                            <span>@field.Label</span>
+                        </label>
+                    }
+                </div>
             </div>
-        </div>
-    </section>
+            <button type="submit" class="btn btn-outline-secondary">Export PDF</button>
+        </form>
+    </div>
 </section>
 
 @if (Model.IsAdmin)
@@ -130,8 +213,8 @@
                 {
                     <tr>
                         <td><strong>@user.UserName</strong></td>
-                        <td>@(string.IsNullOrWhiteSpace(user.DisplayName) ? "—" : user.DisplayName)</td>
-                        <td>@(string.IsNullOrWhiteSpace(user.Email) ? "—" : user.Email)</td>
+                        <td>@(string.IsNullOrWhiteSpace(user.DisplayName) ? "-" : user.DisplayName)</td>
+                        <td>@(string.IsNullOrWhiteSpace(user.Email) ? "-" : user.Email)</td>
                         <td>@string.Join(", ", user.Roles)</td>
                         <td>
                             <form method="post" asp-page-handler="UpdatePermissions" class="inline-form">
@@ -149,68 +232,25 @@
             </table>
         </div>
     </section>
-}
 
-<section class="stats-grid compact-stats-grid">
-    <div class="stat">
-        <span class="stat-label">Books</span>
-        <strong>@Model.Snapshot.TotalBooks</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Items</span>
-        <strong>@Model.Snapshot.TotalItems</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Tags</span>
-        <strong>@Model.Snapshot.TotalTags</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Collections</span>
-        <strong>@Model.Snapshot.TotalCollections</strong>
-    </div>
-</section>
-
-@if (Model.Users.Count == 0)
-{
-    <div class="empty-state">
-        <h2>No users found</h2>
-        <p>Create an account to begin using Stallioneer.</p>
-    </div>
-}
-else
-{
-    <div class="table-wrap">
-        <table class="table inventory-table">
-            <thead>
-                <tr>
-                    <th>Username</th>
-                    <th>Display name</th>
-                    <th>Email</th>
-                    <th>Roles</th>
-                    <th>Email status</th>
-                    <th>Current</th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var user in Model.Users)
-            {
-                var isCurrentUser = user.Id == Model.CurrentUserId;
-                <tr>
-                    <td>
-                        <strong>@user.UserName</strong>
-                    </td>
-                    <td>@(string.IsNullOrWhiteSpace(user.DisplayName) ? "—" : user.DisplayName)</td>
-                    <td>@(string.IsNullOrWhiteSpace(user.Email) ? "—" : user.Email)</td>
-                    <td>@string.Join(", ", user.Roles)</td>
-                    <td>
-                        <span class="status-pill">@(user.EmailConfirmed ? "Confirmed" : "Unconfirmed")</span>
-                    </td>
-                    <td>@(isCurrentUser ? "Yes" : "—")</td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
+    <section class="stats-grid compact-stats-grid">
+        <div class="stat">
+            <span class="stat-label">Books</span>
+            <strong>@Model.Snapshot.TotalBooks</strong>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Items</span>
+            <strong>@Model.Snapshot.TotalItems</strong>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Tags</span>
+            <strong>@Model.Snapshot.TotalTags</strong>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Collections</span>
+            <strong>@Model.Snapshot.TotalCollections</strong>
+        </div>
+    </section>
 }
 
 @section Scripts {

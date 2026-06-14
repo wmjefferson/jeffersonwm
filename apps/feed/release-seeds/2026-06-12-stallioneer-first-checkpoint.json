@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Stallioneer first checkpoint",
+  "content": "<p>Stallioneer now exists as a working first-pass library inventory app inside the JeffersonWM repo. This checkpoint moves it out of planning mode and into a usable application focused on scanning or entering ISBN and UPC codes, pulling metadata, and organizing a personal library in a structured way.</p><p>What is in place so far:</p><ul><li>Built the app as an ASP.NET Core Razor Pages project on .NET 10 with SQLite, Entity Framework Core migrations, and ASP.NET Core Identity for account registration and login.</li><li>Added the core inventory workflow for ISBN and UPC lookup, book creation and editing, tags, locations, collections, quantities, conditions, notes, and extended metadata fields.</li><li>Improved the cataloging experience with case-insensitive inventory search on SQLite, bulk selection and delete actions, add-to-collection actions, copy buttons for key fields, clickable tag suggestions, cover preview, and a reorganized edit page split into common and extended details.</li><li>Backed up the live SQLite database, committed the current state, and pushed Stallioneer to its own branch so it can be reviewed and merged cleanly without mixing into unrelated work already sitting on the repo main branch.</li></ul><p>This is a strong first saved state for Stallioneer: the foundation is running, the data model is taking shape, and the app is already useful enough to keep iterating on real library entry workflows instead of just mockups and plans.</p>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/50",
+  "source": "manual",
+  "external_id": "stallioneer-first-checkpoint-2026-06-12"
+}

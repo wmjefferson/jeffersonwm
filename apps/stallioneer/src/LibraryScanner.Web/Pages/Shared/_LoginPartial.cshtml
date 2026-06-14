@@ -7,9 +7,6 @@
 @if (SignInManager.IsSignedIn(User))
 {
     <li class="nav-item">
-        <a class="nav-link text-dark" asp-area="" asp-page="/Users/Index">Settings</a>
-    </li>
-    <li class="nav-item">
         <a class="nav-link text-dark" asp-area="" asp-page="/Users/Index" title="Settings">Hello @User.Identity?.Name!</a>
     </li>
     <li class="nav-item">

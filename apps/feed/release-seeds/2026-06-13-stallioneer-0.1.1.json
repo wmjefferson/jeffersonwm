@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Stallioneer v0.1.1",
+  "content": "<p>Stallioneer moved through its first real interface and admin pass. This update focused on turning the app from a functional prototype into a cleaner daily-use surface with a more intentional shell and the beginnings of a durable settings area.</p><p>What changed:</p><ul><li>Rebuilt the shared app shell with fixed top and bottom bars, cleaner spacing, a simpler type system, and a more controlled frame so the home, inventory, auth, and management screens now feel like part of the same application.</li><li>Added an initial <code>Settings</code> surface for signed-in users, including a protected route, a read-only account table, a profile card with editable display name, and a local system snapshot showing database and backup context.</li><li>Cleaned up the account flow and internal navigation by removing the redundant Home link, renaming the helper area from Users to Settings, and wiring the new control surface into the signed-in experience without disturbing the rest of the inventory workflow.</li></ul><p>This is still an early version, but it is now a much stronger frame for continuing on roles, admin controls, backup tooling, import/export, and longer-term auth decisions.</p>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/50",
+  "source": "release",
+  "external_id": "stallioneer-v0.1.1-2026-06-13"
+}

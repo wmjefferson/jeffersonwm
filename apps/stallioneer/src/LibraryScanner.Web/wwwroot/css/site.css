@@ -500,6 +500,52 @@ label {
   grid-template-columns: minmax(220px, 1.4fr) minmax(180px, 0.8fr) auto auto;
 }
 
+.import-export-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(240px, 0.7fr) minmax(320px, 0.9fr);
+  margin-top: 14px;
+}
+
+.import-form {
+  display: grid;
+  gap: 10px;
+}
+
+.pdf-export-form {
+  border-top: 1px solid #dde2dc;
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  padding-top: 14px;
+}
+
+.export-field-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.checkbox-pill {
+  align-items: center;
+  border: 1px solid #dde2dc;
+  border-radius: 4px;
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.radio-line {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+  line-height: 1.35;
+}
+
+.radio-line input {
+  margin-top: 3px;
+}
+
 .selection-column {
   text-align: center;
   width: 56px;
@@ -755,6 +801,7 @@ label {
   }
 
   .bulk-actions,
+  .import-export-grid,
   .inventory-filters,
   .copy-field,
   .wide-inline-form {
