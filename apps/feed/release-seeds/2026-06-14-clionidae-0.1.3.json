@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Clionidae v0.1.3",
+  "content": "<div class=\"release-note-body\"><p>What's new</p><ul><li>Finalized Apache/cPanel static routing split via root <code>.htaccess</code> integration.</li><li>Resolved root index-hijacking by prioritizing static <code>landing.html</code> over the React SPA shell at the directory root.</li><li>Ensured deep links to the SPA workspace at <code>/home</code> load cleanly under static hosting without triggering 404 errors.</li></ul></div>",
+  "url": "https://jeffersonwm.com/clionidae/",
+  "source": "release",
+  "external_id": "clionidae-v0.1.3-2026-06-14"
+}
