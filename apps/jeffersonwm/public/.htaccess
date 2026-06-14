@@ -33,6 +33,21 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^perihelion(/.*)?$ /perihelion/index.html [L]
 
+# Clionidae app routing split
+# 1. Serve landing.html at clionidae root
+RewriteCond %{REQUEST_URI} ^/clionidae/?$
+RewriteRule ^(.*)$ /clionidae/landing.html [L]
+
+# 2. Rewrite /clionidae/home to index.html (the SPA)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^clionidae/home(/.*)?$ /clionidae/index.html [L]
+
+# 3. Rewrite any other clionidae paths (deep links) to index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^clionidae(/.*)?$ /clionidae/index.html [L]
+
 # Serve assets directly
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
