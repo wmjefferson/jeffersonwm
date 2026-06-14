@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Clionidae v0.1.2",
+  "content": "<div class=\"release-note-body\"><p>What's new</p><ul><li>Split routing structure: serve minimalist landing page at root (/) and React SPA at (/home).</li><li>Implemented dual-speed hover animations for the logo and Viga-based Enter links.</li><li>Configured noindex robots meta tags inside the main application shell.</li></ul></div>",
+  "url": "https://jeffersonwm.com/clionidae/",
+  "source": "release",
+  "external_id": "clionidae-v0.1.2-2026-06-13"
+}
