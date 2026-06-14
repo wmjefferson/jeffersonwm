@@ -17,18 +17,47 @@
     <div class="alert @Model.LookupMessageCssClass">@Model.LookupMessage</div>
 }
 
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-success">@Model.StatusMessage</div>
+}
+
 <form method="post" class="entry-grid">
+    <input asp-for="IsManualEntry" type="hidden" />
     <section class="panel">
-        <h2>Lookup</h2>
+        <div class="scanner-header">
+            <div>
+                <h2>Lookup</h2>
+                <p class="form-hint">USB and Bluetooth barcode scanners can use this field like a keyboard.</p>
+            </div>
+            <span class="status-pill">@(Model.IsManualEntry ? "Manual entry" : "Scanner ready")</span>
+        </div>
         <div class="lookup-stack">
-            <input asp-for="Input.Isbn" class="form-control lookup-code-input" autocomplete="off" placeholder="Scan or enter ISBN / UPC" autofocus />
+            @if (Model.IsManualEntry)
+            {
+                <input class="form-control lookup-code-input" value="No code required" disabled />
+            }
+            else
+            {
+                <input asp-for="Input.Isbn" class="form-control lookup-code-input" autocomplete="off" placeholder="Scan or enter ISBN / UPC" data-scan-code data-scan-focus="@(!Model.HasSelectedBook).ToString().ToLowerInvariant()" autofocus />
+            }
             <div class="lookup-actions">
-                <button asp-page-handler="Lookup" class="btn btn-primary" formnovalidate>Find matches</button>
+                <button asp-page-handler="Lookup" class="btn btn-primary" data-scan-submit formnovalidate>Find matches</button>
+                <button asp-page-handler="Manual" class="btn btn-outline-secondary" formnovalidate>Manual entry</button>
                 <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear</button>
             </div>
         </div>
         <span asp-validation-for="Input.Isbn" class="text-danger"></span>
-        <p class="form-hint">Enter the code and press Enter. Then choose the matching cover or title to load the book details.</p>
+        <p class="form-hint">
+            @if (Model.IsManualEntry)
+            {
+                <span>No code is needed for this entry. Add the book details and save when ready.</span>
+            }
+            else
+            {
+                <span>Scan or type the code and press Enter. Then choose the matching cover or title to load the book details.</span>
+            }
+        </p>
 
         @if (Model.CandidateMatches.Count > 0)
         {
@@ -54,7 +83,7 @@
                             {
                                 <p>@candidate.Publisher @candidate.PublishedDate</p>
                             }
-                            <p class="source-note">@candidate.Source · ISBN @candidate.Isbn13</p>
+                            <p class="source-note">@candidate.Source - ISBN @candidate.Isbn13</p>
                         </div>
                     </button>
                 }
@@ -80,11 +109,35 @@
                 }
             </div>
         }
+
+        @if (Model.RecentScans.Count > 0)
+        {
+            <div class="recent-scan-list">
+                <div class="scanner-header">
+                    <h3>Recent scans</h3>
+                    <a asp-page="/Books/Index" class="source-note">Inventory</a>
+                </div>
+                @foreach (var scan in Model.RecentScans)
+                {
+                    <a class="recent-scan-item" asp-page="/Books/Edit" asp-route-id="@scan.BookId">
+                        <span>
+                            <strong>@scan.Title</strong>
+                            <small>@scan.EventType - @scan.Isbn13</small>
+                        </span>
+                        <span class="status-pill">+@scan.QuantityDelta</span>
+                    </a>
+                }
+            </div>
+        }
     </section>
 
     <section class="panel">
         <h2>Book details</h2>
-        @if (!Model.HasSelectedBook)
+        @if (Model.IsManualEntry)
+        {
+            <p class="form-hint">Manual mode is active. A private internal code will be created when you save.</p>
+        }
+        else if (!Model.HasSelectedBook)
         {
             <p class="form-hint">Choose a search result to populate these fields.</p>
         }
@@ -138,7 +191,12 @@
     </section>
 
     <section class="panel">
-        <h2>Inventory</h2>
+        <div class="scanner-header">
+            <div>
+                <h2>Inventory</h2>
+                <p class="form-hint">These values can stay active while you scan a stack of books.</p>
+            </div>
+        </div>
         <div class="field-grid">
             <div>
                 <label asp-for="Input.Quantity"></label>
@@ -182,10 +240,16 @@
         </div>
         <label asp-for="Input.Notes"></label>
         <textarea asp-for="Input.Notes" class="form-control" rows="4"></textarea>
+
+        <label class="checkbox-line scan-default-toggle">
+            <input asp-for="KeepScanDefaults" />
+            <span>Keep these inventory values for the next scan</span>
+        </label>
     </section>
 
     <div class="form-actions">
         <button asp-page-handler="Save" class="btn btn-primary">Save book</button>
+        <button asp-page-handler="SaveAndScanNext" class="btn btn-outline-secondary">Save and scan next</button>
         <button asp-page-handler="Clear" class="btn btn-outline-secondary">Clear</button>
     </div>
 </form>

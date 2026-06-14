@@ -1,4 +1,31 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const scanInput = document.querySelector("[data-scan-code]");
+    if (scanInput instanceof HTMLInputElement) {
+        const shouldFocus = scanInput.getAttribute("data-scan-focus") === "true";
+        if (shouldFocus) {
+            scanInput.focus();
+            scanInput.select();
+        }
+
+        scanInput.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter") {
+                return;
+            }
+
+            const value = scanInput.value.trim();
+            scanInput.value = value;
+            if (!value) {
+                return;
+            }
+
+            const submitButton = document.querySelector("[data-scan-submit]");
+            if (submitButton instanceof HTMLButtonElement) {
+                event.preventDefault();
+                submitButton.click();
+            }
+        });
+    }
+
     document.querySelectorAll("[data-copy-text], [data-copy-source]").forEach((button) => {
         button.addEventListener("click", async () => {
             const directText = button.getAttribute("data-copy-text") ?? "";

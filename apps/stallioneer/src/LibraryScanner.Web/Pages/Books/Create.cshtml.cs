@@ -27,12 +27,25 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
     [TempData]
     public string? StatusMessage { get; set; }
 
+    [TempData]
+    public string? ScanDefaults { get; set; }
+
+    [BindProperty]
+    public bool KeepScanDefaults { get; set; } = true;
+
+    [BindProperty]
+    public bool IsManualEntry { get; set; }
+
     public List<SelectListItem> LocationOptions { get; private set; } = [];
 
     public IReadOnlyList<Tag> AvailableTags { get; private set; } = [];
 
+    public IReadOnlyList<RecentScanRow> RecentScans { get; private set; } = [];
+
     public async Task OnGetAsync(string? isbn)
     {
+        ApplyScanDefaults();
+
         if (!string.IsNullOrWhiteSpace(isbn))
         {
             Input.Isbn = isbn.Trim();
@@ -45,6 +58,8 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
     public async Task<IActionResult> OnPostLookupAsync()
     {
         ModelState.Clear();
+        IsManualEntry = false;
+        PersistScanDefaults();
         await LookupCandidatesAsync(Input.Isbn);
         await LoadOptionsAsync();
         return Page();
@@ -53,7 +68,23 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
     public async Task<IActionResult> OnPostReviewAsync()
     {
         ModelState.Clear();
+        IsManualEntry = false;
+        PersistScanDefaults();
         await LoadSelectedBookAsync(Input.Isbn);
+        await LoadOptionsAsync();
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostManualAsync()
+    {
+        ModelState.Clear();
+        PersistScanDefaults();
+        IsManualEntry = true;
+        Input.Isbn = string.Empty;
+        Input.Isbn10 = null;
+        Input.MetadataSource = "Manual entry";
+        LookupMessage = "Manual entry is ready. Add a title and any details you have, then save.";
+        LookupMessageCssClass = "alert-info";
         await LoadOptionsAsync();
         return Page();
     }
@@ -61,8 +92,12 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
     public async Task<IActionResult> OnPostChooseCandidateAsync(string candidateIsbn)
     {
         ModelState.Clear();
+        IsManualEntry = false;
+        var defaults = ScanDefaultValues.FromInput(Input, KeepScanDefaults);
         Input.Isbn = candidateIsbn;
         await LoadSelectedBookAsync(candidateIsbn);
+        defaults.ApplyTo(Input);
+        PersistScanDefaults(defaults);
         LookupMessage = "Selected match loaded into the book details below.";
         LookupMessageCssClass = "alert-info";
         await LoadOptionsAsync();
@@ -76,8 +111,26 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
 
     public async Task<IActionResult> OnPostSaveAsync()
     {
-        var isbn13 = IsbnNormalizer.ToIsbn13(Input.Isbn);
-        if (isbn13 is null)
+        return await SaveBookAsync(scanNext: false);
+    }
+
+    public async Task<IActionResult> OnPostSaveAndScanNextAsync()
+    {
+        return await SaveBookAsync(scanNext: true);
+    }
+
+    private async Task<IActionResult> SaveBookAsync(bool scanNext)
+    {
+        var isbn13 = IsManualEntry
+            ? await GenerateManualCodeAsync()
+            : IsbnNormalizer.ToIsbn13(Input.Isbn);
+
+        if (IsManualEntry)
+        {
+            ModelState.Remove($"{nameof(Input)}.{nameof(Input.Isbn)}");
+        }
+
+        if (!IsManualEntry && isbn13 is null)
         {
             ModelState.AddModelError($"{nameof(Input)}.{nameof(Input.Isbn)}", "Enter a valid ISBN-10 or ISBN-13.");
         }
@@ -129,7 +182,22 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
 
         await dbContext.SaveChangesAsync();
         StatusMessage = $"Saved {Input.Title}.";
-        return RedirectToPage("/Books/Index");
+        PersistScanDefaults();
+        return scanNext
+            ? RedirectToPage("/Books/Create")
+            : RedirectToPage("/Books/Index");
+    }
+
+    private async Task<string> GenerateManualCodeAsync()
+    {
+        string code;
+        do
+        {
+            code = $"M{Guid.NewGuid():N}"[..13];
+        }
+        while (await dbContext.Books.AnyAsync(book => book.Isbn13 == code));
+
+        return code;
     }
 
     private void ApplyInput(Book book, Location? location)
@@ -309,6 +377,37 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
             .ToList();
 
         AvailableTags = await dbContext.Tags.AsNoTracking().OrderBy(tag => tag.Name).ToListAsync();
+
+        RecentScans = await dbContext.InventoryEvents
+            .AsNoTracking()
+            .Include(inventoryEvent => inventoryEvent.Book)
+            .OrderByDescending(inventoryEvent => inventoryEvent.Id)
+            .Take(8)
+            .Select(inventoryEvent => new RecentScanRow(
+                inventoryEvent.BookId,
+                inventoryEvent.Book == null ? "Unknown title" : inventoryEvent.Book.Title,
+                inventoryEvent.Book == null ? string.Empty : inventoryEvent.Book.Isbn13,
+                inventoryEvent.EventType,
+                inventoryEvent.QuantityDelta,
+                inventoryEvent.CreatedAt))
+            .ToListAsync();
+    }
+
+    private void ApplyScanDefaults()
+    {
+        var defaults = ScanDefaultValues.FromString(ScanDefaults);
+        defaults.ApplyTo(Input);
+        KeepScanDefaults = defaults.Keep;
+    }
+
+    private void PersistScanDefaults()
+    {
+        PersistScanDefaults(ScanDefaultValues.FromInput(Input, KeepScanDefaults));
+    }
+
+    private void PersistScanDefaults(ScanDefaultValues defaults)
+    {
+        ScanDefaults = defaults.Keep ? defaults.ToString() : null;
     }
 
     private async Task<Location?> ResolveLocationAsync()
@@ -451,6 +550,107 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
                 Status = book.Status,
                 Notes = book.Notes
             };
+        }
+    }
+
+    public sealed record RecentScanRow(
+        int BookId,
+        string Title,
+        string Isbn13,
+        string EventType,
+        int QuantityDelta,
+        DateTimeOffset CreatedAt);
+
+    private sealed record ScanDefaultValues(
+        bool Keep,
+        int Quantity,
+        int? LocationId,
+        string? NewLocationName,
+        string? TagNames,
+        string Condition,
+        string Status,
+        string? Notes)
+    {
+        public static ScanDefaultValues Empty => new(
+            true,
+            1,
+            null,
+            null,
+            null,
+            "Unspecified",
+            "Owned",
+            null);
+
+        public static ScanDefaultValues FromInput(BookInput input, bool keep)
+        {
+            return new ScanDefaultValues(
+                keep,
+                input.Quantity,
+                input.LocationId,
+                input.NewLocationName,
+                input.TagNames,
+                input.Condition,
+                input.Status,
+                input.Notes);
+        }
+
+        public static ScanDefaultValues FromString(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return Empty;
+            }
+
+            var parts = value.Split('\t');
+            if (parts.Length != 8)
+            {
+                return Empty;
+            }
+
+            return new ScanDefaultValues(
+                bool.TryParse(parts[0], out var keep) ? keep : Empty.Keep,
+                int.TryParse(parts[1], out var quantity) && quantity > 0 ? quantity : Empty.Quantity,
+                int.TryParse(parts[2], out var locationId) ? locationId : null,
+                Decode(parts[3]),
+                Decode(parts[4]),
+                Decode(parts[5]) ?? Empty.Condition,
+                Decode(parts[6]) ?? Empty.Status,
+                Decode(parts[7]));
+        }
+
+        public void ApplyTo(BookInput input)
+        {
+            input.Quantity = Quantity;
+            input.LocationId = LocationId;
+            input.NewLocationName = NewLocationName;
+            input.TagNames = TagNames;
+            input.Condition = Condition;
+            input.Status = Status;
+            input.Notes = Notes;
+        }
+
+        public override string ToString()
+        {
+            return string.Join('\t',
+                Keep,
+                Quantity,
+                LocationId?.ToString() ?? string.Empty,
+                Encode(NewLocationName),
+                Encode(TagNames),
+                Encode(Condition),
+                Encode(Status),
+                Encode(Notes));
+        }
+
+        private static string Encode(string? value)
+        {
+            return Uri.EscapeDataString(value ?? string.Empty);
+        }
+
+        private static string? Decode(string value)
+        {
+            var decoded = Uri.UnescapeDataString(value);
+            return string.IsNullOrWhiteSpace(decoded) ? null : decoded;
         }
     }
 }
