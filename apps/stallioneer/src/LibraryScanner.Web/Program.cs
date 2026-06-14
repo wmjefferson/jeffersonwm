@@ -17,6 +17,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
         options.SignIn.RequireConfirmedAccount = false;
         options.User.RequireUniqueEmail = true;
     })
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddHttpClient<IIsbnLookupService, OpenLibraryIsbnLookupService>(client =>
 {
@@ -26,6 +27,8 @@ builder.Services.AddHttpClient<IIsbnLookupService, OpenLibraryIsbnLookupService>
 builder.Services.AddRazorPages();
 
 var app = builder.Build();
+
+await EnsureIdentityBootstrapAsync(app.Services);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -63,3 +66,34 @@ app.MapGet("/api/isbn/{isbn}", async (string isbn, IIsbnLookupService lookupServ
 }).RequireAuthorization();
 
 app.Run();
+
+static async Task EnsureIdentityBootstrapAsync(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+    foreach (var roleName in new[] { AppRoles.Admin, AppRoles.User })
+    {
+        if (!await roleManager.RoleExistsAsync(roleName))
+        {
+            await roleManager.CreateAsync(new IdentityRole(roleName));
+        }
+    }
+
+    var users = userManager.Users.ToList();
+    foreach (var user in users)
+    {
+        var roles = await userManager.GetRolesAsync(user);
+        if (!roles.Contains(AppRoles.User))
+        {
+            await userManager.AddToRoleAsync(user, AppRoles.User);
+        }
+    }
+
+    var adminUser = await userManager.FindByNameAsync("jefferson");
+    if (adminUser is not null && !await userManager.IsInRoleAsync(adminUser, AppRoles.Admin))
+    {
+        await userManager.AddToRoleAsync(adminUser, AppRoles.Admin);
+    }
+}

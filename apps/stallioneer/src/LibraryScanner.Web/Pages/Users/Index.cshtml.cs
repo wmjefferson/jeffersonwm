@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using LibraryScanner.Web.Data;
+using LibraryScanner.Web.Models;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -10,7 +12,11 @@ using Microsoft.EntityFrameworkCore;
 namespace LibraryScanner.Web.Pages.Users;
 
 [Authorize]
-public class IndexModel(ApplicationDbContext dbContext, IConfiguration configuration, IHostEnvironment environment) : PageModel
+public class IndexModel(
+    ApplicationDbContext dbContext,
+    IConfiguration configuration,
+    IHostEnvironment environment,
+    UserManager<ApplicationUser> userManager) : PageModel
 {
     public List<UserRow> Users { get; private set; } = [];
 
@@ -18,11 +24,15 @@ public class IndexModel(ApplicationDbContext dbContext, IConfiguration configura
 
     public UserRow? CurrentUser => Users.FirstOrDefault(user => user.Id == CurrentUserId);
 
+    public bool IsAdmin { get; private set; }
+
     public int TotalUsers => Users.Count;
 
     public int ConfirmedUsers => Users.Count(user => user.EmailConfirmed);
 
     public int NamedUsers => Users.Count(user => !string.IsNullOrWhiteSpace(user.DisplayName));
+
+    public int AdminUsers => Users.Count(user => user.IsAdmin);
 
     public AppSnapshot Snapshot { get; private set; } = new();
 
@@ -66,11 +76,63 @@ public class IndexModel(ApplicationDbContext dbContext, IConfiguration configura
         return RedirectToPage();
     }
 
+    public async Task<IActionResult> OnPostUpdatePermissionsAsync(string userId, bool isAdmin)
+    {
+        CurrentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(CurrentUserId))
+        {
+            return Challenge();
+        }
+
+        if (!User.IsInRole(AppRoles.Admin))
+        {
+            return Forbid();
+        }
+
+        var user = await userManager.FindByIdAsync(userId);
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        var currentlyAdmin = await userManager.IsInRoleAsync(user, AppRoles.Admin);
+        if (currentlyAdmin == isAdmin)
+        {
+            return RedirectToPage();
+        }
+
+        if (!isAdmin)
+        {
+            var adminUsers = await userManager.GetUsersInRoleAsync(AppRoles.Admin);
+            if (currentlyAdmin && adminUsers.Count <= 1)
+            {
+                StatusMessage = "Stallioneer must keep at least one admin account.";
+                return RedirectToPage();
+            }
+
+            await userManager.RemoveFromRoleAsync(user, AppRoles.Admin);
+            StatusMessage = $"Removed admin access from {user.UserName}.";
+        }
+        else
+        {
+            if (!await userManager.IsInRoleAsync(user, AppRoles.User))
+            {
+                await userManager.AddToRoleAsync(user, AppRoles.User);
+            }
+
+            await userManager.AddToRoleAsync(user, AppRoles.Admin);
+            StatusMessage = $"Granted admin access to {user.UserName}.";
+        }
+
+        return RedirectToPage();
+    }
+
     private async Task LoadPageAsync()
     {
         CurrentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         Users = await LoadUsersAsync();
         Snapshot = await LoadSnapshotAsync();
+        IsAdmin = User.IsInRole(AppRoles.Admin);
 
         Input = new ProfileInput
         {
@@ -80,16 +142,26 @@ public class IndexModel(ApplicationDbContext dbContext, IConfiguration configura
 
     private async Task<List<UserRow>> LoadUsersAsync()
     {
-        return await dbContext.Users
+        var users = await dbContext.Users
             .AsNoTracking()
             .OrderBy(user => user.UserName)
-            .Select(user => new UserRow(
+            .ToListAsync();
+
+        var rows = new List<UserRow>(users.Count);
+        foreach (var user in users)
+        {
+            var roles = await userManager.GetRolesAsync(user);
+            rows.Add(new UserRow(
                 user.Id,
                 user.UserName ?? string.Empty,
                 user.DisplayName,
                 user.Email,
-                user.EmailConfirmed))
-            .ToListAsync();
+                user.EmailConfirmed,
+                roles.OrderBy(role => role).ToList(),
+                roles.Contains(AppRoles.Admin)));
+        }
+
+        return rows;
     }
 
     private async Task<AppSnapshot> LoadSnapshotAsync()
@@ -137,7 +209,9 @@ public class IndexModel(ApplicationDbContext dbContext, IConfiguration configura
         string UserName,
         string? DisplayName,
         string? Email,
-        bool EmailConfirmed);
+        bool EmailConfirmed,
+        IReadOnlyList<string> Roles,
+        bool IsAdmin);
 
     public sealed class ProfileInput
     {

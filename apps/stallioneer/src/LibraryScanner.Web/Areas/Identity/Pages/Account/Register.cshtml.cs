@@ -45,6 +45,7 @@ public class RegisterModel(
         var result = await userManager.CreateAsync(user, Input.Password);
         if (result.Succeeded)
         {
+            await userManager.AddToRoleAsync(user, AppRoles.User);
             logger.LogInformation("User created a new account with password.");
             await signInManager.SignInAsync(user, isPersistent: false);
             return LocalRedirect(returnUrl);

@@ -34,6 +34,10 @@
         <span class="stat-label">Signed in as</span>
         <strong>@(Model.CurrentUser?.UserName ?? "Unknown")</strong>
     </div>
+    <div class="stat">
+        <span class="stat-label">Admin users</span>
+        <strong>@Model.AdminUsers</strong>
+    </div>
 </section>
 
 <section class="entry-grid">
@@ -63,6 +67,10 @@
                 <div>
                     <label>Email status</label>
                     <input class="form-control" value="@(Model.CurrentUser.EmailConfirmed ? "Confirmed" : "Unconfirmed")" readonly />
+                </div>
+                <div>
+                    <label>Permissions</label>
+                    <input class="form-control" value="@(Model.CurrentUser.IsAdmin ? "Admin" : "User")" readonly />
                 </div>
                 <div class="lookup-actions">
                     <button type="submit" class="btn btn-primary">Save profile</button>
@@ -99,6 +107,50 @@
     </section>
 </section>
 
+@if (Model.IsAdmin)
+{
+    <section class="panel">
+        <p class="eyebrow">Admin tools</p>
+        <h2>Account permissions</h2>
+        <p class="muted-block">Use this section to decide which accounts can manage permissions and future system-wide settings. Stallioneer always keeps at least one admin account.</p>
+
+        <div class="table-wrap">
+            <table class="table inventory-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Display name</th>
+                        <th>Email</th>
+                        <th>Roles</th>
+                        <th>Admin access</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var user in Model.Users)
+                {
+                    <tr>
+                        <td><strong>@user.UserName</strong></td>
+                        <td>@(string.IsNullOrWhiteSpace(user.DisplayName) ? "—" : user.DisplayName)</td>
+                        <td>@(string.IsNullOrWhiteSpace(user.Email) ? "—" : user.Email)</td>
+                        <td>@string.Join(", ", user.Roles)</td>
+                        <td>
+                            <form method="post" asp-page-handler="UpdatePermissions" class="inline-form">
+                                <input type="hidden" name="userId" value="@user.Id" />
+                                <input type="hidden" name="isAdmin" value="@(user.IsAdmin ? "false" : "true")" />
+                                <span class="status-pill">@(user.IsAdmin ? "Admin" : "User")</span>
+                                <button type="submit" class="btn btn-outline-secondary">
+                                    @(user.IsAdmin ? "Remove admin" : "Make admin")
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
 <section class="stats-grid compact-stats-grid">
     <div class="stat">
         <span class="stat-label">Books</span>
@@ -134,6 +186,7 @@ else
                     <th>Username</th>
                     <th>Display name</th>
                     <th>Email</th>
+                    <th>Roles</th>
                     <th>Email status</th>
                     <th>Current</th>
                 </tr>
@@ -148,6 +201,7 @@ else
                     </td>
                     <td>@(string.IsNullOrWhiteSpace(user.DisplayName) ? "—" : user.DisplayName)</td>
                     <td>@(string.IsNullOrWhiteSpace(user.Email) ? "—" : user.Email)</td>
+                    <td>@string.Join(", ", user.Roles)</td>
                     <td>
                         <span class="status-pill">@(user.EmailConfirmed ? "Confirmed" : "Unconfirmed")</span>
                     </td>
