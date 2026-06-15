@@ -28,7 +28,21 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^lionship(/.*)?$ /lionship/index.html [L]
 
-# Perihelion app routing
+# Perihelion app routing split
+# 1. Redirect if a share query parameter is present (to bypass landing page)
+RewriteCond %{QUERY_STRING} share=([a-zA-Z0-9]{4})
+RewriteRule ^perihelion/?$ /perihelion/home [QSA,L,R=302]
+
+# 2. Serve landing.html at perihelion root
+RewriteCond %{REQUEST_URI} ^/perihelion/?$
+RewriteRule ^(.*)$ /perihelion/landing.html [L]
+
+# 3. Rewrite /perihelion/home to index.html (the SPA)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^perihelion/home(/.*)?$ /perihelion/index.html [L]
+
+# 4. Rewrite any other perihelion paths (deep links) to index.html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^perihelion(/.*)?$ /perihelion/index.html [L]

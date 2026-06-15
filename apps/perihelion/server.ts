@@ -241,6 +241,25 @@ async function startServer() {
 
   app.use("/images", express.static(IMAGES_DIR));
 
+  app.get("/", (req, res) => {
+    if (req.query.share) {
+      return res.redirect(`/home?share=${req.query.share}`);
+    }
+    const landingPath = process.env.NODE_ENV === "production"
+      ? path.resolve(process.cwd(), "dist", "landing.html")
+      : path.resolve(process.cwd(), "public", "landing.html");
+    res.sendFile(landingPath, { dotfiles: "allow" });
+  });
+
+  app.get("/home", (req, res, next) => {
+    if (process.env.NODE_ENV === "production") {
+      res.sendFile(path.resolve(process.cwd(), "dist", "index.html"));
+    } else {
+      req.url = "/index.html";
+      next();
+    }
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
