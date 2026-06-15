@@ -36,6 +36,9 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
     [BindProperty]
     public bool IsManualEntry { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public bool SpeedMode { get; set; }
+
     public List<SelectListItem> LocationOptions { get; private set; } = [];
 
     public IReadOnlyList<Tag> AvailableTags { get; private set; } = [];
@@ -106,7 +109,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
 
     public IActionResult OnPostClear()
     {
-        return RedirectToPage("/Books/Create");
+        return RedirectToPage("/Books/Create", new { SpeedMode });
     }
 
     public async Task<IActionResult> OnPostSaveAsync()
@@ -184,7 +187,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
         StatusMessage = $"Saved {Input.Title}.";
         PersistScanDefaults();
         return scanNext
-            ? RedirectToPage("/Books/Create")
+            ? RedirectToPage("/Books/Create", new { SpeedMode })
             : RedirectToPage("/Books/Index");
     }
 
@@ -438,6 +441,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
     private async Task SyncTagsAsync(Book book, string? tagNames)
     {
         book.BookTags.Clear();
+
         foreach (var tagName in InventoryText.ParseTags(tagNames))
         {
             var normalized = InventoryText.NormalizeName(tagName);

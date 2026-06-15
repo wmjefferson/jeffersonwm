@@ -6,10 +6,20 @@
 
 <section class="page-heading">
     <div>
-        <p class="eyebrow">ISBN / UPC lookup</p>
-        <h1>Add from code</h1>
+        <p class="eyebrow">@(Model.SpeedMode ? "Rapid intake" : "ISBN / UPC lookup")</p>
+        <h1>@(Model.SpeedMode ? "Speed mode" : "Add from code")</h1>
     </div>
-    <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
+    <div class="header-actions">
+        @if (Model.SpeedMode)
+        {
+            <a class="btn btn-outline-secondary" asp-page="/Books/Create">Standard mode</a>
+        }
+        else
+        {
+            <a class="btn btn-outline-secondary" asp-page="/Books/Create" asp-route-speedMode="true">Speed mode</a>
+        }
+        <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
+    </div>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(Model.LookupMessage))
@@ -22,15 +32,21 @@
     <div class="alert alert-success">@Model.StatusMessage</div>
 }
 
-<form method="post" class="entry-grid">
+<form method="post" class="entry-grid @(Model.SpeedMode ? "entry-grid--speed" : string.Empty)">
     <input asp-for="IsManualEntry" type="hidden" />
+    <input asp-for="SpeedMode" type="hidden" />
+
     <section class="panel">
         <div class="scanner-header">
             <div>
                 <h2>Lookup</h2>
-                <p class="form-hint">USB and Bluetooth barcode scanners can use this field like a keyboard.</p>
+                <p class="form-hint">
+                    @(Model.SpeedMode
+                        ? "Scan, choose a match, tag it, then save and return to the next scan."
+                        : "USB and Bluetooth barcode scanners can use this field like a keyboard.")
+                </p>
             </div>
-            <span class="status-pill">@(Model.IsManualEntry ? "Manual entry" : "Scanner ready")</span>
+            <span class="status-pill">@(Model.IsManualEntry ? "Manual entry" : Model.SpeedMode ? "Speed mode" : "Scanner ready")</span>
         </div>
         <div class="lookup-stack">
             @if (Model.IsManualEntry)
@@ -43,6 +59,10 @@
             }
             <div class="lookup-actions">
                 <button asp-page-handler="Lookup" class="btn btn-primary" data-scan-submit formnovalidate>Find matches</button>
+                @if (!Model.IsManualEntry)
+                {
+                    <button type="button" class="btn btn-outline-secondary" data-camera-start>Camera scan</button>
+                }
                 <button asp-page-handler="Manual" class="btn btn-outline-secondary" formnovalidate>Manual entry</button>
                 <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear</button>
             </div>
@@ -58,6 +78,20 @@
                 <span>Scan or type the code and press Enter. Then choose the matching cover or title to load the book details.</span>
             }
         </p>
+
+        @if (!Model.IsManualEntry)
+        {
+            <div class="camera-scanner" data-camera-panel hidden>
+                <div class="scanner-header">
+                    <div>
+                        <h3>Camera scanner</h3>
+                        <p class="form-hint" data-camera-status>Point the camera at an ISBN or UPC barcode.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary" data-camera-stop hidden>Stop</button>
+                </div>
+                <video data-camera-video muted playsinline hidden></video>
+            </div>
+        }
 
         @if (Model.CandidateMatches.Count > 0)
         {
@@ -103,9 +137,9 @@
         @if (Model.AvailableTags.Count > 0)
         {
             <div class="tag-suggestions">
-                @foreach (var tag in Model.AvailableTags.Take(18))
+                @foreach (var tag in Model.AvailableTags.Take(Model.SpeedMode ? 30 : 18))
                 {
-                    <span class="tag-pill" style="--tag-color:@tag.Color">@tag.Name</span>
+                    <button type="button" class="tag-pill tag-button" style="--tag-color:@tag.Color" data-tag-suggestion="@tag.Name" data-tag-target="#Input_TagNames">@tag.Name</button>
                 }
             </div>
         }
@@ -248,8 +282,16 @@
     </section>
 
     <div class="form-actions">
-        <button asp-page-handler="Save" class="btn btn-primary">Save book</button>
-        <button asp-page-handler="SaveAndScanNext" class="btn btn-outline-secondary">Save and scan next</button>
+        @if (Model.SpeedMode)
+        {
+            <button asp-page-handler="SaveAndScanNext" class="btn btn-primary">Save + next scan</button>
+            <button asp-page-handler="Save" class="btn btn-outline-secondary">Save and view inventory</button>
+        }
+        else
+        {
+            <button asp-page-handler="Save" class="btn btn-primary">Save book</button>
+            <button asp-page-handler="SaveAndScanNext" class="btn btn-outline-secondary">Save and scan next</button>
+        }
         <button asp-page-handler="Clear" class="btn btn-outline-secondary">Clear</button>
     </div>
 </form>

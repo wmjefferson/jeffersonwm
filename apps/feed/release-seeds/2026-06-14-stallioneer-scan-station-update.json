@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Stallioneer scan station update",
+  "content": "<p>Stallioneer’s intake flow took a practical step toward real shelf work. This pass focused on making the add-book screen behave more like a scan station: fast to operate, forgiving when a lookup misses, and flexible enough to work with either a barcode scanner or a camera.</p><p>What changed in this checkpoint:</p><ul><li>Added a dedicated speed mode so rapid intake can stay focused on scan, select, save, and move straight to the next book without breaking the overall catalog flow.</li><li>Added manual entry and camera scan support alongside the existing keyboard-style scanner field, with camera detection using the browser’s native barcode tools when available and a lightweight fallback when it is not.</li><li>Kept recent scans, sticky defaults, and tag suggestions in the workflow so repetitive entry work takes fewer repeated clicks while the standard mode stays lighter and easier to verify.</li></ul><p>This keeps Stallioneer moving toward high-volume real-world cataloging without overcomplicating the base add-book screen.</p>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/50",
+  "source": "manual",
+  "external_id": "stallioneer-scan-station-update-2026-06-14"
+}
