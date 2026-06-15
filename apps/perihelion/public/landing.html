@@ -65,6 +65,11 @@
       padding-top: 60px; /* 60px from the top of the viewport */
       max-width: 680px; /* Constrain text width for premium editorial look */
       text-align: left;
+      transition: opacity 400ms ease;
+    }
+
+    .fade-out-active {
+      opacity: 0 !important;
     }
 
     /* Accent Eyebrow Text */
@@ -190,5 +195,21 @@
     <a href="./home" class="enter-link">Enter</a>
   </main>
 
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const enterLink = document.querySelector('.enter-link');
+      const container = document.querySelector('.content-container');
+      
+      if (enterLink && container) {
+        enterLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          container.classList.add('fade-out-active');
+          setTimeout(() => {
+            window.location.href = enterLink.getAttribute('href');
+          }, 400);
+        });
+      }
+    });
+  </script>
 </body>
 </html>
