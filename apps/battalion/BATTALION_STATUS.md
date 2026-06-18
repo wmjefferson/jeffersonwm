@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="./git-banner.jpeg" alt="Battalion Banner" width="800" />
+</div>
+
 # Battalion Status
 
 ## Snapshot
