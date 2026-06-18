@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Battalion v1.2.35",
+  "content": "<p>Battalion has been updated to v1.2.35, splitting its routing to serve a minimalist landing page at the root URL (/) and the main tracker SPA workspace at (/home), fully integrated with the local dev server and production Apache rules.</p><p>What changed:</p><ul><li><strong>Minimalist Landing Page:</strong> Created a new premium editorial landing page at the root URL using the exact off-white layout format, 36px white banners, left-aligned typography, and bright crimson transitions.</li><li><strong>Split Routing Scheme:</strong> Moved the tracker SPA workspace to the <code>/home</code> URL scheme.</li><li><strong>Vite Dev Middleware:</strong> Integrated a custom configureServer hook in the Vite configuration to handle dev-mode split routing natively on the client port.</li><li><strong>Robots Noindex Meta-tag:</strong> Added a robots noindex meta-tag to the client <code>index.html</code> to prevent indexing of the active tracking dashboard.</li><li><strong>Apache Rewrite Configurations:</strong> Updated the production <code>.htaccess</code> rewrite rules in the main repository to handle the landing and SPA routing splits natively on Apache static hosting.</li></ul>",
+  "url": "https://jeffersonwm.com/battalion/",
+  "source": "release",
+  "external_id": "battalion-v1.2.35-2026-06-17"
+}
