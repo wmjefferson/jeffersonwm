@@ -10,6 +10,7 @@ export async function renderDashboard(container) {
       <div class="dash-status">
         <span class="dash-status__live"><span class="dash-status__dot"></span> Live</span>
         <span class="dash-status__updated" id="last-updated">Loading...</span>
+        <a href="https://jeffersonwm.com" class="btn btn--ghost btn--sm" style="text-decoration:none; margin-right:4px;">← jeffersonwm.com</a>
         <button class="btn btn--ghost btn--sm" id="btn-dash-refresh">↻ Refresh</button>
         <div id="dash-auth-link" style="margin-left:auto;">
           <a href="#login" class="btn btn--ghost btn--sm" style="text-decoration:none;">Sign In →</a>

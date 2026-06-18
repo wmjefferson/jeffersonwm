@@ -20,6 +20,9 @@ export async function renderLogin(container) {
           <button class="btn btn--primary" type="submit" style="width:100%">Sign In</button>
         </form>
         <a href="#dashboard" class="login-link">View Public Dashboard →</a>
+        <div style="margin-top: 12px;">
+          <a href="https://jeffersonwm.com" class="login-link" style="font-size: 0.85em; opacity: 0.7;">← jeffersonwm.com</a>
+        </div>
       </div>
     </div>
   `;
