@@ -51,6 +51,7 @@ public class Book
     [StringLength(1000)]
     public string? InfoUrl { get; set; }
 
+    // Transitional cached aggregate while the UI moves from book quantity to copy records.
     [Range(0, 100000)]
     public int Quantity { get; set; } = 1;
 
@@ -76,4 +77,12 @@ public class Book
     public List<BookTag> BookTags { get; set; } = [];
 
     public List<CollectionBook> CollectionBooks { get; set; } = [];
+
+    public List<BookIdentifier> Identifiers { get; set; } = [];
+
+    public List<BookCopy> Copies { get; set; } = [];
+
+    public List<BookAdditionalInfo> AdditionalInfos { get; set; } = [];
+
+    public int EffectiveQuantity => Copies.Count > 0 ? Copies.Count : Quantity;
 }

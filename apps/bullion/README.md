@@ -1,6 +1,8 @@
 # Bullion
 
-![Bullion - Batch Rename](https://jeffersonwm.com/pic/gitprofbullion.jpg)
+<div align="center">
+  <img src="./git-banner.png" alt="Bullion Banner" width="800" />
+</div>
 
 Bullion is a batch rename utility for sorting files, previewing new names, and exporting the processed set as a ZIP. It is designed to feel direct and practical, with a small number of strong features instead of a sprawling interface.
 

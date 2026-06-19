@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="./git-banner.jpeg" alt="Lionship Banner" width="800" />
+</div>
+
 # Lionship
 
 Lionship is a compact link index with optional shared persistence. It lives inside the JeffersonWM repo, but it now follows the same runtime pattern as the other apps:

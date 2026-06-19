@@ -36,7 +36,7 @@
     <input asp-for="IsManualEntry" type="hidden" />
     <input asp-for="SpeedMode" type="hidden" />
 
-    <section class="panel">
+    <section class="panel @(Model.SpeedMode ? "speed-panel speed-panel--lookup" : string.Empty)">
         <div class="scanner-header">
             <div>
                 <h2>Lookup</h2>
@@ -134,7 +134,7 @@
             <p class="source-note">Source: @Model.Input.MetadataSource</p>
         }
 
-        @if (Model.AvailableTags.Count > 0)
+        @if (!Model.SpeedMode && Model.AvailableTags.Count > 0)
         {
             <div class="tag-suggestions">
                 @foreach (var tag in Model.AvailableTags.Take(Model.SpeedMode ? 30 : 18))
@@ -144,7 +144,7 @@
             </div>
         }
 
-        @if (Model.RecentScans.Count > 0)
+        @if (!Model.SpeedMode && Model.RecentScans.Count > 0)
         {
             <div class="recent-scan-list">
                 <div class="scanner-header">
@@ -165,7 +165,7 @@
         }
     </section>
 
-    <section class="panel">
+    <section class="panel @(Model.SpeedMode ? "speed-panel speed-panel--details" : string.Empty)">
         <h2>Book details</h2>
         @if (Model.IsManualEntry)
         {
@@ -224,7 +224,7 @@
         </div>
     </section>
 
-    <section class="panel">
+    <section class="panel @(Model.SpeedMode ? "speed-panel speed-panel--inventory" : string.Empty)">
         <div class="scanner-header">
             <div>
                 <h2>Inventory</h2>
@@ -245,9 +245,17 @@
         <label asp-for="Input.NewLocationName"></label>
         <input asp-for="Input.NewLocationName" class="form-control" placeholder="Create a location while saving" />
 
-        <label asp-for="Input.TagNames"></label>
-        <input asp-for="Input.TagNames" class="form-control" placeholder="signed, hardcover, favorites" />
-        <span class="form-hint">Separate tags with commas. New tags are created when you save.</span>
+        @if (Model.SpeedMode)
+        {
+            <input asp-for="Input.TagNames" type="hidden" />
+            <p class="form-hint">Tags and collections are applied from the toggle bank below.</p>
+        }
+        else
+        {
+            <label asp-for="Input.TagNames"></label>
+            <input asp-for="Input.TagNames" class="form-control" placeholder="signed, hardcover, favorites" />
+            <span class="form-hint">Separate tags with commas. New tags are created when you save.</span>
+        }
 
         <div class="field-grid">
             <div>
@@ -281,19 +289,106 @@
         </label>
     </section>
 
-    <div class="form-actions">
-        @if (Model.SpeedMode)
-        {
-            <button asp-page-handler="SaveAndScanNext" class="btn btn-primary">Save + next scan</button>
-            <button asp-page-handler="Save" class="btn btn-outline-secondary">Save and view inventory</button>
-        }
-        else
-        {
+    @if (Model.SpeedMode)
+    {
+        <section class="panel speed-panel speed-panel--toggles">
+            <div class="scanner-header">
+                <div>
+                    <h2>Tag + collection toggles</h2>
+                    <p class="form-hint">Tap or click the presets you want to keep active while you scan this batch.</p>
+                </div>
+                <span class="status-pill">@Model.SelectedTagIds.Count tag(s) / @Model.SelectedCollectionIds.Count collection(s)</span>
+            </div>
+
+            <div class="toggle-bank">
+                <div class="toggle-group">
+                    <h3>Tags</h3>
+                    @if (Model.AvailableTags.Count == 0)
+                    {
+                        <p class="form-hint">No tags exist yet.</p>
+                    }
+                    else
+                    {
+                        <div class="toggle-pills">
+                            @foreach (var tag in Model.AvailableTags)
+                            {
+                                var isChecked = Model.SelectedTagIds.Contains(tag.Id);
+                                <label class="toggle-pill" style="--toggle-color:@tag.Color">
+                                    <input type="checkbox" name="SelectedTagIds" value="@tag.Id" checked="@isChecked" />
+                                    <span>@tag.Name</span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="toggle-group">
+                    <h3>Collections</h3>
+                    @if (Model.AvailableCollections.Count == 0)
+                    {
+                        <p class="form-hint">No collections exist yet.</p>
+                    }
+                    else
+                    {
+                        <div class="toggle-pills toggle-pills--collections">
+                            @foreach (var collection in Model.AvailableCollections)
+                            {
+                                var isChecked = Model.SelectedCollectionIds.Contains(collection.Id);
+                                <label class="toggle-pill toggle-pill--collection">
+                                    <input type="checkbox" name="SelectedCollectionIds" value="@collection.Id" checked="@isChecked" />
+                                    <span>@collection.Name</span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <section class="panel speed-panel speed-panel--recent">
+            <div class="scanner-header">
+                <div>
+                    <h2>Next step</h2>
+                    <p class="form-hint">Save and clear for the next book, or clear this lookup and try another code.</p>
+                </div>
+                <a asp-page="/Books/Index" class="source-note">Inventory</a>
+            </div>
+
+            <div class="form-actions form-actions--speed">
+                <button asp-page-handler="SaveAndScanNext" class="btn btn-primary">Save + next scan</button>
+                <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear for next scan</button>
+                <button asp-page-handler="Save" class="btn btn-outline-secondary">Save and view inventory</button>
+            </div>
+
+            @if (Model.RecentScans.Count > 0)
+            {
+                <div class="recent-scan-list recent-scan-list--speed">
+                    @foreach (var scan in Model.RecentScans)
+                    {
+                        <a class="recent-scan-item" asp-page="/Books/Edit" asp-route-id="@scan.BookId">
+                            <span>
+                                <strong>@scan.Title</strong>
+                                <small>@scan.EventType - @scan.Isbn13</small>
+                            </span>
+                            <span class="status-pill">+@scan.QuantityDelta</span>
+                        </a>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="form-hint">No recent entries yet.</p>
+            }
+        </section>
+    }
+    else
+    {
+        <div class="form-actions">
             <button asp-page-handler="Save" class="btn btn-primary">Save book</button>
             <button asp-page-handler="SaveAndScanNext" class="btn btn-outline-secondary">Save and scan next</button>
-        }
-        <button asp-page-handler="Clear" class="btn btn-outline-secondary">Clear</button>
-    </div>
+            <button asp-page-handler="Clear" class="btn btn-outline-secondary">Clear</button>
+        </div>
+    }
 </form>
 
 @section Scripts {

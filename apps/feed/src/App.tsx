@@ -45,6 +45,17 @@ interface FeedWeekGroup {
   items: FeedItem[];
 }
 
+interface FeedLegendEntry {
+  name: string;
+  description: string;
+}
+
+interface FeedSiteFilter {
+  name: string;
+  count: number;
+  description: string;
+}
+
 interface PostFormState {
   title: string;
   content: string;
@@ -60,7 +71,29 @@ const inferredFeedApiBase =
     ? 'https://api-feed.jeffersonwm.com'
     : '';
 const FEED_API_BASE = (import.meta.env.VITE_API_BASE_URL || inferredFeedApiBase).replace(/\/$/, '');
+const FEED_ATOM_URL = `${FEED_API_BASE}/atom.xml`;
 const FEED_TIMEZONE = 'America/Los_Angeles';
+const FEED_LEGEND: FeedLegendEntry[] = [
+  { name: 'auth/multimillion', description: 'auth' },
+  { name: 'battalion', description: 'RPG GAME TWO Ts ONE L' },
+  { name: 'bullion', description: 'batch rename' },
+  { name: 'clionidae', description: 'template' },
+  { name: 'dookydetective', description: 'my dog' },
+  { name: 'endellionite', description: 'windows 95 scanner (DEVELOPMENT, REDEVELOPMENT)' },
+  { name: 'feed', description: 'rss of development and github project' },
+  { name: 'jeffershizzle', description: 'original photo website (ARCHIVE)' },
+  { name: 'jeffersonwm', description: 'experiments' },
+  { name: 'jeffersonwm-legacy', description: 'first version (ARCHIVE)' },
+  { name: 'lionship', description: 'linkstream' },
+  { name: 'medallion', description: 'chefferson (EARLY DEVELOPMENT)' },
+  { name: 'perihelion', description: 'image browser' },
+  { name: 'rebellion', description: 'Text/image writing tool (DEVELOPMENT)' },
+  { name: 'stallioneer', description: 'book scanner (IN PROGRESS)' },
+  { name: 'tourbillion', description: 'screensaver' },
+  { name: 'trillions', description: 'KEEP tool (CANCELLED)' },
+  { name: 'vermilion', description: 'image python script' },
+  { name: 'wmjefferson', description: 'professional' },
+];
 const feedDateFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: FEED_TIMEZONE,
   month: 'short',
@@ -313,6 +346,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
+  const [selectedSites, setSelectedSites] = useState<string[]>([]);
   const [secretInput, setSecretInput] = useState(localStorage.getItem('feed_secret') || '');
   const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('feed_secret_verified') === 'true');
   const [showLogin, setShowLogin] = useState(false);
@@ -578,6 +613,26 @@ export default function App() {
     return actionText.replace(/#\d+/g, '').replace(/:\s*$/, '').trim().toLowerCase();
   };
 
+  const getItemSiteMatches = (item: FeedItem) => {
+    const title = item.title.toLowerCase();
+    const content = (item.content || '').toLowerCase();
+    const url = (item.url || '').toLowerCase();
+    const haystacks = [title, content, url];
+
+    return FEED_LEGEND
+      .map((entry) => entry.name)
+      .filter((name) => {
+        const normalizedName = name.toLowerCase();
+        return haystacks.some((value) => value.includes(normalizedName));
+      });
+  };
+
+  const toggleSelectedSite = (siteName: string) => {
+    setSelectedSites((current) =>
+      current.includes(siteName) ? current.filter((item) => item !== siteName) : [...current, siteName],
+    );
+  };
+
   const groupFeedItems = (rawItems: FeedItem[]) => {
     const sortedRaw = [...rawItems].sort(
       (left, right) => parseFeedDate(right.created_at).getTime() - parseFeedDate(left.created_at).getTime(),
@@ -629,13 +684,50 @@ export default function App() {
 
   const releaseCount = items.filter(isReleaseItem).length;
   const manualCount = items.filter(isManualItem).length;
-  const visibleItems = useMemo(() => {
+  const itemsForView = useMemo(() => {
     const filtered =
       view === 'releases' ? items.filter(isReleaseItem) : view === 'manual' ? items.filter(isManualItem) : items;
+
     return [...filtered].sort(
       (left, right) => parseFeedDate(right.created_at).getTime() - parseFeedDate(left.created_at).getTime(),
     );
   }, [items, view]);
+
+  const siteCountMap = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const item of itemsForView) {
+      const matchedSites = getItemSiteMatches(item);
+      for (const siteName of matchedSites) {
+        counts.set(siteName, (counts.get(siteName) || 0) + 1);
+      }
+    }
+
+    return counts;
+  }, [itemsForView]);
+
+  const siteFilters = useMemo<FeedSiteFilter[]>(() => {
+    return FEED_LEGEND
+      .map((entry) => ({
+        name: entry.name,
+        description: entry.description,
+        count: siteCountMap.get(entry.name) || 0,
+      }))
+      .filter((entry) => entry.count > 0 || selectedSites.includes(entry.name));
+  }, [selectedSites, siteCountMap]);
+
+  const visibleItems = useMemo(() => {
+    if (selectedSites.length === 0) {
+      return itemsForView;
+    }
+
+    const selectedSiteSet = new Set(selectedSites);
+    const filtered = itemsForView.filter((item) => getItemSiteMatches(item).some((site) => selectedSiteSet.has(site)));
+
+    return [...filtered].sort(
+      (left, right) => parseFeedDate(right.created_at).getTime() - parseFeedDate(left.created_at).getTime(),
+    );
+  }, [itemsForView, selectedSites]);
 
   const weeks = useMemo<FeedWeekGroup[]>(() => {
     const buckets = new Map<string, FeedWeekGroup>();
@@ -730,6 +822,64 @@ export default function App() {
             </motion.div>
           </div>
         )}
+
+        {showLegend && (
+          <div className="modal-scrim" onClick={() => setShowLegend(false)}>
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 18 }}
+              className="modal-card modal-card--legend"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2>Legend</h2>
+                <button type="button" className="feed-link-button" onClick={() => setShowLegend(false)}>
+                  Close
+                </button>
+              </div>
+
+              <div className="legend-list" role="list">
+                {FEED_LEGEND.map((entry) => {
+                  const count = siteCountMap.get(entry.name) || 0;
+                  const isSelected = selectedSites.includes(entry.name);
+
+                  return (
+                    <label
+                      key={entry.name}
+                      className={`legend-row ${count === 0 && !isSelected ? 'legend-row--disabled' : ''}`}
+                      role="listitem"
+                    >
+                      <span className="legend-checkbox-wrap">
+                        <input
+                          type="checkbox"
+                          className="legend-checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectedSite(entry.name)}
+                          disabled={count === 0 && !isSelected}
+                        />
+                      </span>
+                      <span className="legend-copy">
+                        <span className="legend-name">
+                          {entry.name}
+                          <span className="legend-count">({count})</span>
+                        </span>
+                        <span className="legend-line">{entry.description}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {selectedSites.length > 0 && (
+                <div className="legend-actions">
+                  <button type="button" className="feed-link-button" onClick={() => setSelectedSites([])}>
+                    Clear
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       <main className="feed-main">
@@ -741,12 +891,12 @@ export default function App() {
           >
             <h2>Automation Setup</h2>
             <div className="setup-grid">
-              <div>
-                <h3>GitHub</h3>
-                <p>The server can pull your GitHub Atom feed on an interval and keep the stream up to date.</p>
-              </div>
-              <div>
-                <h3>Release notes</h3>
+                <div>
+                  <h3>GitHub</h3>
+                  <p>The server pulls your public GitHub activity into the timeline and keeps it in sync on an interval.</p>
+                </div>
+                <div>
+                  <h3>Release notes</h3>
                 <p>
                   Use the <strong>Release</strong> compose type for semantic version updates. Each line in the
                   highlights box becomes a bullet in the stream and also appears in the dedicated changelog view.
@@ -767,6 +917,9 @@ export default function App() {
               This page is meant to sit alongside the GitHub feed, not beneath it. Release notes and status changes land
               in the same chronology.
             </p>
+            <button type="button" className="hero-copy feed-subtitle-link" onClick={() => setShowLegend(true)}>
+              Legend.
+            </button>
             <div className="feed-view-switcher" role="tablist" aria-label="Feed views">
               <button
                 type="button"
@@ -796,6 +949,22 @@ export default function App() {
                 <span>{manualCount}</span>
               </button>
             </div>
+            {selectedSites.length > 0 && (
+              <div className="selected-site-row" aria-label="Selected site filters">
+                {selectedSites.map((siteName) => (
+                  <button
+                    key={siteName}
+                    type="button"
+                    className="selected-site-chip"
+                    onClick={() => toggleSelectedSite(siteName)}
+                    aria-label={`Remove ${siteName} site filter`}
+                  >
+                    <span>{siteName}</span>
+                    <span className="selected-site-chip-close">x</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="feed-hero-actions">
             {isLoggedIn && (
@@ -826,6 +995,10 @@ export default function App() {
               <RefreshCw size={14} className={refreshing ? 'spin' : ''} />
               {refreshing ? 'Syncing' : 'Sync GitHub'}
             </button>
+            <a href={FEED_ATOM_URL} target="_blank" rel="noreferrer" className="feed-button">
+              <FileText size={14} />
+              Atom Feed
+            </a>
             <button
               type="button"
               onClick={isLoggedIn ? handleLogout : () => setShowLogin(true)}
@@ -1045,7 +1218,9 @@ export default function App() {
               {groupedItems.length === 0 ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="feed-card empty-card">
                   <p>
-                    {view === 'releases'
+                    {selectedSites.length > 0
+                      ? 'No entries match the selected sites right now.'
+                      : view === 'releases'
                       ? 'No release notes yet.'
                       : view === 'manual'
                         ? 'No manual entries yet.'
@@ -1073,30 +1248,46 @@ export default function App() {
                             <span>{formatDate(group.created_at)}</span>
                           </div>
                         </div>
-
                         <div className="subfeed-list">
-                          {group.items.map((subItem, index) => (
-                            <div key={subItem.id} className={index > 0 ? 'subfeed-item subfeed-item--stacked' : 'subfeed-item'}>
-                              <div className="subfeed-head">
-                                <h3>{cleanGitHubTitle(subItem.title, group.repo || '')}</h3>
-                                <div className="feed-time">
-                                  <span>{formatDate(subItem.created_at)}</span>
-                                  {subItem.url && (
-                                    <a href={subItem.url} target="_blank" rel="noreferrer" className="icon-link">
-                                      <ExternalLink size={12} />
-                                    </a>
-                                  )}
-                                </div>
+                          <div className="subfeed-item">
+                            <div className="subfeed-head">
+                              <h3>
+                                {group.items[0].url ? (
+                                  <a href={group.items[0].url} target="_blank" rel="noreferrer" className="entry-title-link">
+                                    {cleanGitHubTitle(group.items[0].title, group.repo || '')}
+                                    {group.items.length > 1 ? ` (${group.items.length})` : ''}
+                                  </a>
+                                ) : (
+                                  <>
+                                    {cleanGitHubTitle(group.items[0].title, group.repo || '')}
+                                    {group.items.length > 1 ? ` (${group.items.length})` : ''}
+                                  </>
+                                )}
+                              </h3>
+                              <div className="feed-time">
+                                <span>{formatDate(group.items[0].created_at)}</span>
+                                {group.items[0].url && (
+                                  <a href={group.items[0].url} target="_blank" rel="noreferrer" className="icon-link">
+                                    <ExternalLink size={12} />
+                                  </a>
+                                )}
                               </div>
+                            </div>
 
-                              {subItem.content && (
+                            {group.items.length > 1 ? (
+                              <p className="group-summary">
+                                {group.items.length} similar entries combined from{' '}
+                                {formatDate(group.items[group.items.length - 1].created_at)} to {formatDate(group.items[0].created_at)}.
+                              </p>
+                            ) : (
+                              group.items[0].content && (
                                 <div
                                   className="feed-html"
-                                  dangerouslySetInnerHTML={{ __html: subItem.content }}
+                                  dangerouslySetInnerHTML={{ __html: group.items[0].content }}
                                 />
-                              )}
-                            </div>
-                          ))}
+                              )
+                            )}
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1127,7 +1318,15 @@ export default function App() {
                             </div>
                           </div>
 
-                          <h3 className="entry-title">{item.title}</h3>
+                          <h3 className="entry-title">
+                            {item.url ? (
+                              <a href={item.url} target="_blank" rel="noreferrer" className="entry-title-link">
+                                {item.title}
+                              </a>
+                            ) : (
+                              item.title
+                            )}
+                          </h3>
 
                           {item.content && (
                             <div

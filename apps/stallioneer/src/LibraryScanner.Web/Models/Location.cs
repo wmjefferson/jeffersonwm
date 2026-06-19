@@ -20,4 +20,6 @@ public class Location
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<Book> Books { get; set; } = [];
+
+    public List<BookCopy> Copies { get; set; } = [];
 }

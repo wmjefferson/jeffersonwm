@@ -57,6 +57,38 @@ interface FeedDbRow {
   total?: number;
 }
 
+interface FeedItemRow extends FeedDbRow {
+  id: number;
+  title: string;
+  content: string | null;
+  url: string | null;
+  source: string | null;
+  external_id?: string | null;
+  created_at: string | Date;
+}
+
+interface NormalizedGitHubFeedItem {
+  title: string;
+  content: string | null;
+  url: string | null;
+  externalId: string;
+  createdAt: string | null;
+}
+
+interface GitHubPublicEvent {
+  id: string;
+  type: string;
+  actor?: {
+    login?: string;
+  };
+  repo?: {
+    name?: string;
+    url?: string;
+  };
+  payload?: Record<string, any>;
+  created_at?: string;
+}
+
 interface ChangelogEntryInput {
   id?: string;
   externalId?: string;
@@ -78,6 +110,328 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function trimGitHubHtmlSnippet(value: string | null | undefined, maxLength: number = 320) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength - 1).trimEnd()}…` : trimmed;
+}
+
+function inferGitHubUsername() {
+  const configuredUsername = (process.env.GITHUB_USERNAME || "").trim();
+  if (configuredUsername) {
+    return configuredUsername;
+  }
+
+  const githubUrl = (process.env.GITHUB_FEED_URL || "").trim();
+  if (!githubUrl) {
+    return null;
+  }
+
+  const match = githubUrl.match(/github\.com\/(?:users\/)?([^\/.?]+)(?:\.atom)?/i);
+  return match?.[1] || null;
+}
+
+function buildGitHubRepoUrl(repoName: string | undefined) {
+  return repoName ? `https://github.com/${repoName}` : null;
+}
+
+function buildGitHubCompareUrl(repoName: string | undefined, before: string | undefined, head: string | undefined) {
+  if (!repoName || !head) {
+    return buildGitHubRepoUrl(repoName);
+  }
+
+  if (!before || /^0+$/.test(before)) {
+    return `https://github.com/${repoName}/commit/${head}`;
+  }
+
+  return `https://github.com/${repoName}/compare/${before}...${head}`;
+}
+
+function buildGitHubFeedContent(paragraphs: string[], bullets: string[] = []) {
+  const cleanParagraphs = paragraphs.map((item) => item.trim()).filter(Boolean);
+  const cleanBullets = bullets.map((item) => item.trim()).filter(Boolean);
+
+  if (cleanParagraphs.length === 0 && cleanBullets.length === 0) {
+    return null;
+  }
+
+  const paragraphHtml = cleanParagraphs.map((item) => `<p>${escapeHtml(item)}</p>`).join("");
+  const bulletsHtml =
+    cleanBullets.length > 0
+      ? `<ul>${cleanBullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+      : "";
+
+  return `${paragraphHtml}${bulletsHtml}` || null;
+}
+
+function getIssueOrPullRequestLabel(resource: Record<string, any>, fallbackLabel: string) {
+  const issueNumber = resource?.number;
+  return issueNumber ? `${fallbackLabel} #${issueNumber}` : fallbackLabel;
+}
+
+function normalizeGitHubEvent(event: GitHubPublicEvent): NormalizedGitHubFeedItem | null {
+  const actor = event.actor?.login || "GitHub user";
+  const repoName = event.repo?.name;
+  const repoUrl = buildGitHubRepoUrl(repoName);
+  const payload = event.payload || {};
+  const createdAt = event.created_at || null;
+
+  switch (event.type) {
+    case "PushEvent": {
+      const branch = String(payload.ref || "").replace(/^refs\/heads\//, "") || "a branch";
+      const commits = Array.isArray(payload.commits) ? payload.commits : [];
+      const commitBullets = commits
+        .slice(0, 4)
+        .map((commit: Record<string, any>) => trimGitHubHtmlSnippet(commit?.message))
+        .filter((message): message is string => Boolean(message));
+
+      return {
+        title: `${actor} pushed to ${branch} in ${repoName || "a repository"}`,
+        content: buildGitHubFeedContent(
+          [`${commits.length || 1} commit${commits.length === 1 ? "" : "s"} pushed to ${branch}.`],
+          commitBullets,
+        ),
+        url: buildGitHubCompareUrl(repoName, payload.before, payload.head),
+        externalId: `github-event-${event.id}`,
+        createdAt,
+      };
+    }
+
+    case "CreateEvent": {
+      const refType = payload.ref_type || "reference";
+      const refName = payload.ref || repoName || "repository";
+      return {
+        title: `${actor} created ${refType} ${refName} in ${repoName || "GitHub"}`,
+        content: buildGitHubFeedContent([`Created ${refType} ${refName}.`]),
+        url:
+          refType === "branch" && payload.ref && repoName
+            ? `https://github.com/${repoName}/tree/${payload.ref}`
+            : repoUrl,
+        externalId: `github-event-${event.id}`,
+        createdAt,
+      };
+    }
+
+    case "IssuesEvent": {
+      const issue = payload.issue || {};
+      return {
+        title: `${actor} ${payload.action || "updated"} an issue in ${repoName || "GitHub"}`,
+        content: buildGitHubFeedContent(
+          [String(issue.title || "Issue update")],
+          [trimGitHubHtmlSnippet(issue.body || "")].filter((item): item is string => Boolean(item)),
+        ),
+        url: issue.html_url || repoUrl,
+        externalId: `github-event-${event.id}`,
+        createdAt,
+      };
+    }
+
+    case "IssueCommentEvent": {
+      const issue = payload.issue || {};
+      const comment = payload.comment || {};
+      const action = payload.action || "commented";
+      const commentSnippet = trimGitHubHtmlSnippet(comment.body || "");
+      return {
+        title: `${actor} ${action} a comment on ${getIssueOrPullRequestLabel(issue, "issue")} in ${repoName || "GitHub"}`,
+        content: buildGitHubFeedContent(
+          [String(issue.title || "Issue comment")].filter((item): item is string => Boolean(item)),
+          [commentSnippet].filter((item): item is string => Boolean(item)),
+        ),
+        url: comment.html_url || issue.html_url || repoUrl,
+        externalId: `github-event-${event.id}`,
+        createdAt,
+      };
+    }
+
+    case "PullRequestEvent": {
+      const pullRequest = payload.pull_request || {};
+      return {
+        title: `${actor} ${payload.action || "updated"} a pull request in ${repoName || "GitHub"}`,
+        content: buildGitHubFeedContent(
+          [String(pullRequest.title || "Pull request update")],
+          [trimGitHubHtmlSnippet(pullRequest.body || "")].filter((item): item is string => Boolean(item)),
+        ),
+        url: pullRequest.html_url || repoUrl,
+        externalId: `github-event-${event.id}`,
+        createdAt,
+      };
+    }
+
+    case "PullRequestReviewEvent":
+    case "PullRequestReviewCommentEvent": {
+      const pullRequest = payload.pull_request || {};
+      const review = payload.review || payload.comment || {};
+      const action = payload.action || "reviewed";
+      const reviewSnippet = trimGitHubHtmlSnippet(review.body || "");
+      return {
+        title: `${actor} ${action} a comment on ${getIssueOrPullRequestLabel(pullRequest, "pull request")} in ${repoName || "GitHub"}`,
+        content: buildGitHubFeedContent(
+          [String(pullRequest.title || "Pull request review")].filter((item): item is string => Boolean(item)),
+          [reviewSnippet].filter((item): item is string => Boolean(item)),
+        ),
+        url: review.html_url || pullRequest.html_url || repoUrl,
+        externalId: `github-event-${event.id}`,
+        createdAt,
+      };
+    }
+
+    case "ReleaseEvent": {
+      const release = payload.release || {};
+      return {
+        title: `${actor} published a release in ${repoName || "GitHub"}`,
+        content: buildGitHubFeedContent(
+          [String(release.name || release.tag_name || "Release published")],
+          [trimGitHubHtmlSnippet(release.body || "")].filter((item): item is string => Boolean(item)),
+        ),
+        url: release.html_url || repoUrl,
+        externalId: `github-event-${event.id}`,
+        createdAt,
+      };
+    }
+
+    case "WatchEvent":
+      return {
+        title: `${actor} starred ${repoName || "a repository"}`,
+        content: null,
+        url: repoUrl,
+        externalId: `github-event-${event.id}`,
+        createdAt,
+      };
+
+    case "ForkEvent": {
+      const forkee = payload.forkee || {};
+      return {
+        title: `${actor} forked ${repoName || "a repository"}`,
+        content: buildGitHubFeedContent(
+          [forkee.full_name ? `Forked to ${forkee.full_name}.` : "Repository forked."],
+        ),
+        url: forkee.html_url || repoUrl,
+        externalId: `github-event-${event.id}`,
+        createdAt,
+      };
+    }
+
+    default:
+      return null;
+  }
+}
+
+async function upsertGitHubFeedItem(item: NormalizedGitHubFeedItem) {
+  const sql = `
+    INSERT INTO feed_items (title, content, url, source, external_id, created_at)
+    VALUES (?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+    ON DUPLICATE KEY UPDATE
+      title = VALUES(title),
+      content = VALUES(content),
+      url = VALUES(url),
+      source = VALUES(source),
+      created_at = COALESCE(VALUES(created_at), created_at)
+  `;
+
+  await pool.execute(sql, [
+    item.title,
+    item.content,
+    item.url,
+    "github",
+    item.externalId,
+    item.createdAt ? new Date(item.createdAt).toISOString().slice(0, 19).replace("T", " ") : null,
+  ]);
+}
+
+async function fetchGitHubEventsFromApi(username: string) {
+  const headers: Record<string, string> = {
+    "User-Agent": "JeffersonWMFeed/1.0",
+    Accept: "application/vnd.github+json",
+    "Cache-Control": "no-cache",
+  };
+
+  const token = (process.env.GITHUB_TOKEN || "").trim();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}/events/public?per_page=50`, {
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitHub API HTTP ${response.status} ${response.statusText}`);
+  }
+
+  const events = (await response.json()) as GitHubPublicEvent[];
+  let processed = 0;
+
+  for (const event of events) {
+    const normalized = normalizeGitHubEvent(event);
+    if (!normalized) {
+      continue;
+    }
+
+    await upsertGitHubFeedItem(normalized);
+    processed += 1;
+  }
+
+  return processed;
+}
+
+function formatAtomDate(value: string | Date | null | undefined) {
+  if (!value) {
+    return new Date().toISOString();
+  }
+
+  const parsed = new Date(value);
+  return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+function buildAtomFeedXml(items: FeedItemRow[]) {
+  const atomUrl = `${PUBLIC_BASE_URL.replace(/\/$/, "")}/atom.xml`;
+  const siteUrl = "https://jeffersonwm.com/feed/";
+  const updated = items.length > 0 ? formatAtomDate(items[0].created_at) : new Date().toISOString();
+
+  const entries = items
+    .map((item) => {
+      const itemUrl = item.url || `${siteUrl}#entry-${item.id}`;
+      const content = item.content ? `<content type="html">${escapeXml(item.content)}</content>` : "";
+      const externalId = item.external_id || `feed-item-${item.id}`;
+
+      return `
+  <entry>
+    <id>${escapeXml(`${atomUrl}#${externalId}`)}</id>
+    <title>${escapeXml(item.title)}</title>
+    <updated>${formatAtomDate(item.created_at)}</updated>
+    <published>${formatAtomDate(item.created_at)}</published>
+    <link href="${escapeXml(itemUrl)}" />
+    <author><name>JeffersonWM</name></author>
+    <category term="${escapeXml(String(item.source || "feed"))}" />
+    ${content}
+  </entry>`;
+    })
+    .join("");
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>${escapeXml(atomUrl)}</id>
+  <title>JeffersonWM Feed</title>
+  <updated>${updated}</updated>
+  <link rel="self" href="${escapeXml(atomUrl)}" />
+  <link rel="alternate" href="${escapeXml(siteUrl)}" />
+  <subtitle>JeffersonWM releases, manual updates, and GitHub activity.</subtitle>
+  <author><name>JeffersonWM</name></author>${entries}
+</feed>`;
 }
 
 function normalizeVersion(value: string) {
@@ -258,6 +612,23 @@ async function initDb() {
 
 // Function to fetch and save feeds
 async function fetchFeeds(throwOnError: boolean = false) {
+  const githubUsername = inferGitHubUsername();
+  if (githubUsername) {
+    try {
+      const processed = await fetchGitHubEventsFromApi(githubUsername);
+      console.log(`Updated GitHub feed from public events API: ${processed} items processed.`);
+      return;
+    } catch (error: any) {
+      console.warn(`GitHub public events API fetch failed for ${githubUsername}:`, error?.message || error);
+      if (!process.env.GITHUB_FEED_URL) {
+        if (throwOnError) {
+          throw error;
+        }
+        return;
+      }
+    }
+  }
+
   const githubUrl = process.env.GITHUB_FEED_URL;
   if (!githubUrl) {
     console.log("No GITHUB_FEED_URL set in environment variables. Skipping fetch.");
@@ -398,6 +769,17 @@ app.get("/api/feed", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch feed" });
+  }
+});
+
+app.get("/atom.xml", async (_req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY created_at DESC LIMIT 200");
+    const items = (Array.isArray(rows) ? rows : []) as FeedItemRow[];
+    res.type("application/atom+xml; charset=utf-8").send(buildAtomFeedXml(items));
+  } catch (err) {
+    console.error(err);
+    res.status(500).type("text/plain; charset=utf-8").send("Failed to build Atom feed");
   }
 });
 

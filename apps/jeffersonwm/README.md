@@ -1,6 +1,8 @@
 # JeffersonWM
 
-![William Jefferson](https://jeffersonwm.com/pic/gitprofjeffersonwm.jpg)
+<div align="center">
+  <img src="./git-banner.jpeg" alt="JeffersonWM Banner" width="800" />
+</div>
 
 JeffersonWM is the umbrella app space for William Jefferson's personal web tools. In the monorepo, this app represents the dedicated `jeffersonwm` site that sits alongside Perihelion, Bullion, and Lionship on the hosted domain.
 

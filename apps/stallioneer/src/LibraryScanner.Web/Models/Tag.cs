@@ -24,4 +24,6 @@ public class Tag
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public List<BookTag> BookTags { get; set; } = [];
+
+    public List<BookCopyTag> BookCopyTags { get; set; } = [];
 }

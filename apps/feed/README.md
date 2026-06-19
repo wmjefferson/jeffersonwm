@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="./git-banner.jpg" alt="Feed Banner" width="800" />
+</div>
+
 # Feed
 
 `apps/feed` is the JeffersonWM activity stream page.

@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="./git-banner.jpeg" alt="Tourbillion Banner" width="800" />
+</div>
+
 ## Tourbillion
 
 Tourbillion is a standalone browser screensaver app inside the JeffersonWM app family.

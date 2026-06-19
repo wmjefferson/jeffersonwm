@@ -1,11 +1,19 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace LibraryScanner.Web.Services;
 
-public sealed class OpenLibraryIsbnLookupService(HttpClient httpClient) : IIsbnLookupService
+public sealed class OpenLibraryIsbnLookupService(
+    HttpClient httpClient,
+    IMemoryCache cache,
+    ILogger<OpenLibraryIsbnLookupService> logger) : IIsbnLookupService
 {
+    private static readonly TimeSpan SuccessCacheDuration = TimeSpan.FromMinutes(20);
+    private static readonly TimeSpan MissCacheDuration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan RateLimitCacheDuration = TimeSpan.FromMinutes(1);
+
     public async Task<BookLookupResponse> LookupAsync(string isbn, CancellationToken cancellationToken = default)
     {
         var digits = IsbnNormalizer.DigitsOnly(isbn);
@@ -18,29 +26,98 @@ public sealed class OpenLibraryIsbnLookupService(HttpClient httpClient) : IIsbnL
                 "Scan or enter an ISBN or UPC code.");
         }
 
+        var cacheKey = $"lookup:{digits}";
+        if (cache.TryGetValue<BookLookupResponse>(cacheKey, out var cachedLookup))
+        {
+            return cachedLookup!;
+        }
+
         var isbn13 = IsbnNormalizer.ToIsbn13(isbn);
+        BookLookupResponse lookupResponse;
         if (isbn13 is not null)
         {
-            var openLibraryResult = await LookupOpenLibraryAsync(isbn13, cancellationToken);
+            var openLibraryResult = await TryLookupOpenLibraryAsync(isbn13, cancellationToken);
             if (openLibraryResult is not null)
             {
-                return new BookLookupResponse(BookLookupStatus.Success, openLibraryResult, isbn13);
+                lookupResponse = new BookLookupResponse(BookLookupStatus.Success, openLibraryResult, isbn13);
+                cache.Set(cacheKey, lookupResponse, SuccessCacheDuration);
+                return lookupResponse;
             }
 
-            var googleIsbnResult = await LookupGoogleBooksAsync(isbn13, cancellationToken);
-            if (googleIsbnResult is not null)
+            var googleIsbnLookup = await TryLookupGoogleBooksAsync(isbn13, cancellationToken);
+            if (googleIsbnLookup is not null)
             {
-                return new BookLookupResponse(BookLookupStatus.Success, googleIsbnResult, isbn13);
+                cache.Set(cacheKey, googleIsbnLookup, GetCacheDuration(googleIsbnLookup));
+                return googleIsbnLookup;
             }
         }
 
-        return digits.Length is >= 8 and <= 14
-            ? await LookupGoogleBooksByCodeAsync(digits, cancellationToken)
+        lookupResponse = digits.Length is >= 8 and <= 14
+            ? await TryLookupGoogleBooksByCodeAsync(digits, cancellationToken)
             : new BookLookupResponse(
                 BookLookupStatus.InvalidCode,
                 null,
                 isbn13,
                 "Enter a valid ISBN-10, ISBN-13, or UPC code.");
+
+        cache.Set(cacheKey, lookupResponse, GetCacheDuration(lookupResponse));
+        return lookupResponse;
+    }
+
+    private static TimeSpan GetCacheDuration(BookLookupResponse response)
+    {
+        if (response.Message?.Contains("rate limit", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return RateLimitCacheDuration;
+        }
+
+        return response.Status switch
+        {
+            BookLookupStatus.Success or BookLookupStatus.Ambiguous => SuccessCacheDuration,
+            BookLookupStatus.NotFound => MissCacheDuration,
+            _ => TimeSpan.FromMinutes(2)
+        };
+    }
+
+    private async Task<BookLookupResponse?> TryLookupGoogleBooksAsync(string isbn13, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await LookupGoogleBooksAsync(isbn13, cancellationToken);
+            if (result is not null)
+            {
+                return new BookLookupResponse(BookLookupStatus.Success, result, isbn13);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or NotSupportedException)
+        {
+            if (IsRateLimited(ex))
+            {
+                logger.LogWarning(ex, "Google Books ISBN lookup was rate limited for {Isbn13}.", isbn13);
+                return new BookLookupResponse(
+                    BookLookupStatus.NotFound,
+                    null,
+                    isbn13,
+                    "Google Books rate limit reached for the moment. Try this ISBN again in a minute.");
+            }
+
+            logger.LogWarning(ex, "Google Books ISBN lookup failed for {Isbn13}.", isbn13);
+        }
+
+        return null;
+    }
+
+    private async Task<BookLookupResult?> TryLookupOpenLibraryAsync(string isbn13, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await LookupOpenLibraryAsync(isbn13, cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or NotSupportedException)
+        {
+            logger.LogWarning(ex, "Open Library lookup failed for {Isbn13}. Falling back to Google Books.", isbn13);
+            return null;
+        }
     }
 
     private async Task<BookLookupResult?> LookupOpenLibraryAsync(string isbn13, CancellationToken cancellationToken)
@@ -83,6 +160,33 @@ public sealed class OpenLibraryIsbnLookupService(HttpClient httpClient) : IIsbnL
         }
 
         return MapGoogleVolume(isbn13, volume);
+    }
+
+    private async Task<BookLookupResponse> TryLookupGoogleBooksByCodeAsync(string code, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await LookupGoogleBooksByCodeAsync(code, cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or NotSupportedException)
+        {
+            if (IsRateLimited(ex))
+            {
+                logger.LogWarning(ex, "Google Books code lookup was rate limited for {Code}.", code);
+                return new BookLookupResponse(
+                    BookLookupStatus.NotFound,
+                    null,
+                    code,
+                    "Google Books rate limit reached for the moment. Try this code again in a minute.");
+            }
+
+            logger.LogWarning(ex, "Google Books code lookup failed for {Code}.", code);
+            return new BookLookupResponse(
+                BookLookupStatus.NotFound,
+                null,
+                code,
+                "Online lookup is temporarily unavailable right now. Try again or enter the details manually.");
+        }
     }
 
     private async Task<BookLookupResponse> LookupGoogleBooksByCodeAsync(string code, CancellationToken cancellationToken)
@@ -173,6 +277,12 @@ public sealed class OpenLibraryIsbnLookupService(HttpClient httpClient) : IIsbnL
             volume.PublishedDate,
             volume.ImageLinks?.Thumbnail?.Replace("http://", "https://", StringComparison.OrdinalIgnoreCase),
             "Google Books");
+    }
+
+    private static bool IsRateLimited(Exception ex)
+    {
+        return ex is HttpRequestException httpRequestException &&
+               httpRequestException.StatusCode == System.Net.HttpStatusCode.TooManyRequests;
     }
 
     private static string? GetIndustryIdentifier(IEnumerable<GoogleIndustryIdentifier>? identifiers, string type)

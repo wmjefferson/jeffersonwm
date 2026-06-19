@@ -239,6 +239,153 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    const rawEditTagData = document.getElementById("edit-tag-data")?.textContent ?? "[]";
+    const editTags = JSON.parse(rawEditTagData);
+    const normalizeTagSearch = (value) => value.trim().replace(/\s+/g, " ").toUpperCase();
+    const escapeTagHtml = (value) => String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#39;");
+    const getActiveTagToken = (value) => {
+        const boundary = Math.max(value.lastIndexOf(","), value.lastIndexOf(";"));
+        return value.slice(boundary + 1).trim();
+    };
+    const splitTagValues = (value) => value
+        .split(/[;,]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+    const addTagToEditor = (editor, tagName) => {
+        if (!(editor instanceof HTMLElement)) {
+            return;
+        }
+
+        const input = editor.querySelector("[data-live-tag-input]");
+        const results = editor.querySelector("[data-live-tag-results]");
+        if (!(input instanceof HTMLInputElement)) {
+            return;
+        }
+
+        const existingTags = splitTagValues(input.value);
+        if (!existingTags.some((tag) => tag.localeCompare(tagName, undefined, { sensitivity: "accent" }) === 0)) {
+            existingTags.push(tagName.trim());
+        }
+
+        input.value = existingTags.length === 0 ? "" : `${existingTags.join(", ")}, `;
+        if (results instanceof HTMLElement) {
+            results.hidden = true;
+        }
+
+        input.focus();
+    };
+
+    const renderLiveTagResults = (editor) => {
+        if (!(editor instanceof HTMLElement)) {
+            return;
+        }
+
+        const input = editor.querySelector("[data-live-tag-input]");
+        const results = editor.querySelector("[data-live-tag-results]");
+        if (!(input instanceof HTMLInputElement) || !(results instanceof HTMLElement)) {
+            return;
+        }
+
+        const token = getActiveTagToken(input.value);
+        const query = normalizeTagSearch(token);
+        const matchingTags = query.length === 0
+            ? editTags.slice(0, 8)
+            : editTags
+                .filter((tag) => normalizeTagSearch(`${tag.name ?? tag.Name ?? ""} ${tag.description ?? tag.Description ?? ""}`).includes(query))
+                .slice(0, 8);
+
+        if (matchingTags.length === 0 && query.length === 0) {
+            results.hidden = true;
+            results.innerHTML = "";
+            return;
+        }
+
+        const exactExists = query.length > 0 && editTags.some((tag) => normalizeTagSearch(tag.name ?? tag.Name ?? "") === query);
+        const items = matchingTags.map((tag) => {
+            const name = tag.name ?? tag.Name;
+            const description = tag.description ?? tag.Description ?? "";
+            const color = tag.color ?? tag.Color ?? "#245f4c";
+            return `
+                <button type="button" class="tag-search-item" data-live-tag-value="${escapeTagHtml(name)}">
+                    <span class="tag-pill" style="--tag-color:${escapeTagHtml(color)}">${escapeTagHtml(name)}</span>
+                    <span class="tag-search-meta">${description ? escapeTagHtml(description) : "Existing tag"}</span>
+                </button>`;
+        });
+
+        if (query.length > 0 && !exactExists) {
+            items.unshift(`
+                <button type="button" class="tag-search-item" data-create-live-tag="${escapeTagHtml(token)}">
+                    <span class="tag-search-meta">Create and use: <strong>${escapeTagHtml(token)}</strong></span>
+                </button>`);
+        }
+
+        results.innerHTML = items.join("");
+        results.hidden = false;
+    };
+
+    const initializeLiveTagEditors = (scope) => {
+        const root = scope instanceof Element || scope instanceof Document ? scope : document;
+        root.querySelectorAll("[data-live-tag-editor]").forEach((editor) => {
+            if (!(editor instanceof HTMLElement) || editor.dataset.tagEditorBound === "true") {
+                return;
+            }
+
+            const input = editor.querySelector("[data-live-tag-input]");
+            const results = editor.querySelector("[data-live-tag-results]");
+            if (!(input instanceof HTMLInputElement) || !(results instanceof HTMLElement)) {
+                return;
+            }
+
+            input.addEventListener("input", () => renderLiveTagResults(editor));
+            input.addEventListener("focus", () => renderLiveTagResults(editor));
+            input.addEventListener("keydown", (event) => {
+                if (event.key !== "Enter") {
+                    return;
+                }
+
+                const token = getActiveTagToken(input.value);
+                if (!token) {
+                    return;
+                }
+
+                event.preventDefault();
+                addTagToEditor(editor, token);
+            });
+            input.addEventListener("blur", () => {
+                window.setTimeout(() => {
+                    results.hidden = true;
+                }, 120);
+            });
+
+            results.addEventListener("click", (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+
+                const button = target.closest("[data-live-tag-value], [data-create-live-tag]");
+                if (!(button instanceof HTMLElement)) {
+                    return;
+                }
+
+                const tagValue = button.getAttribute("data-live-tag-value") ?? button.getAttribute("data-create-live-tag");
+                if (!tagValue) {
+                    return;
+                }
+
+                addTagToEditor(editor, tagValue);
+            });
+
+            editor.dataset.tagEditorBound = "true";
+        });
+    };
+
     document.querySelectorAll("[data-tag-suggestion][data-tag-target]").forEach((button) => {
         button.addEventListener("click", () => {
             const suggestion = button.getAttribute("data-tag-suggestion");
@@ -266,22 +413,208 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    document.querySelectorAll("[data-tab-button]").forEach((button) => {
-        button.addEventListener("click", () => {
-            const target = button.getAttribute("data-tab-target");
-            if (!target) {
+    initializeLiveTagEditors(document);
+
+    const editInventory = document.querySelector("[data-edit-inventory]");
+    if (editInventory instanceof HTMLElement) {
+        const quantityInput = editInventory.querySelector("[data-copy-quantity-input]");
+        const applyButton = editInventory.querySelector("[data-copy-apply]");
+        const copyList = editInventory.querySelector("[data-copy-list]");
+        const copyTemplate = document.querySelector("#copy-card-template");
+        const copyCount = editInventory.querySelector("[data-copy-count]");
+        const defaultLocation = editInventory.querySelector("#Input_LocationId");
+        const defaultCondition = editInventory.querySelector("#Input_Condition");
+        const defaultStatus = editInventory.querySelector("#Input_Status");
+        const defaultNotes = editInventory.querySelector("#Input_Notes");
+
+        const renumberCopyCards = () => {
+            if (!(copyList instanceof HTMLElement)) {
                 return;
             }
 
-            document.querySelectorAll("[data-tab-button]").forEach((item) => {
-                item.classList.toggle("is-active", item === button);
+            const cards = Array.from(copyList.querySelectorAll("[data-copy-card]"));
+            cards.forEach((card, index) => {
+                const title = card.querySelector("[data-copy-title]");
+                if (title instanceof HTMLElement) {
+                    title.textContent = `Copy ${index + 1}`;
+                }
+
+                const idField = card.querySelector("[data-copy-field='id']");
+                if (idField instanceof HTMLInputElement) {
+                    idField.name = `Input.Copies[${index}].Id`;
+                    idField.id = `Input_Copies_${index}__Id`;
+                }
+
+                const removeToggle = card.querySelector("[data-copy-remove]");
+                if (removeToggle instanceof HTMLElement) {
+                    removeToggle.hidden = cards.length <= 1;
+                }
+
+                const removeField = card.querySelector("[data-copy-field='remove']");
+                if (removeField instanceof HTMLInputElement) {
+                    removeField.name = `Input.Copies[${index}].Remove`;
+                    removeField.id = `Input_Copies_${index}__Remove`;
+                }
+
+                const locationField = card.querySelector("[data-copy-field='location']");
+                if (locationField instanceof HTMLSelectElement) {
+                    locationField.name = `Input.Copies[${index}].LocationId`;
+                    locationField.id = `Input_Copies_${index}__LocationId`;
+                }
+
+                const conditionField = card.querySelector("[data-copy-field='condition']");
+                if (conditionField instanceof HTMLSelectElement) {
+                    conditionField.name = `Input.Copies[${index}].Condition`;
+                    conditionField.id = `Input_Copies_${index}__Condition`;
+                }
+
+                const statusField = card.querySelector("[data-copy-field='status']");
+                if (statusField instanceof HTMLSelectElement) {
+                    statusField.name = `Input.Copies[${index}].Status`;
+                    statusField.id = `Input_Copies_${index}__Status`;
+                }
+
+                const notesField = card.querySelector("[data-copy-field='notes']");
+                if (notesField instanceof HTMLTextAreaElement) {
+                    notesField.name = `Input.Copies[${index}].Notes`;
+                    notesField.id = `Input_Copies_${index}__Notes`;
+                }
+
+                const tagsField = card.querySelector("[data-copy-field='tags']");
+                if (tagsField instanceof HTMLInputElement) {
+                    tagsField.name = `Input.Copies[${index}].TagNames`;
+                    tagsField.id = `Input_Copies_${index}__TagNames`;
+                }
             });
 
-            document.querySelectorAll("[data-tab-panel]").forEach((panel) => {
-                const matches = panel.getAttribute("data-tab-panel") == target;
-                panel.toggleAttribute("hidden", !matches);
-                panel.classList.toggle("is-active", matches);
+            if (copyCount instanceof HTMLElement) {
+                copyCount.textContent = `${cards.length} existing copy(s)`;
+            }
+        };
+
+        const createCopyCard = () => {
+            if (!(copyTemplate instanceof HTMLTemplateElement)) {
+                return null;
+            }
+
+            const fragment = copyTemplate.content.cloneNode(true);
+            const card = fragment.querySelector("[data-copy-card]");
+            if (!(card instanceof HTMLElement)) {
+                return null;
+            }
+
+            const locationField = card.querySelector("[data-copy-field='location']");
+            if (locationField instanceof HTMLSelectElement && defaultLocation instanceof HTMLSelectElement) {
+                locationField.value = defaultLocation.value;
+            }
+
+            const conditionField = card.querySelector("[data-copy-field='condition']");
+            if (conditionField instanceof HTMLSelectElement && defaultCondition instanceof HTMLSelectElement) {
+                conditionField.value = defaultCondition.value;
+            }
+
+            const statusField = card.querySelector("[data-copy-field='status']");
+            if (statusField instanceof HTMLSelectElement && defaultStatus instanceof HTMLSelectElement) {
+                statusField.value = defaultStatus.value;
+            }
+
+            const notesField = card.querySelector("[data-copy-field='notes']");
+            if (notesField instanceof HTMLTextAreaElement && defaultNotes instanceof HTMLTextAreaElement) {
+                notesField.value = defaultNotes.value;
+            }
+
+            return card;
+        };
+
+        if (applyButton instanceof HTMLButtonElement && quantityInput instanceof HTMLInputElement && copyList instanceof HTMLElement) {
+            applyButton.addEventListener("click", () => {
+                const desiredQuantity = Math.max(1, Number.parseInt(quantityInput.value || "1", 10) || 1);
+                quantityInput.value = String(desiredQuantity);
+                let cards = Array.from(copyList.querySelectorAll("[data-copy-card]"));
+
+                while (cards.length > desiredQuantity) {
+                    cards.pop()?.remove();
+                }
+
+                while (cards.length < desiredQuantity) {
+                    const newCard = createCopyCard();
+                    if (!newCard) {
+                        break;
+                    }
+
+                    copyList.appendChild(newCard);
+                    initializeLiveTagEditors(newCard);
+                    cards = Array.from(copyList.querySelectorAll("[data-copy-card]"));
+                }
+
+                renumberCopyCards();
             });
+        }
+
+        renumberCopyCards();
+    }
+
+    const additionalInfoList = document.querySelector("[data-additional-info-list]");
+    const additionalInfoTemplate = document.querySelector("#additional-info-template");
+    const addAdditionalInfoButton = document.querySelector("[data-add-additional-info]");
+
+    const renumberAdditionalInfoRows = () => {
+        if (!(additionalInfoList instanceof HTMLElement)) {
+            return;
+        }
+
+        const rows = Array.from(additionalInfoList.querySelectorAll("[data-additional-info-row]"));
+        rows.forEach((row, index) => {
+            const idField = row.querySelector("[data-additional-info-field='id']");
+            if (idField instanceof HTMLInputElement) {
+                idField.name = `Input.AdditionalInfos[${index}].Id`;
+                idField.id = `Input_AdditionalInfos_${index}__Id`;
+            }
+
+            const typeField = row.querySelector("[data-additional-info-field='type']");
+            if (typeField instanceof HTMLSelectElement) {
+                typeField.name = `Input.AdditionalInfos[${index}].Type`;
+                typeField.id = `Input_AdditionalInfos_${index}__Type`;
+            }
+
+            const labelField = row.querySelector("[data-additional-info-field='label']");
+            if (labelField instanceof HTMLInputElement) {
+                labelField.name = `Input.AdditionalInfos[${index}].Label`;
+                labelField.id = `Input_AdditionalInfos_${index}__Label`;
+            }
+
+            const valueField = row.querySelector("[data-additional-info-field='value']");
+            if (valueField instanceof HTMLTextAreaElement) {
+                valueField.name = `Input.AdditionalInfos[${index}].Value`;
+                valueField.id = `Input_AdditionalInfos_${index}__Value`;
+            }
         });
-    });
+    };
+
+    if (addAdditionalInfoButton instanceof HTMLButtonElement && additionalInfoList instanceof HTMLElement && additionalInfoTemplate instanceof HTMLTemplateElement) {
+        addAdditionalInfoButton.addEventListener("click", () => {
+            const fragment = additionalInfoTemplate.content.cloneNode(true);
+            additionalInfoList.appendChild(fragment);
+            renumberAdditionalInfoRows();
+        });
+    }
+
+    if (additionalInfoList instanceof HTMLElement) {
+        additionalInfoList.addEventListener("click", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement) || !target.closest("[data-remove-additional-info]")) {
+                return;
+            }
+
+            const row = target.closest("[data-additional-info-row]");
+            row?.remove();
+            if (additionalInfoList.querySelectorAll("[data-additional-info-row]").length === 0 && addAdditionalInfoButton instanceof HTMLButtonElement) {
+                addAdditionalInfoButton.click();
+            } else {
+                renumberAdditionalInfoRows();
+            }
+        });
+
+        renumberAdditionalInfoRows();
+    }
 });

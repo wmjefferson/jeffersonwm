@@ -46,6 +46,7 @@
     <select asp-for="Sort" asp-items="Model.SortOptions" class="form-select"></select>
     <select asp-for="TagId" asp-items="Model.TagOptions" class="form-select"></select>
     <select asp-for="CollectionId" asp-items="Model.CollectionOptions" class="form-select"></select>
+    <select asp-for="PageSize" asp-items="Model.PageSizeOptions" class="form-select"></select>
     <button class="btn btn-outline-secondary" type="submit">Search</button>
     <a class="btn btn-outline-secondary" asp-page="/Books/Index">Clear</a>
 </form>
@@ -65,11 +66,13 @@ else
         <input asp-for="Sort" type="hidden" />
         <input asp-for="TagId" type="hidden" />
         <input asp-for="CollectionId" type="hidden" />
+        <input asp-for="PageSize" type="hidden" />
+        <input asp-for="PageNumber" type="hidden" />
         <section class="panel bulk-panel">
             <div class="bulk-actions">
                 <div class="bulk-copy">
                     <strong>Selected books</strong>
-                    <span class="form-hint">Delete selected after confirmation, or add them to a custom collection.</span>
+                    <span class="form-hint">Showing @Model.Books.Count of @Model.FilteredCount matching books. Delete selected after confirmation, or add them to a custom collection.</span>
                 </div>
                 <select asp-for="SelectedCollectionId" asp-items="Model.CollectionOptions.Skip(1)" class="form-select">
                     <option value="">Choose collection</option>
@@ -83,14 +86,27 @@ else
             <table class="table inventory-table">
                 <thead>
                     <tr>
-                        <th>Book</th>
-                        <th>ISBN</th>
-                        <th>Qty</th>
-                        <th>Location</th>
-                        <th>Tags</th>
-                        <th>Collections</th>
-                        <th>Status</th>
-                        <th></th>
+                        <th>
+                            <a class="sort-link @(Model.IsSortedBy("title") ? "is-active" : string.Empty)" asp-page="/Books/Index" asp-route-query="@Model.Query" asp-route-sort="@Model.GetNextSort("title")" asp-route-tagId="@Model.TagId" asp-route-collectionId="@Model.CollectionId" asp-route-pageSize="@Model.PageSize">@($"Book{Model.GetSortIndicator("title")}")</a>
+                        </th>
+                        <th>
+                            <a class="sort-link @(Model.IsSortedBy("isbn") ? "is-active" : string.Empty)" asp-page="/Books/Index" asp-route-query="@Model.Query" asp-route-sort="@Model.GetNextSort("isbn")" asp-route-tagId="@Model.TagId" asp-route-collectionId="@Model.CollectionId" asp-route-pageSize="@Model.PageSize">@($"ISBN{Model.GetSortIndicator("isbn")}")</a>
+                        </th>
+                        <th>
+                            <a class="sort-link @(Model.IsSortedBy("quantity") ? "is-active" : string.Empty)" asp-page="/Books/Index" asp-route-query="@Model.Query" asp-route-sort="@Model.GetNextSort("quantity")" asp-route-tagId="@Model.TagId" asp-route-collectionId="@Model.CollectionId" asp-route-pageSize="@Model.PageSize">@($"Qty{Model.GetSortIndicator("quantity")}")</a>
+                        </th>
+                        <th>
+                            <a class="sort-link @(Model.IsSortedBy("location") ? "is-active" : string.Empty)" asp-page="/Books/Index" asp-route-query="@Model.Query" asp-route-sort="@Model.GetNextSort("location")" asp-route-tagId="@Model.TagId" asp-route-collectionId="@Model.CollectionId" asp-route-pageSize="@Model.PageSize">@($"Location{Model.GetSortIndicator("location")}")</a>
+                        </th>
+                        <th>
+                            <a class="sort-link @(Model.IsSortedBy("tag") ? "is-active" : string.Empty)" asp-page="/Books/Index" asp-route-query="@Model.Query" asp-route-sort="@Model.GetNextSort("tag")" asp-route-tagId="@Model.TagId" asp-route-collectionId="@Model.CollectionId" asp-route-pageSize="@Model.PageSize">@($"Tags{Model.GetSortIndicator("tag")}")</a>
+                        </th>
+                        <th>
+                            <a class="sort-link @(Model.IsSortedBy("collection") ? "is-active" : string.Empty)" asp-page="/Books/Index" asp-route-query="@Model.Query" asp-route-sort="@Model.GetNextSort("collection")" asp-route-tagId="@Model.TagId" asp-route-collectionId="@Model.CollectionId" asp-route-pageSize="@Model.PageSize">@($"Collections{Model.GetSortIndicator("collection")}")</a>
+                        </th>
+                        <th>
+                            <a class="sort-link @(Model.IsSortedBy("status") ? "is-active" : string.Empty)" asp-page="/Books/Index" asp-route-query="@Model.Query" asp-route-sort="@Model.GetNextSort("status")" asp-route-tagId="@Model.TagId" asp-route-collectionId="@Model.CollectionId" asp-route-pageSize="@Model.PageSize">@($"Status{Model.GetSortIndicator("status")}")</a>
+                        </th>
                         <th class="selection-column">
                             <input type="checkbox" data-select-all aria-label="Select all books" />
                         </th>
@@ -113,7 +129,7 @@ else
                                 }
                                 <div>
                                     <div class="copy-line">
-                                        <strong>@book.Title</strong>
+                                        <a class="book-title-link" asp-page="/Books/Edit" asp-route-id="@book.Id"><strong>@book.Title</strong></a>
                                         <button type="button" class="copy-button text-copy-button" data-copy-text="@titleAuthor" title="Copy title and author" aria-label="Copy title and author">Copy</button>
                                     </div>
                                     <span>@book.Authors</span>
@@ -130,7 +146,7 @@ else
                                 <button type="button" class="copy-button text-copy-button" data-copy-text="@book.Isbn13" title="Copy ISBN" aria-label="Copy ISBN">Copy</button>
                             </div>
                         </td>
-                        <td>@book.Quantity</td>
+                        <td>@book.EffectiveQuantity</td>
                         <td>@book.Location?.Name</td>
                         <td>
                             <div class="tag-list">
@@ -149,9 +165,6 @@ else
                             </div>
                         </td>
                         <td><span class="status-pill">@book.Status</span></td>
-                        <td class="text-end">
-                            <a class="btn btn-sm btn-outline-secondary" asp-page="/Books/Edit" asp-route-id="@book.Id">Edit</a>
-                        </td>
                         <td class="selection-column">
                             <input type="checkbox" name="SelectedBookIds" value="@book.Id" data-select-item aria-label="Select @book.Title" />
                         </td>
@@ -160,5 +173,22 @@ else
                 </tbody>
             </table>
         </div>
+
+        @if (Model.TotalPages > 1)
+        {
+            <div class="pager">
+                <span class="form-hint">Page @Model.PageNumber of @Model.TotalPages</span>
+                <div class="pager-actions">
+                    @if (Model.PageNumber > 1)
+                    {
+                        <a class="btn btn-outline-secondary" asp-page="/Books/Index" asp-route-query="@Model.Query" asp-route-sort="@Model.Sort" asp-route-tagId="@Model.TagId" asp-route-collectionId="@Model.CollectionId" asp-route-pageSize="@Model.PageSize" asp-route-pageNumber="@(Model.PageNumber - 1)">Previous</a>
+                    }
+                    @if (Model.PageNumber < Model.TotalPages)
+                    {
+                        <a class="btn btn-outline-secondary" asp-page="/Books/Index" asp-route-query="@Model.Query" asp-route-sort="@Model.Sort" asp-route-tagId="@Model.TagId" asp-route-collectionId="@Model.CollectionId" asp-route-pageSize="@Model.PageSize" asp-route-pageNumber="@(Model.PageNumber + 1)">Next</a>
+                    }
+                </div>
+            </div>
+        }
     </form>
 }

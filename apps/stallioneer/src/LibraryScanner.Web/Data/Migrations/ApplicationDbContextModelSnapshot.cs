@@ -180,6 +180,135 @@ namespace LibraryScanner.Web.Data.Migrations
                     b.ToTable("Books");
                 });
 
+            modelBuilder.Entity("LibraryScanner.Web.Models.BookAdditionalInfo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BookId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookId");
+
+                    b.ToTable("BookAdditionalInfos");
+                });
+
+            modelBuilder.Entity("LibraryScanner.Web.Models.BookCopy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BookId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Condition")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("LocationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookId");
+
+                    b.HasIndex("LocationId");
+
+                    b.ToTable("BookCopies");
+                });
+
+            modelBuilder.Entity("LibraryScanner.Web.Models.BookCopyTag", b =>
+                {
+                    b.Property<int>("BookCopyId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TagId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("BookCopyId", "TagId");
+
+                    b.HasIndex("TagId");
+
+                    b.ToTable("BookCopyTags");
+                });
+
+            modelBuilder.Entity("LibraryScanner.Web.Models.BookIdentifier", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BookId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("NormalizedValue")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookId");
+
+                    b.HasIndex("Type", "NormalizedValue")
+                        .IsUnique();
+
+                    b.ToTable("BookIdentifiers");
+                });
+
             modelBuilder.Entity("LibraryScanner.Web.Models.BookTag", b =>
                 {
                     b.Property<int>("BookId")
@@ -481,6 +610,65 @@ namespace LibraryScanner.Web.Data.Migrations
                     b.Navigation("Location");
                 });
 
+            modelBuilder.Entity("LibraryScanner.Web.Models.BookAdditionalInfo", b =>
+                {
+                    b.HasOne("LibraryScanner.Web.Models.Book", "Book")
+                        .WithMany("AdditionalInfos")
+                        .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Book");
+                });
+
+            modelBuilder.Entity("LibraryScanner.Web.Models.BookCopy", b =>
+                {
+                    b.HasOne("LibraryScanner.Web.Models.Book", "Book")
+                        .WithMany("Copies")
+                        .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LibraryScanner.Web.Models.Location", "Location")
+                        .WithMany("Copies")
+                        .HasForeignKey("LocationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Book");
+
+                    b.Navigation("Location");
+                });
+
+            modelBuilder.Entity("LibraryScanner.Web.Models.BookCopyTag", b =>
+                {
+                    b.HasOne("LibraryScanner.Web.Models.BookCopy", "BookCopy")
+                        .WithMany("BookCopyTags")
+                        .HasForeignKey("BookCopyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LibraryScanner.Web.Models.Tag", "Tag")
+                        .WithMany("BookCopyTags")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BookCopy");
+
+                    b.Navigation("Tag");
+                });
+
+            modelBuilder.Entity("LibraryScanner.Web.Models.BookIdentifier", b =>
+                {
+                    b.HasOne("LibraryScanner.Web.Models.Book", "Book")
+                        .WithMany("Identifiers")
+                        .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Book");
+                });
+
             modelBuilder.Entity("LibraryScanner.Web.Models.BookTag", b =>
                 {
                     b.HasOne("LibraryScanner.Web.Models.Book", "Book")
@@ -583,11 +771,22 @@ namespace LibraryScanner.Web.Data.Migrations
 
             modelBuilder.Entity("LibraryScanner.Web.Models.Book", b =>
                 {
+                    b.Navigation("AdditionalInfos");
+
                     b.Navigation("BookTags");
 
                     b.Navigation("CollectionBooks");
 
+                    b.Navigation("Copies");
+
+                    b.Navigation("Identifiers");
+
                     b.Navigation("InventoryEvents");
+                });
+
+            modelBuilder.Entity("LibraryScanner.Web.Models.BookCopy", b =>
+                {
+                    b.Navigation("BookCopyTags");
                 });
 
             modelBuilder.Entity("LibraryScanner.Web.Models.Collection", b =>
@@ -598,10 +797,14 @@ namespace LibraryScanner.Web.Data.Migrations
             modelBuilder.Entity("LibraryScanner.Web.Models.Location", b =>
                 {
                     b.Navigation("Books");
+
+                    b.Navigation("Copies");
                 });
 
             modelBuilder.Entity("LibraryScanner.Web.Models.Tag", b =>
                 {
+                    b.Navigation("BookCopyTags");
+
                     b.Navigation("BookTags");
                 });
 #pragma warning restore 612, 618

@@ -20,6 +20,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     public DbSet<CollectionBook> CollectionBooks => Set<CollectionBook>();
 
+    public DbSet<BookIdentifier> BookIdentifiers => Set<BookIdentifier>();
+
+    public DbSet<BookCopy> BookCopies => Set<BookCopy>();
+
+    public DbSet<BookAdditionalInfo> BookAdditionalInfos => Set<BookAdditionalInfo>();
+
+    public DbSet<BookCopyTag> BookCopyTags => Set<BookCopyTag>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -50,6 +58,44 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .WithMany(location => location.Books)
                 .HasForeignKey(book => book.LocationId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<BookIdentifier>(entity =>
+        {
+            entity.HasIndex(identifier => new { identifier.Type, identifier.NormalizedValue }).IsUnique();
+            entity.Property(identifier => identifier.Type).HasMaxLength(20);
+            entity.Property(identifier => identifier.Value).HasMaxLength(120);
+            entity.Property(identifier => identifier.NormalizedValue).HasMaxLength(120);
+            entity.HasOne(identifier => identifier.Book)
+                .WithMany(book => book.Identifiers)
+                .HasForeignKey(identifier => identifier.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<BookCopy>(entity =>
+        {
+            entity.Property(copy => copy.Condition).HasMaxLength(80);
+            entity.Property(copy => copy.Status).HasMaxLength(80);
+            entity.Property(copy => copy.Notes).HasMaxLength(4000);
+            entity.HasOne(copy => copy.Book)
+                .WithMany(book => book.Copies)
+                .HasForeignKey(copy => copy.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(copy => copy.Location)
+                .WithMany(location => location.Copies)
+                .HasForeignKey(copy => copy.LocationId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<BookAdditionalInfo>(entity =>
+        {
+            entity.Property(info => info.Type).HasMaxLength(40);
+            entity.Property(info => info.Label).HasMaxLength(120);
+            entity.Property(info => info.Value).HasMaxLength(4000);
+            entity.HasOne(info => info.Book)
+                .WithMany(book => book.AdditionalInfos)
+                .HasForeignKey(info => info.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<InventoryEvent>(entity =>
@@ -96,6 +142,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.HasOne(bookTag => bookTag.Tag)
                 .WithMany(tag => tag.BookTags)
                 .HasForeignKey(bookTag => bookTag.TagId);
+        });
+
+        builder.Entity<BookCopyTag>(entity =>
+        {
+            entity.HasKey(copyTag => new { copyTag.BookCopyId, copyTag.TagId });
+            entity.HasOne(copyTag => copyTag.BookCopy)
+                .WithMany(copy => copy.BookCopyTags)
+                .HasForeignKey(copyTag => copyTag.BookCopyId);
+            entity.HasOne(copyTag => copyTag.Tag)
+                .WithMany(tag => tag.BookCopyTags)
+                .HasForeignKey(copyTag => copyTag.TagId);
         });
 
         builder.Entity<CollectionBook>(entity =>
