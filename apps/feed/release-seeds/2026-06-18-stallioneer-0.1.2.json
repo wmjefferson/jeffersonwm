@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Stallioneer v0.1.2",
+  "content": "<p>Stallioneer has moved into a much more practical cataloging pass. This release focused on making day-to-day entry faster, giving the inventory view stronger management tools, and letting one title carry richer information across both the book record and its individual physical copies.</p><p>What changed:</p><ul><li><strong>Faster intake flow:</strong> ISBN and code entry now centers on immediate lookup results, speed-mode cataloging, manual fallbacks, and a smoother scan-first workflow that reduces how often book details have to be filled in by hand.</li><li><strong>Stronger inventory controls:</strong> Inventory now supports better sorting and filtering, bulk selection and delete actions, collection assignment, cleaner title-first navigation, and copy/apply improvements that make existing records easier to update in place.</li><li><strong>Richer record detail:</strong> The edit experience now separates common and extended fields more clearly, supports flexible additional-info rows, and adds GitHub-style live tags for both books and individual copies so collection notes can stay specific without slowing down entry.</li></ul><p>This version keeps Stallioneer pointed at real shelf work: quick enough for repeated intake, structured enough for later cleanup, and detailed enough to distinguish one copy from another when the catalog gets larger.</p>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/50",
+  "source": "release",
+  "external_id": "stallioneer-v0.1.2-2026-06-18"
+}
