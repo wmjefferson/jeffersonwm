@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Stallioneer v0.1.3",
+  "content": "<p>Stallioneer’s cataloging flow took another practical step toward real shelf work. This pass focused on reducing duplicated decisions during intake and editing, making the add-book flow read more clearly, and letting copy-level inventory behave the way a physical collection actually does.</p><p>What changed:</p><ul><li><strong>Cleaner add-book flow:</strong> the add screen now separates lookup, details, inventory, and actions more clearly, including a dedicated actions block under the details area so save and scan choices stay easy to find.</li><li><strong>Copy-first inventory editing:</strong> the edit screen no longer asks you to manage a shared top inventory block first. Each copy can now be edited directly in place, and new copies can be added from the inventory section itself.</li><li><strong>Faster real-world cataloging:</strong> speed mode, standard entry, and copy-specific notes, locations, conditions, statuses, and tags now align more closely with the actual workflow of scanning books, checking the record, and moving on.</li></ul><p>This version keeps Stallioneer focused on becoming a usable personal inventory station: simpler to read, faster to operate, and better matched to handling one or many physical copies of the same title.</p>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/50",
+  "source": "release",
+  "external_id": "stallioneer-v0.1.3-2026-06-20"
+}

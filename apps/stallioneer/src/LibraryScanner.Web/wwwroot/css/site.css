@@ -320,11 +320,17 @@ a {
   grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
 }
 
+.entry-panel--lookup,
 .edit-panel--common {
   grid-column: 1;
 }
 
+.entry-panel--details,
 .edit-panel--extended {
+  grid-column: 2;
+}
+
+.entry-panel--actions {
   grid-column: 2;
 }
 
@@ -338,6 +344,7 @@ a {
     "lookup inventory"
     "toggles toggles"
     "details details"
+    "actions actions"
     "recent recent";
 }
 
@@ -393,6 +400,10 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.form-actions--lookup {
+  margin-top: 18px;
 }
 
 .recent-scan-list {
@@ -463,6 +474,10 @@ a {
   grid-area: details;
 }
 
+.speed-panel--actions {
+  grid-area: actions;
+}
+
 .speed-panel--recent {
   grid-area: recent;
 }
@@ -505,26 +520,29 @@ a {
 
 .toggle-pill span {
   align-items: center;
-  background: color-mix(in srgb, var(--toggle-color, #7a857c) 12%, white);
-  border: 1px solid color-mix(in srgb, var(--toggle-color, #7a857c) 30%, white);
+  background: #f7f8f6;
+  border: 1px solid color-mix(in srgb, var(--toggle-color, #7a857c) 18%, #cfd8d0);
   border-radius: 999px;
-  color: color-mix(in srgb, var(--toggle-color, #7a857c) 72%, black);
+  color: #5f6961;
   display: inline-flex;
   font-size: 0.84rem;
   font-weight: 700;
   min-height: 34px;
   padding: 7px 12px;
-  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
 }
 
 .toggle-pill:hover span {
-  filter: brightness(0.98);
+  border-color: color-mix(in srgb, var(--toggle-color, #7a857c) 34%, #c6d2c8);
+  color: #2e3831;
 }
 
 .toggle-pill input:checked + span {
-  background: color-mix(in srgb, var(--toggle-color, #245f4c) 22%, white);
-  border-color: color-mix(in srgb, var(--toggle-color, #245f4c) 58%, white);
-  box-shadow: 0 0 0 2px rgba(36, 95, 76, 0.1);
+  background: color-mix(in srgb, var(--toggle-color, #245f4c) 84%, white);
+  border-color: color-mix(in srgb, var(--toggle-color, #245f4c) 92%, black 8%);
+  box-shadow: 0 0 0 2px rgba(36, 95, 76, 0.12);
+  color: #0f1511;
+  transform: translateY(-1px);
 }
 
 .toggle-pill input:focus-visible + span {
@@ -533,19 +551,17 @@ a {
 }
 
 .toggle-pill--collection span {
-  background: #f3f5fa;
-  border-color: #ccd5e6;
-  color: #38527f;
+  background: #f7f8fc;
+  border-color: #ccd3e0;
+  color: #667189;
 }
 
 .toggle-pill--collection input:checked + span {
-  background: #e5ebf8;
-  border-color: #8ca5cf;
-  box-shadow: 0 0 0 2px rgba(56, 82, 127, 0.1);
-}
-
-.form-actions--speed {
-  margin-top: 16px;
+  background: #bfd0f0;
+  border-color: #6d8fc8;
+  box-shadow: 0 0 0 2px rgba(56, 82, 127, 0.12);
+  color: #142235;
+  transform: translateY(-1px);
 }
 
 .recent-scan-list--speed {
@@ -898,6 +914,21 @@ label {
   margin: 0 0 4px;
 }
 
+.copy-editor-heading--actions {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.copy-editor-heading__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .copy-editor-card {
   background: #f8faf7;
   border: 1px solid #dde2dc;
@@ -1106,7 +1137,17 @@ label {
       "inventory"
       "toggles"
       "details"
+      "actions"
       "recent";
+  }
+
+  .entry-panel--lookup,
+  .entry-panel--details,
+  .entry-panel--actions,
+  .edit-panel--common,
+  .edit-panel--extended,
+  .edit-panel--inventory {
+    grid-column: auto;
   }
 
   .bulk-actions,

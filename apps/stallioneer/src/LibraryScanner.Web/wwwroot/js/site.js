@@ -1,4 +1,89 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const unsavedChangesForm = document.querySelector("[data-unsaved-changes-form]");
+    if (unsavedChangesForm instanceof HTMLFormElement) {
+        let allowNavigation = false;
+        const navigationMessage = "Discard unsaved changes?";
+        let initialFormState = new FormData(unsavedChangesForm);
+
+        const formStatesMatch = (left, right) => {
+            const leftEntries = Array.from(left.entries());
+            const rightEntries = Array.from(right.entries());
+            if (leftEntries.length !== rightEntries.length) {
+                return false;
+            }
+
+            return leftEntries.every(([key, value], index) => {
+                const [otherKey, otherValue] = rightEntries[index] ?? [];
+                return key === otherKey && String(value) === String(otherValue);
+            });
+        };
+
+        const hasUnsavedChanges = () => !formStatesMatch(initialFormState, new FormData(unsavedChangesForm));
+
+        const confirmNavigation = () => {
+            if (allowNavigation || !hasUnsavedChanges()) {
+                return true;
+            }
+
+            return window.confirm(navigationMessage);
+        };
+
+        unsavedChangesForm.addEventListener("submit", () => {
+            allowNavigation = true;
+        });
+
+        window.addEventListener("beforeunload", (event) => {
+            if (allowNavigation || !hasUnsavedChanges()) {
+                return;
+            }
+
+            event.preventDefault();
+            event.returnValue = "";
+        });
+
+        document.addEventListener("click", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+
+            const link = target.closest("a[href]");
+            if (!(link instanceof HTMLAnchorElement)) {
+                return;
+            }
+
+            const href = link.getAttribute("href");
+            if (!href || href === "#" || href.startsWith("javascript:")) {
+                return;
+            }
+
+            if (!confirmNavigation()) {
+                event.preventDefault();
+                return;
+            }
+
+            allowNavigation = true;
+        });
+
+        document.addEventListener("submit", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLFormElement) || target === unsavedChangesForm) {
+                return;
+            }
+
+            if (!confirmNavigation()) {
+                event.preventDefault();
+                return;
+            }
+
+            allowNavigation = true;
+        });
+
+        window.setTimeout(() => {
+            initialFormState = new FormData(unsavedChangesForm);
+        }, 0);
+    }
+
     const scanInput = document.querySelector("[data-scan-code]");
     if (scanInput instanceof HTMLInputElement) {
         const shouldFocus = scanInput.getAttribute("data-scan-focus") === "true";
@@ -417,15 +502,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const editInventory = document.querySelector("[data-edit-inventory]");
     if (editInventory instanceof HTMLElement) {
-        const quantityInput = editInventory.querySelector("[data-copy-quantity-input]");
-        const applyButton = editInventory.querySelector("[data-copy-apply]");
+        const addCopyButton = editInventory.querySelector("[data-copy-add]");
         const copyList = editInventory.querySelector("[data-copy-list]");
         const copyTemplate = document.querySelector("#copy-card-template");
         const copyCount = editInventory.querySelector("[data-copy-count]");
-        const defaultLocation = editInventory.querySelector("#Input_LocationId");
-        const defaultCondition = editInventory.querySelector("#Input_Condition");
-        const defaultStatus = editInventory.querySelector("#Input_Status");
-        const defaultNotes = editInventory.querySelector("#Input_Notes");
 
         const renumberCopyCards = () => {
             if (!(copyList instanceof HTMLElement)) {
@@ -488,7 +568,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             if (copyCount instanceof HTMLElement) {
-                copyCount.textContent = `${cards.length} existing copy(s)`;
+                copyCount.textContent = cards.length === 1 ? "1 copy" : `${cards.length} copies`;
             }
         };
 
@@ -503,50 +583,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 return null;
             }
 
-            const locationField = card.querySelector("[data-copy-field='location']");
-            if (locationField instanceof HTMLSelectElement && defaultLocation instanceof HTMLSelectElement) {
-                locationField.value = defaultLocation.value;
-            }
-
-            const conditionField = card.querySelector("[data-copy-field='condition']");
-            if (conditionField instanceof HTMLSelectElement && defaultCondition instanceof HTMLSelectElement) {
-                conditionField.value = defaultCondition.value;
-            }
-
-            const statusField = card.querySelector("[data-copy-field='status']");
-            if (statusField instanceof HTMLSelectElement && defaultStatus instanceof HTMLSelectElement) {
-                statusField.value = defaultStatus.value;
-            }
-
-            const notesField = card.querySelector("[data-copy-field='notes']");
-            if (notesField instanceof HTMLTextAreaElement && defaultNotes instanceof HTMLTextAreaElement) {
-                notesField.value = defaultNotes.value;
-            }
-
             return card;
         };
 
-        if (applyButton instanceof HTMLButtonElement && quantityInput instanceof HTMLInputElement && copyList instanceof HTMLElement) {
-            applyButton.addEventListener("click", () => {
-                const desiredQuantity = Math.max(1, Number.parseInt(quantityInput.value || "1", 10) || 1);
-                quantityInput.value = String(desiredQuantity);
-                let cards = Array.from(copyList.querySelectorAll("[data-copy-card]"));
-
-                while (cards.length > desiredQuantity) {
-                    cards.pop()?.remove();
+        if (addCopyButton instanceof HTMLButtonElement && copyList instanceof HTMLElement) {
+            addCopyButton.addEventListener("click", () => {
+                const newCard = createCopyCard();
+                if (!newCard) {
+                    return;
                 }
 
-                while (cards.length < desiredQuantity) {
-                    const newCard = createCopyCard();
-                    if (!newCard) {
-                        break;
-                    }
-
-                    copyList.appendChild(newCard);
-                    initializeLiveTagEditors(newCard);
-                    cards = Array.from(copyList.querySelectorAll("[data-copy-card]"));
-                }
-
+                copyList.appendChild(newCard);
+                initializeLiveTagEditors(newCard);
                 renumberCopyCards();
             });
         }

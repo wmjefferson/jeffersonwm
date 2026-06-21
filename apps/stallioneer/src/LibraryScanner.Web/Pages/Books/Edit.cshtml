@@ -16,7 +16,7 @@
     <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
 </section>
 
-<form method="post" class="entry-grid">
+<form method="post" class="entry-grid" data-unsaved-changes-form>
     <input asp-for="Input.Id" type="hidden" />
     <input asp-for="Input.Isbn13" type="hidden" />
 
@@ -123,119 +123,71 @@
 
     <section class="panel edit-panel edit-panel--inventory" data-edit-inventory>
         <h2>Inventory</h2>
-        <div class="field-stack">
-            <div class="field-grid">
+        <div class="copy-editor-list" data-copy-list>
+            <div class="copy-editor-heading copy-editor-heading--actions">
                 <div>
-                    <label asp-for="Input.Quantity"></label>
-                    <div class="copy-field">
-                        <input asp-for="Input.Quantity" class="form-control" min="1" data-copy-quantity-input />
-                        <button type="button" class="btn btn-outline-secondary text-copy-button" data-copy-apply>Apply</button>
-                    </div>
+                    <h3>Copies</h3>
+                    <p class="form-hint">Edit each copy directly. Add another copy when you need one, or use Delete below to remove the whole book.</p>
                 </div>
-                <div>
-                    <label asp-for="Input.LocationId"></label>
-                    <select asp-for="Input.LocationId" asp-items="Model.LocationOptions" class="form-select"></select>
+                <div class="copy-editor-heading__actions">
+                    <span class="status-pill" data-copy-count>@Model.Input.Copies.Count copy(s)</span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-add>Add copy</button>
                 </div>
             </div>
 
-            <div class="copy-defaults-banner">
-                <span class="status-pill" data-copy-count>@Model.Input.Copies.Count existing copy(s)</span>
-                <span class="form-hint">Set the total quantity here, then edit the individual copies below if needed.</span>
-            </div>
-
-            <label asp-for="Input.NewLocationName"></label>
-            <input asp-for="Input.NewLocationName" class="form-control" placeholder="Create a location while saving" />
-
-            <div class="field-grid">
-                <div>
-                    <label asp-for="Input.Condition"></label>
-                    <select asp-for="Input.Condition" class="form-select">
-                        <option>Unspecified</option>
-                        <option>New</option>
-                        <option>Like new</option>
-                        <option>Good</option>
-                        <option>Fair</option>
-                        <option>Poor</option>
-                    </select>
-                </div>
-                <div>
-                    <label asp-for="Input.Status"></label>
-                    <select asp-for="Input.Status" class="form-select">
-                        <option>Owned</option>
-                        <option>Reading</option>
-                        <option>Loaned</option>
-                        <option>Wishlist</option>
-                        <option>Archived</option>
-                    </select>
-                </div>
-            </div>
-
-            <label asp-for="Input.Notes"></label>
-            <textarea asp-for="Input.Notes" class="form-control" rows="4"></textarea>
-
-            @if (Model.Input.Copies.Count > 0)
+            @for (var index = 0; index < Model.Input.Copies.Count; index++)
             {
-                <div class="copy-editor-list" data-copy-list>
-                    <div class="copy-editor-heading">
-                        <h3>Existing copies</h3>
-                        <p class="form-hint">Edit each copy directly. Use Delete below if you want to remove the whole book.</p>
+                <article class="copy-editor-card" data-copy-card>
+                    <input asp-for="Input.Copies[index].Id" type="hidden" data-copy-field="id" />
+                    <div class="copy-editor-card__header">
+                        <strong data-copy-title>Copy @(index + 1)</strong>
+                        <label class="checkbox-line" data-copy-remove @(Model.Input.Copies.Count > 1 ? null : "hidden")>
+                            <input asp-for="Input.Copies[index].Remove" data-copy-field="remove" />
+                            <span>Remove this copy</span>
+                        </label>
                     </div>
 
-                    @for (var index = 0; index < Model.Input.Copies.Count; index++)
-                    {
-                        <article class="copy-editor-card" data-copy-card>
-                            <input asp-for="Input.Copies[index].Id" type="hidden" data-copy-field="id" />
-                            <div class="copy-editor-card__header">
-                                <strong>Copy @(index + 1)</strong>
-                                <label class="checkbox-line" data-copy-remove @(Model.Input.Copies.Count > 1 ? null : "hidden")>
-                                    <input asp-for="Input.Copies[index].Remove" data-copy-field="remove" />
-                                    <span>Remove this copy</span>
-                                </label>
-                            </div>
+                    <div class="field-grid">
+                        <div>
+                            <label asp-for="Input.Copies[index].LocationId"></label>
+                            <select asp-for="Input.Copies[index].LocationId" asp-items="Model.LocationOptions" class="form-select" data-copy-field="location"></select>
+                        </div>
+                        <div>
+                            <label asp-for="Input.Copies[index].Condition"></label>
+                            <select asp-for="Input.Copies[index].Condition" class="form-select" data-copy-field="condition">
+                                <option>Unspecified</option>
+                                <option>New</option>
+                                <option>Like new</option>
+                                <option>Good</option>
+                                <option>Fair</option>
+                                <option>Poor</option>
+                            </select>
+                        </div>
+                    </div>
 
-                            <div class="field-grid">
-                                <div>
-                                    <label asp-for="Input.Copies[index].LocationId"></label>
-                                    <select asp-for="Input.Copies[index].LocationId" asp-items="Model.LocationOptions" class="form-select" data-copy-field="location"></select>
-                                </div>
-                                <div>
-                                    <label asp-for="Input.Copies[index].Condition"></label>
-                                    <select asp-for="Input.Copies[index].Condition" class="form-select" data-copy-field="condition">
-                                        <option>Unspecified</option>
-                                        <option>New</option>
-                                        <option>Like new</option>
-                                        <option>Good</option>
-                                        <option>Fair</option>
-                                        <option>Poor</option>
-                                    </select>
-                                </div>
-                            </div>
+                    <div class="field-grid">
+                        <div>
+                            <label asp-for="Input.Copies[index].Status"></label>
+                            <select asp-for="Input.Copies[index].Status" class="form-select" data-copy-field="status">
+                                <option>Owned</option>
+                                <option>Reading</option>
+                                <option>Loaned</option>
+                                <option>Wishlist</option>
+                                <option>Archived</option>
+                            </select>
+                        </div>
+                        <div></div>
+                    </div>
 
-                            <div class="field-grid">
-                                <div>
-                                    <label asp-for="Input.Copies[index].Status"></label>
-                                    <select asp-for="Input.Copies[index].Status" class="form-select" data-copy-field="status">
-                                        <option>Owned</option>
-                                        <option>Reading</option>
-                                        <option>Loaned</option>
-                                        <option>Wishlist</option>
-                                        <option>Archived</option>
-                                    </select>
-                                </div>
-                                <div></div>
-                            </div>
+                    <label asp-for="Input.Copies[index].Notes"></label>
+                    <textarea asp-for="Input.Copies[index].Notes" class="form-control" rows="3" data-copy-field="notes"></textarea>
 
-                            <label asp-for="Input.Copies[index].Notes"></label>
-                            <textarea asp-for="Input.Copies[index].Notes" class="form-control" rows="3" data-copy-field="notes"></textarea>
-
-                            <label asp-for="Input.Copies[index].TagNames"></label>
-                            <div class="tag-input-stack" data-live-tag-editor>
-                                <input asp-for="Input.Copies[index].TagNames" class="form-control" placeholder="signed, damaged, duplicate..." data-copy-field="tags" data-live-tag-input />
-                                <div class="tag-search-results" data-live-tag-results hidden></div>
-                            </div>
-                        </article>
-                    }
-                </div>
+                    <label asp-for="Input.Copies[index].TagNames"></label>
+                    <div class="tag-input-stack" data-live-tag-editor>
+                        <input asp-for="Input.Copies[index].TagNames" class="form-control" placeholder="signed, damaged, duplicate..." data-copy-field="tags" data-live-tag-input />
+                        <div class="tag-search-results" data-live-tag-results hidden></div>
+                    </div>
+                </article>
             }
         </div>
     </section>

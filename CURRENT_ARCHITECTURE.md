@@ -21,6 +21,8 @@ This is the current working shape of the active sites, services, and supporting 
   - live homepage and widget hub
 - `apps/feed`
   - JeffersonWM feed page and release timeline
+- `apps/stallioneer`
+  - library inventory and barcode entry app
 - `apps/perihelion`
   - live frontend client for the Perihelion archive
 - `apps/lionship`
@@ -29,8 +31,20 @@ This is the current working shape of the active sites, services, and supporting 
   - static app in the JeffersonWM family
 - `apps/vermilion`
   - local Python project now tracked in the monorepo
+- `apps/millionfold`
+  - batch image trimmer, renamer, and processor
 - `apps/battalion`
   - tracked source for the live Battalion app; current runtime still deploys from the home server copy
+
+## Current Project Checkpoints
+
+- Stallioneer
+  - current release checkpoint:
+    - `v0.1.3`
+  - current editing direction:
+    - add-book flow split more clearly into lookup, details, inventory, and actions
+    - inventory editing now prefers copy-first editing instead of shared top-level defaults
+    - speed mode and standard mode are both being tuned around real scanning and shelf entry work
 
 ## Home Server Runtime Layout
 
@@ -70,6 +84,10 @@ This is the current working shape of the active sites, services, and supporting 
   - current production start command:
     - `npm run prod`
   - port: `8070`
+- Millionfold:
+  - backend script: `E:\millionfold\millionfold_api.py`
+  - port: `8090`
+  - auth mode: central auth via `auth.jeffersonwm.com`
 
 ## Public Frontends
 
@@ -87,6 +105,9 @@ This is the current working shape of the active sites, services, and supporting 
   - `https://dookydetective.com`
 - Jeffershizzle:
   - `https://jeffershizzle.com`
+- Millionfold frontend:
+  - `https://jeffersonwm.com/millionfold/`
+
 
 ## Public APIs
 
@@ -103,6 +124,10 @@ This is the current working shape of the active sites, services, and supporting 
   - `https://api.dookydetective.com`
 - Jeffershizzle API:
   - `https://api.jeffershizzle.com`
+- Millionfold API:
+  - suggested:
+    - `https://api-millionfold.jeffersonwm.com`
+
 
 ## Cloudflare Tunnels
 
@@ -129,6 +154,10 @@ This is the current working shape of the active sites, services, and supporting 
     - `api-battalion.token`
   - live runtime service:
     - `http://127.0.0.1:8070`
+- `api-millionfold`
+  - suggested hostname: `api-millionfold.jeffersonwm.com`
+  - service: `http://127.0.0.1:8090`
+
 
 ## Deployment Split
 
@@ -192,6 +221,11 @@ Current active client:
   - requires:
     - valid central auth session
     - `perihelion` app membership
+- Millionfold
+  - requires:
+    - valid central auth session
+    - `millionfold` app membership
+
 
 ## Source Of Truth Summary
 

@@ -82,8 +82,6 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         }
 
         var previousQuantity = book.Copies.Count > 0 ? book.Copies.Count : book.Quantity;
-        var location = await ResolveLocationAsync();
-
         book.Title = Input.Title;
         book.Authors = Input.Authors;
         book.Publisher = Input.Publisher;
@@ -96,7 +94,7 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         book.InfoUrl = Input.InfoUrl;
         book.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await SyncCopiesAsync(book, location);
+        await SyncCopiesAsync(book);
         await SyncBookTagsAsync(book, Input.TagNames);
         SyncAdditionalInfos(book);
 
@@ -142,31 +140,6 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         AdditionalInfoTypeOptions = AdditionalInfoTypes;
     }
 
-    private async Task<Location?> ResolveLocationAsync()
-    {
-        if (!string.IsNullOrWhiteSpace(Input.NewLocationName))
-        {
-            var normalized = InventoryText.NormalizeName(Input.NewLocationName);
-            var location = await dbContext.Locations.FirstOrDefaultAsync(location => location.NormalizedName == normalized);
-            if (location is not null)
-            {
-                return location;
-            }
-
-            location = new Location
-            {
-                Name = Input.NewLocationName.Trim(),
-                NormalizedName = normalized
-            };
-            dbContext.Locations.Add(location);
-            return location;
-        }
-
-        return Input.LocationId is null
-            ? null
-            : await dbContext.Locations.FirstOrDefaultAsync(location => location.Id == Input.LocationId);
-    }
-
     private async Task SyncBookTagsAsync(Book book, string? tagNames)
     {
         var tags = await ResolveTagsAsync(tagNames);
@@ -178,9 +151,8 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         }
     }
 
-    private async Task SyncCopiesAsync(Book book, Location? defaultLocation)
+    private async Task SyncCopiesAsync(Book book)
     {
-        var targetQuantity = Math.Max(1, Input.Quantity);
         var inputsById = Input.Copies
             .Where(copy => copy.Id != 0)
             .ToDictionary(copy => copy.Id);
@@ -218,56 +190,48 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
             await SyncCopyTagsAsync(copy, inputCopy.TagNames);
         }
 
-        var remainingCopies = book.Copies
-            .OrderBy(copy => copy.Id == 0 ? int.MaxValue : copy.Id)
-            .ToList();
-
-        if (targetQuantity < remainingCopies.Count)
+        foreach (var source in newCopyInputs)
         {
-            foreach (var copy in remainingCopies.Skip(targetQuantity))
-            {
-                book.Copies.Remove(copy);
-                dbContext.BookCopies.Remove(copy);
-            }
-        }
-        else if (targetQuantity > remainingCopies.Count)
-        {
-            var copiesToAdd = targetQuantity - remainingCopies.Count;
-            for (var index = 0; index < copiesToAdd; index++)
-            {
-                var source = index < newCopyInputs.Count ? newCopyInputs[index] : null;
-                var sourceLocation = source?.LocationId is int locationId && existingLocations.TryGetValue(locationId, out var resolvedLocation)
-                    ? resolvedLocation
-                    : defaultLocation;
-                book.Copies.Add(new BookCopy
-                {
-                    Book = book,
-                    Location = sourceLocation,
-                    LocationId = sourceLocation?.Id,
-                    Condition = source?.Condition ?? Input.Condition,
-                    Status = source?.Status ?? Input.Status,
-                    Notes = string.IsNullOrWhiteSpace(source?.Notes) ? (string.IsNullOrWhiteSpace(Input.Notes) ? null : Input.Notes.Trim()) : source!.Notes!.Trim(),
-                    BookCopyTags = []
-                });
+            var sourceLocation = source.LocationId is int locationId && existingLocations.TryGetValue(locationId, out var resolvedLocation)
+                ? resolvedLocation
+                : null;
 
-                if (source is not null)
-                {
-                    await SyncCopyTagsAsync(book.Copies[^1], source.TagNames);
-                }
-            }
+            var newCopy = new BookCopy
+            {
+                Book = book,
+                Location = sourceLocation,
+                LocationId = sourceLocation?.Id,
+                Condition = string.IsNullOrWhiteSpace(source.Condition) ? "Unspecified" : source.Condition,
+                Status = string.IsNullOrWhiteSpace(source.Status) ? "Owned" : source.Status,
+                Notes = string.IsNullOrWhiteSpace(source.Notes) ? null : source.Notes.Trim(),
+                BookCopyTags = []
+            };
+            book.Copies.Add(newCopy);
+            await SyncCopyTagsAsync(newCopy, source.TagNames);
         }
 
-        book.Quantity = targetQuantity;
+        if (book.Copies.Count == 0)
+        {
+            book.Copies.Add(new BookCopy
+            {
+                Book = book,
+                Condition = "Unspecified",
+                Status = "Owned",
+                BookCopyTags = []
+            });
+        }
+
+        book.Quantity = Math.Max(1, book.Copies.Count);
 
         var primaryCopy = book.Copies
             .OrderBy(copy => copy.Id == 0 ? int.MaxValue : copy.Id)
             .FirstOrDefault();
 
-        book.Location = primaryCopy?.Location ?? defaultLocation;
-        book.LocationId = primaryCopy?.LocationId ?? defaultLocation?.Id;
-        book.Condition = primaryCopy?.Condition ?? Input.Condition;
-        book.Status = primaryCopy?.Status ?? Input.Status;
-        book.Notes = primaryCopy?.Notes ?? (string.IsNullOrWhiteSpace(Input.Notes) ? null : Input.Notes.Trim());
+        book.Location = primaryCopy?.Location;
+        book.LocationId = primaryCopy?.LocationId;
+        book.Condition = primaryCopy?.Condition ?? "Unspecified";
+        book.Status = primaryCopy?.Status ?? "Owned";
+        book.Notes = primaryCopy?.Notes;
     }
 
     private async Task SyncCopyTagsAsync(BookCopy copy, string? tagNames)
@@ -394,28 +358,9 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         [StringLength(1000)]
         public string? InfoUrl { get; set; }
 
-        [Range(1, 100000)]
-        public int Quantity { get; set; }
-
-        [Display(Name = "Location")]
-        public int? LocationId { get; set; }
-
-        [Display(Name = "New location")]
-        [StringLength(120)]
-        public string? NewLocationName { get; set; }
-
         [Display(Name = "Tags")]
         [StringLength(1000)]
         public string? TagNames { get; set; }
-
-        [StringLength(80)]
-        public string Condition { get; set; } = "Unspecified";
-
-        [StringLength(80)]
-        public string Status { get; set; } = "Owned";
-
-        [StringLength(4000)]
-        public string? Notes { get; set; }
 
         public List<CopyInput> Copies { get; set; } = [];
 
@@ -448,13 +393,16 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
                 Categories = book.Categories,
                 Language = book.Language,
                 InfoUrl = book.InfoUrl,
-                Quantity = copies.Count > 0 ? copies.Count : book.Quantity,
-                LocationId = primaryCopy?.LocationId ?? book.LocationId,
                 TagNames = string.Join(", ", book.BookTags.Select(bookTag => bookTag.Tag.Name).Order()),
-                Condition = primaryCopy?.Condition ?? book.Condition,
-                Status = primaryCopy?.Status ?? book.Status,
-                Notes = primaryCopy?.Notes ?? book.Notes,
-                Copies = copies.Select(copy => new CopyInput
+                Copies = (copies.Count > 0 ? copies : [new BookCopy
+                {
+                    Condition = book.Condition,
+                    Status = book.Status,
+                    Notes = book.Notes,
+                    LocationId = book.LocationId,
+                    Location = book.Location,
+                    BookCopyTags = []
+                }]).Select(copy => new CopyInput
                 {
                     Id = copy.Id,
                     LocationId = copy.LocationId,
