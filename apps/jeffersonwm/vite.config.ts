@@ -14,14 +14,25 @@ function copyRootDummyToDist() {
       const distDummyPath = resolve(distDir, dummyFileName)
       const legacyDistDummyPath = resolve(distDir, 'dummyjeffersonwm')
 
-      mkdirSync(distDir, { recursive: true })
-
-      if (existsSync(rootDummyPath)) {
-        copyFileSync(rootDummyPath, distDummyPath)
+      try {
+        if (!existsSync(distDir)) {
+          mkdirSync(distDir, { recursive: true })
+        }
+      } catch (error) {
+        console.warn('[vite] Could not prepare dist folder for dummy copy.', error)
+        return
       }
 
-      if (existsSync(legacyDistDummyPath)) {
-        rmSync(legacyDistDummyPath)
+      try {
+        if (existsSync(rootDummyPath)) {
+          copyFileSync(rootDummyPath, distDummyPath)
+        }
+
+        if (existsSync(legacyDistDummyPath)) {
+          rmSync(legacyDistDummyPath)
+        }
+      } catch (error) {
+        console.warn('[vite] Dist dummy sync was skipped.', error)
       }
     },
   }

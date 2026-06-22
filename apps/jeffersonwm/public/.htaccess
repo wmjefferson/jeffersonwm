@@ -77,6 +77,36 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^clionidae(/.*)?$ /clionidae/index.html [L]
 
+# Vermilion app routing split
+# 1. Serve landing.html at vermilion root
+RewriteCond %{REQUEST_URI} ^/vermilion/?$
+RewriteRule ^(.*)$ /vermilion/landing.html [L]
+
+# 2. Rewrite /vermilion/home to index.html (the SPA)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^vermilion/home(/.*)?$ /vermilion/index.html [L]
+
+# 3. Rewrite any other vermilion paths (deep links) to index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^vermilion(/.*)?$ /vermilion/index.html [L]
+
+# Millionfold app routing split
+# 1. Serve landing.html at millionfold root
+RewriteCond %{REQUEST_URI} ^/millionfold/?$
+RewriteRule ^(.*)$ /millionfold/landing.html [L]
+
+# 2. Rewrite /millionfold/home to index.html (the SPA)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^millionfold/home(/.*)?$ /millionfold/index.html [L]
+
+# 3. Rewrite any other millionfold paths (deep links) to index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^millionfold(/.*)?$ /millionfold/index.html [L]
+
 # Serve assets directly
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d

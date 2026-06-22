@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vermilion</title>
+  
+  <!-- Google Fonts: Young Serif, IBM Plex Sans Condensed, Viga -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=IBM+Plex+Sans+Condensed:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Viga&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-color: #fafaf9; /* Warm off-white */
+      --text-main: #000000; /* Black */
+      --text-body: #374151; /* Dark charcoal grey for readability */
+      --accent-color: #df5c13; /* Warm solar gold/amber accent */
+      --banner-bg: #ffffff; /* White banners */
+      --border-color: #e5e7eb; /* Light grey border */
+      
+      --font-title: 'Young Serif', Georgia, serif;
+      --font-body: 'IBM Plex Sans Condensed', -apple-system, sans-serif;
+      --font-accent: 'Viga', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* 36px top and bottom banners */
+    .banner {
+      position: fixed;
+      left: 0;
+      width: 100%;
+      height: 36px;
+      background-color: var(--banner-bg);
+      z-index: 100;
+    }
+
+    .banner-top {
+      top: 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .banner-bottom {
+      bottom: 0;
+      border-top: 1px solid var(--border-color);
+    }
+
+    /* Content Area with 42px margins */
+    .content-container {
+      margin-left: 42px;
+      margin-right: 42px;
+      padding-top: 60px; /* 60px from the top of the viewport */
+      max-width: 680px; /* Constrain text width for premium editorial look */
+      text-align: left;
+      transition: opacity 400ms ease;
+    }
+
+    .fade-out-active {
+      opacity: 0 !important;
+    }
+
+    /* Accent Eyebrow Text */
+    .eyebrow {
+      font-family: var(--font-accent);
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent-color);
+      margin-bottom: 6px;
+      display: inline-block;
+      
+      /* Initial load fade-in */
+      opacity: 0;
+      animation: fadeIn 200ms ease-out forwards;
+    }
+
+    /* Brand Name */
+    .brand-title {
+      font-family: var(--font-title);
+      font-size: 38px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin: 0 0 24px 0;
+      color: var(--text-main);
+      display: block;
+      cursor: default;
+      
+      /* Initial load fade-in */
+      opacity: 0;
+      animation: fadeIn 250ms ease-out forwards;
+      
+      /* Fade back to black transition (1000ms) */
+      transition: color 1000ms ease;
+    }
+
+    /* Hover transition (250ms to solar gold/amber #df5c13) */
+    .brand-title:hover {
+      color: var(--accent-color);
+      transition: color 250ms ease;
+    }
+
+    /* Body Text */
+    .body-text {
+      font-family: var(--font-body);
+      font-size: 19px;
+      font-weight: 300;
+      line-height: 1.6;
+      color: var(--text-body);
+      margin-bottom: 24px;
+      opacity: 0;
+      animation: fadeIn 350ms ease-out forwards;
+    }
+
+    .body-text a {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      transition: color 250ms ease;
+    }
+
+    .body-text a:hover {
+      color: var(--accent-color);
+    }
+
+    .body-text:nth-of-type(1) {
+      animation-delay: 100ms;
+    }
+    .body-text:nth-of-type(2) {
+      animation-delay: 200ms;
+    }
+    .body-text:nth-of-type(3) {
+      animation-delay: 300ms;
+    }
+
+    /* Enter Link */
+    .enter-link {
+      display: inline-block;
+      font-family: var(--font-accent);
+      font-size: 16px;
+      color: var(--text-main);
+      text-decoration: none;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border-bottom: 2px solid var(--text-main);
+      padding-bottom: 4px;
+      margin-top: 8px;
+      margin-bottom: 60px; /* Padding space above the bottom banner */
+      opacity: 0;
+      animation: fadeIn 450ms ease-out forwards;
+      animation-delay: 400ms;
+      transition: color 250ms ease, border-color 250ms ease;
+    }
+
+    .enter-link:hover {
+      color: var(--accent-color);
+      border-color: var(--accent-color);
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top and Bottom Banners -->
+  <div class="banner banner-top"></div>
+  <div class="banner banner-bottom"></div>
+
+  <!-- Content Container -->
+  <main class="content-container">
+    <span class="eyebrow">File Organizer</span>
+    <h1 class="brand-title">Vermilion</h1>
+    
+    <p class="body-text">
+      The current Vermilion is a React 19 + TypeScript SPA with a Python 3 HTTP API. The frontend is Vite and the backend is multi-threaded with dry-run planning algorithms. Real-time status, warnings, and paths are streamed via (SSE), which are logged to JSON files to support complete recursive Undo rollbacks.
+    </p>
+    
+    <p class="body-text">
+      The original Vermilion was a local utility using Python/tkinter with no external pip dependencies required. It scans a source directory, builds structured records, separates images from non-images, generates a destination tree, previews the result, then executes. <a href="/verm/" target="_blank" rel="noopener noreferrer">Spec sheet</a>.
+    </p>
+    
+    <p class="body-text">
+      I created Verm to reorganize image folders for better management over the internet. It was originally just a local script with gui, but after creating the Millionfold web interface, I wanted to convert this into something that can be run on the server from whatever computer I am using. Like Peri and Mill (and Bullion), it accomplishes the purpose of handling large amounts of image files.
+    </p>
+    
+    <a href="./home" class="enter-link">ENTER</a>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const enterLink = document.querySelector('.enter-link');
+      const container = document.querySelector('.content-container');
+      
+      if (enterLink && container) {
+        enterLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          container.classList.add('fade-out-active');
+          setTimeout(() => {
+            window.location.href = enterLink.getAttribute('href');
+          }, 400);
+        });
+      }
+    });
+  </script>
+</body>
+</html>
