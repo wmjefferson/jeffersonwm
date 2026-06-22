@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Millionfold v0.1.1",
+  "content": "<p>Millionfold’s v0.1.1 update brings real-time visual previews and collision resolution modes to the batch image pipeline, improving safety and feedback during large-scale cataloging.</p><p>What changed:</p><ul><li><strong>Centered Flashing Preview:</strong> Added a Feed Display Mode selector to choose between history thumbnail grids, a large centered preview flashing each image dynamically, or both combined.</li><li><strong>Local File Streaming:</strong> Added a GET file endpoint to safely stream processed image binaries directly from disk, ensuring instant local preview loads.</li><li><strong>Duplicate Name Resolution:</strong> Added overwrite, suffix parenthesis (e.g. image (1).jpg), and duplicates-folder collision rules to handle duplicate filenames safely during copies.</li></ul>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/50",
+  "source": "release",
+  "external_id": "millionfold-v0.1.1-2026-06-21"
+}
