@@ -13,6 +13,12 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddMemoryCache();
+builder.Services.Configure<LookupProviderOptions>(options =>
+{
+    options.IsbnDbApiKey =
+        builder.Configuration["STALLIONEER_ISBNDB_API_KEY"] ??
+        builder.Configuration["LookupProviders:IsbnDbApiKey"];
+});
 
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
     {
@@ -68,9 +74,13 @@ app.MapStaticAssets();
 app.MapRazorPages()
    .WithStaticAssets();
 
-app.MapGet("/api/isbn/{isbn}", async (string isbn, IIsbnLookupService lookupService, CancellationToken cancellationToken) =>
+app.MapGet("/api/isbn/{isbn}", async (string isbn, HttpContext httpContext, IIsbnLookupService lookupService, CancellationToken cancellationToken) =>
 {
-    var result = await lookupService.LookupAsync(isbn, cancellationToken);
+    var providerValue = httpContext.Request.Query["provider"].ToString();
+    var provider = Enum.TryParse<LookupProviderPreference>(providerValue, true, out var parsedProvider)
+        ? parsedProvider
+        : LookupProviderPreference.OpenLibrary;
+    var result = await lookupService.LookupAsync(isbn, provider, cancellationToken);
     return result.Status switch
     {
         BookLookupStatus.Success => Results.Ok(result),

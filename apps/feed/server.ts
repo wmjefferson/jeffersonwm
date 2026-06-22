@@ -103,6 +103,24 @@ interface ChangelogEntryInput {
   source?: string;
 }
 
+function normalizeManualCreatedAt(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = new Date(trimmed.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString().slice(0, 19).replace("T", " ");
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -822,7 +840,7 @@ app.post("/api/auth/verify", (req, res) => {
 });
 
 app.post("/api/feed", async (req, res) => {
-  const { secret, title, content, url, source, external_id } = req.body;
+  const { secret, title, content, url, source, external_id, created_at } = req.body;
 
   if (secret !== process.env.FEED_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -832,8 +850,13 @@ app.post("/api/feed", async (req, res) => {
     return res.status(400).json({ error: "Title is required" });
   }
 
+  const normalizedCreatedAt = normalizeManualCreatedAt(created_at);
+  if (created_at && !normalizedCreatedAt) {
+    return res.status(400).json({ error: "Invalid created_at value" });
+  }
+
   try {
-    const createdAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+    const createdAt = normalizedCreatedAt || new Date().toISOString().slice(0, 19).replace("T", " ");
     const sql = `
       INSERT INTO feed_items (title, content, url, source, external_id, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -862,7 +885,7 @@ app.post("/api/feed", async (req, res) => {
 
 app.put("/api/feed/:id", async (req, res) => {
   const { id } = req.params;
-  const { secret, title, content, url, source } = req.body || {};
+  const { secret, title, content, url, source, created_at } = req.body || {};
 
   if (secret !== process.env.FEED_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -870,6 +893,11 @@ app.put("/api/feed/:id", async (req, res) => {
 
   if (!title) {
     return res.status(400).json({ error: "Title is required" });
+  }
+
+  const normalizedCreatedAt = normalizeManualCreatedAt(created_at);
+  if (created_at && !normalizedCreatedAt) {
+    return res.status(400).json({ error: "Invalid created_at value" });
   }
 
   try {
@@ -887,10 +915,10 @@ app.put("/api/feed/:id", async (req, res) => {
     await pool.execute(
       `
         UPDATE feed_items
-        SET title = ?, content = ?, url = ?, source = ?
+        SET title = ?, content = ?, url = ?, source = ?, created_at = COALESCE(?, created_at)
         WHERE id = ?
       `,
-      [title, content || null, url || null, source || entry.source || "manual", id],
+      [title, content || null, url || null, source || entry.source || "manual", normalizedCreatedAt, id],
     );
 
     res.json({ success: true });

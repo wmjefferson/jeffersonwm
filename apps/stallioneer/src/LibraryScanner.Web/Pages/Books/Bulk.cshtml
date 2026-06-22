@@ -1,0 +1,234 @@
+@page
+@model LibraryScanner.Web.Pages.Books.BulkModel
+@{
+    ViewData["Title"] = "Bulk tools";
+}
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Batch workflow</p>
+        <h1>Bulk tools</h1>
+        <p class="muted-block">Use this page for multi-book changes so Inventory can stay focused on browsing and single-book edits.</p>
+    </div>
+    <div class="header-actions">
+        <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back to inventory</a>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-success">@Model.StatusMessage</div>
+}
+
+<section class="stats-grid compact-stats-grid">
+    <div class="stat">
+        <span class="stat-label">Titles</span>
+        <strong>@Model.TotalTitles</strong>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Items</span>
+        <strong>@Model.TotalItems</strong>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Tags</span>
+        <strong>@Model.TotalTags</strong>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Collections</span>
+        <strong>@Model.TotalCollections</strong>
+    </div>
+</section>
+
+<form method="get" class="toolbar bulk-filter-toolbar">
+    <input asp-for="Query" class="form-control" placeholder="Search title, ISBN, author, publisher, tags, collections, or location" />
+    <select asp-for="TagId" asp-items="Model.TagOptions" class="form-select"></select>
+    <select asp-for="CollectionId" asp-items="Model.CollectionOptions" class="form-select"></select>
+    <button class="btn btn-outline-secondary" type="submit">Filter</button>
+    <a class="btn btn-outline-secondary" asp-page="/Books/Bulk">Clear</a>
+</form>
+
+@if (Model.Books.Count == 0)
+{
+    <div class="empty-state">
+        <h2>No books found</h2>
+        <p>Try clearing the filters or return to Inventory to add books first.</p>
+        <a class="btn btn-primary" asp-page="/Books/Index">Go to inventory</a>
+    </div>
+}
+else
+{
+    <form method="post" class="bulk-form">
+        <input asp-for="Query" type="hidden" />
+        <input asp-for="CollectionId" type="hidden" />
+        <input asp-for="TagId" type="hidden" />
+
+        <section class="panel bulk-panel">
+            <div class="bulk-selection-summary">
+                <div class="bulk-copy">
+                    <p class="eyebrow">Selection</p>
+                    <h2>Choose books, then run an action</h2>
+                    <span class="form-hint">Showing @Model.Books.Count visible books out of @Model.FilteredCount matching the current filters.</span>
+                </div>
+                <div class="lookup-actions">
+                    <button type="submit" asp-page-handler="ExportSelected" class="btn btn-outline-secondary">Export selected CSV</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="entry-grid bulk-tools-grid bulk-action-grid">
+            <section class="panel bulk-action-panel">
+                <p class="eyebrow">Tags</p>
+                <h2>Add or remove tags</h2>
+                <div class="field-stack">
+                    <div>
+                        <label asp-for="AddTagNames">Add tags</label>
+                        <input asp-for="AddTagNames" class="form-control" placeholder="fiction, favorites, test shelf" />
+                        <span class="form-hint">Comma or semicolon separated. New tags will be created if needed.</span>
+                    </div>
+                    <button type="submit" asp-page-handler="AddTags" class="btn btn-primary">Add tags to selected</button>
+                    <div>
+                        <label asp-for="RemoveTagNames">Remove tags</label>
+                        <input asp-for="RemoveTagNames" class="form-control" placeholder="wishlist, duplicate" />
+                        <span class="form-hint">Only matching tags on selected books will be removed.</span>
+                    </div>
+                    <button type="submit" asp-page-handler="RemoveTags" class="btn btn-outline-secondary">Remove tags from selected</button>
+                </div>
+            </section>
+
+            <section class="panel bulk-action-panel">
+                <p class="eyebrow">Grouping</p>
+                <h2>Collection and location</h2>
+                <div class="field-stack">
+                    <div>
+                        <label asp-for="SelectedCollectionId">Add to collection</label>
+                        <select asp-for="SelectedCollectionId" asp-items="Model.CollectionOptions.Skip(1)" class="form-select">
+                            <option value="">Choose collection</option>
+                        </select>
+                    </div>
+                    <button type="submit" asp-page-handler="AddToCollection" class="btn btn-primary">Add selected to collection</button>
+                    <div>
+                        <label asp-for="SelectedLocationId">Move to location</label>
+                        <select asp-for="SelectedLocationId" asp-items="Model.LocationOptions" class="form-select"></select>
+                    </div>
+                    <button type="submit" asp-page-handler="MoveToLocation" class="btn btn-outline-secondary">Move selected to location</button>
+                </div>
+            </section>
+
+            <section class="panel bulk-action-panel">
+                <p class="eyebrow">Status</p>
+                <h2>Shared availability</h2>
+                <div class="field-stack">
+                    <div>
+                        <label asp-for="SelectedStatus">Set status</label>
+                        <select asp-for="SelectedStatus" asp-items="Model.StatusOptions" class="form-select">
+                            <option value="">Choose status</option>
+                        </select>
+                        <span class="form-hint">Updates the book and its copies together.</span>
+                    </div>
+                    <button type="submit" asp-page-handler="SetStatus" class="btn btn-primary">Apply status to selected</button>
+                </div>
+            </section>
+
+            <section class="panel bulk-action-panel">
+                <p class="eyebrow">Disposition</p>
+                <h2>Sold or disposed</h2>
+                <div class="field-stack">
+                    <div>
+                        <label asp-for="DispositionStatus">Disposition</label>
+                        <select asp-for="DispositionStatus" class="form-select">
+                            <option value="">Choose disposition</option>
+                            <option value="Sold">Sold</option>
+                            <option value="Disposed">Disposed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label asp-for="DispositionNote">Note</label>
+                        <textarea asp-for="DispositionNote" class="form-control" rows="3" placeholder="Optional note for the history log"></textarea>
+                    </div>
+                    <button type="submit" asp-page-handler="MarkDisposition" class="btn btn-outline-danger">Mark selected</button>
+                </div>
+            </section>
+        </section>
+
+        <div class="table-wrap">
+            <table class="table inventory-table">
+                <thead>
+                    <tr>
+                        <th>Book</th>
+                        <th>ISBN</th>
+                        <th>Qty</th>
+                        <th>Location</th>
+                        <th>Tags</th>
+                        <th>Collections</th>
+                        <th>Status</th>
+                        <th class="selection-column">
+                            <input type="checkbox" data-select-all aria-label="Select all books" />
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var book in Model.Books)
+                {
+                    var titleAuthor = string.IsNullOrWhiteSpace(book.Authors) ? book.Title : $"{book.Title} - {book.Authors}";
+                    <tr>
+                        <td>
+                            <div class="book-cell">
+                                @if (!string.IsNullOrWhiteSpace(book.CoverImageUrl))
+                                {
+                                    <img src="@book.CoverImageUrl" alt="" />
+                                }
+                                else
+                                {
+                                    <div class="cover-placeholder"></div>
+                                }
+                                <div>
+                                    <div class="copy-line">
+                                        <a class="book-title-link" asp-page="/Books/Edit" asp-route-id="@book.Id"><strong>@book.Title</strong></a>
+                                        <button type="button" class="copy-button text-copy-button" data-copy-text="@titleAuthor" title="Copy title and author" aria-label="Copy title and author">Copy</button>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(book.Authors))
+                                    {
+                                        <span>@book.Authors</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(book.Publisher))
+                                    {
+                                        <small>@book.Publisher @book.PublishedDate</small>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="copy-line">
+                                <span>@book.Isbn13</span>
+                                <button type="button" class="copy-button text-copy-button" data-copy-text="@book.Isbn13" title="Copy ISBN" aria-label="Copy ISBN">Copy</button>
+                            </div>
+                        </td>
+                        <td>@book.EffectiveQuantity</td>
+                        <td>@(book.Location?.Name ?? "-")</td>
+                        <td>
+                            <div class="tag-list">
+                                @foreach (var bookTag in book.BookTags.OrderBy(bookTag => bookTag.Tag.Name))
+                                {
+                                    <span class="tag-pill" style="--tag-color:@bookTag.Tag.Color">@bookTag.Tag.Name</span>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            <div class="tag-list">
+                                @foreach (var collectionBook in book.CollectionBooks.OrderBy(item => item.Collection.Name))
+                                {
+                                    <span class="status-pill collection-pill">@collectionBook.Collection.Name</span>
+                                }
+                            </div>
+                        </td>
+                        <td><span class="status-pill">@book.Status</span></td>
+                        <td class="selection-column">
+                            <input type="checkbox" name="SelectedBookIds" value="@book.Id" data-select-item aria-label="Select @book.Title" />
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </form>
+}

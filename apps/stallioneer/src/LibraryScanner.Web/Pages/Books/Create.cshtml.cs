@@ -47,11 +47,21 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
 
     public IReadOnlyList<RecentScanRow> RecentScans { get; private set; } = [];
 
+    public IReadOnlyList<SelectListItem> LookupProviderOptions { get; } =
+    [
+        new("Open Library first", LookupProviderPreference.OpenLibrary.ToString()),
+        new("Google Books first", LookupProviderPreference.GoogleBooks.ToString()),
+        new("ISBNdb first", LookupProviderPreference.IsbnDb.ToString())
+    ];
+
     [BindProperty]
     public List<int> SelectedTagIds { get; set; } = [];
 
     [BindProperty]
     public List<int> SelectedCollectionIds { get; set; } = [];
+
+    [BindProperty]
+    public LookupProviderPreference PreferredLookupProvider { get; set; } = LookupProviderPreference.OpenLibrary;
 
     public async Task OnGetAsync(string? isbn)
     {
@@ -104,10 +114,11 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
     {
         ModelState.Clear();
         IsManualEntry = false;
-        var defaults = ScanDefaultValues.FromInput(Input, KeepScanDefaults, SelectedTagIds, SelectedCollectionIds);
+        var defaults = ScanDefaultValues.FromInput(Input, KeepScanDefaults, PreferredLookupProvider, SelectedTagIds, SelectedCollectionIds);
         Input.Isbn = candidateIsbn;
         await LoadSelectedBookAsync(candidateIsbn);
         defaults.ApplyTo(Input);
+        PreferredLookupProvider = defaults.PreferredLookupProvider;
         SelectedTagIds = [.. defaults.SelectedTagIds];
         SelectedCollectionIds = [.. defaults.SelectedCollectionIds];
         PersistScanDefaults(defaults);
@@ -215,7 +226,15 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
 
         await dbContext.SaveChangesAsync();
         StatusMessage = $"Saved {Input.Title}.";
-        PersistScanDefaults();
+        if (scanNext && SpeedMode)
+        {
+            SelectedTagIds = [];
+            PersistScanDefaults(ScanDefaultValues.FromInput(Input, KeepScanDefaults, PreferredLookupProvider, SelectedTagIds, SelectedCollectionIds));
+        }
+        else
+        {
+            PersistScanDefaults();
+        }
         return scanNext
             ? RedirectToPage("/Books/Create", new { SpeedMode })
             : RedirectToPage("/Books/Index");
@@ -265,7 +284,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
 
     private async Task LookupCandidatesAsync(string? isbn)
     {
-        var lookup = await isbnLookupService.LookupAsync(isbn ?? string.Empty);
+        var lookup = await isbnLookupService.LookupAsync(isbn ?? string.Empty, PreferredLookupProvider);
         ApplyLookupOutcome(lookup, populateInput: false, showSuccessAsCandidate: true);
     }
 
@@ -304,7 +323,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
             return;
         }
 
-        var lookup = await isbnLookupService.LookupAsync(isbn13);
+        var lookup = await isbnLookupService.LookupAsync(isbn13, PreferredLookupProvider);
         ApplyLookupOutcome(lookup, populateInput: true, showSuccessAsCandidate: false);
     }
 
@@ -535,13 +554,14 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
         var defaults = ScanDefaultValues.FromString(ScanDefaults);
         defaults.ApplyTo(Input);
         KeepScanDefaults = defaults.Keep;
+        PreferredLookupProvider = defaults.PreferredLookupProvider;
         SelectedTagIds = [.. defaults.SelectedTagIds];
         SelectedCollectionIds = [.. defaults.SelectedCollectionIds];
     }
 
     private void PersistScanDefaults()
     {
-        PersistScanDefaults(ScanDefaultValues.FromInput(Input, KeepScanDefaults, SelectedTagIds, SelectedCollectionIds));
+        PersistScanDefaults(ScanDefaultValues.FromInput(Input, KeepScanDefaults, PreferredLookupProvider, SelectedTagIds, SelectedCollectionIds));
     }
 
     private void PersistScanDefaults(ScanDefaultValues defaults)
@@ -792,6 +812,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
         int? LocationId,
         string? NewLocationName,
         string? TagNames,
+        LookupProviderPreference PreferredLookupProvider,
         IReadOnlyList<int> SelectedTagIds,
         IReadOnlyList<int> SelectedCollectionIds,
         string Condition,
@@ -804,13 +825,19 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
             null,
             null,
             null,
+            LookupProviderPreference.OpenLibrary,
             [],
             [],
             "Unspecified",
             "Owned",
             null);
 
-        public static ScanDefaultValues FromInput(BookInput input, bool keep, IEnumerable<int>? selectedTagIds = null, IEnumerable<int>? selectedCollectionIds = null)
+        public static ScanDefaultValues FromInput(
+            BookInput input,
+            bool keep,
+            LookupProviderPreference preferredLookupProvider,
+            IEnumerable<int>? selectedTagIds = null,
+            IEnumerable<int>? selectedCollectionIds = null)
         {
             return new ScanDefaultValues(
                 keep,
@@ -818,6 +845,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
                 input.LocationId,
                 input.NewLocationName,
                 input.TagNames,
+                preferredLookupProvider,
                 selectedTagIds?.Distinct().ToArray() ?? [],
                 selectedCollectionIds?.Distinct().ToArray() ?? [],
                 input.Condition,
@@ -833,7 +861,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
             }
 
             var parts = value.Split('\t');
-            if (parts.Length is not 8 and not 10)
+            if (parts.Length is not 8 and not 10 and not 11)
             {
                 return Empty;
             }
@@ -862,6 +890,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
                     int.TryParse(parts[2], out var locationId) ? locationId : null,
                     Decode(parts[3]),
                     Decode(parts[4]),
+                    LookupProviderPreference.OpenLibrary,
                     [],
                     [],
                     Decode(parts[5]) ?? Empty.Condition,
@@ -869,17 +898,36 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
                     Decode(parts[7]));
             }
 
+            if (parts.Length == 10)
+            {
+                return new ScanDefaultValues(
+                    bool.TryParse(parts[0], out var keepValue) ? keepValue : Empty.Keep,
+                    int.TryParse(parts[1], out var quantityValue) && quantityValue > 0 ? quantityValue : Empty.Quantity,
+                    int.TryParse(parts[2], out var locationIdValue) ? locationIdValue : null,
+                    Decode(parts[3]),
+                    Decode(parts[4]),
+                    LookupProviderPreference.OpenLibrary,
+                    ParseIds(Decode(parts[5]) ?? string.Empty),
+                    ParseIds(Decode(parts[6]) ?? string.Empty),
+                    Decode(parts[7]) ?? Empty.Condition,
+                    Decode(parts[8]) ?? Empty.Status,
+                    Decode(parts[9]));
+            }
+
             return new ScanDefaultValues(
-                bool.TryParse(parts[0], out var keepValue) ? keepValue : Empty.Keep,
-                int.TryParse(parts[1], out var quantityValue) && quantityValue > 0 ? quantityValue : Empty.Quantity,
-                int.TryParse(parts[2], out var locationIdValue) ? locationIdValue : null,
+                bool.TryParse(parts[0], out var keepValueV2) ? keepValueV2 : Empty.Keep,
+                int.TryParse(parts[1], out var quantityValueV2) && quantityValueV2 > 0 ? quantityValueV2 : Empty.Quantity,
+                int.TryParse(parts[2], out var locationIdValueV2) ? locationIdValueV2 : null,
                 Decode(parts[3]),
                 Decode(parts[4]),
-                ParseIds(Decode(parts[5]) ?? string.Empty),
+                Enum.TryParse<LookupProviderPreference>(Decode(parts[5]), true, out var preferredProvider)
+                    ? preferredProvider
+                    : LookupProviderPreference.OpenLibrary,
                 ParseIds(Decode(parts[6]) ?? string.Empty),
-                Decode(parts[7]) ?? Empty.Condition,
-                Decode(parts[8]) ?? Empty.Status,
-                Decode(parts[9]));
+                ParseIds(Decode(parts[7]) ?? string.Empty),
+                Decode(parts[8]) ?? Empty.Condition,
+                Decode(parts[9]) ?? Empty.Status,
+                Decode(parts[10]));
         }
 
         public void ApplyTo(BookInput input)
@@ -901,6 +949,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
                 LocationId?.ToString() ?? string.Empty,
                 Encode(NewLocationName),
                 Encode(TagNames),
+                Encode(PreferredLookupProvider.ToString()),
                 Encode(string.Join(',', SelectedTagIds)),
                 Encode(string.Join(',', SelectedCollectionIds)),
                 Encode(Condition),

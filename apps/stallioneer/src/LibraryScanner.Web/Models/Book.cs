@@ -84,5 +84,7 @@ public class Book
 
     public List<BookAdditionalInfo> AdditionalInfos { get; set; } = [];
 
+    public List<BookCover> Covers { get; set; } = [];
+
     public int EffectiveQuantity => Copies.Count > 0 ? Copies.Count : Quantity;
 }

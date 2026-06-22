@@ -61,6 +61,7 @@ interface PostFormState {
   content: string;
   source: string;
   url: string;
+  publishAt: string;
   appName: string;
   version: string;
   highlights: string;
@@ -146,6 +147,7 @@ const defaultPostState = (): PostFormState => ({
   content: '',
   source: 'log',
   url: '',
+  publishAt: '',
   appName: '',
   version: '',
   highlights: '',
@@ -241,6 +243,43 @@ function buildReleaseTitle(appName: string, version: string) {
   const normalizedVersion = normalizeVersion(version);
   const trimmedAppName = appName.trim();
   return normalizedVersion ? `${trimmedAppName} v${normalizedVersion}` : trimmedAppName;
+}
+
+function formatEditorDate(value: string) {
+  const date = parseFeedDate(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeEditorDate(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsedDate = new Date(`${trimmed}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  const now = new Date();
+  const parsed = new Date(
+    parsedDate.getFullYear(),
+    parsedDate.getMonth(),
+    parsedDate.getDate(),
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    0,
+  );
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString().slice(0, 19).replace('T', ' ');
 }
 
 function formatParagraphHtml(value: string) {
@@ -342,6 +381,7 @@ function buildPostStateFromItem(item: FeedItem): PostFormState {
       content: '',
       source: 'release',
       url: item.url || '',
+      publishAt: formatEditorDate(item.created_at),
       appName: parsedTitle.appName,
       version: parsedTitle.version,
       highlights: releaseHtmlToHighlights(item.content),
@@ -353,6 +393,7 @@ function buildPostStateFromItem(item: FeedItem): PostFormState {
     content: htmlToEditorText(item.content),
     source: item.source,
     url: item.url || '',
+    publishAt: formatEditorDate(item.created_at),
     appName: '',
     version: '',
     highlights: '',
@@ -469,9 +510,15 @@ export default function App() {
     const resolvedContent = isRelease
       ? formatReleaseHtml(newPost.highlights)
       : formatParagraphHtml(newPost.content);
+    const createdAt = normalizeEditorDate(newPost.publishAt);
 
     if (!resolvedTitle) {
       setError(isRelease ? 'App name and version are required for release notes.' : 'Title is required.');
+      return;
+    }
+
+    if (newPost.publishAt.trim() && !createdAt) {
+      setError('Publish date must be a valid date.');
       return;
     }
 
@@ -488,6 +535,7 @@ export default function App() {
           content: resolvedContent || null,
           url: newPost.url || null,
           source: newPost.source,
+          created_at: createdAt,
           secret: secretInput,
           ...(isEditing ? {} : { external_id: `${newPost.source}-${Date.now()}` }),
         }),
@@ -1126,6 +1174,19 @@ export default function App() {
                       <option value="handshake">Handshake</option>
                       <option value="linkedin">LinkedIn</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="field-label" htmlFor="feed-publish-at">
+                      Publish Date
+                    </label>
+                    <input
+                      id="feed-publish-at"
+                      type="date"
+                      className="feed-input"
+                      value={newPost.publishAt}
+                      onChange={(event) => setNewPost({ ...newPost, publishAt: event.target.value })}
+                    />
                   </div>
 
                   <div>

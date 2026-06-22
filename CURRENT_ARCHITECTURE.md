@@ -30,7 +30,7 @@ This is the current working shape of the active sites, services, and supporting 
 - `apps/bullion`
   - static app in the JeffersonWM family
 - `apps/vermilion`
-  - local Python project now tracked in the monorepo
+  - batch file organizing and renaming tool (React + Python API)
 - `apps/millionfold`
   - batch image trimmer, renamer, and processor
 - `apps/battalion`
@@ -88,6 +88,10 @@ This is the current working shape of the active sites, services, and supporting 
   - backend script: `E:\millionfold\millionfold_api.py`
   - port: `8090`
   - auth mode: central auth via `auth.jeffersonwm.com`
+- Vermilion:
+  - backend script: `E:\vermilion\vermilion_api.py`
+  - port: `8100`
+  - auth mode: central auth via `auth.jeffersonwm.com`
 
 ## Public Frontends
 
@@ -107,6 +111,8 @@ This is the current working shape of the active sites, services, and supporting 
   - `https://jeffershizzle.com`
 - Millionfold frontend:
   - `https://jeffersonwm.com/millionfold/`
+- Vermilion frontend:
+  - `https://jeffersonwm.com/vermilion/`
 
 
 ## Public APIs
@@ -127,6 +133,9 @@ This is the current working shape of the active sites, services, and supporting 
 - Millionfold API:
   - suggested:
     - `https://api-millionfold.jeffersonwm.com`
+- Vermilion API:
+  - suggested:
+    - `https://api-vermilion.jeffersonwm.com`
 
 
 ## Cloudflare Tunnels
@@ -157,6 +166,9 @@ This is the current working shape of the active sites, services, and supporting 
 - `api-millionfold`
   - suggested hostname: `api-millionfold.jeffersonwm.com`
   - service: `http://127.0.0.1:8090`
+- `api-vermilion`
+  - suggested hostname: `api-vermilion.jeffersonwm.com`
+  - service: `http://127.0.0.1:8100`
 
 
 ## Deployment Split
@@ -183,6 +195,8 @@ This applies to:
 - Perihelion frontend
 - Lionship frontend
 - Bullion
+- Millionfold frontend
+- Vermilion frontend
 
 ### Production backend deploy
 
@@ -225,6 +239,10 @@ Current active client:
   - requires:
     - valid central auth session
     - `millionfold` app membership
+- Vermilion
+  - requires:
+    - valid central auth session
+    - `vermilion` app membership
 
 
 ## Source Of Truth Summary

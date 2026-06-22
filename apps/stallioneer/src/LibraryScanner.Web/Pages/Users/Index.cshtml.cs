@@ -53,11 +53,20 @@ public class IndexModel(
     [BindProperty]
     public List<string> PdfFieldKeys { get; set; } = [];
 
+    [BindProperty]
+    [DataType(DataType.Date)]
+    public DateOnly? LogStartDate { get; set; }
+
+    [BindProperty]
+    [DataType(DataType.Date)]
+    public DateOnly? LogEndDate { get; set; }
+
     [TempData]
     public string? StatusMessage { get; set; }
 
     public async Task OnGetAsync()
     {
+        ApplyDefaultLogRange();
         await LoadPageAsync();
     }
 
@@ -105,6 +114,31 @@ public class IndexModel(
         var pdf = InventoryPdf.ExportBooks(books, fields);
         var fileName = $"stallioneer-inventory-{DateTime.UtcNow:yyyyMMdd-HHmmss}.pdf";
         return File(pdf, "application/pdf", fileName);
+    }
+
+    public async Task<IActionResult> OnPostExportLogAsync()
+    {
+        var startDate = LogStartDate ?? DateOnly.FromDateTime(DateTime.Today.AddDays(-29));
+        var endDate = LogEndDate ?? DateOnly.FromDateTime(DateTime.Today);
+        if (endDate < startDate)
+        {
+            StatusMessage = "Log export end date must be on or after the start date.";
+            return RedirectToPage();
+        }
+
+        var start = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Local);
+        var endExclusive = endDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Local);
+
+        var events = await dbContext.InventoryEvents
+            .AsNoTracking()
+            .Include(inventoryEvent => inventoryEvent.Book)
+            .Where(inventoryEvent => inventoryEvent.CreatedAt >= start && inventoryEvent.CreatedAt < endExclusive)
+            .OrderByDescending(inventoryEvent => inventoryEvent.CreatedAt)
+            .ToListAsync();
+
+        var csv = InventoryLogCsv.ExportEvents(events);
+        var fileName = $"stallioneer-log-{startDate:yyyyMMdd}-to-{endDate:yyyyMMdd}.csv";
+        return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
     }
 
     public async Task<IActionResult> OnPostImportAsync()
@@ -191,6 +225,12 @@ public class IndexModel(
         {
             DisplayName = CurrentUser?.DisplayName ?? string.Empty
         };
+    }
+
+    private void ApplyDefaultLogRange()
+    {
+        LogStartDate ??= DateOnly.FromDateTime(DateTime.Today.AddDays(-29));
+        LogEndDate ??= DateOnly.FromDateTime(DateTime.Today);
     }
 
     private async Task<List<Book>> GetInventoryBooksAsync()

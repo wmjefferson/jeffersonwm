@@ -2,19 +2,24 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace LibraryScanner.Web.Services;
 
 public sealed class OpenLibraryIsbnLookupService(
     HttpClient httpClient,
     IMemoryCache cache,
-    ILogger<OpenLibraryIsbnLookupService> logger) : IIsbnLookupService
+    ILogger<OpenLibraryIsbnLookupService> logger,
+    IOptions<LookupProviderOptions> lookupProviderOptions) : IIsbnLookupService
 {
     private static readonly TimeSpan SuccessCacheDuration = TimeSpan.FromMinutes(20);
     private static readonly TimeSpan MissCacheDuration = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan RateLimitCacheDuration = TimeSpan.FromMinutes(1);
 
-    public async Task<BookLookupResponse> LookupAsync(string isbn, CancellationToken cancellationToken = default)
+    public async Task<BookLookupResponse> LookupAsync(
+        string isbn,
+        LookupProviderPreference preferredProvider = LookupProviderPreference.OpenLibrary,
+        CancellationToken cancellationToken = default)
     {
         var digits = IsbnNormalizer.DigitsOnly(isbn);
         if (string.IsNullOrWhiteSpace(digits))
@@ -26,7 +31,7 @@ public sealed class OpenLibraryIsbnLookupService(
                 "Scan or enter an ISBN or UPC code.");
         }
 
-        var cacheKey = $"lookup:{digits}";
+        var cacheKey = $"lookup:{preferredProvider}:{digits}";
         if (cache.TryGetValue<BookLookupResponse>(cacheKey, out var cachedLookup))
         {
             return cachedLookup!;
@@ -34,21 +39,56 @@ public sealed class OpenLibraryIsbnLookupService(
 
         var isbn13 = IsbnNormalizer.ToIsbn13(isbn);
         BookLookupResponse lookupResponse;
+        BookLookupResponse? deferredResponse = null;
         if (isbn13 is not null)
         {
-            var openLibraryResult = await TryLookupOpenLibraryAsync(isbn13, cancellationToken);
-            if (openLibraryResult is not null)
+            foreach (var provider in GetProviderOrder(preferredProvider))
             {
-                lookupResponse = new BookLookupResponse(BookLookupStatus.Success, openLibraryResult, isbn13);
-                cache.Set(cacheKey, lookupResponse, SuccessCacheDuration);
-                return lookupResponse;
+                switch (provider)
+                {
+                    case LookupProviderPreference.OpenLibrary:
+                    {
+                        var openLibraryResult = await TryLookupOpenLibraryAsync(isbn13, cancellationToken);
+                        if (openLibraryResult is not null)
+                        {
+                            lookupResponse = new BookLookupResponse(BookLookupStatus.Success, openLibraryResult, isbn13);
+                            cache.Set(cacheKey, lookupResponse, SuccessCacheDuration);
+                            return lookupResponse;
+                        }
+
+                        break;
+                    }
+                    case LookupProviderPreference.GoogleBooks:
+                    {
+                        var googleIsbnLookup = await TryLookupGoogleBooksAsync(isbn13, cancellationToken);
+                        if (googleIsbnLookup?.Status == BookLookupStatus.Success)
+                        {
+                            cache.Set(cacheKey, googleIsbnLookup, GetCacheDuration(googleIsbnLookup));
+                            return googleIsbnLookup;
+                        }
+
+                        deferredResponse ??= googleIsbnLookup;
+                        break;
+                    }
+                    case LookupProviderPreference.IsbnDb:
+                    {
+                        var isbnDbLookup = await TryLookupIsbnDbAsync(isbn13, cancellationToken);
+                        if (isbnDbLookup?.Status == BookLookupStatus.Success)
+                        {
+                            cache.Set(cacheKey, isbnDbLookup, GetCacheDuration(isbnDbLookup));
+                            return isbnDbLookup;
+                        }
+
+                        deferredResponse ??= isbnDbLookup;
+                        break;
+                    }
+                }
             }
 
-            var googleIsbnLookup = await TryLookupGoogleBooksAsync(isbn13, cancellationToken);
-            if (googleIsbnLookup is not null)
+            if (deferredResponse is not null)
             {
-                cache.Set(cacheKey, googleIsbnLookup, GetCacheDuration(googleIsbnLookup));
-                return googleIsbnLookup;
+                cache.Set(cacheKey, deferredResponse, GetCacheDuration(deferredResponse));
+                return deferredResponse;
             }
         }
 
@@ -62,6 +102,24 @@ public sealed class OpenLibraryIsbnLookupService(
 
         cache.Set(cacheKey, lookupResponse, GetCacheDuration(lookupResponse));
         return lookupResponse;
+    }
+
+    private string? IsbnDbApiKey =>
+        string.IsNullOrWhiteSpace(lookupProviderOptions.Value.IsbnDbApiKey)
+            ? null
+            : lookupProviderOptions.Value.IsbnDbApiKey.Trim();
+
+    private static IReadOnlyList<LookupProviderPreference> GetProviderOrder(LookupProviderPreference preferredProvider)
+    {
+        var providers = new[]
+        {
+            preferredProvider,
+            LookupProviderPreference.OpenLibrary,
+            LookupProviderPreference.GoogleBooks,
+            LookupProviderPreference.IsbnDb
+        };
+
+        return providers.Distinct().ToArray();
     }
 
     private static TimeSpan GetCacheDuration(BookLookupResponse response)
@@ -102,6 +160,44 @@ public sealed class OpenLibraryIsbnLookupService(
             }
 
             logger.LogWarning(ex, "Google Books ISBN lookup failed for {Isbn13}.", isbn13);
+        }
+
+        return null;
+    }
+
+    private async Task<BookLookupResponse?> TryLookupIsbnDbAsync(string isbn13, CancellationToken cancellationToken)
+    {
+        var apiKey = IsbnDbApiKey;
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            return new BookLookupResponse(
+                BookLookupStatus.NotFound,
+                null,
+                isbn13,
+                "ISBNdb is selected first, but no API key is configured yet.");
+        }
+
+        try
+        {
+            var result = await LookupIsbnDbAsync(isbn13, apiKey, cancellationToken);
+            if (result is not null)
+            {
+                return new BookLookupResponse(BookLookupStatus.Success, result, isbn13);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or NotSupportedException)
+        {
+            if (IsRateLimited(ex))
+            {
+                logger.LogWarning(ex, "ISBNdb lookup was rate limited for {Isbn13}.", isbn13);
+                return new BookLookupResponse(
+                    BookLookupStatus.NotFound,
+                    null,
+                    isbn13,
+                    "ISBNdb rate limit reached for the moment. Try this ISBN again in a minute.");
+            }
+
+            logger.LogWarning(ex, "ISBNdb lookup failed for {Isbn13}.", isbn13);
         }
 
         return null;
@@ -160,6 +256,43 @@ public sealed class OpenLibraryIsbnLookupService(
         }
 
         return MapGoogleVolume(isbn13, volume);
+    }
+
+    private async Task<BookLookupResult?> LookupIsbnDbAsync(string isbn13, string apiKey, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api2.isbndb.com/book/{isbn13}");
+        request.Headers.TryAddWithoutValidation("Authorization", apiKey);
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<IsbnDbResponse>(cancellationToken);
+        var book = payload?.Book;
+        if (book is null || string.IsNullOrWhiteSpace(book.Title))
+        {
+            return null;
+        }
+
+        var resolvedIsbn13 = string.IsNullOrWhiteSpace(book.Isbn13) ? isbn13 : book.Isbn13;
+        return new BookLookupResult(
+            resolvedIsbn13,
+            string.IsNullOrWhiteSpace(book.Isbn10) ? book.Isbn : book.Isbn10,
+            book.Title,
+            JoinTextValues(book.Authors),
+            book.Publisher,
+            book.DatePublished,
+            book.Image,
+            book.Synopsis,
+            book.Pages,
+            JoinTextValues(book.Subjects),
+            book.Language,
+            null,
+            "ISBNdb");
     }
 
     private async Task<BookLookupResponse> TryLookupGoogleBooksByCodeAsync(string code, CancellationToken cancellationToken)
@@ -315,6 +448,34 @@ public sealed class OpenLibraryIsbnLookupService(
         };
     }
 
+    private static string? JoinTextValues(JsonElement? values)
+    {
+        if (values is null)
+        {
+            return null;
+        }
+
+        var value = values.Value;
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            return string.IsNullOrWhiteSpace(value.GetString()) ? null : value.GetString();
+        }
+
+        if (value.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var parts = value
+            .EnumerateArray()
+            .Select(item => item.ValueKind == JsonValueKind.String ? item.GetString() : null)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Cast<string>()
+            .ToList();
+
+        return parts.Count == 0 ? null : string.Join(", ", parts);
+    }
+
     private sealed class OpenLibraryResponse : Dictionary<string, OpenLibraryBook>
     {
     }
@@ -440,5 +601,53 @@ public sealed class OpenLibraryIsbnLookupService(
     {
         [JsonPropertyName("thumbnail")]
         public string? Thumbnail { get; set; }
+    }
+
+    private sealed class IsbnDbResponse
+    {
+        [JsonPropertyName("book")]
+        public IsbnDbBook? Book { get; set; }
+    }
+
+    private sealed class IsbnDbBook
+    {
+        [JsonPropertyName("isbn13")]
+        public string? Isbn13 { get; set; }
+
+        [JsonPropertyName("isbn10")]
+        public string? Isbn10 { get; set; }
+
+        [JsonPropertyName("isbn")]
+        public string? Isbn { get; set; }
+
+        [JsonPropertyName("title")]
+        public string? Title { get; set; }
+
+        [JsonPropertyName("authors")]
+        public JsonElement? Authors { get; set; }
+
+        [JsonPropertyName("publisher")]
+        public string? Publisher { get; set; }
+
+        [JsonPropertyName("date_published")]
+        public string? DatePublished { get; set; }
+
+        [JsonPropertyName("pages")]
+        public int? Pages { get; set; }
+
+        [JsonPropertyName("synopsis")]
+        public string? Synopsis { get; set; }
+
+        [JsonPropertyName("subjects")]
+        public JsonElement? Subjects { get; set; }
+
+        [JsonPropertyName("language")]
+        public string? Language { get; set; }
+
+        [JsonPropertyName("image")]
+        public string? Image { get; set; }
+
+        [JsonPropertyName("msrp")]
+        public string? Msrp { get; set; }
     }
 }

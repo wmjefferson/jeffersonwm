@@ -138,12 +138,47 @@
         <span class="form-hint">CSV uses Stallioneer's fixed common field set. PDF lets you choose which fields appear in a printable inventory report.</span>
     </div>
     <div class="import-export-grid">
-        <form method="post" asp-page-handler="Export" class="inline-form">
+        <form method="post" asp-page-handler="Export" class="inline-form export-form export-form--simple">
             <div class="field-stack">
                 <label>Export inventory</label>
                 <span class="form-hint">Downloads the full library as CSV.</span>
             </div>
             <button type="submit" class="btn btn-outline-secondary">Export CSV</button>
+        </form>
+
+        <form method="post" asp-page-handler="ExportPdf" class="pdf-export-form export-form">
+            <div class="field-stack">
+                <label>Export PDF fields</label>
+                <div class="export-field-list">
+                    @foreach (var field in Model.ExportFields)
+                    {
+                        var isChecked = LibraryScanner.Web.Services.InventoryExportField.DefaultPdfKeys.Contains(field.Key);
+                        <label class="checkbox-pill">
+                            <input type="checkbox" name="PdfFieldKeys" value="@field.Key" checked="@isChecked" />
+                            <span>@field.Label</span>
+                        </label>
+                    }
+                </div>
+            </div>
+            <button type="submit" class="btn btn-outline-secondary">Export PDF</button>
+        </form>
+
+        <form method="post" asp-page-handler="ExportLog" class="export-log-form export-form">
+            <div class="field-stack">
+                <label>Export log</label>
+                <span class="form-hint">Downloads inventory actions over a custom date range.</span>
+                <div class="field-grid export-log-range">
+                    <div>
+                        <label asp-for="LogStartDate">From</label>
+                        <input asp-for="LogStartDate" type="date" class="form-control" />
+                    </div>
+                    <div>
+                        <label asp-for="LogEndDate">To</label>
+                        <input asp-for="LogEndDate" type="date" class="form-control" />
+                    </div>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-outline-secondary">Export log CSV</button>
         </form>
 
         <form method="post" asp-page-handler="Import" enctype="multipart/form-data" class="import-form">
@@ -169,23 +204,6 @@
                 <span class="form-hint">Overwrite clears books, book tags, collection links, and inventory history before importing. Accounts and reusable tag/location/collection names remain.</span>
             </div>
             <button type="submit" class="btn btn-primary" onclick="return confirm('Import this CSV using the selected mode? Overwrite mode clears the current book inventory first.');">Import CSV</button>
-        </form>
-
-        <form method="post" asp-page-handler="ExportPdf" class="pdf-export-form">
-            <div class="field-stack">
-                <label>Export PDF fields</label>
-                <div class="export-field-list">
-                    @foreach (var field in Model.ExportFields)
-                    {
-                        var isChecked = LibraryScanner.Web.Services.InventoryExportField.DefaultPdfKeys.Contains(field.Key);
-                        <label class="checkbox-pill">
-                            <input type="checkbox" name="PdfFieldKeys" value="@field.Key" checked="@isChecked" />
-                            <span>@field.Label</span>
-                        </label>
-                    }
-                </div>
-            </div>
-            <button type="submit" class="btn btn-outline-secondary">Export PDF</button>
         </form>
     </div>
 </section>

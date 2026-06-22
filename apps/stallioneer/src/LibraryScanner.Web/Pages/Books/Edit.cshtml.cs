@@ -13,14 +13,6 @@ namespace LibraryScanner.Web.Pages.Books;
 [Authorize]
 public class EditModel(ApplicationDbContext dbContext) : PageModel
 {
-    private static readonly IReadOnlyList<SelectListItem> AdditionalInfoTypes =
-    [
-        new("Text note", BookAdditionalInfoType.Text),
-        new("Link", BookAdditionalInfoType.Link),
-        new("Related title", BookAdditionalInfoType.RelatedTitle),
-        new("Reference", BookAdditionalInfoType.Reference)
-    ];
-
     [BindProperty]
     public BookInput Input { get; set; } = new();
 
@@ -28,7 +20,15 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
 
     public IReadOnlyList<Tag> AvailableTags { get; private set; } = [];
 
-    public IReadOnlyList<SelectListItem> AdditionalInfoTypeOptions { get; private set; } = AdditionalInfoTypes;
+    public IReadOnlyList<SelectListItem> AdditionalInfoTypeOptions { get; private set; } =
+        BookAdditionalInfoType.Options
+            .Select(option => new SelectListItem(option.Label, option.Value))
+            .ToList();
+
+    public string? PreviewCoverUrl =>
+        Input.Covers.FirstOrDefault(cover => cover.IsPrimary && !string.IsNullOrWhiteSpace(cover.Url))?.Url ??
+        Input.Covers.FirstOrDefault(cover => !string.IsNullOrWhiteSpace(cover.Url))?.Url ??
+        Input.CoverImageUrl;
 
     [TempData]
     public string? StatusMessage { get; set; }
@@ -39,6 +39,7 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
             .AsNoTracking()
             .Include(book => book.Location)
             .Include(book => book.AdditionalInfos)
+            .Include(book => book.Covers)
             .Include(book => book.Copies)
             .ThenInclude(copy => copy.Location)
             .Include(book => book.Copies)
@@ -70,6 +71,7 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
             .Include(book => book.BookTags)
             .ThenInclude(bookTag => bookTag.Tag)
             .Include(book => book.AdditionalInfos)
+            .Include(book => book.Covers)
             .Include(book => book.Copies)
             .ThenInclude(copy => copy.BookCopyTags)
             .ThenInclude(copyTag => copyTag.Tag)
@@ -86,8 +88,6 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         book.Authors = Input.Authors;
         book.Publisher = Input.Publisher;
         book.PublishedDate = Input.PublishedDate;
-        book.CoverImageUrl = Input.CoverImageUrl;
-        book.Description = Input.Description;
         book.PageCount = Input.PageCount;
         book.Categories = Input.Categories;
         book.Language = Input.Language;
@@ -97,6 +97,7 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         await SyncCopiesAsync(book);
         await SyncBookTagsAsync(book, Input.TagNames);
         SyncAdditionalInfos(book);
+        SyncCovers(book);
 
         var quantityDelta = book.Copies.Count - previousQuantity;
         if (quantityDelta != 0)
@@ -137,7 +138,9 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
             .ToList();
 
         AvailableTags = await dbContext.Tags.AsNoTracking().OrderBy(tag => tag.Name).ToListAsync();
-        AdditionalInfoTypeOptions = AdditionalInfoTypes;
+        AdditionalInfoTypeOptions = BookAdditionalInfoType.Options
+            .Select(option => new SelectListItem(option.Label, option.Value))
+            .ToList();
     }
 
     private async Task SyncBookTagsAsync(Book book, string? tagNames)
@@ -315,6 +318,56 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
                 SortOrder = nextSortOrder++
             });
         }
+
+        book.Description = book.AdditionalInfos
+            .Where(info => info.Type == BookAdditionalInfoType.Description)
+            .Select(info => info.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
+    private void SyncCovers(Book book)
+    {
+        if (book.Covers.Count > 0)
+        {
+            dbContext.BookCovers.RemoveRange(book.Covers);
+            book.Covers.Clear();
+        }
+
+        var normalizedCovers = Input.Covers
+            .Select((cover, index) => new
+            {
+                Input = cover,
+                Index = index,
+                Url = string.IsNullOrWhiteSpace(cover.Url) ? null : cover.Url.Trim(),
+                Source = string.IsNullOrWhiteSpace(cover.Source) ? null : cover.Source.Trim(),
+                Label = string.IsNullOrWhiteSpace(cover.Label) ? null : cover.Label.Trim()
+            })
+            .Where(item => item.Url is not null)
+            .ToList();
+
+        var primaryIndex = normalizedCovers.FindIndex(item => item.Input.IsPrimary);
+        if (primaryIndex < 0 && normalizedCovers.Count > 0)
+        {
+            primaryIndex = 0;
+        }
+
+        for (var index = 0; index < normalizedCovers.Count; index++)
+        {
+            var item = normalizedCovers[index];
+            book.Covers.Add(new BookCover
+            {
+                Book = book,
+                Url = item.Url!,
+                Source = item.Source,
+                Label = item.Label,
+                IsPrimary = index == primaryIndex,
+                SortOrder = index
+            });
+        }
+
+        book.CoverImageUrl = book.Covers
+            .FirstOrDefault(cover => cover.IsPrimary)?.Url ??
+            book.Covers.FirstOrDefault()?.Url;
     }
 
     public class BookInput
@@ -342,9 +395,6 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         [StringLength(1000)]
         public string? CoverImageUrl { get; set; }
 
-        [StringLength(4000)]
-        public string? Description { get; set; }
-
         [Display(Name = "Pages")]
         public int? PageCount { get; set; }
 
@@ -366,6 +416,8 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
 
         public List<AdditionalInfoInput> AdditionalInfos { get; set; } = [];
 
+        public List<CoverInput> Covers { get; set; } = [];
+
         public static BookInput FromBook(Book book)
         {
             var copies = book.Copies
@@ -375,9 +427,37 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
                 .OrderBy(info => info.SortOrder)
                 .ThenBy(info => info.Id)
                 .ToList();
+            var covers = book.Covers
+                .OrderByDescending(cover => cover.IsPrimary)
+                .ThenBy(cover => cover.SortOrder)
+                .ThenBy(cover => cover.Id)
+                .ToList();
             var primaryCopy = copies
                 .OrderBy(copy => copy.Id)
                 .FirstOrDefault();
+
+            if (!string.IsNullOrWhiteSpace(book.Description) &&
+                additionalInfos.All(info => info.Type != BookAdditionalInfoType.Description || !string.Equals(info.Value, book.Description, StringComparison.Ordinal)))
+            {
+                additionalInfos.Insert(0, new BookAdditionalInfo
+                {
+                    Type = BookAdditionalInfoType.Description,
+                    Value = book.Description,
+                    SortOrder = -1
+                });
+            }
+
+            if (covers.Count == 0 && !string.IsNullOrWhiteSpace(book.CoverImageUrl))
+            {
+                covers.Add(new BookCover
+                {
+                    Url = book.CoverImageUrl,
+                    Source = book.MetadataSource,
+                    Label = "Primary cover",
+                    IsPrimary = true,
+                    SortOrder = 0
+                });
+            }
 
             return new BookInput
             {
@@ -388,7 +468,6 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
                 Publisher = book.Publisher,
                 PublishedDate = book.PublishedDate,
                 CoverImageUrl = book.CoverImageUrl,
-                Description = book.Description,
                 PageCount = book.PageCount,
                 Categories = book.Categories,
                 Language = book.Language,
@@ -410,7 +489,7 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
                     Status = copy.Status,
                     Notes = copy.Notes,
                     TagNames = string.Join(", ", copy.BookCopyTags.Select(copyTag => copyTag.Tag.Name).Order())
-                }).ToList(),
+                    }).ToList(),
                 AdditionalInfos = additionalInfos.Count > 0
                     ? additionalInfos.Select(info => new AdditionalInfoInput
                     {
@@ -419,7 +498,17 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
                         Label = info.Label,
                         Value = info.Value
                     }).ToList()
-                    : [new AdditionalInfoInput()]
+                    : [new AdditionalInfoInput { Type = BookAdditionalInfoType.Description }],
+                Covers = covers.Count > 0
+                    ? covers.Select(cover => new CoverInput
+                    {
+                        Id = cover.Id,
+                        Url = cover.Url,
+                        Source = cover.Source,
+                        Label = cover.Label,
+                        IsPrimary = cover.IsPrimary
+                    }).ToList()
+                    : [new CoverInput { Source = book.MetadataSource, Label = "Primary cover", IsPrimary = true }]
             };
         }
     }
@@ -452,12 +541,29 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         public int Id { get; set; }
 
         [StringLength(40)]
-        public string Type { get; set; } = BookAdditionalInfoType.Text;
+        public string Type { get; set; } = BookAdditionalInfoType.Description;
 
         [StringLength(120)]
         public string? Label { get; set; }
 
         [StringLength(4000)]
         public string? Value { get; set; }
+    }
+
+    public class CoverInput
+    {
+        public int Id { get; set; }
+
+        [Display(Name = "Cover URL")]
+        [StringLength(1000)]
+        public string? Url { get; set; }
+
+        [StringLength(80)]
+        public string? Source { get; set; }
+
+        [StringLength(120)]
+        public string? Label { get; set; }
+
+        public bool IsPrimary { get; set; }
     }
 }

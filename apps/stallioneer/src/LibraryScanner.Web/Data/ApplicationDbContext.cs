@@ -28,6 +28,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     public DbSet<BookCopyTag> BookCopyTags => Set<BookCopyTag>();
 
+    public DbSet<BookCover> BookCovers => Set<BookCover>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -95,6 +97,17 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.HasOne(info => info.Book)
                 .WithMany(book => book.AdditionalInfos)
                 .HasForeignKey(info => info.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<BookCover>(entity =>
+        {
+            entity.Property(cover => cover.Url).HasMaxLength(1000);
+            entity.Property(cover => cover.Source).HasMaxLength(80);
+            entity.Property(cover => cover.Label).HasMaxLength(120);
+            entity.HasOne(cover => cover.Book)
+                .WithMany(book => book.Covers)
+                .HasForeignKey(cover => cover.BookId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

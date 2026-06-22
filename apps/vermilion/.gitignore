@@ -1,5 +1,8 @@
-__pycache__/
+node_modules
+dist
+.env
+*.local
+__pycache__
 *.pyc
 _recents.json
-test_files/
-test_existing/
+_undo_log_*.json

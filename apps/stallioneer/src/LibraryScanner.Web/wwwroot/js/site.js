@@ -503,6 +503,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const editInventory = document.querySelector("[data-edit-inventory]");
     if (editInventory instanceof HTMLElement) {
         const addCopyButton = editInventory.querySelector("[data-copy-add]");
+        const duplicateCopyButton = editInventory.querySelector("[data-copy-duplicate]");
         const copyList = editInventory.querySelector("[data-copy-list]");
         const copyTemplate = document.querySelector("#copy-card-template");
         const copyCount = editInventory.querySelector("[data-copy-count]");
@@ -534,6 +535,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (removeField instanceof HTMLInputElement) {
                     removeField.name = `Input.Copies[${index}].Remove`;
                     removeField.id = `Input_Copies_${index}__Remove`;
+                }
+
+                const removeHiddenField = card.querySelector("[data-copy-field='remove-hidden']");
+                if (removeHiddenField instanceof HTMLInputElement) {
+                    removeHiddenField.name = `Input.Copies[${index}].Remove`;
                 }
 
                 const locationField = card.querySelector("[data-copy-field='location']");
@@ -586,6 +592,42 @@ document.addEventListener("DOMContentLoaded", () => {
             return card;
         };
 
+        const duplicateCopyCard = (sourceCard) => {
+            if (!(sourceCard instanceof HTMLElement)) {
+                return null;
+            }
+
+            const duplicateCard = createCopyCard();
+            if (!(duplicateCard instanceof HTMLElement)) {
+                return null;
+            }
+
+            const fieldNames = ["location", "condition", "status", "notes", "tags"];
+            fieldNames.forEach((fieldName) => {
+                const sourceField = sourceCard.querySelector(`[data-copy-field='${fieldName}']`);
+                const duplicateField = duplicateCard.querySelector(`[data-copy-field='${fieldName}']`);
+                if (!sourceField || !duplicateField) {
+                    return;
+                }
+
+                if (sourceField instanceof HTMLInputElement && duplicateField instanceof HTMLInputElement) {
+                    duplicateField.value = sourceField.value;
+                    return;
+                }
+
+                if (sourceField instanceof HTMLTextAreaElement && duplicateField instanceof HTMLTextAreaElement) {
+                    duplicateField.value = sourceField.value;
+                    return;
+                }
+
+                if (sourceField instanceof HTMLSelectElement && duplicateField instanceof HTMLSelectElement) {
+                    duplicateField.value = sourceField.value;
+                }
+            });
+
+            return duplicateCard;
+        };
+
         if (addCopyButton instanceof HTMLButtonElement && copyList instanceof HTMLElement) {
             addCopyButton.addEventListener("click", () => {
                 const newCard = createCopyCard();
@@ -599,7 +641,119 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
+        if (duplicateCopyButton instanceof HTMLButtonElement && copyList instanceof HTMLElement) {
+            duplicateCopyButton.addEventListener("click", () => {
+                const cards = Array.from(copyList.querySelectorAll("[data-copy-card]"));
+                const sourceCard = cards[cards.length - 1];
+                const newCard = duplicateCopyCard(sourceCard);
+                if (!newCard) {
+                    return;
+                }
+
+                copyList.appendChild(newCard);
+                initializeLiveTagEditors(newCard);
+                renumberCopyCards();
+            });
+        }
+
         renumberCopyCards();
+    }
+
+    const coverList = document.querySelector("[data-cover-list]");
+    const coverTemplate = document.querySelector("#cover-card-template");
+    const addCoverButton = document.querySelector("[data-add-cover]");
+
+    const renumberCoverRows = () => {
+        if (!(coverList instanceof HTMLElement)) {
+            return;
+        }
+
+        const rows = Array.from(coverList.querySelectorAll("[data-cover-row]"));
+        rows.forEach((row, index) => {
+            const idField = row.querySelector("[data-cover-field='id']");
+            if (idField instanceof HTMLInputElement) {
+                idField.name = `Input.Covers[${index}].Id`;
+                idField.id = `Input_Covers_${index}__Id`;
+            }
+
+            const labelField = row.querySelector("[data-cover-field='label']");
+            if (labelField instanceof HTMLInputElement) {
+                labelField.name = `Input.Covers[${index}].Label`;
+                labelField.id = `Input_Covers_${index}__Label`;
+            }
+
+            const sourceField = row.querySelector("[data-cover-field='source']");
+            if (sourceField instanceof HTMLInputElement) {
+                sourceField.name = `Input.Covers[${index}].Source`;
+                sourceField.id = `Input_Covers_${index}__Source`;
+            }
+
+            const urlField = row.querySelector("[data-cover-field='url']");
+            if (urlField instanceof HTMLInputElement) {
+                urlField.name = `Input.Covers[${index}].Url`;
+                urlField.id = `Input_Covers_${index}__Url`;
+            }
+
+            const primaryField = row.querySelector("[data-cover-field='primary']");
+            if (primaryField instanceof HTMLInputElement) {
+                primaryField.name = `Input.Covers[${index}].IsPrimary`;
+                primaryField.id = `Input_Covers_${index}__IsPrimary`;
+            }
+
+            const primaryHiddenField = row.querySelector("[data-cover-field='primary-hidden']");
+            if (primaryHiddenField instanceof HTMLInputElement) {
+                primaryHiddenField.name = `Input.Covers[${index}].IsPrimary`;
+            }
+        });
+
+        const primaryFields = rows
+            .map((row) => row.querySelector("[data-cover-field='primary']"))
+            .filter((field) => field instanceof HTMLInputElement);
+
+        if (primaryFields.length > 0 && !primaryFields.some((field) => field.checked)) {
+            primaryFields[0].checked = true;
+        }
+    };
+
+    if (addCoverButton instanceof HTMLButtonElement && coverList instanceof HTMLElement && coverTemplate instanceof HTMLTemplateElement) {
+        addCoverButton.addEventListener("click", () => {
+            const fragment = coverTemplate.content.cloneNode(true);
+            coverList.appendChild(fragment);
+            renumberCoverRows();
+        });
+    }
+
+    if (coverList instanceof HTMLElement) {
+        coverList.addEventListener("click", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement) || !target.closest("[data-remove-cover]")) {
+                return;
+            }
+
+            const row = target.closest("[data-cover-row]");
+            row?.remove();
+            if (coverList.querySelectorAll("[data-cover-row]").length === 0 && addCoverButton instanceof HTMLButtonElement) {
+                addCoverButton.click();
+            } else {
+                renumberCoverRows();
+            }
+        });
+
+        coverList.addEventListener("change", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLInputElement) || target.dataset.coverField !== "primary" || !target.checked) {
+                return;
+            }
+
+            const primaryFields = coverList.querySelectorAll("[data-cover-field='primary']");
+            primaryFields.forEach((field) => {
+                if (field instanceof HTMLInputElement && field !== target) {
+                    field.checked = false;
+                }
+            });
+        });
+
+        renumberCoverRows();
     }
 
     const additionalInfoList = document.querySelector("[data-additional-info-list]");
