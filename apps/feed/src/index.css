@@ -223,10 +223,10 @@ a {
 .feed-button {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.75rem 1rem;
+  gap: 0.25rem;
+  padding: 0.2rem 0.3rem;
   border-radius: 0;
-  border: 1px solid rgba(17, 24, 39, 0.18);
+  border: none;
   color: #111827;
   text-decoration: none;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
@@ -240,10 +240,10 @@ a {
   appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.65rem 0.95rem;
-  border: 1px solid rgba(17, 24, 39, 0.15);
-  border-radius: 0;
+  gap: 0.25rem;
+  padding: 0.18rem 0.28rem;
+  border: none;
+  border-radius: 4px;
   background: rgba(255, 255, 255, 0.72);
   color: rgba(17, 24, 39, 0.74);
   font: inherit;
@@ -259,8 +259,8 @@ a {
   align-items: center;
   justify-content: center;
   min-width: 1.65rem;
-  padding: 0.15rem 0.42rem;
-  border-radius: 0;
+  padding: 0.05rem 0.18rem;
+  border-radius: 3px;
   background: rgba(17, 24, 39, 0.08);
   color: rgba(17, 24, 39, 0.6);
   font-size: 0.72rem;
@@ -613,6 +613,15 @@ a {
   color: #111827;
 }
 
+.legend-name-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.legend-name-link:hover {
+  color: #1f4fd6;
+}
+
 .legend-count {
   margin-left: 0.35rem;
   color: rgba(17, 24, 39, 0.52);
@@ -629,6 +638,11 @@ a {
 
 .legend-actions {
   margin-top: 1rem;
+}
+
+.legend-clear-button:disabled {
+  opacity: 0.38;
+  cursor: default;
 }
 
 .feed-subtitle-link {
@@ -657,9 +671,10 @@ a {
 .selected-site-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.55rem 0.8rem;
-  border: 1px solid rgba(17, 24, 39, 0.18);
+  gap: 0.25rem;
+  padding: 0.18rem 0.28rem;
+  border: none;
+  border-radius: 4px;
   color: #111827;
   background: rgba(17, 24, 39, 0.03);
   font: inherit;

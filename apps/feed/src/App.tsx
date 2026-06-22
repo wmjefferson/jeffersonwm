@@ -73,6 +73,27 @@ const inferredFeedApiBase =
 const FEED_API_BASE = (import.meta.env.VITE_API_BASE_URL || inferredFeedApiBase).replace(/\/$/, '');
 const FEED_ATOM_URL = `${FEED_API_BASE}/atom.xml`;
 const FEED_TIMEZONE = 'America/Los_Angeles';
+const FEED_LEGEND_LINKS: Record<string, string> = {
+  'auth/multimillion': 'https://github.com/wmjefferson',
+  battalion: 'https://jeffersonwm.com/battalion/',
+  bullion: 'https://jeffersonwm.com/bullion/',
+  clionidae: 'https://jeffersonwm.com/clionidae/',
+  dookydetective: 'https://dookydetective.com',
+  endellionite: 'https://github.com/wmjefferson',
+  feed: 'https://jeffersonwm.com/feed/',
+  jeffershizzle: 'https://jeffershizzle.com',
+  jeffersonwm: 'https://jeffersonwm.com',
+  'jeffersonwm-legacy': 'https://github.com/wmjefferson',
+  lionship: 'https://jeffersonwm.com/lionship/',
+  medallion: 'https://github.com/wmjefferson',
+  perihelion: 'https://jeffersonwm.com/perihelion/',
+  rebellion: 'https://github.com/wmjefferson',
+  stallioneer: 'https://github.com/wmjefferson/jeffersonwm/issues/50',
+  tourbillion: 'https://jeffersonwm.com/tourbillion/',
+  trillions: 'https://github.com/wmjefferson',
+  vermilion: 'https://jeffersonwm.com/vermilion/',
+  wmjefferson: 'https://github.com/wmjefferson',
+};
 const FEED_LEGEND: FeedLegendEntry[] = [
   { name: 'auth/multimillion', description: 'auth' },
   { name: 'battalion', description: 'RPG GAME TWO Ts ONE L' },
@@ -770,7 +791,6 @@ export default function App() {
       <header className="feed-topbar">
         <div>
           <h1 className="feed-title">Feed</h1>
-          <p className="feed-subtitle">Version notes, public logs, and code movement in one running line.</p>
         </div>
       </header>
 
@@ -861,7 +881,15 @@ export default function App() {
                       </span>
                       <span className="legend-copy">
                         <span className="legend-name">
-                          {entry.name}
+                          <a
+                            href={FEED_LEGEND_LINKS[entry.name] || 'https://github.com/wmjefferson'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="legend-name-link"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {entry.name}
+                          </a>
                           <span className="legend-count">({count})</span>
                         </span>
                         <span className="legend-line">{entry.description}</span>
@@ -870,13 +898,16 @@ export default function App() {
                   );
                 })}
               </div>
-              {selectedSites.length > 0 && (
-                <div className="legend-actions">
-                  <button type="button" className="feed-link-button" onClick={() => setSelectedSites([])}>
-                    Clear
-                  </button>
-                </div>
-              )}
+              <div className="legend-actions">
+                <button
+                  type="button"
+                  className="feed-link-button legend-clear-button"
+                  onClick={() => setSelectedSites([])}
+                  disabled={selectedSites.length === 0}
+                >
+                  Clear
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
@@ -912,9 +943,8 @@ export default function App() {
 
         <section className="feed-hero">
           <div>
-            <span className="eyebrow">Timeline</span>
             <p className="hero-copy">
-              This page is meant to sit alongside the GitHub feed, not beneath it. Release notes and status changes land
+              Version notes, public logs, and code movement in one running line. Release notes and status changes land
               in the same chronology.
             </p>
             <button type="button" className="hero-copy feed-subtitle-link" onClick={() => setShowLegend(true)}>
@@ -1333,13 +1363,6 @@ export default function App() {
                               className="feed-html"
                               dangerouslySetInnerHTML={{ __html: item.content }}
                             />
-                          )}
-
-                          {item.url && (
-                            <a href={item.url} target="_blank" rel="noreferrer" className="entry-link">
-                              View source
-                              <ExternalLink size={12} />
-                            </a>
                           )}
                         </div>
                       ))

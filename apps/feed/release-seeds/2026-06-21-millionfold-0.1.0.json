@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Millionfold v0.1.0",
+  "content": "<p>Millionfold’s first release establishes a robust desktop pipeline for batch image trimming, padding, and organization. Built for fast workflow prep, it allows direct path manipulation, custom background fill values, monthly date-sorting, and filename conflict handling.</p><p>What changed:</p><ul><li><strong>Custom Canvas Padding:</strong> Added background tolerance slider and hex color picker to pad/expand images to custom backgrounds (e.g. off-white) rather than defaulting only to pure white.</li><li><strong>Directory Browser & Folder Creation:</strong> Integrated directory browsing (supporting logical drives) and added the ability to create subdirectories directly inside the dialog.</li><li><strong>Duplicate Resolution & Monthly Sorting:</strong> Added output organization into monthly YYYY MM subfolders, with copy resolution modes to append parenthesis suffixes or move duplicate names to separate, context-preserved folders.</li><li><strong>Single Centered Image Feed:</strong> Added option to toggle between historical scrolling grids, a centered preview flashing currently processed images, or both combined.</li></ul>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/50",
+  "source": "release",
+  "external_id": "millionfold-v0.1.0-2026-06-21"
+}

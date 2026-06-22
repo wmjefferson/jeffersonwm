@@ -56,13 +56,13 @@
             else
             {
                 <input asp-for="Input.Isbn" class="form-control lookup-code-input" autocomplete="off" placeholder="Scan or enter ISBN / UPC" data-scan-code data-scan-focus="@(!Model.HasSelectedBook).ToString().ToLowerInvariant()" autofocus />
+                <div class="lookup-provider-picker">
+                    <label asp-for="PreferredLookupProvider">Lookup provider</label>
+                    <select asp-for="PreferredLookupProvider" asp-items="Model.LookupProviderOptions" class="form-select"></select>
+                </div>
             }
             <div class="lookup-actions">
                 <button asp-page-handler="Lookup" class="btn btn-primary" data-scan-submit formnovalidate>Find matches</button>
-                @if (!Model.IsManualEntry)
-                {
-                    <button type="button" class="btn btn-outline-secondary" data-camera-start>Camera scan</button>
-                }
                 <button asp-page-handler="Manual" class="btn btn-outline-secondary" formnovalidate>Manual entry</button>
                 <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear</button>
             </div>
@@ -78,6 +78,11 @@
                 <span>Scan or type the code and press Enter. Then choose the matching cover or title to load the book details.</span>
             }
         </p>
+
+        @if (!Model.IsManualEntry)
+        {
+            <p class="form-hint">Open Library and Google Books work without setup. ISBNdb needs an API key before it can be used first.</p>
+        }
 
         @if (!Model.IsManualEntry)
         {
