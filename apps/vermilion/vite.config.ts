@@ -23,7 +23,7 @@ export default defineConfig({
             }
           }
           if (urlPath === '/home' || urlPath === '/vermilion/home' || urlPath === '/vermilion/home/') {
-            req.url = '/index.html';
+            req.url = '/vermilion/index.html';
           }
           next();
         });

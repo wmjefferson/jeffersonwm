@@ -23,7 +23,7 @@ export default defineConfig({
             }
           }
           if (urlPath === '/home' || urlPath === '/millionfold/home' || urlPath === '/millionfold/home/') {
-            req.url = '/index.html';
+            req.url = '/millionfold/index.html';
           }
           next();
         });
