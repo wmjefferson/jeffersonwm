@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Millionfold v0.1.3 Post-Run Summary Modal",
+  "content": "<p>Millionfold has been updated to v0.1.3, introducing a detailed post-run summary popup overlay when processing completes.</p><p>Key additions:</p><ul><li><strong>Job Completion Modal:</strong> Automatically displays a clean, brutalist-styled modal listing final stats (processed files, successes, and errors) and the exact configuration selected (input/output paths, rename pattern, canvas transformations, zip export details).</li><li><strong>ZIP Path Exposure:</strong> Explicitly renders the generated export ZIP archive path for easy retrieval.</li><li><strong>State Synchronization:</strong> Tracks progress details and zip creation directly in the React state to present accurate metrics.</li></ul>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/53",
+  "source": "release",
+  "external_id": "millionfold-v0.1.3-2026-06-23"
+}

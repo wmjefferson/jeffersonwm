@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import LeftPanel from './components/LeftPanel';
 import LiveFeed from './components/LiveFeed';
 import ProgressPanel from './components/ProgressPanel';
+import JobCompleteModal from './components/JobCompleteModal';
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:8090';
 
@@ -60,6 +61,7 @@ export interface JobProgress {
   errors: number;
   error_msg?: string;
   currentFile?: string;
+  zip_path?: string;
 }
 
 interface User {
@@ -98,6 +100,7 @@ export default function App() {
   const [scanCount, setScanCount] = useState<number | null>(null);
   const [errorLog, setErrorLog] = useState<{ path: string; error: string }[]>([]);
   const [showErrors, setShowErrors] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
   const jobIdRef = useRef<string | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
@@ -148,6 +151,7 @@ export default function App() {
     if (!output.input_folder) return;
     setImages([]);
     setErrorLog([]);
+    setShowCompleteModal(false);
     setProgress({ phase: 'running', total: 0, current: 0, success: 0, errors: 0 });
 
     try {
@@ -201,9 +205,10 @@ export default function App() {
             }]);
           }
         } else if (evt.type === 'zipping') {
-          setProgress(p => ({ ...p, phase: 'zipping' }));
+          setProgress(p => ({ ...p, phase: 'zipping', zip_path: evt.zip }));
         } else if (evt.type === 'done') {
           setProgress(p => ({ ...p, phase: 'done', success: evt.success, errors: evt.errors }));
+          setShowCompleteModal(true);
           es.close();
           fetch(`${API_BASE}/api/errors/${jobIdRef.current}`, { credentials: 'include' })
             .then(r => r.json())
@@ -327,6 +332,15 @@ export default function App() {
           )}
         </div>
       </div>
+
+      <JobCompleteModal
+        isOpen={showCompleteModal}
+        onClose={() => setShowCompleteModal(false)}
+        progress={progress}
+        output={output}
+        pipeline={pipeline}
+        rules={rules}
+      />
     </div>
   );
 }
