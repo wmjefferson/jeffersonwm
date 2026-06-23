@@ -15,7 +15,7 @@
       --bg-color: #fafaf9; /* Warm off-white */
       --text-main: #000000; /* Black */
       --text-body: #374151; /* Dark charcoal grey for readability */
-      --accent-color: #df5c13; /* Warm solar gold/amber accent */
+      --accent-color: #dc2626; /* Match red square on home page */
       --banner-bg: #ffffff; /* White banners */
       --border-color: #e5e7eb; /* Light grey border */
       
@@ -192,15 +192,11 @@
     <h1 class="brand-title">Vermilion</h1>
     
     <p class="body-text">
-      The current Vermilion is a React 19 + TypeScript SPA with a Python 3 HTTP API. The frontend is Vite and the backend is multi-threaded with dry-run planning algorithms. Real-time status, warnings, and paths are streamed via (SSE), which are logged to JSON files to support complete recursive Undo rollbacks.
+      The current Vermilion is a React 19 + TypeScript SPA with a Python 3 HTTP API that splits folders with large amounts of files into smaller folders. The original Vermilion was a local utility using Python/tkinter, scanning a source directory, separating images from non-images, generating a destination tree, then executing. <a href="/verm/" target="_blank" rel="noopener noreferrer">Spec sheet</a>.
     </p>
     
     <p class="body-text">
-      The original Vermilion was a local utility using Python/tkinter with no external pip dependencies required. It scans a source directory, builds structured records, separates images from non-images, generates a destination tree, previews the result, then executes. <a href="/verm/" target="_blank" rel="noopener noreferrer">Spec sheet</a>.
-    </p>
-    
-    <p class="body-text">
-      I created Verm to reorganize image folders for better management over the internet. It was originally just a local script with gui, but after creating the Millionfold web interface, I wanted to convert this into something that can be run on the server from whatever computer I am using. Like Peri and Mill (and Bullion), it accomplishes the purpose of handling large amounts of image files.
+      I created Verm for better folder management. It was originally just a local script with gui, but after creating the Millionfold web interface, I wanted to convert this into something that can be run on the server from whatever computer I am using. Like Peri and Mill (and Bullion), it accomplishes the purpose of handling large amounts of image files.
     </p>
     
     <a href="./home" class="enter-link">ENTER</a>

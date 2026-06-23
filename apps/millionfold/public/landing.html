@@ -15,7 +15,7 @@
       --bg-color: #fafaf9; /* Warm off-white */
       --text-main: #000000; /* Black */
       --text-body: #374151; /* Dark charcoal grey for readability */
-      --accent-color: #df5c13; /* Warm solar gold/amber accent */
+      --accent-color: #15803d; /* Money green accent */
       --banner-bg: #ffffff; /* White banners */
       --border-color: #e5e7eb; /* Light grey border */
       
@@ -181,15 +181,7 @@
     <h1 class="brand-title">Millionfold</h1>
     
     <p class="body-text">
-      Millionfold is a batch image trimmer, renamer, and processor. The current Millionfold is a React 19 + TypeScript SPA with a Python 3 HTTP API. The client interface is bundled via Vite, styled using a brutalist Tailwind CSS v4 design system, and provides interactive layout configurations to toggle between scrolling thumbnail grids, a centered flashing preview card, and direct zip-export downloads.
-    </p>
-    
-    <p class="body-text">
-      The backend utilizes a multi-threaded Python HTTP server leveraging the Pillow library to perform batch image canvas operations, including edge-variance background trimming, custom color padding, and background transparency removal.
-    </p>
-    
-    <p class="body-text">
-      These transformations execute in a separate worker thread that pushes real-time processing status to the frontend through an SSE event stream while serving raw output files via a dedicated binary file streaming endpoint.
+      Millionfold a web-based image processor using a React 19 + TypeScript SPA using Vite, and a Python 3 HTTP API. I have thousands of drawings on Google Keep Notes that vary in dimensions, and needed to equalize position and size for use in print and web. Manually this process has taken forever. With Millionfold I get every image, regardless of content, processed with a standard background (or transparency) in my desired format. All I have to do is collect the images.
     </p>
     
     <a href="./home" class="enter-link">ENTER</a>

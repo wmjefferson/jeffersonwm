@@ -223,17 +223,17 @@ export default function RulesPanel({ rules, setRules, separator, setSeparator }:
                           className="w-12 text-xs border border-black px-1 py-0.5 bg-white font-mono text-center"
                         />
                       </div>
-                      <div className="flex items-center gap-1.5 flex-1">
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
                         <span className="text-[9px] font-extrabold uppercase text-gray-500">Padding:</span>
                         <select
                           value={rule.padding ?? 3}
                           onChange={(e) => updateRule(rule.id, { padding: parseInt(e.target.value) || 0 })}
-                          className="flex-1 text-xs border border-black px-1 py-0.5 bg-white font-mono"
+                          className="flex-1 min-w-0 text-xs border border-black px-1 py-0.5 bg-white font-mono"
                         >
-                          <option value={0}>None (1, 2, 10)</option>
-                          <option value={2}>01, 02 (2 digits)</option>
-                          <option value={3}>001, 002 (3 digits)</option>
-                          <option value={4}>0001, 0002 (4 digits)</option>
+                          <option value={0}>None</option>
+                          <option value={2}>2 Digits</option>
+                          <option value={3}>3 Digits</option>
+                          <option value={4}>4 Digits</option>
                         </select>
                       </div>
                     </div>
