@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Vermilion v1.3.0 Pure Grouping Modes",
+  "content": "<p>Vermilion has been updated to v1.3.0, introducing pure grouping distribution options for Name Prefix and Dates.</p><p>Key additions:</p><ul><li><strong>Pure Date & Name Prefix Grouping:</strong> Added two new distribution options: 'Group by Date' and 'Group by Name Prefix'. Unlike count-based modes, these modes reorganize files purely into folders matching their date or name prefix without dividing them into sub-folders based on size constraints.</li><li><strong>Sub-option Selection:</strong> Conditionally renders date type/granularity selectors for Date Grouping, and character counts for Name Grouping, while hiding the conflicting 'Sort Methods' card.</li><li><strong>Backend Planner Updates:</strong> Bypasses count-boundary splits when grouping is selected to keep all matching files in single folders.</li></ul>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/52",
+  "source": "release",
+  "external_id": "vermilion-v1.3.0-2026-06-23"
+}

@@ -228,7 +228,9 @@ def generate_plan(images: list, non_images: list, config: PlanConfig) -> Plan:
     # "exact_per_folder" always uses sequential chunking regardless of sort.
     # Character grouping is only used when the sort mode is char/date AND
     # the distribution mode is not "exact_per_folder".
-    if config.distribution_mode == "exact_per_folder":
+    if config.distribution_mode in ("group_by_date", "group_by_name"):
+        plan.folders = _plan_pure_grouping(images_sorted, config, _make_name)
+    elif config.distribution_mode == "exact_per_folder":
         plan.folders = _plan_even_distribution(images_sorted, config, _make_name)
     elif config.sort_by == "char" or config.sort_by.startswith("date_modified") or config.sort_by.startswith("date_created"):
         plan.folders = _plan_character_grouping(images_sorted, config, _make_name)
@@ -240,6 +242,53 @@ def generate_plan(images: list, non_images: list, config: PlanConfig) -> Plan:
     plan.total_folders = _count_folders(plan.folders)
 
     return plan
+
+
+# ---------------------------------------------------------------------------
+# Strategy: pure grouping (no count-based splits)
+# ---------------------------------------------------------------------------
+
+def _plan_pure_grouping(images, config, make_name):
+    """Group files by their sort key prefix, without any splits."""
+    # 1. Group
+    groups: OrderedDict[str, list] = OrderedDict()
+    for fi in images:
+        key = group_key_for_file(fi, config.sort_by, config.char_count)
+        groups.setdefault(key, []).append(fi)
+
+    # 2. Sort group keys naturally (0-9 before A-Z)
+    sorted_keys = sorted(groups.keys(), key=natural_sort_key)
+
+    folders: list[PlannedFolder] = []
+    global_seq = 1
+
+    for gkey in sorted_keys:
+        group_files = groups[gkey]
+        safe_gkey = safe_folder_name(gkey)
+
+        folder_label = safe_gkey
+        if config.append_range and len(group_files) > 0:
+            first = _sort_prefix(group_files[0], config)
+            last = _sort_prefix(group_files[-1], config)
+            if first != last:
+                folder_label += f" - {first} - {last}"
+
+        folder_path = os.path.join(config.dest_dir, safe_gkey)
+        pf = PlannedFolder(
+            display_name=f"{folder_label} ({len(group_files)})",
+            path=folder_path,
+        )
+        for fi in group_files:
+            pf.files.append(PlannedFile(
+                source_path=fi.path,
+                original_name=fi.name,
+                new_name=make_name(fi, global_seq),
+                destination_dir=folder_path,
+            ))
+            global_seq += 1
+        folders.append(pf)
+
+    return folders
 
 
 # ---------------------------------------------------------------------------
