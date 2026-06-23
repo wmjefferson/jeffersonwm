@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Millionfold v0.1.2 Landing & Split Routing",
+  "content": "<p>Millionfold has been updated to v0.1.2, introducing split-routing and a custom landing page.</p><p>Key additions:</p><ul><li><strong>Split Routing Architecture:</strong> Configured local Vite dev servers and production Apache rules to serve a static landing page at the root URL (/) and route the main SPA to (/home).</li><li><strong>Aesthetic Customization:</strong> Customized the landing page to a rich money green (#15803d) and added Keep Notes image equalization copy.</li><li><strong>Routing Loop Correction:</strong> Resolved a dev-server redirect loop by base-prefixing the SPA index rewrite targets.</li></ul>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/50",
+  "source": "release",
+  "external_id": "millionfold-v0.1.2-2026-06-23"
+}
