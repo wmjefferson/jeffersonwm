@@ -132,6 +132,15 @@
         opacity: 0.72;
       }
 
+      .widget-word:focus-visible,
+      .widget-time:focus-visible,
+      .widget-event:focus-visible,
+      .widget-weather:focus-visible,
+      .widget-location:focus-visible {
+        outline: 1px solid rgba(17, 24, 39, 0.72);
+        outline-offset: 3px;
+      }
+
       .widget-location,
       .widget-date {
         display: block;
@@ -225,6 +234,14 @@
         letter-spacing: 0.04em;
       }
 
+      .widget-word--button {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        text-align: inherit;
+      }
+
       .widget-events-popup {
         position: fixed;
         inset: 0;
@@ -242,8 +259,34 @@
         display: none;
       }
 
+      .widget-fonts-popup {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
+        padding: var(--frame);
+        padding-bottom: 0;
+        background: rgba(253, 253, 253, 0.96);
+        overflow-y: auto;
+        z-index: 24;
+      }
+
+      .widget-fonts-popup[hidden] {
+        display: none;
+      }
+
       .widget-events-shell {
-        width: min(var(--widget-width), calc(100vw - (var(--frame) * 2)));
+        width: min(calc(var(--widget-width) + 76px), calc(100vw - (var(--frame) * 2)));
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.6rem;
+        text-align: right;
+      }
+
+      .widget-fonts-shell {
+        width: min(calc(var(--widget-width) + 76px), calc(100vw - (var(--frame) * 2)));
         display: flex;
         flex-direction: column;
         align-items: flex-end;
@@ -260,11 +303,21 @@
         margin-bottom: 0.4rem;
       }
 
+      .widget-fonts-header {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        width: 100%;
+        gap: 1rem;
+        margin-bottom: 0.4rem;
+      }
+
       .widget-events-spacer {
         min-height: 1px;
       }
 
-      .widget-events-close {
+      .widget-events-close,
+      .widget-fonts-close {
         padding: 0;
         border: 0;
         background: transparent;
@@ -277,7 +330,8 @@
         opacity: 0.36;
       }
 
-      .widget-events-close:hover {
+      .widget-events-close:hover,
+      .widget-fonts-close:hover {
         opacity: 1;
       }
 
@@ -285,8 +339,63 @@
         display: flex;
         flex-direction: column;
         align-items: flex-end;
-        gap: 0.36rem;
+        gap: 0.6rem;
         width: 100%;
+      }
+
+      .widget-fonts-card {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.35rem;
+        width: 100%;
+      }
+
+      .widget-fonts-name {
+        font-size: 0.82rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        opacity: 0.88;
+      }
+
+      .widget-fonts-controls {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+
+      .widget-fonts-weight {
+        min-width: 2.2rem;
+        padding: 0.46rem 0.7rem;
+        border: 1px solid rgba(17, 24, 39, 0.46);
+        background: rgba(255, 255, 255, 0.78);
+        color: inherit;
+        font-family: inherit;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition: background 0.15s ease-out, color 0.15s ease-out, opacity 0.15s ease-out;
+      }
+
+      .widget-fonts-weight:hover,
+      .widget-fonts-weight:focus-visible {
+        background: #111827;
+        color: #fff;
+        opacity: 1;
+        outline: none;
+      }
+
+      .widget-fonts-weight.is-active {
+        background: #111827;
+        border-color: #111827;
+        color: #fff;
+      }
+
+      .widget-fonts-weight.is-current-font {
+        border-color: rgba(17, 24, 39, 0.9);
       }
 
       .widget-events-item {
@@ -518,13 +627,29 @@
           text-align: left;
         }
 
+        .widget-fonts-shell {
+          width: 100%;
+          align-items: flex-start;
+          text-align: left;
+        }
+
         .widget-events-header,
         .widget-events-list,
         .widget-events-footer {
           justify-content: flex-start;
         }
 
+        .widget-fonts-header,
+        .widget-fonts-list,
+        .widget-fonts-controls {
+          justify-content: flex-start;
+        }
+
         .widget-events-item-text {
+          align-items: flex-start;
+        }
+
+        .widget-fonts-card {
           align-items: flex-start;
         }
 
@@ -574,7 +699,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            Vermilion. v.1.1.0
+            Vermilion. v.1.2.0
           </a>
           <a
             class="app-link"
@@ -647,10 +772,18 @@
             <span class="widget-weather-temp" id="widget-weather-temp">--°F</span>
           </button>
           <div class="widget-words" id="widget-words"></div>
+          <div class="widget-fonts-popup" id="widget-fonts-popup" hidden>
+            <div class="widget-fonts-shell">
+              <div class="widget-fonts-header">
+                <button class="widget-fonts-close" id="widget-fonts-close" type="button">Close Typeface</button>
+              </div>
+              <div class="widget-fonts-list" id="widget-fonts-list"></div>
+            </div>
+          </div>
           <div class="widget-events-popup" id="widget-events-popup" hidden>
             <div class="widget-events-shell">
               <div class="widget-events-header">
-                <button class="widget-events-close" id="widget-events-close" type="button">Close List</button>
+                <button class="widget-events-close" id="widget-events-close" type="button">Close Special Dates</button>
               </div>
               <div class="widget-events-list" id="widget-events-list"></div>
               <div class="widget-events-footer">
@@ -723,6 +856,9 @@
           weatherIcon: document.getElementById('widget-weather-icon'),
           weatherTemp: document.getElementById('widget-weather-temp'),
           words: document.getElementById('widget-words'),
+          fontsPopup: document.getElementById('widget-fonts-popup'),
+          fontsList: document.getElementById('widget-fonts-list'),
+          fontsClose: document.getElementById('widget-fonts-close'),
           panel: document.getElementById('home-widget'),
           eventsPopup: document.getElementById('widget-events-popup'),
           eventsList: document.getElementById('widget-events-list'),
@@ -742,8 +878,13 @@
         let showNextHour = false;
         let weatherState = null;
         let widgetEvents = [];
+        let widgetFonts = [];
+        let currentWidgetFont = null;
         let eventsLoaded = false;
         let editingEventId = null;
+        let savingFontName = null;
+        const WIDGET_FONT_WEIGHT_MIN = 1;
+        const WIDGET_FONT_WEIGHT_MAX = 5;
         const getWeatherIcon = code => {
           if (code === 0) return '\u2600';
           if (code > 0 && code < 50) return '\u2601';
@@ -812,9 +953,25 @@
             };
           });
 
-          elements.words.innerHTML = sources.map(source => `
+          const wordsMarkup = sources.map(source => `
             <a class="widget-word" href="${source.href}" target="_blank" rel="noopener noreferrer">${source.label}</a>
           `).join('');
+
+          const typefaceLabel = escapeHtml(currentWidgetFont?.name || 'IBM Plex Sans Condensed');
+
+          elements.words.innerHTML = `${wordsMarkup}
+            <button class="widget-word widget-word--button" id="widget-typeface" type="button">${typefaceLabel}</button>
+          `;
+
+          const typefaceButton = document.getElementById('widget-typeface');
+          typefaceButton?.addEventListener('click', event => {
+            event.preventDefault();
+            if (elements.fontsPopup.hidden) {
+              openFontsPopup();
+            } else {
+              closeFontsPopup();
+            }
+          });
         };
 
         const formatEventDate = dateStr => {
@@ -923,6 +1080,19 @@
           elements.event.setAttribute('aria-expanded', 'false');
         };
 
+        const closeFontsPopup = () => {
+          elements.fontsPopup.hidden = true;
+          const typefaceButton = document.getElementById('widget-typeface');
+          typefaceButton?.setAttribute('aria-expanded', 'false');
+        };
+
+        const openFontsPopup = () => {
+          renderFontsPopup();
+          elements.fontsPopup.hidden = false;
+          const typefaceButton = document.getElementById('widget-typeface');
+          typefaceButton?.setAttribute('aria-expanded', 'true');
+        };
+
         const openEventsPopup = async () => {
           if (!eventsLoaded) {
             widgetEvents = await fetchJson(`${WIDGET_API_BASE}/all-events`, []);
@@ -974,12 +1144,12 @@
           return response.json().catch(() => null);
         };
 
-        const applyRandomFont = fonts => {
-          if (!Array.isArray(fonts) || fonts.length === 0) {
-            return;
+        const normaliseFonts = fonts => {
+          if (!Array.isArray(fonts)) {
+            return [];
           }
 
-          const normalizedFonts = fonts
+          return fonts
             .map(font => {
               if (typeof font === 'string') {
                 return { name: font.trim(), weight: 2 };
@@ -989,31 +1159,104 @@
                 return {
                   name: font.name.trim(),
                   weight: Number.isFinite(parsedWeight)
-                    ? Math.min(3, Math.max(1, Math.round(parsedWeight)))
+                    ? Math.min(WIDGET_FONT_WEIGHT_MAX, Math.max(WIDGET_FONT_WEIGHT_MIN, Math.round(parsedWeight)))
                     : 2
                 };
               }
               return null;
             })
             .filter(font => Boolean(font && font.name));
+        };
+
+        const loadGoogleFont = fontName => {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}&display=swap`;
+          document.head.appendChild(link);
+          elements.panel.style.fontFamily = `"${fontName}", "IBM Plex Sans Condensed", system-ui, sans-serif`;
+        };
+
+        const renderFontsPopup = () => {
+          if (!currentWidgetFont?.name) {
+            elements.fontsList.innerHTML = '<div class="widget-events-empty">No typefaces available yet.</div>';
+            return;
+          }
+
+          const font = widgetFonts.find(entry => entry.name === currentWidgetFont.name) || currentWidgetFont;
+          const buttons = Array.from({ length: WIDGET_FONT_WEIGHT_MAX }, (_value, index) => {
+            const weight = index + WIDGET_FONT_WEIGHT_MIN;
+            const isActive = weight === font.weight;
+            const isCurrent = currentWidgetFont?.name === font.name;
+            return `
+              <button
+                class="widget-fonts-weight${isActive ? ' is-active' : ''}${isCurrent ? ' is-current-font' : ''}"
+                type="button"
+                data-font-name="${escapeHtml(font.name)}"
+                data-font-weight="${weight}"
+                ${savingFontName === font.name ? 'disabled' : ''}
+              >${weight}</button>
+            `;
+          }).join('');
+
+          elements.fontsList.innerHTML = `
+            <div class="widget-fonts-card">
+              <div class="widget-fonts-name">${escapeHtml(font.name)}</div>
+              <div class="widget-fonts-controls">${buttons}</div>
+            </div>
+          `;
+
+          elements.fontsList.querySelectorAll('[data-font-name][data-font-weight]').forEach(button => {
+            button.addEventListener('click', async clickEvent => {
+              const target = clickEvent.currentTarget;
+              const fontName = target.getAttribute('data-font-name');
+              const weight = Number(target.getAttribute('data-font-weight'));
+              if (!fontName || !Number.isFinite(weight)) {
+                return;
+              }
+
+              savingFontName = fontName;
+              renderFontsPopup();
+
+              try {
+                await requestJson(`${WIDGET_API_BASE}/fonts/${encodeURIComponent(fontName)}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ weight })
+                });
+
+                widgetFonts = widgetFonts.map(font => (
+                  font.name === fontName
+                    ? { ...font, weight }
+                    : font
+                ));
+              } catch (_error) {
+                // Keep the current values in place if the request fails.
+              } finally {
+                savingFontName = null;
+                renderFontsPopup();
+              }
+            });
+          });
+        };
+
+        const applyRandomFont = fonts => {
+          const normalizedFonts = normaliseFonts(fonts);
+          widgetFonts = normalizedFonts;
 
           if (normalizedFonts.length === 0) {
+            currentWidgetFont = null;
             return;
           }
 
           const totalWeight = normalizedFonts.reduce((sum, font) => sum + font.weight, 0);
           let threshold = Math.random() * totalWeight;
-          const font =
+          currentWidgetFont =
             normalizedFonts.find(candidate => {
               threshold -= candidate.weight;
               return threshold < 0;
             }) || normalizedFonts[normalizedFonts.length - 1];
 
-          const link = document.createElement('link');
-          link.rel = 'stylesheet';
-          link.href = `https://fonts.googleapis.com/css2?family=${font.name.replace(/ /g, '+')}&display=swap`;
-          document.head.appendChild(link);
-          elements.panel.style.fontFamily = `"${font.name}", "IBM Plex Sans Condensed", system-ui, sans-serif`;
+          loadGoogleFont(currentWidgetFont.name);
         };
 
         const refreshWidgetData = async () => {
@@ -1068,6 +1311,7 @@
           });
 
           elements.eventsClose.addEventListener('click', closeEventsPopup);
+          elements.fontsClose.addEventListener('click', closeFontsPopup);
 
           elements.eventsAdd.addEventListener('click', () => {
             openEventEditor(null);
@@ -1136,12 +1380,15 @@
           });
 
           document.addEventListener('click', event => {
-            if (elements.eventsPopup.hidden) {
-              return;
+            const clickTarget = event.target;
+
+            if (!elements.eventsPopup.hidden && !elements.eventsPopup.contains(clickTarget) && clickTarget !== elements.event) {
+              closeEventsPopup();
             }
 
-            if (!elements.panel.contains(event.target)) {
-              closeEventsPopup();
+            const typefaceButton = document.getElementById('widget-typeface');
+            if (!elements.fontsPopup.hidden && !elements.fontsPopup.contains(clickTarget) && clickTarget !== typefaceButton) {
+              closeFontsPopup();
             }
           });
 

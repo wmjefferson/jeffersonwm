@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Vermilion v1.2.0 Date Sorting & Layout Polish",
+  "content": "<p>Vermilion has been updated to v1.2.0, introducing expanded date sorting/distribution sub-options and layout refinements.</p><p>Key additions:</p><ul><li><strong>Expanded Date Grouping:</strong> Added sub-options to organize files by Date Modified and Date Created on a Day, Month, or Year basis.</li><li><strong>Layout Polish:</strong> Expanded the configuration side panel width to 390px to prevent input overlaps, giving sequence rule padding elements proper visual breathing room.</li><li><strong>Planner Integration:</strong> Updated the Python backend scanner and planner to natively handle year-level and month-level directory splits.</li></ul>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/51",
+  "source": "release",
+  "external_id": "vermilion-v1.2.0-2026-06-23"
+}

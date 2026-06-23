@@ -1,8 +1,8 @@
 import React from 'react';
 
 interface Props {
-  sortBy: 'char' | 'full' | 'date_modified' | 'date_created';
-  setSortBy: (val: 'char' | 'full' | 'date_modified' | 'date_created') => void;
+  sortBy: 'char' | 'full' | 'date_modified_day' | 'date_modified_month' | 'date_modified_year' | 'date_created_day' | 'date_created_month' | 'date_created_year';
+  setSortBy: (val: 'char' | 'full' | 'date_modified_day' | 'date_modified_month' | 'date_modified_year' | 'date_created_day' | 'date_created_month' | 'date_created_year') => void;
   charCount: number;
   setCharCount: (val: number) => void;
   distMode: 'max_per_folder' | 'num_folders' | 'exact_per_folder';
@@ -42,20 +42,23 @@ export default function LeftPanel({
           {[
             { value: 'char', label: 'First N Characters' },
             { value: 'full', label: 'Full Filename' },
-            { value: 'date_modified', label: 'Date Modified' },
-            { value: 'date_created', label: 'Date Created' }
-          ].map(opt => (
-            <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input
-                type="radio"
-                name="sort_by"
-                checked={sortBy === opt.value}
-                onChange={() => setSortBy(opt.value as any)}
-                className="w-4 h-4 border-2 border-black rounded-full accent-black cursor-pointer"
-              />
-              <span className="font-archivo text-xs font-bold uppercase tracking-wider text-gray-700">{opt.label}</span>
-            </label>
-          ))}
+            { value: 'date_modified', label: 'Date Modified', isDate: true, defaultVal: 'date_modified_day' },
+            { value: 'date_created', label: 'Date Created', isDate: true, defaultVal: 'date_created_day' }
+          ].map(opt => {
+            const isChecked = opt.isDate ? sortBy.startsWith(opt.value) : sortBy === opt.value;
+            return (
+              <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="radio"
+                  name="sort_by"
+                  checked={isChecked}
+                  onChange={() => setSortBy((opt.defaultVal || opt.value) as any)}
+                  className="w-4 h-4 border-2 border-black rounded-full accent-black cursor-pointer"
+                />
+                <span className="font-archivo text-xs font-bold uppercase tracking-wider text-gray-700">{opt.label}</span>
+              </label>
+            );
+          })}
         </div>
 
         {sortBy === 'char' && (
@@ -76,7 +79,54 @@ export default function LeftPanel({
             </div>
           </div>
         )}
+
+        {sortBy.startsWith('date_modified') && (
+          <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500">Group by:</span>
+            <div className="flex gap-1">
+              {[
+                { value: 'day', label: 'Day' },
+                { value: 'month', label: 'Month' },
+                { value: 'year', label: 'Year' }
+              ].map(g => (
+                <button
+                  key={g.value}
+                  onClick={() => setSortBy(`date_modified_${g.value}` as any)}
+                  className={`px-2.5 py-1 text-[10px] font-bold border border-black flex items-center justify-center transition-colors uppercase tracking-wider ${
+                    sortBy === `date_modified_${g.value}` ? 'bg-black text-white' : 'bg-gray-100 text-black hover:bg-gray-200'
+                  }`}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {sortBy.startsWith('date_created') && (
+          <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500">Group by:</span>
+            <div className="flex gap-1">
+              {[
+                { value: 'day', label: 'Day' },
+                { value: 'month', label: 'Month' },
+                { value: 'year', label: 'Year' }
+              ].map(g => (
+                <button
+                  key={g.value}
+                  onClick={() => setSortBy(`date_created_${g.value}` as any)}
+                  className={`px-2.5 py-1 text-[10px] font-bold border border-black flex items-center justify-center transition-colors uppercase tracking-wider ${
+                    sortBy === `date_created_${g.value}` ? 'bg-black text-white' : 'bg-gray-100 text-black hover:bg-gray-200'
+                  }`}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
 
       {/* DISTRIBUTION MODE */}
       <div className="bg-white border-2 border-black p-3.5 shadow-[2px_2px_0_rgba(0,0,0,1)] space-y-3">

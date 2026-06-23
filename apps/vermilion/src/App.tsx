@@ -84,7 +84,7 @@ export default function App() {
   } | null>(null);
 
   // Sorting & Distribution config
-  const [sortBy, setSortBy] = useState<'char' | 'full' | 'date_modified' | 'date_created'>('char');
+  const [sortBy, setSortBy] = useState<'char' | 'full' | 'date_modified_day' | 'date_modified_month' | 'date_modified_year' | 'date_created_day' | 'date_created_month' | 'date_created_year'>('char');
   const [charCount, setCharCount] = useState<number>(1);
   const [distMode, setDistMode] = useState<'max_per_folder' | 'num_folders' | 'exact_per_folder'>('max_per_folder');
   const [distCount, setDistCount] = useState<number>(50);
@@ -486,7 +486,7 @@ export default function App() {
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-red-600 border border-black shadow-[1px_1px_0_rgba(0,0,0,1)]"></div>
           <h1 className="font-archivo text-[15px] uppercase tracking-wider font-extrabold">Vermilion</h1>
-          <span className="text-[10px] bg-black text-white px-1.5 py-0.5 rounded font-mono font-bold tracking-tight">v1.1.0 Web</span>
+          <span className="text-[10px] bg-black text-white px-1.5 py-0.5 rounded font-mono font-bold tracking-tight">v1.2.0 Web</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -514,7 +514,7 @@ export default function App() {
       <div className="flex flex-1 overflow-hidden">
         
         {/* Left Side Panels - Configuration and Rules */}
-        <aside className="w-[360px] shrink-0 border-r-[3px] border-black flex flex-col bg-[#EDEDED] overflow-hidden">
+        <aside className="w-[390px] shrink-0 border-r-[3px] border-black flex flex-col bg-[#EDEDED] overflow-hidden">
           {/* Tab buttons */}
           <nav className="flex border-b-[2px] border-black bg-white shrink-0">
             <button

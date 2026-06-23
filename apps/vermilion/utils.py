@@ -61,7 +61,7 @@ def sort_key_for_file(file_info, sort_by: str, char_count: int = 1):
     file_info : FileInfo
         As returned by scanner.scan_directory.
     sort_by : str
-        One of 'char', 'full', 'date_modified', 'date_created'.
+        One of 'char', 'full', 'date_modified*', 'date_created*'.
     char_count : int
         Number of leading characters when sort_by == 'char'.
     """
@@ -69,9 +69,9 @@ def sort_key_for_file(file_info, sort_by: str, char_count: int = 1):
         return file_info.name[:char_count].upper()
     elif sort_by == "full":
         return file_info.name.upper()
-    elif sort_by == "date_modified":
+    elif sort_by.startswith("date_modified"):
         return file_info.date_modified
-    elif sort_by == "date_created":
+    elif sort_by.startswith("date_created"):
         return file_info.date_created
     else:
         return file_info.name.upper()
@@ -81,7 +81,7 @@ def group_key_for_file(file_info, sort_by: str, char_count: int = 1) -> str:
     """
     Return the *grouping* key (the folder label) for a file.
     For character modes this is the uppercase N-char prefix.
-    For date modes this is the date string (YYYY-MM-DD).
+    For date modes this is the date string (YYYY-MM-DD, YYYY-MM, or YYYY).
     For full-name mode there is no natural grouping — returns the full name
     (caller should switch to even-distribution instead).
     """
@@ -91,12 +91,18 @@ def group_key_for_file(file_info, sort_by: str, char_count: int = 1) -> str:
         prefix = file_info.name[:char_count].upper()
         # Pad if filename is shorter than char_count
         return prefix.ljust(char_count, '_')
-    elif sort_by == "date_modified":
-        dt = datetime.datetime.fromtimestamp(file_info.date_modified)
-        return dt.strftime("%Y-%m-%d")
-    elif sort_by == "date_created":
-        dt = datetime.datetime.fromtimestamp(file_info.date_created)
-        return dt.strftime("%Y-%m-%d")
+    elif sort_by.startswith("date_modified") or sort_by.startswith("date_created"):
+        is_mod = sort_by.startswith("date_modified")
+        ts = file_info.date_modified if is_mod else file_info.date_created
+        dt = datetime.datetime.fromtimestamp(ts)
+        
+        if "_month" in sort_by:
+            return dt.strftime("%Y-%m")
+        elif "_year" in sort_by:
+            return dt.strftime("%Y")
+        else:
+            return dt.strftime("%Y-%m-%d")
     else:
         # full filename — no grouping
         return file_info.name.upper()
+

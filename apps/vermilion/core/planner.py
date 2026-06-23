@@ -230,9 +230,7 @@ def generate_plan(images: list, non_images: list, config: PlanConfig) -> Plan:
     # the distribution mode is not "exact_per_folder".
     if config.distribution_mode == "exact_per_folder":
         plan.folders = _plan_even_distribution(images_sorted, config, _make_name)
-    elif config.sort_by == "char":
-        plan.folders = _plan_character_grouping(images_sorted, config, _make_name)
-    elif config.sort_by in ("date_modified", "date_created"):
+    elif config.sort_by == "char" or config.sort_by.startswith("date_modified") or config.sort_by.startswith("date_created"):
         plan.folders = _plan_character_grouping(images_sorted, config, _make_name)
     else:
         # full filename — even distribution
@@ -429,10 +427,16 @@ def _sort_prefix(file_info, config: PlanConfig) -> str:
     if config.sort_by == "char":
         # Use char_count chars from name
         return file_info.name[:config.char_count].upper()
-    elif config.sort_by in ("date_modified", "date_created"):
-        ts = file_info.date_modified if config.sort_by == "date_modified" else file_info.date_created
+    elif config.sort_by.startswith("date_modified") or config.sort_by.startswith("date_created"):
+        is_mod = config.sort_by.startswith("date_modified")
+        ts = file_info.date_modified if is_mod else file_info.date_created
         dt = datetime.datetime.fromtimestamp(ts)
-        return dt.strftime("%Y-%m-%d")
+        if "_month" in config.sort_by:
+            return dt.strftime("%Y-%m")
+        elif "_year" in config.sort_by:
+            return dt.strftime("%Y")
+        else:
+            return dt.strftime("%Y-%m-%d")
     else:
         # Full name — show first 8 chars
         return file_info.name_no_ext[:8]
