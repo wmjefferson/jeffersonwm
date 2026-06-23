@@ -9,8 +9,8 @@ interface Props {
 }
 
 function SinglePreview({ img }: { img: LiveImage }) {
-  const fileName = img.dest.split(/[\\/]/).pop() || img.src.split(/[\\/]/).pop() || '';
-  const fileUrl = `${API_BASE}/api/file?path=${encodeURIComponent(img.status === 'ok' ? img.dest : img.src)}`;
+  const fileName = (img.dest ? img.dest.split(/[\\/]/).pop() : '') || (img.src ? img.src.split(/[\\/]/).pop() : '') || '';
+  const fileUrl = `${API_BASE}/api/file?path=${encodeURIComponent(img.status === 'ok' ? (img.dest || '') : (img.src || ''))}`;
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-0">
@@ -54,7 +54,7 @@ function GridHistory({ images, endRef }: { images: LiveImage[]; endRef: React.Re
       {images.map((img, i) => (
         <div
           key={i}
-          title={img.src.split(/[\\/]/).pop()}
+          title={img.src ? img.src.split(/[\\/]/).pop() : ''}
           className={`relative w-[72px] h-[72px] shrink-0 border-[2px] overflow-hidden transition-all duration-200 ${
             img.status === 'error'
               ? 'border-red-500'
