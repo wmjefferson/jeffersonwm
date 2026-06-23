@@ -486,7 +486,7 @@ export default function App() {
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-red-600 border border-black shadow-[1px_1px_0_rgba(0,0,0,1)]"></div>
           <h1 className="font-archivo text-[15px] uppercase tracking-wider font-extrabold">Vermilion</h1>
-          <span className="text-[10px] bg-black text-white px-1.5 py-0.5 rounded font-mono font-bold tracking-tight">v1.0.0 Web</span>
+          <span className="text-[10px] bg-black text-white px-1.5 py-0.5 rounded font-mono font-bold tracking-tight">v1.1.0 Web</span>
         </div>
 
         <div className="flex items-center gap-3">
