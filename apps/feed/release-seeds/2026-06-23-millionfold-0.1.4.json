@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Millionfold v0.1.4 Null-Safety Crash Fix",
+  "content": "<p>Millionfold has been updated to v0.1.4 to resolve a critical UI crash when processing large numbers of files.</p><p>Key additions:</p><ul><li><strong>Path Parsing Null-Safety:</strong> Added guards to prevent <code>TypeError</code> when splitting image destinations/sources on files that fail to process.</li><li><strong>React Render Resilience:</strong> Prevents unhandled exceptions in the live feed preview and grid history components from unmounting the React virtual DOM tree, avoiding blank screens during large batch runs.</li></ul>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/54",
+  "source": "release",
+  "external_id": "millionfold-v0.1.4-2026-06-23"
+}

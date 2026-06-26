@@ -43,6 +43,7 @@ export interface OutputConfig {
   organize_by_date: boolean;
   live_feed_mode: 'grid' | 'single' | 'both';
   duplicate_mode: 'overwrite' | 'parenthesis' | 'duplicates_folder';
+  live_feed_limit?: number;
 }
 
 export interface LiveImage {
@@ -92,6 +93,7 @@ export default function App() {
     separate_uncertain: false, show_live_feed: true, organize_by_date: false,
     live_feed_mode: 'both',
     duplicate_mode: 'overwrite',
+    live_feed_limit: 50,
   });
   const [progress, setProgress] = useState<JobProgress>({
     phase: 'idle', total: 0, current: 0, success: 0, errors: 0,
@@ -103,6 +105,7 @@ export default function App() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const jobIdRef = useRef<string | null>(null);
   const esRef = useRef<EventSource | null>(null);
+  const [pid, setPid] = useState<number | null>(null);
 
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
 
@@ -111,6 +114,29 @@ export default function App() {
       .then(res => res.json())
       .then(data => setAuthStatus(data))
       .catch(() => {});
+
+    fetch(`${API_BASE}/api/health`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok && data.pid) {
+          setPid(data.pid);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const cancelJob = useCallback(async () => {
+    if (!jobIdRef.current) return;
+    try {
+      await fetch(`${API_BASE}/api/job/cancel`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobIdRef.current }),
+      });
+    } catch (err) {
+      console.error('Failed to cancel job:', err);
+    }
   }, []);
 
   const handleLogout = async () => {
@@ -199,10 +225,15 @@ export default function App() {
             errors: evt.status === 'error' ? p.errors + 1 : p.errors,
           }));
           if (output.show_live_feed) {
-            setImages(prev => [...prev.slice(-499), {
-              src: evt.src, dest: evt.dest, thumb_b64: evt.thumb_b64,
-              status: evt.status, is_solid: evt.is_solid ?? true,
-            }]);
+            const limit = output.live_feed_limit ?? 50;
+            setImages(prev => {
+              const sliceCount = limit - 1;
+              const base = sliceCount <= 0 ? [] : prev.slice(-sliceCount);
+              return [...base, {
+                src: evt.src, dest: evt.dest, thumb_b64: evt.thumb_b64,
+                status: evt.status, is_solid: evt.is_solid ?? true,
+              }];
+            });
           }
         } else if (evt.type === 'zipping') {
           setProgress(p => ({ ...p, phase: 'zipping', zip_path: evt.zip }));
@@ -255,7 +286,14 @@ export default function App() {
     <div className="flex flex-col h-screen bg-[#F0F0F0] overflow-hidden">
       {/* Header */}
       <header className="bg-white border-b-[3px] border-black shrink-0 h-9 px-4 flex items-center justify-between">
-        <h1 className="font-archivo text-[15px] uppercase tracking-wider font-bold">Millionfold</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="font-archivo text-[15px] uppercase tracking-wider font-bold">Millionfold</h1>
+          {pid && (
+            <span className="font-mono text-[9px] bg-black text-white px-1.5 py-0.5 uppercase font-bold tracking-wider rounded-sm" title="Process ID of the Millionfold backend server">
+              PID: {pid}
+            </span>
+          )}
+        </div>
         
         {/* Auth System Links */}
         <div className="flex items-center gap-3 text-[11px] font-archivo font-bold uppercase tracking-wider">
@@ -326,6 +364,7 @@ export default function App() {
             errorLog={errorLog}
             showErrors={showErrors}
             setShowErrors={setShowErrors}
+            onCancel={cancelJob}
           />
           {output.show_live_feed && (
             <LiveFeed images={images} mode={output.live_feed_mode || 'both'} />

@@ -236,6 +236,22 @@ export default function LeftPanel({
                     </button>
                   ))}
                 </div>
+                
+                <div className="flex flex-col gap-1 mt-1.5">
+                  <span className="font-archivo text-[9px] font-bold uppercase tracking-widest text-[#666]">Feed History Limit</span>
+                  <select
+                    value={output.live_feed_limit ?? 50}
+                    onChange={e => setOutput(o => ({ ...o, live_feed_limit: Number(e.target.value) }))}
+                    className="border-[2px] border-black bg-white px-2 py-1 text-xs font-archivo uppercase focus:outline-none focus:border-black cursor-pointer font-bold"
+                  >
+                    <option value={1}>Latest Only (Unload History)</option>
+                    <option value={10}>Last 10 Items</option>
+                    <option value={20}>Last 20 Items</option>
+                    <option value={50}>Last 50 Items</option>
+                    <option value={100}>Last 100 Items</option>
+                    <option value={500}>Last 500 Items</option>
+                  </select>
+                </div>
               </div>
             )}
           </div>

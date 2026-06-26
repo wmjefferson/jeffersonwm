@@ -6,6 +6,7 @@ interface Props {
   errorLog: { path: string; error: string }[];
   showErrors: boolean;
   setShowErrors: (v: boolean) => void;
+  onCancel?: () => void;
 }
 
 function formatEta(current: number, total: number, startTime: number): string {
@@ -19,7 +20,7 @@ function formatEta(current: number, total: number, startTime: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function ProgressPanel({ progress, errorLog, showErrors, setShowErrors }: Props) {
+export default function ProgressPanel({ progress, errorLog, showErrors, setShowErrors, onCancel }: Props) {
   const startTimeRef = React.useRef<number>(Date.now());
   const [, forceUpdate] = React.useState(0);
 
@@ -56,6 +57,14 @@ export default function ProgressPanel({ progress, errorLog, showErrors, setShowE
             : ''}
         </span>
         <div className="flex items-center gap-3">
+          {progress.phase === 'running' && onCancel && (
+            <button
+              onClick={onCancel}
+              className="font-archivo text-[9px] font-bold uppercase tracking-widest border-[2px] border-red-600 text-red-600 hover:bg-red-600 hover:text-white px-2 py-0.5 transition-colors cursor-pointer"
+            >
+              Cancel Job
+            </button>
+          )}
           <span className="font-archivo text-[11px] uppercase tracking-wider">
             <span className="text-green-700 font-bold">✓ {progress.success}</span>
             {progress.errors > 0 && (
