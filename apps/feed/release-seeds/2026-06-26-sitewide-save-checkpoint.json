@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "JeffersonWM site-wide save checkpoint",
+  "content": "<p>This checkpoint was a cleanup and handoff pass before a broader site-wide save. The practical focus was Perihelion: finishing the thumbnail deployment loop, syncing the runtime Python script, and making sure the public notes and cross-computer handoff trail matched the code we now have in place.</p><p>What was confirmed:</p><ul><li><strong>Perihelion runtime synced:</strong> the updated thumbnail-capable Python service was recopied to the shared runtime script location and re-verified so the live/local process can be restarted against the current backend logic.</li><li><strong>Navigation polish:</strong> the Perihelion wordmark at the top left now links back to the app root, which makes it easier to jump home after browsing folders or shared views.</li><li><strong>Public status stayed aligned:</strong> JeffersonWM Home was checked against the current saved app versions, and Perihelion remains correctly labeled at <code>v1.4.2</code> without needing an extra version bump just for this sync pass.</li><li><strong>Cross-machine notes updated:</strong> the shared actions handoff files were refreshed so the other workstation and the next save point both inherit the current state instead of the pre-thumbnail notes.</li></ul><p>No new UI branch was introduced here; this was the kind of maintenance checkpoint that keeps the platform understandable while the bigger app work continues.</p>",
+  "url": "https://jeffersonwm.com/",
+  "source": "milestone",
+  "external_id": "jeffersonwm-sitewide-save-checkpoint-2026-06-26"
+}

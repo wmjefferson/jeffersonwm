@@ -256,6 +256,14 @@ const buildSharePageUrl = (shareId: string) => {
   return `${origin}/${shareId}`;
 };
 
+const getPerihelionRootUrl = () => {
+  const origin = window.location.origin;
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const perihelionIndex = segments.indexOf('perihelion');
+  const basePath = perihelionIndex >= 0 ? `/${segments.slice(0, perihelionIndex + 1).join('/')}/` : '/';
+  return `${origin}${basePath}`;
+};
+
 const toMediaEntry = (value: string): MediaEntry => ({
   path: value,
   name: basename(value),
@@ -1545,7 +1553,11 @@ export default function App() {
       ) : (
         <>
           <header className="h-[36px] bg-white border-b-[3px] border-black sticky top-0 z-40 flex items-center justify-between px-4 shrink-0 gap-4">
-        <h1 className="font-archivo text-[15px] uppercase tracking-wider font-bold">Perihelion</h1>
+        <h1 className="font-archivo text-[15px] uppercase tracking-wider font-bold">
+          <a href={getPerihelionRootUrl()} className="hover:opacity-70 transition-opacity">
+            Perihelion
+          </a>
+        </h1>
         <div className="flex items-center gap-3 font-sans text-[11px] font-bold uppercase tracking-widest">
           {authLoading ? (
             <span className="text-[#888]">Checking Account…</span>
