@@ -36,6 +36,8 @@ async function startServer() {
   let widgetEventsSchemaReady: Promise<void> | null = null;
   let widgetFontsSchemaReady: Promise<void> | null = null;
   const FALLBACK_FONTS = ['Inter', 'Roboto', 'Open Sans', 'Playfair Display', 'Outfit'];
+  const WIDGET_FONT_WEIGHT_MIN = 1;
+  const WIDGET_FONT_WEIGHT_MAX = 5;
   const FALLBACK_WOTD = [
     {
       dictionary: 'Meliorism',
@@ -193,7 +195,7 @@ async function startServer() {
 
           const parsedWeight = Number(row.weight);
           const weight = Number.isFinite(parsedWeight)
-            ? Math.min(3, Math.max(1, Math.round(parsedWeight)))
+            ? Math.min(WIDGET_FONT_WEIGHT_MAX, Math.max(WIDGET_FONT_WEIGHT_MIN, Math.round(parsedWeight)))
             : 2;
 
           return { name, weight };
@@ -495,6 +497,46 @@ async function startServer() {
 
   app.get('/api/widget/fonts', async (_req, res) => {
     res.json(await getWidgetFonts());
+  });
+
+  app.put('/api/widget/fonts/:name', async (req, res) => {
+    const db = initDb();
+    if (!db) {
+      return res.status(503).json({ error: 'Database not configured.' });
+    }
+
+    await ensureWidgetFontsSchema();
+
+    const fontName = decodeURIComponent(req.params.name ?? '').trim();
+    const requestedWeight = Number(req.body?.weight);
+    if (!fontName) {
+      return res.status(400).json({ error: 'Font name is required.' });
+    }
+
+    if (!Number.isFinite(requestedWeight)) {
+      return res.status(400).json({ error: 'Weight is required.' });
+    }
+
+    const weight = Math.min(
+      WIDGET_FONT_WEIGHT_MAX,
+      Math.max(WIDGET_FONT_WEIGHT_MIN, Math.round(requestedWeight))
+    );
+
+    try {
+      const [result] = await db.execute(
+        'UPDATE jeffers4_fonts.fonts SET weight = ? WHERE name = ?',
+        [weight, fontName]
+      );
+
+      if ((result as mysql.ResultSetHeader).affectedRows === 0) {
+        return res.status(404).json({ error: 'Font not found.' });
+      }
+
+      res.json({ success: true, name: fontName, weight });
+    } catch (error) {
+      console.error('Widget font update failed:', error);
+      res.status(500).json({ error: 'Failed to update font weight.' });
+    }
   });
 
   app.get('/api/widget/next-event', async (_req, res) => {

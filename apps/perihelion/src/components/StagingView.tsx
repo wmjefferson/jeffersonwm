@@ -2,9 +2,68 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Download, GripVertical, X, Settings2, Image as ImageIcon, FileImage, Check, Share } from 'lucide-react';
 
 const APIBASE = 'https://api.jeffersonwm.com';
-const IMAGE_PATH = `${APIBASE}/images`;
-const MEDIA_PATH = `${APIBASE}/media`;
+const THUMB_PATH = `${APIBASE}/thumbs`;
 const SHARE_API = `${APIBASE}/api/share`;
+
+const encodeAssetPath = (assetPath: string) =>
+  assetPath
+    .split('/')
+    .map(segment => encodeURIComponent(segment))
+    .join('/');
+
+const buildThumbUrl = (assetPath: string, height: number, width = height * 2, cacheBust?: number) => {
+  const params = new URLSearchParams({
+    w: String(Math.max(64, Math.round(width))),
+    h: String(Math.max(64, Math.round(height))),
+  });
+  if (cacheBust) {
+    params.append('r', String(cacheBust));
+  }
+  return `${THUMB_PATH}/${encodeAssetPath(assetPath)}?${params.toString()}`;
+};
+
+const resetImageFallback = (container: Element | null) => {
+  const img = container?.querySelector<HTMLImageElement>('img');
+  const fallback = container?.querySelector<HTMLElement>('[data-image-fallback]');
+  img?.classList.remove('hidden');
+  if (img) {
+    img.dataset.errorMode = 'thumb';
+  }
+  fallback?.classList.add('hidden');
+  fallback?.classList.remove('flex');
+};
+
+const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+  const img = event.currentTarget;
+  img.classList.remove('hidden');
+  const fallback = img.parentElement?.querySelector<HTMLElement>('[data-image-fallback]');
+  fallback?.classList.add('hidden');
+  fallback?.classList.remove('flex');
+};
+
+const showImageFallback = (img: HTMLImageElement) => {
+  img.classList.add('hidden');
+  const fallback = img.parentElement?.querySelector<HTMLElement>('[data-image-fallback]');
+  fallback?.classList.remove('hidden');
+  fallback?.classList.add('flex');
+};
+
+const handleThumbImageError = (
+  event: React.SyntheticEvent<HTMLImageElement>,
+  retryUrl: string,
+) => {
+  const img = event.currentTarget;
+  const attempt = img.dataset.errorMode || 'thumb';
+
+  if (attempt === 'thumb') {
+    img.dataset.errorMode = 'original';
+    img.src = retryUrl;
+    return;
+  }
+
+  img.dataset.errorMode = 'failed';
+  showImageFallback(img);
+};
 
 const buildSharePageUrl = (shareId: string) => {
   const origin = window.location.origin;
@@ -133,6 +192,7 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
   const [showTitlePopup, setShowTitlePopup] = useState<boolean>(false);
   const [pageTitle, setPageTitle] = useState<string>('');
   const [pageDescription, setPageDescription] = useState<string>('');
+  const [previewRetryTokens, setPreviewRetryTokens] = useState<Record<string, number>>({});
 
   const addRule = (type: RuleType) => {
     const newRule: Rule = {
@@ -531,12 +591,14 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
               (() => {
                 const meta = selectedMetadata?.[img];
                 const isMissing = Boolean(meta?.isMissing);
+                const retryToken = previewRetryTokens[img] || 0;
                 return (
               <div 
                 key={img} 
                 className={`bg-white border-[2px] flex flex-col transition-all ${selectedForDownload.has(img) ? 'border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]' : 'border-[#666] opacity-60 hover:opacity-100'}`}
               >
                 <div 
+                  data-image-container
                   className="h-[200px] border-b-[2px] border-[#666] bg-[#e0e0e0] relative flex items-center justify-center overflow-hidden cursor-pointer"
                   onClick={() => {
                     if (!isMissing) onOpenLightbox(img);
@@ -568,12 +630,36 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
                   ) : isRenderable(img) ? (
                     <>
                       <img 
-                        src={isLargeMap?.[img] ? `${MEDIA_PATH}/${encodeURI(img)}` : `${IMAGE_PATH}/${encodeURI(img)}`} 
+                        src={buildThumbUrl(img, 240, 480, retryToken)} 
                         alt={img} 
                         loading="lazy" 
                         referrerPolicy="no-referrer" 
-                        className="h-full w-auto object-contain" 
+                        className="h-full w-auto object-contain"
+                        onLoad={handleImageLoad}
+                        onError={(event) => handleThumbImageError(event, `${APIBASE}/images/${encodeAssetPath(img)}?r=${retryToken}`)}
                       />
+                      <div
+                        data-image-fallback
+                        className="hidden h-full w-full flex-col items-center justify-center gap-3 bg-[#F8F3F1] px-5 text-center text-[#8A5A44]"
+                      >
+                        <div className="border-[2px] border-[#B89D91] bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em]">
+                          Preview
+                        </div>
+                        <div className="max-w-[180px] text-[11px] font-bold uppercase leading-relaxed text-[#7A5A49]">
+                          This image preview is unavailable right now.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            resetImageFallback(event.currentTarget.closest('[data-image-container]'));
+                            setPreviewRetryTokens(prev => ({ ...prev, [img]: (prev[img] || 0) + 1 }));
+                          }}
+                          className="border-[2px] border-[#8A5A44] bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-[#8A5A44] hover:text-white transition-colors"
+                        >
+                          Retry
+                        </button>
+                      </div>
                       {isLargeMap?.[img] && (
                         <div className="absolute top-2 right-2 z-20 bg-yellow-400 text-black border-[2px] border-black px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                           Lrg

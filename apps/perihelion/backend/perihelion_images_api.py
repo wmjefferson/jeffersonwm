@@ -35,6 +35,7 @@ HOST = "0.0.0.0"
 PORT = 8010
 SHARES_DIR = Path(r"E:\perihelion\shares").resolve()
 DATA_DIR = Path(os.environ.get("PERIHELION_DATA_DIR", r"E:\perihelion\data")).resolve()
+THUMB_CACHE_DIR = Path(os.environ.get("PERIHELION_THUMB_CACHE_DIR", str(DATA_DIR / "thumb-cache"))).resolve()
 DB_PATH = DATA_DIR / "perihelion.sqlite3"
 DEFAULT_ORIGIN = "https://jeffersonwm.com"
 ALLOWED_ORIGINS = {
@@ -60,6 +61,8 @@ BOOTSTRAP_ADMIN_PASSWORD = os.environ.get("PERIHELION_BOOTSTRAP_ADMIN_PASSWORD",
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg", ".tif", ".tiff", ".avif", ".jfif"}
 VIDEO_EXTS = {".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv"}
+LARGE_IMAGE_DIMENSION_THRESHOLD = int(os.environ.get("PERIHELION_LARGE_IMAGE_DIMENSION_THRESHOLD", "4096"))
+_IMAGE_DIMENSION_CACHE: dict[str, tuple[int | None, int | None]] = {}
 
 
 def safe_path(rel_path: str) -> Path:
@@ -80,6 +83,10 @@ def ensure_shares_dir() -> None:
 
 def ensure_data_dir() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def ensure_thumb_cache_dir() -> None:
+    THUMB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def make_share_id(length: int = 4) -> str:
@@ -119,6 +126,40 @@ def guess_kind(ext: str) -> str:
     return "other"
 
 
+def image_dimensions(file_path: Path) -> tuple[int | None, int | None]:
+    if not PIL_AVAILABLE or file_path.suffix.lower() == ".svg":
+        return None, None
+
+    try:
+        stat = file_path.stat()
+        cache_key = f"{file_path}|{stat.st_mtime_ns}|{stat.st_size}"
+        cached = _IMAGE_DIMENSION_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+    except Exception:
+        cache_key = None
+
+    try:
+        with Image.open(file_path) as img:
+            size = img.size
+            if cache_key:
+                _IMAGE_DIMENSION_CACHE[cache_key] = size
+            return size
+    except Exception:
+        return None, None
+
+
+def is_large_image_file(file_path: Path) -> bool:
+    if guess_kind(file_path.suffix.lower()) != "image":
+        return False
+
+    width, height = image_dimensions(file_path)
+    if width is None or height is None:
+        return False
+
+    return max(width, height) >= LARGE_IMAGE_DIMENSION_THRESHOLD
+
+
 def visible_name(name: str) -> bool:
     return not name.startswith(".")
 
@@ -133,10 +174,14 @@ def sorted_visible_files(folder: Path) -> list[Path]:
 def folder_preview(folder: Path) -> dict:
     files = sorted_visible_files(folder)
     first = files[0] if files else None
+    first_image = next((entry for entry in files if guess_kind(entry.suffix.lower()) == "image"), None)
     return {
         "thumbnailPath": rel_url(first) if first else None,
         "thumbnailKind": guess_kind(first.suffix) if first else None,
         "thumbnailExt": first.suffix.lower() if first else "",
+        "imageThumbnailPath": rel_url(first_image) if first_image else None,
+        "imageThumbnailKind": guess_kind(first_image.suffix) if first_image else None,
+        "imageThumbnailExt": first_image.suffix.lower() if first_image else "",
         "itemCount": len(files),
     }
 
@@ -426,6 +471,7 @@ def load_share_record(share_id: str) -> dict | None:
             target = safe_path(rel_path)
             if target.is_file():
                 info["size"] = target.stat().st_size
+                info["is_large"] = is_large_image_file(target)
             else:
                 info["missing"] = True
                 missing_images.append(rel_path)
@@ -911,6 +957,50 @@ def process_image_bytes(file_path: Path, options: dict) -> bytes:
         return out.getvalue()
 
 
+def parse_thumb_dimension(raw_value: str | None, fallback: int) -> int:
+    try:
+        value = int(str(raw_value or "").strip())
+    except (TypeError, ValueError):
+        return fallback
+    return max(32, min(2400, value))
+
+
+def thumb_cache_path(rel_path: str, width: int, height: int, source_stamp: str) -> Path:
+    ext = Path(rel_path).suffix.lower() or ".img"
+    digest = hashlib.sha1(f"{rel_path}|{width}|{height}|contain|{source_stamp}".encode("utf-8")).hexdigest()
+    return THUMB_CACHE_DIR / digest[:2] / f"{digest}{ext}"
+
+
+def write_bytes_atomic(target: Path, data: bytes) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(delete=False, dir=target.parent) as temp:
+        temp.write(data)
+        temp_path = Path(temp.name)
+    os.replace(temp_path, target)
+
+
+def cached_thumbnail_path(source: Path, rel_path: str, width: int, height: int) -> Path:
+    source_stat = source.stat()
+    source_stamp = f"{source_stat.st_mtime_ns}-{source_stat.st_size}"
+    cache_path = thumb_cache_path(rel_path, width, height, source_stamp)
+    if cache_path.is_file():
+        return cache_path
+
+    options = {
+        "enableDimensions": True,
+        "dimensions": {
+            "width": width,
+            "height": height,
+            "maintainAspect": True,
+        },
+        "enableFilesize": False,
+    }
+    thumb_bytes = process_image_bytes(source, options)
+    write_bytes_atomic(cache_path, thumb_bytes)
+    os.utime(cache_path, ns=(source_stat.st_atime_ns, source_stat.st_mtime_ns))
+    return cache_path
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send_json(self, data, status=200, extra_headers: list[tuple[str, str]] | None = None):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -937,6 +1027,39 @@ class Handler(BaseHTTPRequestHandler):
 
         with open(file_path, "rb") as f:
             shutil.copyfileobj(f, self.wfile)
+
+    def _send_thumbnail(self, source_path: Path, rel_path: str, query: dict[str, list[str]]):
+        if not source_path.is_file():
+            self._send_json({"error": "File not found"}, 404)
+            return
+
+        if guess_kind(source_path.suffix) != "image":
+            self._send_file(source_path)
+            return
+
+        width = parse_thumb_dimension((query.get("w") or [None])[0], 500)
+        height = parse_thumb_dimension((query.get("h") or [None])[0], 250)
+
+        try:
+            if not PIL_AVAILABLE or source_path.suffix.lower() == ".svg":
+                self._send_file(source_path)
+                return
+
+            thumb_path = cached_thumbnail_path(source_path, rel_path, width, height)
+            ctype, _ = mimetypes.guess_type(str(thumb_path))
+            ctype = ctype or "application/octet-stream"
+            size = thumb_path.stat().st_size
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(size))
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+            send_cors_headers(self)
+            self.end_headers()
+
+            with open(thumb_path, "rb") as f:
+                shutil.copyfileobj(f, self.wfile)
+        except Exception:
+            self._send_file(source_path)
 
     def _set_session_cookie(self, token: str, expires_at: datetime) -> tuple[str, str]:
         expires_text = expires_at.strftime("%a, %d %b %Y %H:%M:%S GMT")
@@ -1074,6 +1197,7 @@ class Handler(BaseHTTPRequestHandler):
                         item["ext"] = ext
                         item["size"] = entry.stat().st_size
                         item["kind"] = guess_kind(ext)
+                        item["is_large"] = is_large_image_file(entry)
                         item["url"] = f"/images/{rel_url(entry)}"
                         files.append(item)
 
@@ -1154,6 +1278,15 @@ class Handler(BaseHTTPRequestHandler):
                 rel = unquote(path[len(prefix):])
                 target = safe_path(rel)
                 self._send_file(target)
+                return
+
+            if path.startswith("/thumbs/"):
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                rel = unquote(path[len("/thumbs/"):])
+                target = safe_path(rel)
+                self._send_thumbnail(target, rel, query)
                 return
 
             if path.startswith("/api/image-meta/"):
@@ -1691,8 +1824,14 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     ensure_shares_dir()
     ensure_data_dir()
+    ensure_thumb_cache_dir()
     init_db()
     bootstrap_admin_if_needed()
     print(f"Serving {ROOT} at http://localhost:{PORT}")
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("Perihelion image service stopped.")
+    finally:
+        server.server_close()

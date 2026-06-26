@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Stallioneer v0.1.4",
+  "content": "<p>Stallioneer settled into a cleaner local working shape this pass. Instead of adding new systems, this checkpoint focused on separating admin controls from personal account controls, clarifying the add and edit layouts, and smoothing the UI around the actual shelf-entry workflow.</p><p>What changed:</p><ul><li><strong>Settings split into account and admin:</strong> the signed-in account page now stays focused on profile and import/export, while admin-only snapshot and permission controls moved onto a dedicated Settings page in the banner.</li><li><strong>Add flow layout tuned again:</strong> standard add mode now presents lookup beside book details, with the action buttons in their own shorter block under lookup and inventory kept in its own matching panel.</li><li><strong>Edit view corrected:</strong> the edit-book screen returned to a true left/right layout so common and extended details stay grouped on the left while copy-first inventory editing remains on the right.</li><li><strong>Interface polish pass:</strong> spacing and panel height issues were cleaned up across the new admin settings view and the add/edit screens so the working surfaces read more clearly during repeated use.</li></ul><p>This version keeps Stallioneer pointed in the same direction: a serious personal inventory station built around scanning, copy-level editing, and lower-friction cataloging rather than decorative complexity.</p>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/50",
+  "source": "release",
+  "external_id": "stallioneer-v0.1.4-2026-06-25"
+}

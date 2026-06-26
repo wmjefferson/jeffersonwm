@@ -318,6 +318,9 @@ a {
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
+  grid-template-areas:
+    "lookup details"
+    "actions inventory";
 }
 
 .edit-layout {
@@ -331,22 +334,31 @@ a {
   gap: 18px;
 }
 
-.entry-panel--lookup,
-.edit-panel--common {
+.entry-panel--lookup {
+  grid-area: lookup;
   grid-column: 1;
 }
 
-.entry-panel--details,
-.edit-panel--extended {
-  grid-column: 1;
+.entry-panel--details {
+  grid-area: details;
+  grid-column: 2;
 }
 
 .entry-panel--actions {
+  align-self: start;
+  grid-area: actions;
+  grid-column: 1;
+}
+
+.entry-panel--inventory {
+  grid-area: inventory;
   grid-column: 2;
 }
 
+.edit-panel--common,
+.edit-panel--extended,
 .edit-panel--inventory {
-  grid-column: 2;
+  grid-column: 1;
 }
 
 .entry-grid--speed {
@@ -361,6 +373,14 @@ a {
 
 .bulk-tools-grid {
   grid-template-columns: repeat(2, minmax(280px, 1fr));
+}
+
+.admin-settings-summary {
+  margin-top: 18px;
+}
+
+.admin-settings-panel {
+  margin-bottom: 18px;
 }
 
 .bulk-action-grid {

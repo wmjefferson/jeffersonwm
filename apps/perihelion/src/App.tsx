@@ -25,6 +25,9 @@ interface FolderEntry {
   thumbnailPath: string | null;
   thumbnailKind: MediaKind | null;
   thumbnailExt: string;
+  imageThumbnailPath?: string | null;
+  imageThumbnailKind?: MediaKind | null;
+  imageThumbnailExt?: string;
   itemCount: number;
 }
 
@@ -148,7 +151,74 @@ const getFileTypeTone = (filename: string) => {
 const APIBASE = 'https://api.jeffersonwm.com';
 const IMAGE_PATH = `${APIBASE}/images`;
 const MEDIA_PATH = `${APIBASE}/media`;
+const THUMB_PATH = `${APIBASE}/thumbs`;
 const API_PATH = `${APIBASE}/api`;
+
+const encodeAssetPath = (assetPath: string) =>
+  assetPath
+    .split('/')
+    .map(segment => encodeURIComponent(segment))
+    .join('/');
+
+const buildImageUrl = (assetPath: string, cacheBust?: number) =>
+  `${IMAGE_PATH}/${encodeAssetPath(assetPath)}${cacheBust ? `?r=${cacheBust}` : ''}`;
+
+const buildMediaUrl = (assetPath: string, cacheBust?: number) =>
+  `${MEDIA_PATH}/${encodeAssetPath(assetPath)}${cacheBust ? `?r=${cacheBust}` : ''}`;
+
+const buildThumbUrl = (assetPath: string, height: number, width = height * 2, cacheBust?: number) => {
+  const params = new URLSearchParams({
+    w: String(Math.max(64, Math.round(width))),
+    h: String(Math.max(64, Math.round(height))),
+  });
+  if (cacheBust) {
+    params.append('r', String(cacheBust));
+  }
+  return `${THUMB_PATH}/${encodeAssetPath(assetPath)}?${params.toString()}`;
+};
+
+const resetImageFallback = (container: Element | null) => {
+  const img = container?.querySelector<HTMLImageElement>('img');
+  const fallback = container?.querySelector<HTMLElement>('[data-image-fallback]');
+  img?.classList.remove('hidden');
+  if (img) {
+    img.dataset.errorMode = 'thumb';
+  }
+  fallback?.classList.add('hidden');
+  fallback?.classList.remove('flex');
+};
+
+const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+  const img = event.currentTarget;
+  img.classList.remove('hidden');
+  const fallback = img.parentElement?.querySelector<HTMLElement>('[data-image-fallback]');
+  fallback?.classList.add('hidden');
+  fallback?.classList.remove('flex');
+};
+
+const showImageFallback = (img: HTMLImageElement) => {
+  img.classList.add('hidden');
+  const fallback = img.parentElement?.querySelector<HTMLElement>('[data-image-fallback]');
+  fallback?.classList.remove('hidden');
+  fallback?.classList.add('flex');
+};
+
+const handleThumbImageError = (
+  event: React.SyntheticEvent<HTMLImageElement>,
+  retryUrl: string,
+) => {
+  const img = event.currentTarget;
+  const attempt = img.dataset.errorMode || 'thumb';
+
+  if (attempt === 'thumb') {
+    img.dataset.errorMode = 'original';
+    img.src = retryUrl;
+    return;
+  }
+
+  img.dataset.errorMode = 'failed';
+  showImageFallback(img);
+};
 
 const formatBytes = (bytes: number, decimals = 2) => {
   if (bytes === 0) return '0 Bytes';
@@ -265,6 +335,7 @@ export default function App() {
   const [sharedTitle, setSharedTitle] = useState<string>('');
   const [sharedDescription, setSharedDescription] = useState<string>('');
   const [sharedError, setSharedError] = useState('');
+  const [previewRetryTokens, setPreviewRetryTokens] = useState<Record<string, number>>({});
 
   const [rowHeight, setRowHeight] = useState(250);
   const [limit, setLimit] = useState(25);
@@ -356,6 +427,7 @@ export default function App() {
 
   const sharedNonRenderable = (sharedImages || []).filter(item => !isRenderable(item));
   const sharedRenderable = (sharedImages || []).filter(item => isRenderable(item));
+  const folderThumbnailHeight = Math.max(120, Math.min(220, rowHeight - 30));
 
   const sharedRenderableFiles = useMemo(() => {
     if (sharedFiles) {
@@ -678,6 +750,9 @@ export default function App() {
             thumbnailPath: folder.thumbnailPath ?? null,
             thumbnailKind: folder.thumbnailKind ?? (folder.thumbnailPath ? getMediaKind(folder.thumbnailPath) : null),
             thumbnailExt: folder.thumbnailExt || (folder.thumbnailPath ? extensionOf(folder.thumbnailPath) : ''),
+            imageThumbnailPath: folder.imageThumbnailPath ?? null,
+            imageThumbnailKind: folder.imageThumbnailKind ?? (folder.imageThumbnailPath ? getMediaKind(folder.imageThumbnailPath) : null),
+            imageThumbnailExt: folder.imageThumbnailExt || (folder.imageThumbnailPath ? extensionOf(folder.imageThumbnailPath) : ''),
             itemCount: folder.itemCount ?? 0,
           })).filter((folder: FolderEntry) => Boolean(folder.path))
         : (data.directories || []).map((dir: string) => ({
@@ -1410,8 +1485,8 @@ export default function App() {
               const size = file.size || 0;
               const isForced = forceFullImage[file.path];
               const srcUrl = (isLarge && !isForced)
-                ? `${MEDIA_PATH}/${encodeURI(file.path)}`
-                : `${IMAGE_PATH}/${encodeURI(file.path)}`;
+                ? buildMediaUrl(file.path)
+                : buildImageUrl(file.path);
 
               return (
                 <div key={file.path} className="flex flex-col items-center justify-center w-full gap-2 relative">
@@ -1958,7 +2033,17 @@ export default function App() {
               </label>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {displayFolders.map(folder => (
+              {displayFolders.map(folder => {
+                const previewPath = includeOtherFiles
+                  ? (folder.thumbnailPath || folder.imageThumbnailPath || null)
+                  : (folder.imageThumbnailPath || folder.thumbnailPath || null);
+                const previewKind = includeOtherFiles
+                  ? (folder.thumbnailKind || folder.imageThumbnailKind || null)
+                  : (folder.imageThumbnailKind || folder.thumbnailKind || null);
+                const folderRetryKey = `folder:${folder.path}:${previewPath ?? 'empty'}`;
+                const folderRetryToken = previewRetryTokens[folderRetryKey] || 0;
+
+                return (
                 <div
                   key={folder.path}
                   role="button"
@@ -1976,28 +2061,51 @@ export default function App() {
                 >
                   {showFolderThumbnails ? (
                     <div
+                      data-image-container
                       className="w-full border-b-[2px] border-[#666] bg-[#e0e0e0] flex items-center justify-center overflow-hidden"
                       style={{ height: `${Math.max(120, Math.min(220, rowHeight - 30))}px` }}
                     >
-                      {folder.thumbnailPath && folder.thumbnailKind === 'image' ? (
-                        <img
-                          src={`${IMAGE_PATH}/${encodeURI(folder.thumbnailPath)}`}
-                          alt={folder.name}
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : folder.thumbnailPath ? (
-                        <div className={`flex flex-col items-center justify-center gap-2 w-full h-full px-4 ${getFileTypeTone(folder.thumbnailPath).accent}`}>
-                          <div className={`w-14 h-14 rounded-full border-[2px] flex items-center justify-center ${getFileTypeTone(folder.thumbnailPath).border} ${getFileTypeTone(folder.thumbnailPath).bg}`}>
+                      {previewPath && previewKind === 'image' ? (
+                        <>
+                          <img
+                            src={buildThumbUrl(previewPath, folderThumbnailHeight, folderThumbnailHeight * 2, folderRetryToken)}
+                            alt={folder.name}
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover"
+                            onLoad={handleImageLoad}
+                            onError={(event) => handleThumbImageError(event, buildImageUrl(previewPath, folderRetryToken))}
+                          />
+                          <div
+                            data-image-fallback
+                            className="hidden h-full w-full flex-col items-center justify-center gap-2 bg-[#F3F3F3] px-4 text-center text-[#666]"
+                          >
+                            <FolderOpen size={28} className="text-black" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">Preview Unavailable</span>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                resetImageFallback(event.currentTarget.closest('[data-image-container]'));
+                                setPreviewRetryTokens(prev => ({ ...prev, [folderRetryKey]: (prev[folderRetryKey] || 0) + 1 }));
+                              }}
+                              className="border-[2px] border-black bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        </>
+                      ) : previewPath ? (
+                        <div className={`flex flex-col items-center justify-center gap-2 w-full h-full px-4 ${getFileTypeTone(previewPath).accent}`}>
+                          <div className={`w-14 h-14 rounded-full border-[2px] flex items-center justify-center ${getFileTypeTone(previewPath).border} ${getFileTypeTone(previewPath).bg}`}>
                             <FileImage size={24} strokeWidth={1.5} />
                           </div>
                           <div className="flex flex-col items-center gap-1 text-center">
                             <span className="text-[11px] font-bold uppercase tracking-[0.25em]">
-                              {getFileTypeCode(folder.thumbnailPath)}
+                              {getFileTypeCode(previewPath)}
                             </span>
                             <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">
-                              First File
+                              {includeOtherFiles ? 'First File' : 'First Image'}
                             </span>
                           </div>
                         </div>
@@ -2021,7 +2129,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}
@@ -2077,11 +2185,16 @@ export default function App() {
         ) : (
           <div className="flex flex-wrap gap-4 sm:gap-6">
             {pagedEntries.map((entry, idx) => (
+              (() => {
+                const retryKey = `entry:${entry.path}`;
+                const retryToken = previewRetryTokens[retryKey] || 0;
+                return (
               <div
                 key={entry.path || idx}
                 className={`bg-white border-[2px] flex flex-col transition-all ${selectedImages.has(entry.path) ? 'border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-10' : 'border-[#666] hover:border-black'}`}
               >
                 <div
+                  data-image-container
                   className={`border-b-[2px] ${selectedImages.has(entry.path) ? 'border-black' : 'border-[#666]'} bg-[#e0e0e0] relative flex items-center justify-center overflow-hidden cursor-pointer`}
                   style={{ height: `${rowHeight}px` }}
                   onClick={() => setSelectedImage(entry.path)}
@@ -2104,12 +2217,36 @@ export default function App() {
                   ) : entry.kind === 'image' && isRenderable(entry.path) ? (
                     <>
                       <img
-                        src={entry.is_large ? `${MEDIA_PATH}/${encodeURI(entry.path)}` : `${IMAGE_PATH}/${encodeURI(entry.path)}`}
+                        src={buildThumbUrl(entry.path, rowHeight, rowHeight * 2, retryToken)}
                         alt={entry.path}
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         className="h-full w-auto object-contain p-2"
+                        onLoad={handleImageLoad}
+                        onError={(event) => handleThumbImageError(event, buildImageUrl(entry.path, retryToken))}
                       />
+                      <div
+                        data-image-fallback
+                        className="hidden h-full w-full flex-col items-center justify-center gap-3 bg-[#F8F3F1] px-5 text-center text-[#8A5A44]"
+                      >
+                        <div className="border-[2px] border-[#B89D91] bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em]">
+                          Preview
+                        </div>
+                        <div className="max-w-[180px] text-[11px] font-bold uppercase leading-relaxed text-[#7A5A49]">
+                          This image preview is unavailable right now.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            resetImageFallback(event.currentTarget.closest('[data-image-container]'));
+                            setPreviewRetryTokens(prev => ({ ...prev, [retryKey]: (prev[retryKey] || 0) + 1 }));
+                          }}
+                          className="border-[2px] border-[#8A5A44] bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-[#8A5A44] hover:text-white transition-colors"
+                        >
+                          Retry
+                        </button>
+                      </div>
                       {entry.is_large && (
                         <div className="absolute top-2 right-2 z-20 bg-yellow-400 text-black border-[2px] border-black px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                           Lrg
@@ -2146,6 +2283,7 @@ export default function App() {
                   )}
                 </div>
               </div>
+              )})()
             ))}
           </div>
         )}
@@ -2223,8 +2361,8 @@ export default function App() {
                   const showFullImage = !isSelectedImageLarge || forceFullImage[selectedImage || ''];
 
                   const imageUrl = showFullImage
-                    ? `${IMAGE_PATH}/${encodeURI(selectedImage || '')}`
-                    : `${MEDIA_PATH}/${encodeURI(selectedImage || '')}`;
+                    ? buildImageUrl(selectedImage || '')
+                    : buildMediaUrl(selectedImage || '');
 
                   return (
                     <div className="flex flex-col items-center gap-3 max-w-full">
@@ -2285,17 +2423,17 @@ export default function App() {
                 <div className="truncate flex-1">
                   <span className="text-[#888] uppercase font-bold tracking-wider mr-1">Direct URL:</span>
                   <a 
-                    href={`${IMAGE_PATH}/${encodeURI(selectedImage)}`} 
+                    href={buildImageUrl(selectedImage)} 
                     className="text-black hover:underline font-bold" 
                     target="_blank" 
                     rel="noopener noreferrer"
                   >
-                    {`${IMAGE_PATH}/${encodeURI(selectedImage)}`}
+                    {buildImageUrl(selectedImage)}
                   </a>
                 </div>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(`${IMAGE_PATH}/${encodeURI(selectedImage)}`);
+                    navigator.clipboard.writeText(buildImageUrl(selectedImage));
                     setCopiedImageLink(true);
                     setTimeout(() => setCopiedImageLink(false), 2000);
                   }}

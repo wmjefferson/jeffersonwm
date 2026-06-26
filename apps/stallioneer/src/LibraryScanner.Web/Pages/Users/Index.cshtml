@@ -1,46 +1,20 @@
-@page "/Settings"
+@page
 @model LibraryScanner.Web.Pages.Users.IndexModel
 @{
-    ViewData["Title"] = "Settings";
+    ViewData["Title"] = "Account";
 }
 
 <section class="page-heading">
     <div>
-        <p class="eyebrow">Control surface</p>
-        <h1>Settings</h1>
-        <p class="muted-block">Starter admin surface for Stallioneer. Right now it shows the local account records from <code>app.db</code>, and we can grow it into a fuller settings page later.</p>
+        <p class="eyebrow">Account</p>
+        <h1>Your account</h1>
+        <p class="muted-block">Manage your signed-in profile and move inventory data in or out of Stallioneer.</p>
     </div>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <div class="alert alert-success">@Model.StatusMessage</div>
-}
-
-@if (Model.IsAdmin)
-{
-    <section class="stats-grid compact-stats-grid">
-        <div class="stat">
-            <span class="stat-label">Total users</span>
-            <strong>@Model.TotalUsers</strong>
-        </div>
-        <div class="stat">
-            <span class="stat-label">Confirmed emails</span>
-            <strong>@Model.ConfirmedUsers</strong>
-        </div>
-        <div class="stat">
-            <span class="stat-label">Display names</span>
-            <strong>@Model.NamedUsers</strong>
-        </div>
-        <div class="stat">
-            <span class="stat-label">Signed in as</span>
-            <strong>@(Model.CurrentUser?.UserName ?? "Unknown")</strong>
-        </div>
-        <div class="stat">
-            <span class="stat-label">Admin users</span>
-            <strong>@Model.AdminUsers</strong>
-        </div>
-    </section>
 }
 
 <section class="entry-grid">
@@ -71,64 +45,24 @@
                     <label>Email status</label>
                     <input class="form-control" value="@(Model.CurrentUser.EmailConfirmed ? "Confirmed" : "Unconfirmed")" readonly />
                 </div>
-                @if (Model.IsAdmin)
-                {
-                    <div>
-                        <label>Permissions</label>
-                        <input class="form-control" value="Admin" readonly />
-                    </div>
-                }
-                @if (!Model.IsAdmin)
-                {
-                    <div>
-                        <label>Library totals</label>
-                        <p class="muted-block">
-                            Titles: @Model.Snapshot.TotalBooks
-                            <br />
-                            Items: @Model.Snapshot.TotalItems
-                            <br />
-                            Tags: @Model.Snapshot.TotalTags
-                            <br />
-                            Collections: @Model.Snapshot.TotalCollections
-                        </p>
-                    </div>
-                }
+                <div>
+                    <label>Library totals</label>
+                    <p class="muted-block">
+                        Titles: @Model.Snapshot.TotalBooks
+                        <br />
+                        Items: @Model.Snapshot.TotalItems
+                        <br />
+                        Tags: @Model.Snapshot.TotalTags
+                        <br />
+                        Collections: @Model.Snapshot.TotalCollections
+                    </p>
+                </div>
                 <div class="lookup-actions">
                     <button type="submit" class="btn btn-primary">Save profile</button>
                 </div>
             </form>
         }
     </section>
-
-    @if (Model.IsAdmin)
-    {
-        <section class="panel">
-            <p class="eyebrow">App snapshot</p>
-            <h2>Local system</h2>
-            <div class="field-stack">
-                <div>
-                    <label>Database path</label>
-                    <input class="form-control" value="@Model.Snapshot.DatabasePath" readonly />
-                </div>
-                <div>
-                    <label>Database updated</label>
-                    <input class="form-control" value="@(Model.Snapshot.DatabaseLastUpdated?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown")" readonly />
-                </div>
-                <div>
-                    <label>Backup directory</label>
-                    <input class="form-control" value="@Model.Snapshot.BackupDirectory" readonly />
-                </div>
-                <div>
-                    <label>Latest backup</label>
-                    <input class="form-control" value="@(Model.Snapshot.LatestBackupName ?? "No backup found")" readonly />
-                </div>
-                <div>
-                    <label>Latest backup updated</label>
-                    <input class="form-control" value="@(Model.Snapshot.LatestBackupUpdated?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown")" readonly />
-                </div>
-            </div>
-        </section>
-    }
 </section>
 
 <section class="panel bulk-panel">
@@ -207,69 +141,6 @@
         </form>
     </div>
 </section>
-
-@if (Model.IsAdmin)
-{
-    <section class="panel">
-        <p class="eyebrow">Admin tools</p>
-        <h2>Account permissions</h2>
-        <p class="muted-block">Use this section to decide which accounts can manage permissions and future system-wide settings. Stallioneer always keeps at least one admin account.</p>
-
-        <div class="table-wrap">
-            <table class="table inventory-table">
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>Display name</th>
-                        <th>Email</th>
-                        <th>Roles</th>
-                        <th>Admin access</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var user in Model.Users)
-                {
-                    <tr>
-                        <td><strong>@user.UserName</strong></td>
-                        <td>@(string.IsNullOrWhiteSpace(user.DisplayName) ? "-" : user.DisplayName)</td>
-                        <td>@(string.IsNullOrWhiteSpace(user.Email) ? "-" : user.Email)</td>
-                        <td>@string.Join(", ", user.Roles)</td>
-                        <td>
-                            <form method="post" asp-page-handler="UpdatePermissions" class="inline-form">
-                                <input type="hidden" name="userId" value="@user.Id" />
-                                <input type="hidden" name="isAdmin" value="@(user.IsAdmin ? "false" : "true")" />
-                                <span class="status-pill">@(user.IsAdmin ? "Admin" : "User")</span>
-                                <button type="submit" class="btn btn-outline-secondary">
-                                    @(user.IsAdmin ? "Remove admin" : "Make admin")
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <section class="stats-grid compact-stats-grid">
-        <div class="stat">
-            <span class="stat-label">Books</span>
-            <strong>@Model.Snapshot.TotalBooks</strong>
-        </div>
-        <div class="stat">
-            <span class="stat-label">Items</span>
-            <strong>@Model.Snapshot.TotalItems</strong>
-        </div>
-        <div class="stat">
-            <span class="stat-label">Tags</span>
-            <strong>@Model.Snapshot.TotalTags</strong>
-        </div>
-        <div class="stat">
-            <span class="stat-label">Collections</span>
-            <strong>@Model.Snapshot.TotalCollections</strong>
-        </div>
-    </section>
-}
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
