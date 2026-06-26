@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Millionfold v0.1.5 Cancel Job, Backend PID & Performance Fixes",
+  "content": "<p>Millionfold has been updated to v0.1.5, introducing runtime process cancellation, server PID visibility, and customizable feed history limits.</p><p>Key additions:</p><ul><li><strong>Configurable Live Feed Limit:</strong> Added a dropdown to restrict the number of live tiles in memory. You can select \"Latest Only\" to instantly discard previous images as new ones load, avoiding browser memory crashes on large batches.</li><li><strong>Run Cancellation:</strong> Implemented a \"Cancel Job\" button in the UI which POSTs to a new backend endpoint to abort processing immediately.</li><li><strong>Server PID Display:</strong> Exposes the backend Process ID (PID) in the header for system administration.</li></ul>",
+  "url": "https://github.com/wmjefferson/jeffersonwm/issues/55",
+  "source": "release",
+  "external_id": "millionfold-v0.1.5-2026-06-26"
+}
