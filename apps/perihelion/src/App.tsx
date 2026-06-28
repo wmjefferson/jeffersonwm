@@ -229,6 +229,8 @@ const formatBytes = (bytes: number, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
+const isLikelyShareCode = (value: string) => /^[a-z0-9]{4}$/i.test(value) && value.toLowerCase() !== 'home';
+
 const getShareIdFromLocation = () => {
   const params = new URLSearchParams(window.location.search);
   const queryShareId = params.get('share');
@@ -239,21 +241,11 @@ const getShareIdFromLocation = () => {
   const segments = window.location.pathname.split('/').filter(Boolean);
   const perihelionIndex = segments.indexOf('perihelion');
   if (perihelionIndex >= 0) {
-    return segments[perihelionIndex + 1] || '';
+    const candidate = segments[perihelionIndex + 1] || '';
+    return isLikelyShareCode(candidate) ? candidate : '';
   }
 
   return '';
-};
-
-const buildSharePageUrl = (shareId: string) => {
-  const origin = window.location.origin;
-  if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-    const segments = window.location.pathname.split('/').filter(Boolean);
-    const perihelionIndex = segments.indexOf('perihelion');
-    const basePath = perihelionIndex >= 0 ? `/${segments.slice(0, perihelionIndex + 1).join('/')}/` : '/';
-    return `${origin}${basePath}?share=${shareId}`;
-  }
-  return `${origin}/${shareId}`;
 };
 
 const getPerihelionRootUrl = () => {
@@ -262,6 +254,148 @@ const getPerihelionRootUrl = () => {
   const perihelionIndex = segments.indexOf('perihelion');
   const basePath = perihelionIndex >= 0 ? `/${segments.slice(0, perihelionIndex + 1).join('/')}/` : '/';
   return `${origin}${basePath}`;
+};
+
+const getPerihelionBasePath = () => {
+  const rootUrl = new URL(getPerihelionRootUrl());
+  return rootUrl.pathname;
+};
+
+const getPerihelionAppUrl = () => `${getPerihelionRootUrl()}home`;
+
+const getPerihelionAppPath = () => {
+  const appUrl = new URL(getPerihelionAppUrl());
+  return appUrl.pathname;
+};
+
+const buildSharePageUrl = (shareId: string) => {
+  const appUrl = new URL(getPerihelionAppUrl());
+  appUrl.searchParams.set('share', shareId);
+  return appUrl.toString();
+};
+
+type GalleryMode = 'gallery' | 'selected' | 'staging';
+
+interface GalleryLocationState {
+  path: string;
+  page: number;
+  rowHeight: number;
+  limit: number;
+  includeOtherFiles: boolean;
+  showFolderThumbnails: boolean;
+  selectedTag: string;
+  selectedList: string;
+  searchQuery: string;
+  selectedImage: string | null;
+  mode: GalleryMode;
+  selectionId: string | null;
+}
+
+interface SelectionDraft {
+  id: string;
+  createdAt: string;
+  items: MediaEntry[];
+}
+
+const SELECTION_STORAGE_PREFIX = 'peri_selection_';
+
+const parsePositiveInt = (value: string | null, fallback: number) => {
+  if (!value) return fallback;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const createSelectionDraftId = () => Math.random().toString(36).slice(2, 6);
+
+const getSelectionDraftKey = (id: string) => `${SELECTION_STORAGE_PREFIX}${id}`;
+
+const loadSelectionDraft = (id: string): SelectionDraft | null => {
+  try {
+    const raw = window.sessionStorage.getItem(getSelectionDraftKey(id));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SelectionDraft;
+    if (!parsed || !Array.isArray(parsed.items)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const saveSelectionDraft = (draft: SelectionDraft) => {
+  try {
+    window.sessionStorage.setItem(getSelectionDraftKey(draft.id), JSON.stringify(draft));
+  } catch {
+    // Keep the app working even if session storage is unavailable.
+  }
+};
+
+const deleteSelectionDraft = (id: string) => {
+  try {
+    window.sessionStorage.removeItem(getSelectionDraftKey(id));
+  } catch {
+    // Ignore storage cleanup failures.
+  }
+};
+
+const parseGalleryLocationState = (): GalleryLocationState => {
+  const params = new URLSearchParams(window.location.search);
+  const path = params.get('path') || '';
+  const searchQuery = params.get('search') || '';
+  const selectedTag = searchQuery ? '' : (params.get('tag') || '');
+  const selectedList = searchQuery || selectedTag ? '' : (params.get('list') || '');
+  const modeParam = params.get('mode');
+  const mode: GalleryMode = modeParam === 'selected' || modeParam === 'staging' ? modeParam : 'gallery';
+  const selectionId = params.get('selection');
+
+  let rowHeight = 250;
+  const heightParam = params.get('height');
+  const colsParam = params.get('columns');
+
+  if (heightParam) {
+    rowHeight = parsePositiveInt(heightParam, 250);
+  } else if (colsParam) {
+    const columns = parsePositiveInt(colsParam, 4);
+    if (columns <= 2) rowHeight = 400;
+    else if (columns === 3) rowHeight = 300;
+    else rowHeight = 250;
+  }
+
+  return {
+    path,
+    page: parsePositiveInt(params.get('page'), 1),
+    rowHeight,
+    limit: parsePositiveInt(params.get('limit'), 25),
+    includeOtherFiles: params.get('includeOther') === '1' || params.get('includeOther') === 'true',
+    showFolderThumbnails: !(params.get('folderThumbs') === '0' || params.get('folderThumbs') === 'false'),
+    selectedTag,
+    selectedList,
+    searchQuery,
+    selectedImage: params.get('item') || null,
+    mode,
+    selectionId,
+  };
+};
+
+const buildGalleryStateUrl = (state: GalleryLocationState) => {
+  const params = new URLSearchParams();
+
+  if (state.path) params.set('path', state.path);
+  if (state.page > 1) params.set('page', String(state.page));
+  if (state.rowHeight !== 250) params.set('height', String(state.rowHeight));
+  if (state.limit !== 25) params.set('limit', String(state.limit));
+  if (state.includeOtherFiles) params.set('includeOther', '1');
+  if (!state.showFolderThumbnails) params.set('folderThumbs', '0');
+  if (state.selectedTag) params.set('tag', state.selectedTag);
+  if (state.selectedList) params.set('list', state.selectedList);
+  if (state.searchQuery.trim()) params.set('search', state.searchQuery.trim());
+  if (state.selectedImage) params.set('item', state.selectedImage);
+  if (state.selectionId) params.set('selection', state.selectionId);
+  if (state.mode !== 'gallery') params.set('mode', state.mode);
+
+  const query = params.toString();
+  return `${getPerihelionAppPath()}${query ? `?${query}` : ''}`;
 };
 
 const toMediaEntry = (value: string): MediaEntry => ({
@@ -324,6 +458,8 @@ export default function App() {
   const [listSearch, setListSearch] = useState('');
   const tagsRef = React.useRef<HTMLDivElement>(null);
   const listsRef = React.useRef<HTMLDivElement>(null);
+  const rowHeightRef = React.useRef<HTMLDivElement>(null);
+  const limitRef = React.useRef<HTMLDivElement>(null);
   const [editTags, setEditTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [showEditBox, setShowEditBox] = useState(false);
@@ -349,6 +485,9 @@ export default function App() {
   const [limit, setLimit] = useState(25);
   const [includeOtherFiles, setIncludeOtherFiles] = useState(false);
   const [showFolderThumbnails, setShowFolderThumbnails] = useState(true);
+  const [locationReady, setLocationReady] = useState(false);
+  const [selectionDraftId, setSelectionDraftId] = useState<string | null>(null);
+  const [locationNotice, setLocationNotice] = useState('');
 
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [isDownloading, setIsDownloading] = useState(false);
@@ -372,6 +511,14 @@ export default function App() {
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
   const [confirmNewPasswordInput, setConfirmNewPasswordInput] = useState('');
+  const [showRowHeightMenu, setShowRowHeightMenu] = useState(false);
+  const [showLimitMenu, setShowLimitMenu] = useState(false);
+  const historyModeRef = React.useRef<'replace' | 'push'>('replace');
+  const locationHydratedRef = React.useRef(false);
+
+  const queueHistoryUpdate = (mode: 'replace' | 'push' = 'push') => {
+    historyModeRef.current = mode;
+  };
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -393,6 +540,25 @@ export default function App() {
       setShowSelectedOnly(false);
     }
   }, [selectedImages.size]);
+
+  useEffect(() => {
+    if (isSharedView || !locationReady) {
+      return;
+    }
+
+    if (selectionDraftId) {
+      if (selectedImages.size === 0) {
+        deleteSelectionDraft(selectionDraftId);
+        setSelectionDraftId(null);
+        if (showSelectedOnly || view === 'staging') {
+          leaveSelectionModes('replace');
+        }
+        return;
+      }
+
+      persistSelectionDraft(selectionDraftId, selectedImages);
+    }
+  }, [isSharedView, locationReady, selectionDraftId, selectedImages, selectedMetadata, entries, showSelectedOnly, view]);
 
   const computedStagedEntries = useMemo(() => {
     return Array.from(selectedImages).map(path => {
@@ -452,8 +618,94 @@ export default function App() {
   }, [sharedFiles, sharedImages]);
 
   const navigateToPath = (path: string) => {
+    queueHistoryUpdate('push');
     setCurrentPath(path);
     setSearchQuery('');
+    setPage(1);
+  };
+
+  const openLightbox = (path: string) => {
+    queueHistoryUpdate('push');
+    setSelectedImage(path);
+  };
+
+  const closeLightbox = () => {
+    if (!selectedImage) return;
+    queueHistoryUpdate('push');
+    setSelectedImage(null);
+  };
+
+  const buildSelectionDraftItems = (paths: Iterable<string>) => {
+    return Array.from(paths).map(path => {
+      const existing = selectedMetadata[path] || entries.find(entry => entry.path === path);
+      return existing || {
+        path,
+        name: basename(path),
+        kind: getMediaKind(path),
+        ext: extensionOf(path),
+        title: '',
+        description: '',
+        tags: [],
+        is_large: false,
+        size: 0,
+      };
+    });
+  };
+
+  const persistSelectionDraft = (draftId: string, paths: Iterable<string>) => {
+    const items = buildSelectionDraftItems(paths);
+    saveSelectionDraft({
+      id: draftId,
+      createdAt: new Date().toISOString(),
+      items,
+    });
+  };
+
+  const ensureSelectionDraft = () => {
+    if (selectedImages.size === 0) {
+      return null;
+    }
+    const draftId = selectionDraftId || createSelectionDraftId();
+    persistSelectionDraft(draftId, selectedImages);
+    if (!selectionDraftId) {
+      setSelectionDraftId(draftId);
+    }
+    return draftId;
+  };
+
+  const enterSelectedMode = () => {
+    const draftId = ensureSelectionDraft();
+    if (!draftId) return;
+    queueHistoryUpdate('push');
+    setView('gallery');
+    setShowSelectedOnly(true);
+  };
+
+  const enterStagingMode = () => {
+    const draftId = ensureSelectionDraft();
+    if (!draftId) return;
+    queueHistoryUpdate('push');
+    setShowSelectedOnly(true);
+    setView('staging');
+  };
+
+  const leaveSelectionModes = (historyMode: 'replace' | 'push' = 'replace') => {
+    queueHistoryUpdate(historyMode);
+    setView('gallery');
+    setShowSelectedOnly(false);
+  };
+
+  const clearWorkingSet = (historyMode: 'replace' | 'push' = 'push') => {
+    if (selectionDraftId) {
+      deleteSelectionDraft(selectionDraftId);
+    }
+    queueHistoryUpdate(historyMode);
+    setSelectionDraftId(null);
+    setSelectedImages(new Set());
+    setSelectedMetadata({});
+    setLocationNotice('');
+    setView('gallery');
+    setShowSelectedOnly(false);
     setPage(1);
   };
 
@@ -606,17 +858,23 @@ export default function App() {
       if (listsRef.current && !listsRef.current.contains(event.target as Node)) {
         setShowListsPopover(false);
       }
+      if (rowHeightRef.current && !rowHeightRef.current.contains(event.target as Node)) {
+        setShowRowHeightMenu(false);
+      }
+      if (limitRef.current && !limitRef.current.contains(event.target as Node)) {
+        setShowLimitMenu(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
     const shareId = getShareIdFromLocation();
 
     if (shareId) {
       setIsSharedView(true);
+      setLocationReady(true);
       const controller = new AbortController();
 
       fetch(`${API_PATH}/share/${encodeURIComponent(shareId)}`, {
@@ -644,30 +902,61 @@ export default function App() {
       return () => controller.abort();
     }
 
-    const heightParam = params.get('height');
-    const colsParam = params.get('columns');
-    const limitParam = params.get('limit');
-    const pageParam = params.get('page');
-    const includeOtherParam = params.get('includeOther');
-    const folderThumbsParam = params.get('folderThumbs');
+    const applyLocationState = () => {
+      const nextState = parseGalleryLocationState();
+      let nextSelected = new Set<string>();
+      let nextMeta: Record<string, MediaEntry> = {};
+      let nextNotice = '';
 
-    if (heightParam) setRowHeight(parseInt(heightParam, 10));
-    else if (colsParam) {
-      const c = parseInt(colsParam, 10);
-      if (c <= 2) setRowHeight(400);
-      else if (c === 3) setRowHeight(300);
-      else setRowHeight(250);
-    }
-    if (limitParam) setLimit(parseInt(limitParam, 10));
-    if (pageParam) setPage(parseInt(pageParam, 10));
-    if (includeOtherParam === '1' || includeOtherParam === 'true') {
-      setIncludeOtherFiles(true);
-    }
-    if (folderThumbsParam === '0' || folderThumbsParam === 'false') {
-      setShowFolderThumbnails(false);
-    }
+      if (nextState.selectionId) {
+        const draft = loadSelectionDraft(nextState.selectionId);
+        if (draft && draft.items.length > 0) {
+          nextSelected = new Set(draft.items.map(item => item.path));
+          nextMeta = draft.items.reduce<Record<string, MediaEntry>>((acc, item) => {
+            acc[item.path] = item;
+            return acc;
+          }, {});
+          setSelectionDraftId(nextState.selectionId);
+        } else {
+          nextNotice = '';
+          setSelectionDraftId(null);
+        }
+      } else {
+        setSelectionDraftId(null);
+      }
+
+      setCurrentPath(nextState.path);
+      setPage(nextState.page);
+      setRowHeight(nextState.rowHeight);
+      setLimit(nextState.limit);
+      setIncludeOtherFiles(nextState.includeOtherFiles);
+      setShowFolderThumbnails(nextState.showFolderThumbnails);
+      setSelectedTag(nextState.selectedTag);
+      setSelectedList(nextState.selectedList);
+      setSearchQuery(nextState.searchQuery);
+      setSelectedImage(nextState.selectedImage);
+      setSelectedImages(nextSelected);
+      setSelectedMetadata(nextMeta);
+      setLocationNotice(nextNotice);
+      const hasSelection = nextSelected.size > 0;
+      setShowSelectedOnly(hasSelection && (nextState.mode === 'selected' || nextState.mode === 'staging'));
+      setView(hasSelection && nextState.mode === 'staging' ? 'staging' : 'gallery');
+    };
+
+    applyLocationState();
     fetchTags();
     fetchShares();
+    setLocationReady(true);
+    locationHydratedRef.current = true;
+
+    const handlePopState = () => {
+      applyLocationState();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, []);
 
   useEffect(() => {
@@ -684,8 +973,67 @@ export default function App() {
   }, [isSharedView, sharedTitle]);
 
   useEffect(() => {
+    if (!locationReady || isSharedView) {
+      return;
+    }
     fetchImages(page, limit, currentPath, selectedTag, selectedList, debouncedSearch);
-  }, [page, limit, currentPath, selectedTag, selectedList, debouncedSearch, authStatus?.user?.id, authStatus?.requireAuth]);
+  }, [locationReady, isSharedView, page, limit, currentPath, selectedTag, selectedList, debouncedSearch, authStatus?.user?.id, authStatus?.requireAuth]);
+
+  useEffect(() => {
+    if (!locationReady || isSharedView || !locationHydratedRef.current) {
+      historyModeRef.current = 'replace';
+      return;
+    }
+
+    const mode: GalleryMode =
+      view === 'staging'
+        ? 'staging'
+        : showSelectedOnly && selectionDraftId
+          ? 'selected'
+          : 'gallery';
+
+    const nextUrl = buildGalleryStateUrl({
+      path: currentPath,
+      page,
+      rowHeight,
+      limit,
+      includeOtherFiles,
+      showFolderThumbnails,
+      selectedTag,
+      selectedList,
+      searchQuery: debouncedSearch,
+      selectedImage,
+      mode,
+      selectionId: mode === 'gallery' ? null : selectionDraftId,
+    });
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+
+    if (locationReady && !isSharedView && locationHydratedRef.current && nextUrl !== currentUrl) {
+      if (historyModeRef.current === 'push') {
+        window.history.pushState(null, '', nextUrl);
+      } else {
+        window.history.replaceState(null, '', nextUrl);
+      }
+    }
+
+    historyModeRef.current = 'replace';
+  }, [
+    locationReady,
+    isSharedView,
+    view,
+    showSelectedOnly,
+    selectionDraftId,
+    currentPath,
+    page,
+    rowHeight,
+    limit,
+    includeOtherFiles,
+    showFolderThumbnails,
+    selectedTag,
+    selectedList,
+    debouncedSearch,
+    selectedImage,
+  ]);
 
   useEffect(() => {
     if (page > computedTotalPages) {
@@ -799,11 +1147,11 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedImage(null);
+      if (e.key === 'Escape') closeLightbox();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [selectedImage]);
 
   useEffect(() => {
     if (!selectedImage) {
@@ -1158,6 +1506,14 @@ export default function App() {
       });
 
       setSelectedMetadata(prev => ({ ...prev, ...nextMeta }));
+      const draftId = createSelectionDraftId();
+      saveSelectionDraft({
+        id: draftId,
+        createdAt: new Date().toISOString(),
+        items: Object.values(nextMeta),
+      });
+      setSelectionDraftId(draftId);
+      queueHistoryUpdate('push');
       setSelectedImages(nextSelected);
       setShowSelectedOnly(true);
       setSelectedTag('');
@@ -1544,17 +1900,17 @@ export default function App() {
         <StagingView
           selectedImages={stagedImages}
           selectedMetadata={selectedMetadata}
-          onBack={() => setView('gallery')}
+          onBack={() => leaveSelectionModes('push')}
           onDownload={handleDownload}
           isDownloading={isDownloading}
-          onOpenLightbox={(img) => setSelectedImage(img)}
+          onOpenLightbox={openLightbox}
           isLargeMap={isLargeMap}
         />
       ) : (
         <>
           <header className="h-[36px] bg-white border-b-[3px] border-black sticky top-0 z-40 flex items-center justify-between px-4 shrink-0 gap-4">
         <h1 className="font-archivo text-[15px] uppercase tracking-wider font-bold">
-          <a href={getPerihelionRootUrl()} className="hover:opacity-70 transition-opacity">
+          <a href={getPerihelionAppUrl()} className="hover:opacity-70 transition-opacity">
             Perihelion
           </a>
         </h1>
@@ -1620,9 +1976,9 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 px-4 pt-4 pb-[52px] sm:px-6 sm:pt-6 sm:pb-[60px] max-w-[1800px] mx-auto w-full">
+      <main className="flex-1 px-[42px] pt-[24px] pb-[42px] max-w-none mx-auto w-full">
         {!showPrivateGate && (
-          <div className="flex flex-col gap-1 mb-6">
+          <div className="flex flex-col gap-1 mb-6 border-b-[2px] border-[#DDD] pb-2">
             <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider">
               <span className="text-[#888]">Image Height</span>
               {[150, 200, 250, 300, 400].map(num => (
@@ -1979,10 +2335,11 @@ export default function App() {
                     Selected Only
                   </span>
                   <button
-                    onClick={() => {
-                      setShowSelectedOnly(false);
-                      setPage(1);
-                    }}
+                  onClick={() => {
+                    queueHistoryUpdate('replace');
+                    setShowSelectedOnly(false);
+                    setPage(1);
+                  }}
                     className="text-xs font-bold uppercase tracking-wider text-[#888] hover:text-black transition-colors"
                   >
                     Back to Full Gallery
@@ -2017,14 +2374,9 @@ export default function App() {
               </span>
               {debouncedSearch && <span className="text-[#8A5A44] ml-2">(Searching: "{debouncedSearch}")</span>}
             </div>
-            {shareCodeNotice && (
-              <div className="text-[10px] font-bold uppercase tracking-widest text-[#666]">
-                {shareCodeNotice}
-              </div>
-            )}
-            {showSelectedOnly && selectedImages.size > 0 && (
-              <div className="text-[10px] font-bold uppercase tracking-widest text-[#8A5A44]">
-                Working selection: {selectedImages.size} item{selectedImages.size === 1 ? '' : 's'}
+            {(shareCodeNotice || locationNotice) && (
+              <div className={`text-[10px] font-bold uppercase tracking-widest ${locationNotice ? 'text-[#8A5A44]' : 'text-[#666]'}`}>
+                {shareCodeNotice || locationNotice}
               </div>
             )}
           </div>
@@ -2044,6 +2396,7 @@ export default function App() {
                 Show Folder Thumbnails
               </label>
             </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {displayFolders.map(folder => {
                 const previewPath = includeOtherFiles
@@ -2209,7 +2562,7 @@ export default function App() {
                   data-image-container
                   className={`border-b-[2px] ${selectedImages.has(entry.path) ? 'border-black' : 'border-[#666]'} bg-[#e0e0e0] relative flex items-center justify-center overflow-hidden cursor-pointer`}
                   style={{ height: `${rowHeight}px` }}
-                  onClick={() => setSelectedImage(entry.path)}
+                  onClick={() => openLightbox(entry.path)}
                 >
                   <button
                     onClick={e => toggleSelection(entry.path, e)}
@@ -2310,14 +2663,20 @@ export default function App() {
           {computedTotalPages > 1 && (
             <div className="flex items-center gap-4 font-sans text-xs font-bold uppercase tracking-wider">
               <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+                onClick={() => {
+                  queueHistoryUpdate('push');
+                  setPage(p => Math.max(1, p - 1));
+                }}
                 disabled={page === 1}
                 className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
               >
                 Prev
               </button>
               <button
-                onClick={() => setPage(p => Math.min(computedTotalPages, p + 1))}
+                onClick={() => {
+                  queueHistoryUpdate('push');
+                  setPage(p => Math.min(computedTotalPages, p + 1));
+                }}
                 disabled={page === computedTotalPages}
                 className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
               >
@@ -2333,7 +2692,7 @@ export default function App() {
       {selectedImage && (
         <div
           className="fixed inset-0 z-50 bg-[#F0F0F0]/95 backdrop-blur-sm overflow-y-auto p-4 md:p-8 animate-in fade-in duration-200"
-          onClick={() => setSelectedImage(null)}
+          onClick={closeLightbox}
         >
           {/* Top fixed bar for close and download options to ensure they always stay visible and touch-accessible */}
           <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
@@ -2350,7 +2709,7 @@ export default function App() {
               className="p-2 bg-white border-[2px] border-black hover:bg-black hover:text-white transition-colors flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
               onClick={e => {
                 e.stopPropagation();
-                setSelectedImage(null);
+                closeLightbox();
               }}
               title="Close"
             >
@@ -2383,7 +2742,7 @@ export default function App() {
                         alt={selectedImage || ''}
                         referrerPolicy="no-referrer"
                         className="max-w-full max-h-[60vh] object-contain border-[2px] border-black bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] cursor-pointer"
-                        onClick={() => setSelectedImage(null)}
+                        onClick={closeLightbox}
                       />
                       {isSelectedImageLarge && !showFullImage && (
                         <div className="flex flex-col items-center gap-1.5 mt-1">

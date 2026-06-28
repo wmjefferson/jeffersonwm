@@ -65,17 +65,20 @@ const handleThumbImageError = (
   showImageFallback(img);
 };
 
-const buildSharePageUrl = (shareId: string) => {
+const getPerihelionRootUrl = () => {
   const origin = window.location.origin;
-  if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-    const segments = window.location.pathname.split('/').filter(Boolean);
-    const perihelionIndex = segments.indexOf('perihelion');
-    const basePath = perihelionIndex >= 0 ? `/${segments.slice(0, perihelionIndex + 1).join('/')}/` : '/';
-    return `${origin}${basePath}?share=${shareId}`;
-  }
-  return `${origin}/${shareId}`;
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const perihelionIndex = segments.indexOf('perihelion');
+  const basePath = perihelionIndex >= 0 ? `/${segments.slice(0, perihelionIndex + 1).join('/')}/` : '/';
+  return `${origin}${basePath}`;
 };
 
+const getPerihelionAppUrl = () => `${getPerihelionRootUrl()}home`;
+const buildSharePageUrl = (shareId: string) => {
+  const appUrl = new URL(getPerihelionAppUrl());
+  appUrl.searchParams.set('share', shareId);
+  return appUrl.toString();
+};
 const renderableExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg', '.bmp'];
 const isRenderable = (filename: string) => {
   const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
@@ -175,7 +178,15 @@ interface Rule {
   padding?: number;
 }
 
-export default function StagingView({ selectedImages, selectedMetadata, onBack, onDownload, isDownloading, onOpenLightbox, isLargeMap }: StagingViewProps) {
+export default function StagingView({
+  selectedImages,
+  selectedMetadata,
+  onBack,
+  onDownload,
+  isDownloading,
+  onOpenLightbox,
+  isLargeMap,
+}: StagingViewProps) {
   const [rules, setRules] = useState<Rule[]>([{ id: '1', type: 'original', value: '' }]);
   const [enableRenaming, setEnableRenaming] = useState<boolean>(false);
   const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(
@@ -308,13 +319,13 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
       {/* Header */}
       <header className="bg-white border-b-[3px] border-black shrink-0 sticky top-0 z-40 pt-[max(8px,env(safe-area-inset-top))] pb-2 px-3 sm:h-[36px] sm:py-0 sm:px-4">
         <div className="flex flex-col gap-3 sm:h-full sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3 pt-1 sm:pt-0">
-          <button onClick={onBack} className="hover:bg-[#f0f0f0] p-1 sm:p-0.5 transition-colors border-[2px] border-transparent hover:border-black flex items-center justify-center">
-            <ArrowLeft size={16} strokeWidth={2.5} />
-          </button>
-          <h1 className="font-archivo text-[15px] uppercase tracking-wider font-bold">Staging & Export</h1>
-        </div>
-        <div className="flex flex-wrap items-start gap-2 sm:items-center sm:gap-3 relative pl-7 sm:pl-0">
+          <div className="flex items-center gap-3 pt-1 sm:pt-0">
+            <button onClick={onBack} className="hover:bg-[#f0f0f0] p-1 sm:p-0.5 transition-colors border-[2px] border-transparent hover:border-black flex items-center justify-center">
+              <ArrowLeft size={16} strokeWidth={2.5} />
+            </button>
+            <h1 className="font-archivo text-[15px] uppercase tracking-wider font-bold">Staging & Export</h1>
+          </div>
+          <div className="flex flex-wrap items-start gap-2 sm:items-center sm:gap-3 relative pl-7 sm:pl-0">
           <button 
             onClick={() => setSelectedForDownload(new Set())}
             disabled={selectedForDownload.size === 0}
@@ -393,7 +404,7 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
             <Download size={12} strokeWidth={2.5} />
             {isDownloading ? 'Processing...' : `Export ${selectedForDownload.size} ${selectedItemLabel}`}
           </button>
-        </div>
+          </div>
         </div>
       </header>
 
@@ -404,108 +415,102 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
           
           {/* Naming Rules Section */}
           <div className="px-6 pt-8 pb-6 sm:pt-6 border-b-[3px] border-black">
-            <div className="flex items-center justify-between mb-4">
-              <label className="flex items-center gap-2 cursor-pointer group w-fit">
-                <input 
-                  type="checkbox" 
-                  checked={enableRenaming} 
-                  onChange={e => setEnableRenaming(e.target.checked)}
-                  className="w-4 h-4 accent-black border-[2px] border-[#666]"
-                />
-                <span className="font-sans font-bold uppercase tracking-widest text-sm text-black group-hover:text-[#666] transition-colors">Rename Files</span>
-              </label>
+            <div className="flex flex-col gap-5 mb-6">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer group w-fit">
+                  <input 
+                    type="checkbox" 
+                    checked={enableRenaming} 
+                    onChange={e => setEnableRenaming(e.target.checked)}
+                    className="w-4 h-4 accent-black border-[2px] border-[#666]"
+                  />
+                  <span className="font-sans font-bold uppercase tracking-widest text-sm text-black group-hover:text-[#666] transition-colors">Rename Files</span>
+                </label>
+                {enableRenaming && (
+                  <span className="bg-[#F0F0F0] text-black border-[2px] border-black text-[11px] font-bold px-2 py-1 uppercase tracking-wider">
+                    {rules.length} Active
+                  </span>
+                )}
+              </div>
+
               {enableRenaming && (
-                <span className="bg-[#F0F0F0] text-black border-[2px] border-black text-[11px] font-bold px-2 py-1 uppercase tracking-wider">
-                  {rules.length} Active
-                </span>
-              )}
-            </div>
-
-            {enableRenaming && (
-              <>
-                <div className="flex flex-col gap-3 mb-6">
-                  {rules.map((rule, idx) => (
-                    <div key={rule.id} className="bg-[#F0F0F0] border-[2px] border-[#666] p-3 flex items-start gap-3 group hover:border-black transition-colors">
-                      <GripVertical size={16} className="text-[#888] mt-1 cursor-grab group-hover:text-black" />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-black font-bold text-xs uppercase tracking-wider">{rule.type}</span>
-                          <button onClick={() => removeRule(rule.id)} className="text-[#888] hover:text-black opacity-0 group-hover:opacity-100 transition-opacity">
-                            <X size={14} strokeWidth={2.5} />
-                          </button>
-                        </div>
-                        {rule.type === 'original' && <p className="text-[#666] text-[11px] uppercase font-bold tracking-wider">Using original filename</p>}
-                        {rule.type === 'text' && (
-                          <input 
-                            type="text" 
-                            value={rule.value} 
-                            onChange={e => updateRule(rule.id, { value: e.target.value })}
-                            className="w-full bg-white border-[2px] border-[#666] text-black text-xs px-2 py-1.5 mt-1 focus:outline-none focus:border-black font-medium"
-                            placeholder="Enter text..."
-                          />
-                        )}
-                        {rule.type === 'sequence' && (
-                          <div className="flex items-center gap-3 mt-1">
-                            <div className="flex flex-col">
-                              <span className="text-[#666] text-[10px] font-bold uppercase tracking-wider mb-0.5">Start at</span>
-                              <input 
-                                type="number" 
-                                value={rule.value} 
-                                onChange={e => updateRule(rule.id, { value: e.target.value })}
-                                className="w-16 bg-white border-[2px] border-[#666] text-black text-xs px-2 py-1.5 focus:outline-none focus:border-black font-medium"
-                              />
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-[#666] text-[10px] font-bold uppercase tracking-wider mb-0.5">Digits</span>
-                              <select
-                                value={rule.padding || 3}
-                                onChange={e => updateRule(rule.id, { padding: parseInt(e.target.value) })}
-                                className="w-16 bg-white border-[2px] border-[#666] text-black text-xs px-2 py-1.5 focus:outline-none focus:border-black font-medium"
-                              >
-                                <option value={1}>1</option>
-                                <option value={2}>2</option>
-                                <option value={3}>3</option>
-                                <option value={4}>4</option>
-                                <option value={5}>5</option>
-                              </select>
-                            </div>
+                <>
+                  <div className="flex flex-col gap-3 mb-6">
+                    {rules.map((rule, idx) => (
+                      <div key={rule.id} className="bg-[#F0F0F0] border-[2px] border-[#666] p-3 flex items-start gap-3 group hover:border-black transition-colors">
+                        <GripVertical size={16} className="text-[#888] mt-1 cursor-grab group-hover:text-black" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-black font-bold text-xs uppercase tracking-wider">{rule.type}</span>
+                            <button onClick={() => removeRule(rule.id)} className="text-[#888] hover:text-black opacity-0 group-hover:opacity-100 transition-opacity">
+                              <X size={14} strokeWidth={2.5} />
+                            </button>
                           </div>
-                        )}
-                        {rule.type === 'date' && (
-                          <p className="text-[#666] text-[11px] uppercase font-bold tracking-wider">YYYY-MM-DD</p>
-                        )}
+                          {rule.type === 'original' && <p className="text-[#666] text-[11px] uppercase font-bold tracking-wider">Using original filename</p>}
+                          {rule.type === 'text' && (
+                            <input 
+                              type="text" 
+                              value={rule.value} 
+                              onChange={e => updateRule(rule.id, { value: e.target.value })}
+                              className="w-full bg-white border-[2px] border-[#666] text-black text-xs px-2 py-1.5 mt-1 focus:outline-none focus:border-black font-medium"
+                              placeholder="Enter text..."
+                            />
+                          )}
+                          {rule.type === 'sequence' && (
+                            <div className="flex items-center gap-3 mt-1">
+                              <div className="flex flex-col">
+                                <span className="text-[#666] text-[10px] font-bold uppercase tracking-wider mb-0.5">Start at</span>
+                                <input 
+                                  type="number" 
+                                  value={rule.value} 
+                                  onChange={e => updateRule(rule.id, { value: e.target.value })}
+                                  className="w-16 bg-white border-[2px] border-[#666] text-black text-xs px-2 py-1.5 focus:outline-none focus:border-black font-medium"
+                                />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[#666] text-[10px] font-bold uppercase tracking-wider mb-0.5">Digits</span>
+                                <select
+                                  value={rule.padding || 3}
+                                  onChange={e => updateRule(rule.id, { padding: parseInt(e.target.value) })}
+                                  className="w-16 bg-white border-[2px] border-[#666] text-black text-xs px-2 py-1.5 focus:outline-none focus:border-black font-medium"
+                                >
+                                  <option value={1}>1</option>
+                                  <option value={2}>2</option>
+                                  <option value={3}>3</option>
+                                  <option value={4}>4</option>
+                                  <option value={5}>5</option>
+                                </select>
+                              </div>
+                            </div>
+                          )}
+                          {rule.type === 'date' && (
+                            <p className="text-[#666] text-[11px] uppercase font-bold tracking-wider">YYYY-MM-DD</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
 
-                <div className="mb-3">
-                  <span className="text-[#666] text-[11px] font-bold uppercase tracking-wider">Add Rule Block</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => addRule('text')} className="bg-white border-[2px] border-[#666] hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black font-bold uppercase tracking-wider text-[11px] py-2 flex items-center justify-center gap-1 transition-all">
-                    <span>+</span> Text
-                  </button>
-                  <button onClick={() => addRule('date')} className="bg-white border-[2px] border-[#666] hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black font-bold uppercase tracking-wider text-[11px] py-2 flex items-center justify-center gap-1 transition-all">
-                    <span>+</span> Date
-                  </button>
-                  <button onClick={() => addRule('sequence')} className="bg-white border-[2px] border-[#666] hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black font-bold uppercase tracking-wider text-[11px] py-2 flex items-center justify-center gap-1 transition-all">
-                    <span>+</span> Sequence
-                  </button>
-                  <button onClick={() => addRule('original')} className="bg-white border-[2px] border-[#666] hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black font-bold uppercase tracking-wider text-[11px] py-2 flex items-center justify-center gap-1 transition-all">
-                    <span>+</span> Original Name
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+                  <div className="mb-3">
+                    <span className="text-[#666] text-[11px] font-bold uppercase tracking-wider">Add Rule Block</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => addRule('text')} className="bg-white border-[2px] border-[#666] hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black font-bold uppercase tracking-wider text-[11px] py-2 flex items-center justify-center gap-1 transition-all">
+                      <span>+</span> Text
+                    </button>
+                    <button onClick={() => addRule('date')} className="bg-white border-[2px] border-[#666] hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black font-bold uppercase tracking-wider text-[11px] py-2 flex items-center justify-center gap-1 transition-all">
+                      <span>+</span> Date
+                    </button>
+                    <button onClick={() => addRule('sequence')} className="bg-white border-[2px] border-[#666] hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black font-bold uppercase tracking-wider text-[11px] py-2 flex items-center justify-center gap-1 transition-all">
+                      <span>+</span> Sequence
+                    </button>
+                    <button onClick={() => addRule('original')} className="bg-white border-[2px] border-[#666] hover:border-black hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black font-bold uppercase tracking-wider text-[11px] py-2 flex items-center justify-center gap-1 transition-all">
+                      <span>+</span> Original Name
+                    </button>
+                  </div>
+                </>
+              )}
 
-          {/* Resize Options Section */}
-          <div className="px-6 pt-8 pb-6 sm:pt-6">
-            <h2 className="font-sans font-bold uppercase tracking-widest text-sm text-black mb-4">Processing Options</h2>
-            
-            <div className="flex flex-col gap-5">
-              {/* Dimensions Toggle */}
               <div className="flex flex-col gap-3">
                 <label className="flex items-center gap-2 cursor-pointer group w-fit">
                   <input 
@@ -516,9 +521,8 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
                   />
                   <span className="text-xs font-bold uppercase tracking-wider text-[#666] group-hover:text-black transition-colors">Resize Dimensions</span>
                 </label>
-                
                 {enableDimensions && (
-                  <div className="ml-6 flex flex-col gap-3 bg-[#F0F0F0] p-4 border-[2px] border-[#666]">
+                  <div className="ml-6 flex flex-col gap-3 bg-white p-4 border-[2px] border-[#666]">
                     <div className="flex items-center gap-3">
                       <div className="flex flex-col">
                         <span className="text-[#666] text-[10px] font-bold uppercase tracking-wider mb-0.5">Width</span>
@@ -529,7 +533,7 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
                           className="w-20 bg-white border-[2px] border-[#666] text-black text-xs px-2 py-1.5 focus:outline-none focus:border-black font-medium"
                         />
                       </div>
-                      <span className="text-[#888] mt-4 font-bold">×</span>
+                      <span className="text-[#888] mt-4 font-bold">x</span>
                       <div className="flex flex-col">
                         <span className="text-[#666] text-[10px] font-bold uppercase tracking-wider mb-0.5">Height</span>
                         <input 
@@ -552,8 +556,6 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
                   </div>
                 )}
               </div>
-
-              {/* Filesize Toggle */}
               <div className="flex flex-col gap-3">
                 <label className="flex items-center gap-2 cursor-pointer group w-fit">
                   <input 
@@ -564,9 +566,8 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
                   />
                   <span className="text-xs font-bold uppercase tracking-wider text-[#666] group-hover:text-black transition-colors">Compress File Size</span>
                 </label>
-
                 {enableFilesize && (
-                  <div className="ml-6 flex items-center gap-3 bg-[#F0F0F0] p-4 border-[2px] border-[#666]">
+                  <div className="ml-6 flex items-center gap-3 bg-white p-4 border-[2px] border-[#666]">
                     <span className="text-[#666] text-[11px] font-bold uppercase tracking-wider">Target Size:</span>
                     <input 
                       type="number" 
@@ -579,7 +580,7 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
                 )}
               </div>
             </div>
-          </div>
+            </div>
 
         </div>
 
@@ -705,3 +706,4 @@ export default function StagingView({ selectedImages, selectedMetadata, onBack, 
     </div>
   );
 }
+
