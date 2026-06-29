@@ -426,6 +426,21 @@ export default function App() {
     setShowCompose(false);
   };
 
+  const handleResetPage = () => {
+    setView('all');
+    setSelectedSites([]);
+    setShowSetup(false);
+    setShowCompose(false);
+    setShowLegend(false);
+    setShowLogin(false);
+    setAuthError(null);
+    setError(null);
+    setPasswordInput('');
+    setActiveWeekKey(weeks[0]?.key || null);
+    resetComposer();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const fetchFeed = async () => {
     try {
       const response = await fetch(apiUrl('/api/feed'));
@@ -838,7 +853,9 @@ export default function App() {
     <div className="feed-shell">
       <header className="feed-topbar">
         <div>
-          <h1 className="feed-title">Feed</h1>
+          <button type="button" className="feed-title-button" onClick={handleResetPage}>
+            <h1 className="feed-title">Feed</h1>
+          </button>
         </div>
       </header>
 

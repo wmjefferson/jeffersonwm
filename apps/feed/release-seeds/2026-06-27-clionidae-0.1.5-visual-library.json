@@ -1,0 +1,9 @@
+{
+  "appName": "Clionidae",
+  "version": "0.1.5",
+  "title": "Clionidae v0.1.5 Visual Library Styling Checkpoint",
+  "content": "<p>Clionidae stayed on the same functional version this pass, but the design workspace was simplified into a more useful starter reference for future sites.</p><p>What changed:</p><ul><li><strong>Visual library reduced to essentials:</strong> the design page now keeps the structural specimen pieces without overcommitting to one finished brand direction, making it easier to borrow layouts and composition patterns for new projects.</li><li><strong>Banner and typography calibration:</strong> top and bottom banners were aligned with the lighter Stallioneer-style frame, while multiple editorial type roles were tested so the page reads more clearly as a template surface.</li><li><strong>Neutralized styling for reuse:</strong> color fills, extra borders, and block padding were stripped back so spacing, hierarchy, and content regions are easier to study when planning a new site.</li></ul><p>This leaves Clionidae in a good place as a working reference: enough infrastructure to model real pages, but simplified enough to pull apart and reuse deliberately.</p>",
+  "url": "https://jeffersonwm.com/clionidae/",
+  "created_at": "2026-06-27 20:03:04",
+  "external_id": "clionidae-v0.1.5-visual-library-2026-06-27"
+}

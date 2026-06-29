@@ -9,6 +9,7 @@ import { renderSettings } from './pages/settings.js';
 import { auth, player as playerApi } from './utils/api.js';
 
 const app = document.getElementById('app');
+const PUBLIC_PATTERN_PATH = `${import.meta.env.BASE_URL}images/backgrounds/battalion-public-pattern-20260627.jpeg`;
 
 // ─── Toast System ───────────────────────────────────────────────────
 
@@ -114,6 +115,8 @@ async function route() {
   clearActiveIntervals();
 
   const hash = window.location.hash || '#dashboard';
+  const isPatternRoute = hash === '#dashboard' || hash === '#login';
+  document.body.classList.toggle('body--public-dashboard', isPatternRoute);
 
   if (hash === '#login') {
     renderLogin(app);
@@ -246,6 +249,11 @@ function triggerCheckInNotification() {
 
 window.addEventListener('hashchange', route);
 window.addEventListener('DOMContentLoaded', () => {
+  document.documentElement.style.setProperty(
+    '--batt-public-pattern-url',
+    `url("${PUBLIC_PATTERN_PATH}")`,
+  );
+
   // Apply saved background color
   const savedBg = localStorage.getItem('battalion_bg_color');
   if (savedBg) document.body.style.backgroundColor = savedBg;

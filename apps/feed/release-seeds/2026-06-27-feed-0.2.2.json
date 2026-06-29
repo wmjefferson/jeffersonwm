@@ -1,0 +1,9 @@
+{
+  "appName": "Feed",
+  "version": "0.2.2",
+  "title": "Feed v0.2.2",
+  "content": "<p>Feed and the JeffersonWM public shell both got a quieter presentation pass in this checkpoint. The goal was not to add new systems, but to make the public-facing surfaces feel more intentional, easier to reset, and more visually consistent with the newer background work happening elsewhere.</p><p>What changed:</p><ul><li><strong>Feed title now resets the page:</strong> clicking <em>Feed</em> at the top returns the interface to its default view, clears active filters, closes open editor/login panels, jumps back to the newest week, and scrolls to the top.</li><li><strong>Shared patterned backgrounds added:</strong> Feed and JeffersonWM Home now use the new lion pattern at a subtle <code>5%</code> opacity, stored in stable per-app background folders so the visual layer survives future builds cleanly.</li><li><strong>Battalion public polish continued:</strong> Battalion's landing, login/register, and public dashboard were updated to use the new illustrated background treatment, with softer alternating feed-row grays so the public page reads as one continuous surface.</li></ul><p>This is a presentation-and-operations checkpoint: the public pages are a little calmer, the reset behavior is more practical, and the asset organization is cleaner for future background experiments.</p>",
+  "url": "https://jeffersonwm.com/feed/",
+  "created_at": "2026-06-27 22:43:00",
+  "external_id": "feed-v0.2.2-2026-06-27"
+}

@@ -38,11 +38,27 @@
         padding: var(--frame);
         background: #fdfdfd;
         color: #111827;
+        position: relative;
+        isolation: isolate;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("./images/backgrounds/jeffwm-feed-lion-pattern-20260627.jpeg");
+        background-repeat: repeat;
+        background-size: 900px auto;
+        opacity: 0.05;
+        pointer-events: none;
+        z-index: 0;
       }
 
       .layout {
         width: 100%;
         display: block;
+        position: relative;
+        z-index: 1;
       }
 
       .page {
@@ -136,12 +152,14 @@
       .widget-time:focus-visible,
       .widget-event:focus-visible,
       .widget-weather:focus-visible,
+      .widget-greeting:focus-visible,
       .widget-location:focus-visible {
         outline: 1px solid rgba(17, 24, 39, 0.72);
         outline-offset: 3px;
       }
 
       .widget-location,
+      .widget-greeting,
       .widget-date {
         display: block;
         width: 100%;
@@ -164,6 +182,10 @@
         font-family: inherit;
         cursor: pointer;
         text-align: right;
+      }
+
+      .widget-greeting {
+        margin-bottom: 0.35rem;
       }
 
       .widget-location:hover {
@@ -604,6 +626,7 @@
         }
 
         .widget-time,
+        .widget-greeting,
         .widget-weather {
           margin-left: 0;
           margin-right: 0;
@@ -683,15 +706,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            Feed. v.0.2.1
-          </a>
-          <a
-            class="app-link"
-            href="/bullion/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Bullion. v.0.1.0
+            Feed. v.0.2.2
           </a>
           <a
             class="app-link"
@@ -708,6 +723,14 @@
             rel="noopener noreferrer"
           >
             Tourbillion. v.0.1.1
+          </a>
+          <a
+            class="app-link"
+            href="/millionfold/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Millionfold. v.0.1.5
           </a>
           <a
             class="app-link"
@@ -763,6 +786,7 @@
 
       <aside class="widget" aria-label="Homepage widget">
         <section class="widget-panel" id="home-widget">
+          <div class="widget-greeting" id="widget-greeting">Good Day</div>
           <button class="widget-location" id="widget-location" type="button" title="Refresh widget">San Francisco, California</button>
           <button class="widget-time" id="widget-time" type="button" title="Toggle 12/24 hour format">--:--</button>
           <div class="widget-date" id="widget-date">Loading date</div>
@@ -848,6 +872,7 @@
           return acc;
         }, {});
         const elements = {
+          greeting: document.getElementById('widget-greeting'),
           location: document.getElementById('widget-location'),
           time: document.getElementById('widget-time'),
           date: document.getElementById('widget-date'),
@@ -891,6 +916,17 @@
           if (code >= 50 && code < 80) return '\u2614';
           if (code >= 80) return '\u26c8';
           return '\u2601';
+        };
+
+        const getGreetingPrefix = () => {
+          const hour = new Date().getHours();
+          if (hour < 12) return 'Good Morning';
+          if (hour < 17) return 'Good Afternoon';
+          return 'Good Evening';
+        };
+
+        const renderGreeting = () => {
+          elements.greeting.textContent = getGreetingPrefix();
         };
 
         const renderTime = () => {
@@ -1267,6 +1303,7 @@
             fetchJson(WEATHER_API_URL, null)
           ]);
 
+          renderGreeting();
           applyRandomFont(fonts);
           renderWords(words || FALLBACK_WORDS);
           renderEvent(nextEvent);
@@ -1289,6 +1326,7 @@
         };
 
         const loadWidget = async () => {
+          renderGreeting();
           renderTime();
           setInterval(renderTime, 1000);
 

@@ -19,6 +19,25 @@ body {
     linear-gradient(to bottom, rgba(17, 24, 39, 0.04), rgba(17, 24, 39, 0.01)),
     #f8f7f4;
   color: #111827;
+  position: relative;
+  isolation: isolate;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: var(--feed-page-pattern-url);
+  background-repeat: repeat;
+  background-size: 900px auto;
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
 }
 
 a {
@@ -44,6 +63,27 @@ a {
   font-family: "Young Serif", serif;
   font-size: clamp(2rem, 3vw, 2.4rem);
   font-weight: 400;
+}
+
+.feed-title-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.feed-title-button:hover .feed-title,
+.feed-title-button:focus-visible .feed-title {
+  opacity: 0.76;
+}
+
+.feed-title-button:focus-visible {
+  outline: 2px solid rgba(17, 24, 39, 0.22);
+  outline-offset: 6px;
 }
 
 .feed-subtitle {

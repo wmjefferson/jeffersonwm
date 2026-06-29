@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Battalion — track your daily life as an RPG">
   <title>Battalion</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <meta property="og:image" content="./bookmark-preview.jpeg" />
+  <meta name="twitter:image" content="./bookmark-preview.jpeg" />
   
   <!-- Google Fonts: Young Serif, IBM Plex Sans Condensed, Viga -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -36,6 +40,19 @@
       font-family: var(--font-body);
       min-height: 100vh;
       position: relative;
+      isolation: isolate;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: url('./images/backgrounds/battalion-public-pattern-20260627.jpeg');
+      background-repeat: repeat;
+      background-size: 820px auto;
+      opacity: 0.08;
+      pointer-events: none;
+      z-index: 0;
     }
 
     /* 36px top and bottom banners */
@@ -66,6 +83,8 @@
       max-width: 680px; /* Constrain text width for premium editorial look */
       text-align: left;
       transition: opacity 400ms ease;
+      position: relative;
+      z-index: 1;
     }
 
     .fade-out-active {

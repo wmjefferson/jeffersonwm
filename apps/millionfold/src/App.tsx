@@ -301,7 +301,7 @@ export default function App() {
             authStatus.user ? (
               <>
                 <a
-                  href={authStatus.authBaseUrl || 'https://auth.jeffersonwm.com'}
+                  href={`${authStatus.authBaseUrl || 'https://auth.jeffersonwm.com'}/home`}
                   className="text-[#888] hover:text-black transition-colors"
                 >
                   Dashboard
