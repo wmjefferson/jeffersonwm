@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { FolderOpen, X, Check, Download, ArrowLeft, FileImage, Tag, List, Plus, Search, Minus, Copy } from 'lucide-react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { FolderOpen, X, Check, Download, ArrowLeft, FileImage, Tag, List, Plus, Search, Minus, Copy, BookImage } from 'lucide-react';
 import StagingView, { DownloadOptions } from './components/StagingView';
 
 const renderableExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg', '.bmp'];
@@ -29,6 +29,7 @@ interface FolderEntry {
   imageThumbnailKind?: MediaKind | null;
   imageThumbnailExt?: string;
   itemCount: number;
+  hasCoverOverride?: boolean;
 }
 
 interface AuthUser {
@@ -433,6 +434,8 @@ export default function App() {
   const [entries, setEntries] = useState<MediaEntry[]>([]);
   const [folders, setFolders] = useState<FolderEntry[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
+  const [folderCoverPath, setFolderCoverPath] = useState<string | null>(null);
+  const [setCoverStatus, setSetCoverStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [selectedList, setSelectedList] = useState<string>('');
@@ -979,6 +982,18 @@ export default function App() {
     fetchImages(page, limit, currentPath, selectedTag, selectedList, debouncedSearch);
   }, [locationReady, isSharedView, page, limit, currentPath, selectedTag, selectedList, debouncedSearch, authStatus?.user?.id, authStatus?.requireAuth]);
 
+  // Load the manual cover for the current folder whenever the path changes
+  useEffect(() => {
+    if (!currentPath || !authStatus?.user?.isAdmin) {
+      setFolderCoverPath(null);
+      return;
+    }
+    fetch(`${API_PATH}/folder-cover?path=${encodeURIComponent(currentPath)}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setFolderCoverPath(data?.coverImagePath ?? null))
+      .catch(() => setFolderCoverPath(null));
+  }, [currentPath, authStatus?.user?.isAdmin]);
+
   useEffect(() => {
     if (!locationReady || isSharedView || !locationHydratedRef.current) {
       historyModeRef.current = 'replace';
@@ -1099,7 +1114,11 @@ export default function App() {
             thumbnailPath?: string | null;
             thumbnailKind?: MediaKind | null;
             thumbnailExt?: string;
+            imageThumbnailPath?: string | null;
+            imageThumbnailKind?: MediaKind | null;
+            imageThumbnailExt?: string;
             itemCount?: number;
+            hasCoverOverride?: boolean;
           }) => ({
             path: folder.path || folder.name || '',
             name: folder.name || basename(folder.path || ''),
@@ -2437,7 +2456,7 @@ export default function App() {
                             alt={folder.name}
                             loading="lazy"
                             referrerPolicy="no-referrer"
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-contain"
                             onLoad={handleImageLoad}
                             onError={(event) => handleThumbImageError(event, buildImageUrl(previewPath, folderRetryToken))}
                           />
@@ -2556,7 +2575,7 @@ export default function App() {
                 return (
               <div
                 key={entry.path || idx}
-                className={`bg-white border-[2px] flex flex-col transition-all ${selectedImages.has(entry.path) ? 'border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-10' : 'border-[#666] hover:border-black'}`}
+                className={`bg-white border-[2px] flex flex-col transition-all group ${selectedImages.has(entry.path) ? 'border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-10' : 'border-[#666] hover:border-black'}`}
               >
                 <div
                   data-image-container
@@ -2615,6 +2634,15 @@ export default function App() {
                       {entry.is_large && (
                         <div className="absolute top-2 right-2 z-20 bg-yellow-400 text-black border-[2px] border-black px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                           Lrg
+                        </div>
+                      )}
+                      {folderCoverPath && folderCoverPath === entry.path && (
+                        <div
+                          className="absolute bottom-2 right-2 z-20 bg-black text-white border-[2px] border-black px-1.5 py-0.5 flex items-center gap-1 text-[9px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] pointer-events-none"
+                          title="This image is the folder cover"
+                        >
+                          <BookImage size={10} strokeWidth={2.5} />
+                          Cover
                         </div>
                       )}
                     </>
@@ -3009,6 +3037,79 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {/* Folder Cover — admin only, when inside a folder */}
+                {currentPath && authStatus?.user?.isAdmin && selectedImage && isRenderable(selectedImage) && (
+                  <div className="flex items-center justify-between border-t border-[#DDD] pt-3 mt-1 gap-3">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Folder Cover</span>
+                      {folderCoverPath === selectedImage ? (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-black flex items-center gap-1">
+                          <BookImage size={10} strokeWidth={2.5} /> This is the folder cover
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[#aaa] uppercase tracking-wider truncate">
+                          {folderCoverPath ? 'Different cover is set' : 'No cover set'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <button
+                        onClick={async () => {
+                          setSetCoverStatus('saving');
+                          try {
+                            const res = await fetch(`${API_PATH}/folder-cover`, {
+                              method: 'POST',
+                              credentials: 'include',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ folderPath: currentPath, imagePath: selectedImage }),
+                            });
+                            if (res.ok) {
+                              setFolderCoverPath(selectedImage);
+                              setSetCoverStatus('saved');
+                              setFolders(prev => prev.map(f =>
+                                f.path === currentPath
+                                  ? { ...f, imageThumbnailPath: selectedImage, imageThumbnailKind: 'image' as const, hasCoverOverride: true }
+                                  : f
+                              ));
+                              setTimeout(() => setSetCoverStatus('idle'), 2000);
+                            } else { setSetCoverStatus('idle'); }
+                          } catch { setSetCoverStatus('idle'); }
+                        }}
+                        disabled={setCoverStatus === 'saving' || folderCoverPath === selectedImage}
+                        className="bg-black text-white px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors border-[2px] border-black disabled:bg-[#888] disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <BookImage size={9} strokeWidth={2.5} />
+                        {setCoverStatus === 'saving' ? 'Setting...' : setCoverStatus === 'saved' ? 'Set!' : 'Set as Cover'}
+                      </button>
+                      {folderCoverPath === selectedImage && (
+                        <button
+                          onClick={async () => {
+                            setSetCoverStatus('saving');
+                            try {
+                              const res = await fetch(`${API_PATH}/folder-cover`, {
+                                method: 'POST',
+                                credentials: 'include',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ folderPath: currentPath, imagePath: null }),
+                              });
+                              if (res.ok) {
+                                setFolderCoverPath(null);
+                                setSetCoverStatus('idle');
+                                setFolders(prev => prev.map(f =>
+                                  f.path === currentPath ? { ...f, hasCoverOverride: false } : f
+                                ));
+                              } else { setSetCoverStatus('idle'); }
+                            } catch { setSetCoverStatus('idle'); }
+                          }}
+                          className="text-[9px] font-bold uppercase tracking-widest text-[#888] hover:text-black transition-colors underline"
+                        >
+                          Clear cover
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={handleSaveDetails}

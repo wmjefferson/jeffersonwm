@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Perihelion v1.4.4",
+  "content": "<p>This update adds manual folder covers and aspect-ratio scaling fixes to Perihelion.</p><ul><li><strong>Manual folder covers:</strong> Administrators can now set any image as the cover for a folder from the Edit Details panel. A passive badge marks the cover in the gallery.</li><li><strong>Widescreen scaling fixes:</strong> Folder thumbnails now preserve their aspect ratio and use contain-scaling inside grid layouts instead of zooming and cropping.</li></ul>",
+  "url": "https://jeffersonwm.com/perihelion/",
+  "source": "release",
+  "external_id": "perihelion-v1.4.4-2026-06-30"
+}

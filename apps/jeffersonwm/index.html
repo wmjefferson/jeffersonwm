@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Jefferson Williams</title>
+    <title>Jefferson Williams Dotcom</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- Site icon files: swap favicon.svg here if you want a different tab/bookmark icon. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -110,6 +110,159 @@
 
       .app-link:hover::after {
         transform: scaleX(1);
+      }
+
+      .bottom-links {
+        position: fixed;
+        left: var(--frame);
+        bottom: var(--frame);
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+      }
+
+      .personal-link,
+      .about-trigger {
+        position: relative;
+        color: #111827;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        font-family: inherit;
+        font-size: 0.92rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .personal-link::after,
+      .about-trigger::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.1rem;
+        width: 100%;
+        height: 1px;
+        background: #d4d4d4;
+        transform-origin: left;
+        transform: scaleX(0);
+        transition: transform 0.15s ease-out;
+      }
+
+      .personal-link:hover::after,
+      .about-trigger:hover::after {
+        transform: scaleX(1);
+      }
+
+      .about-popup,
+      .map-popup {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding: var(--frame);
+        background: rgba(253, 253, 253, 0.96);
+        overflow: auto;
+      }
+
+      .map-popup {
+        z-index: 60;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .about-popup[hidden],
+      .map-popup[hidden] {
+        display: none;
+      }
+
+      .about-shell {
+        width: min(760px, 100%);
+      }
+
+      .about-header,
+      .map-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .about-title,
+      .map-title {
+        margin: 0;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: clamp(1.8rem, 3vw, 2.4rem);
+        font-weight: 400;
+      }
+
+      .about-close,
+      .map-close,
+      .map-trigger {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .about-close,
+      .map-close {
+        opacity: 0.42;
+      }
+
+      .about-close:hover,
+      .map-close:hover,
+      .map-trigger:hover {
+        opacity: 1;
+      }
+
+      .about-intro {
+        max-width: 38rem;
+        margin: 0 0 1.35rem;
+        font-size: 1rem;
+        line-height: 1.55;
+        opacity: 0.72;
+      }
+
+      .about-list {
+        display: grid;
+        grid-template-columns: minmax(9rem, 0.32fr) minmax(0, 1fr);
+        gap: 0.55rem 1.2rem;
+        margin: 1.25rem 0 0;
+      }
+
+      .about-list dt {
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .about-list dd {
+        margin: 0;
+        line-height: 1.45;
+        opacity: 0.72;
+      }
+
+      .map-shell {
+        width: min(92vw, 1480px);
+      }
+
+      .map-image {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid rgba(17, 24, 39, 0.22);
+        background: #fff;
       }
 
       .widget {
@@ -644,6 +797,16 @@
           padding: var(--frame);
         }
 
+        .bottom-links {
+          position: static;
+          margin-top: 2.5rem;
+        }
+
+        .about-list {
+          grid-template-columns: 1fr;
+          gap: 0.2rem 0;
+        }
+
         .widget-events-shell {
           width: 100%;
           align-items: flex-start;
@@ -755,7 +918,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            Perihelion. v.1.4.3
+            Perihelion. v.1.4.4
           </a>
           <a
             class="app-link"
@@ -783,6 +946,19 @@
           </a>
         </nav>
       </main>
+
+      <div class="bottom-links" aria-label="Site links">
+        <a class="personal-link" href="/status/">Status</a>
+        <button class="about-trigger" id="about-trigger" type="button">About</button>
+        <a
+          class="personal-link"
+          href="https://wmjefferson.com"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          William Jefferson
+        </a>
+      </div>
 
       <aside class="widget" aria-label="Homepage widget">
         <section class="widget-panel" id="home-widget">
@@ -847,10 +1023,137 @@
           </div>
         </section>
       </aside>
+
+      <section class="about-popup" id="about-popup" aria-label="About JeffersonWM" hidden>
+        <div class="about-shell">
+          <div class="about-header">
+            <h2 class="about-title">About</h2>
+            <button class="about-close" id="about-close" type="button">Close</button>
+          </div>
+          <p class="about-intro">
+            JeffersonWM is a living map of experiments, utilities, archives, personal sites, and development systems.
+            <button class="map-trigger" id="map-trigger" type="button">Map</button>
+          </p>
+          <dl class="about-list">
+            <dt>auth/multimillion</dt>
+            <dd>auth</dd>
+            <dt>battalion</dt>
+            <dd>RPG GAME TWO Ts ONE L</dd>
+            <dt>bullion</dt>
+            <dd>batch rename</dd>
+            <dt>clionidae</dt>
+            <dd>template</dd>
+            <dt>dookydetective</dt>
+            <dd>my dog</dd>
+            <dt>endellionite</dt>
+            <dd>windows 95 scanner (DEVELOPMENT, REDEVELOPMENT WIN 98)</dd>
+            <dt>feed</dt>
+            <dd>rss of development and github project</dd>
+            <dt>jeffershizzle</dt>
+            <dd>original photo website (ARCHIVE)</dd>
+            <dt>jeffersonwm</dt>
+            <dd>experiments</dd>
+            <dt>jeffersonwm-legacy</dt>
+            <dd>first version (ARCHIVE)</dd>
+            <dt>lionship</dt>
+            <dd>linkstream</dd>
+            <dt>medallion</dt>
+            <dd>chefferson (EARLY DEVELOPMENT)</dd>
+            <dt>millionfold</dt>
+            <dd>keep notes trim/expand</dd>
+            <dt>perihelion</dt>
+            <dd>image browser</dd>
+            <dt>rebellion</dt>
+            <dd>Text/image writing tool (DEVELOPMENT)</dd>
+            <dt>stallioneer</dt>
+            <dd>book scanner (IN PROGRESS)</dd>
+            <dt>tourbillion</dt>
+            <dd>screensaver</dd>
+            <dt>trillions</dt>
+            <dd>KEEP tool (CANCELLED)</dd>
+            <dt>vermillion</dt>
+            <dd>image python script</dd>
+            <dt>wmjefferson</dt>
+            <dd>professional</dd>
+          </dl>
+        </div>
+      </section>
+
+      <section class="map-popup" id="map-popup" aria-label="JeffersonWM network map" hidden>
+        <div class="map-shell">
+          <div class="map-header">
+            <h2 class="map-title">Map</h2>
+            <button class="map-close" id="map-close" type="button">Close</button>
+          </div>
+          <img
+            class="map-image"
+            src="/images/about/jeffersonwm-network-map-placeholder.png"
+            alt="JeffersonWM network topography placeholder map"
+          />
+        </div>
+      </section>
     </div>
 
     <script>
       (() => {
+        const aboutElements = {
+          trigger: document.getElementById('about-trigger'),
+          popup: document.getElementById('about-popup'),
+          close: document.getElementById('about-close'),
+          mapTrigger: document.getElementById('map-trigger'),
+          mapPopup: document.getElementById('map-popup'),
+          mapClose: document.getElementById('map-close')
+        };
+
+        const openAbout = () => {
+          aboutElements.popup.hidden = false;
+        };
+
+        const closeAbout = () => {
+          aboutElements.popup.hidden = true;
+          closeMap();
+        };
+
+        const openMap = () => {
+          aboutElements.mapPopup.hidden = false;
+        };
+
+        const closeMap = () => {
+          aboutElements.mapPopup.hidden = true;
+        };
+
+        aboutElements.trigger?.addEventListener('click', openAbout);
+        aboutElements.close?.addEventListener('click', closeAbout);
+        aboutElements.mapTrigger?.addEventListener('click', openMap);
+        aboutElements.mapClose?.addEventListener('click', closeMap);
+
+        aboutElements.popup?.addEventListener('click', event => {
+          if (event.target === aboutElements.popup) {
+            closeAbout();
+          }
+        });
+
+        aboutElements.mapPopup?.addEventListener('click', event => {
+          if (event.target === aboutElements.mapPopup) {
+            closeMap();
+          }
+        });
+
+        document.addEventListener('keydown', event => {
+          if (event.key !== 'Escape') {
+            return;
+          }
+
+          if (!aboutElements.mapPopup.hidden) {
+            closeMap();
+            return;
+          }
+
+          if (!aboutElements.popup.hidden) {
+            closeAbout();
+          }
+        });
+
         const WIDGET_API_BASE = 'https://api-lionship.jeffersonwm.com/api/widget';
         const WEATHER_API_URL = 'https://api.open-meteo.com/v1/forecast?latitude=37.7811&longitude=-122.4883&current_weather=true&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&forecast_days=2';
         const WORD_SOURCES = [

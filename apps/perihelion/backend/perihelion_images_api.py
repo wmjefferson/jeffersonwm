@@ -171,10 +171,30 @@ def sorted_visible_files(folder: Path) -> list[Path]:
     )
 
 
-def folder_preview(folder: Path) -> dict:
+def folder_preview(folder: Path, folder_rel_path: str = "") -> dict:
     files = sorted_visible_files(folder)
     first = files[0] if files else None
     first_image = next((entry for entry in files if guess_kind(entry.suffix.lower()) == "image"), None)
+
+    # Check for a manually-set cover image override
+    cover_path: str | None = None
+    if folder_rel_path:
+        cover_path = get_folder_cover(folder_rel_path)
+
+    if cover_path:
+        thumb_kind = guess_kind(Path(cover_path).suffix.lower())
+        thumb_ext = Path(cover_path).suffix.lower()
+        return {
+            "thumbnailPath": cover_path,
+            "thumbnailKind": thumb_kind,
+            "thumbnailExt": thumb_ext,
+            "imageThumbnailPath": cover_path if thumb_kind == "image" else (rel_url(first_image) if first_image else None),
+            "imageThumbnailKind": thumb_kind if thumb_kind == "image" else (guess_kind(first_image.suffix) if first_image else None),
+            "imageThumbnailExt": thumb_ext if thumb_kind == "image" else (first_image.suffix.lower() if first_image else ""),
+            "itemCount": len(files),
+            "hasCoverOverride": True,
+        }
+
     return {
         "thumbnailPath": rel_url(first) if first else None,
         "thumbnailKind": guess_kind(first.suffix) if first else None,
@@ -183,6 +203,7 @@ def folder_preview(folder: Path) -> dict:
         "imageThumbnailKind": guess_kind(first_image.suffix) if first_image else None,
         "imageThumbnailExt": first_image.suffix.lower() if first_image else "",
         "itemCount": len(files),
+        "hasCoverOverride": False,
     }
 
 
@@ -265,6 +286,12 @@ def init_db() -> None:
                 tags_json TEXT NOT NULL DEFAULT '[]',
                 updated_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS folder_covers (
+                folder_path TEXT PRIMARY KEY,
+                image_path TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
@@ -335,6 +362,35 @@ def save_image_detail_record(rel_path: str, title: str, description: str, tags: 
         )
         conn.commit()
     return payload
+
+
+def get_folder_cover(folder_path: str) -> str | None:
+    """Return the manually-set cover image path for a folder, or None."""
+    with db_connect() as conn:
+        row = conn.execute(
+            "SELECT image_path FROM folder_covers WHERE folder_path = ?",
+            (folder_path,),
+        ).fetchone()
+    return row["image_path"] if row else None
+
+
+def set_folder_cover(folder_path: str, image_path: str | None) -> None:
+    """Set or clear the manual cover image for a folder."""
+    with db_connect() as conn:
+        if image_path:
+            conn.execute(
+                """
+                INSERT INTO folder_covers (folder_path, image_path, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(folder_path) DO UPDATE SET
+                    image_path = excluded.image_path,
+                    updated_at = excluded.updated_at
+                """,
+                (folder_path, image_path, iso_utc()),
+            )
+        else:
+            conn.execute("DELETE FROM folder_covers WHERE folder_path = ?", (folder_path,))
+        conn.commit()
 
 
 def load_image_details_map(paths: list[str]) -> dict[str, dict]:
@@ -1189,7 +1245,8 @@ class Handler(BaseHTTPRequestHandler):
                     }
                     if entry.is_dir():
                         item["type"] = "directory"
-                        item.update(folder_preview(entry))
+                        folder_rel = rel_url(entry)
+                        item.update(folder_preview(entry, folder_rel))
                         folders.append(item)
                     else:
                         ext = entry.suffix.lower()
@@ -1356,6 +1413,15 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"error": "Shared page not found"}, 404)
                     return
                 self._send_json(share)
+                return
+
+            if path == "/api/folder-cover":
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                folder_path = (query.get("path", [""])[0] or "").strip().strip("/")
+                cover = get_folder_cover(folder_path) if folder_path else None
+                self._send_json({"ok": True, "folderPath": folder_path, "coverImagePath": cover})
                 return
 
             if path == "/" or path == "/index.html":
@@ -1765,6 +1831,27 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 share_file.unlink()
                 self._send_json({"ok": True, "id": share_id})
+                return
+
+            if path == "/api/folder-cover":
+                user = self._require_admin()
+                if not user:
+                    return
+                payload = load_json_body(self)
+                folder_path = (payload.get("folderPath") or "").strip().strip("/")
+                image_path = (payload.get("imagePath") or "").strip() or None
+                if not folder_path:
+                    self._send_json({"error": "folderPath is required"}, 400)
+                    return
+                # Validate that image_path is within our image root (security check)
+                if image_path:
+                    try:
+                        safe_path(image_path)  # will raise ValueError if path traversal
+                    except ValueError:
+                        self._send_json({"error": "Invalid imagePath"}, 400)
+                        return
+                set_folder_cover(folder_path, image_path)
+                self._send_json({"ok": True, "folderPath": folder_path, "coverImagePath": image_path})
                 return
 
             if path == "/api/download":
