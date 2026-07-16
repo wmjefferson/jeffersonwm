@@ -2,13 +2,13 @@
 @using System.Text.Json
 @model LibraryScanner.Web.Pages.Tags.IndexModel
 @{
-    ViewData["Title"] = "Tags";
+    ViewData["Title"] = "Tags and collections";
 }
 
 <section class="page-heading">
     <div>
-        <p class="eyebrow">Inventory labels</p>
-        <h1>Tags</h1>
+        <p class="eyebrow">Inventory labels and groupings</p>
+        <h1>Tags and collections</h1>
     </div>
     <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
 </section>
@@ -18,64 +18,125 @@
     <div class="alert alert-info">@Model.StatusMessage</div>
 }
 
-<section class="panel">
-    <h2>Search or create tags</h2>
-    <form method="post" class="tag-admin-form" id="tag-create-form">
-        <div class="tag-input-stack">
-            <input asp-for="Input.Name" class="form-control" id="tag-search-input" placeholder="Search existing tags or create new ones with commas" autocomplete="off" />
-            <div class="tag-search-results" id="tag-search-results" hidden></div>
-            <span asp-validation-for="Input.Name" class="text-danger"></span>
-            <span class="form-hint">Type to search live. Press Enter to create any tags that do not already exist.</span>
-        </div>
-        <input asp-for="Input.Description" class="form-control" placeholder="Optional tag note or meaning" />
-        <input asp-for="Input.Color" class="form-control color-input" type="color" />
-        <button asp-page-handler="Create" class="btn btn-primary">Create tags</button>
-        <a class="btn btn-outline-secondary" asp-page="/Tags/Index">Clear</a>
-    </form>
-</section>
+<section class="bulk-manage-grid">
+    <section class="panel bulk-manage-panel">
+        <h2>Tags</h2>
+        <form method="post" class="tag-admin-form" id="tag-create-form">
+            <div class="tag-input-stack">
+                <input asp-for="Input.Name" class="form-control" id="tag-search-input" placeholder="paper | paperback, hard | hardcover" autocomplete="off" />
+                <div class="tag-search-results" id="tag-search-results" hidden></div>
+                <span asp-validation-for="Input.Name" class="text-danger"></span>
+                <span class="form-hint">Type to search live. Use commas between tags. Optional format: <code>tag | note</code>.</span>
+            </div>
+            <input asp-for="Input.Description" class="form-control" placeholder="Optional tag note or meaning" />
+            <input asp-for="Input.Color" class="form-control color-input" type="color" />
+            <div class="form-actions form-actions--local">
+                <button asp-page-handler="Create" class="btn btn-primary">Create tags</button>
+                <a class="btn btn-outline-secondary" asp-page="/Tags/Index">Clear</a>
+            </div>
+        </form>
 
-<div class="table-wrap">
-    <table class="table inventory-table">
-        <thead>
-            <tr>
-                <th>Tag</th>
-                <th>Books</th>
-                <th>Edit</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-        @foreach (var tag in Model.Tags)
-        {
-            <tr id="tag-@tag.Id" data-tag-row data-tag-search="@($"{tag.Name} {tag.Description}".Trim())">
-                <td>
-                    <span class="tag-pill" style="--tag-color:@tag.Color">@tag.Name</span>
-                    @if (!string.IsNullOrWhiteSpace(tag.Description))
-                    {
-                        <span class="muted-block">@tag.Description</span>
-                    }
-                </td>
-                <td>@tag.BookCount</td>
-                <td>
-                    <form method="post" class="tag-edit-form">
-                        <input name="id" type="hidden" value="@tag.Id" />
-                        <input name="name" class="form-control" value="@tag.Name" />
-                        <input name="description" class="form-control" value="@tag.Description" placeholder="Optional note" />
-                        <input name="color" class="form-control color-input" type="color" value="@tag.Color" />
-                        <button asp-page-handler="Update" class="btn btn-sm btn-outline-secondary">Save</button>
-                    </form>
-                </td>
-                <td class="text-end">
-                    <form method="post">
-                        <input name="id" type="hidden" value="@tag.Id" />
-                        <button asp-page-handler="Delete" class="btn btn-sm btn-outline-danger">Delete</button>
-                    </form>
-                </td>
-            </tr>
-        }
-        </tbody>
-    </table>
-</div>
+        <div class="table-wrap">
+            <table class="table inventory-table">
+                <thead>
+                    <tr>
+                        <th>Tag</th>
+                        <th>Books</th>
+                        <th>Edit</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var tag in Model.Tags)
+                {
+                    <tr id="tag-@tag.Id" data-tag-row data-tag-search="@($"{tag.Name} {tag.Description}".Trim())">
+                        <td>
+                            <span class="tag-pill" style="--tag-color:@tag.Color" title="@tag.Description">@tag.Name</span>
+                            @if (!string.IsNullOrWhiteSpace(tag.Description))
+                            {
+                                <span class="muted-block">@tag.Description</span>
+                            }
+                        </td>
+                        <td>@tag.BookCount</td>
+                        <td>
+                            <form method="post" class="tag-edit-form">
+                                <input name="id" type="hidden" value="@tag.Id" />
+                                <input name="name" class="form-control" value="@tag.Name" />
+                                <input name="description" class="form-control" value="@tag.Description" placeholder="Optional note" />
+                                <input name="color" class="form-control color-input" type="color" value="@tag.Color" />
+                                <button asp-page-handler="Update" class="btn btn-sm btn-outline-secondary">Save</button>
+                            </form>
+                        </td>
+                        <td class="text-end">
+                            <form method="post">
+                                <input name="id" type="hidden" value="@tag.Id" />
+                                <button asp-page-handler="Delete" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel bulk-manage-panel">
+        <h2>Collections</h2>
+        <form method="post" asp-page-handler="CreateCollection" class="inline-form wide-inline-form">
+            <input asp-for="NewCollection.Name" class="form-control" placeholder="Collection name" />
+            <input asp-for="NewCollection.Description" class="form-control" placeholder="Optional note" />
+            <button class="btn btn-primary">Create</button>
+            <a class="btn btn-outline-secondary" asp-page="/Tags/Index">Clear</a>
+        </form>
+        <span asp-validation-for="NewCollection.Name" class="text-danger"></span>
+
+        <div class="table-wrap">
+            <table class="table inventory-table">
+                <thead>
+                    <tr>
+                        <th>Collection</th>
+                        <th>Books</th>
+                        <th>Edit</th>
+                        <th>View</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var collection in Model.Collections)
+                {
+                    <tr>
+                        <td>
+                            <strong>@collection.Name</strong>
+                            @if (!string.IsNullOrWhiteSpace(collection.Description))
+                            {
+                                <span class="muted-block">@collection.Description</span>
+                            }
+                        </td>
+                        <td>@collection.BookCount</td>
+                        <td>
+                            <form method="post" asp-page-handler="UpdateCollection" class="inline-form wide-inline-form">
+                                <input name="id" type="hidden" value="@collection.Id" />
+                                <input name="name" class="form-control" value="@collection.Name" />
+                                <input name="description" class="form-control" value="@collection.Description" placeholder="Optional note" />
+                                <button class="btn btn-sm btn-outline-secondary">Save</button>
+                            </form>
+                        </td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-secondary" asp-page="/Books/Index" asp-route-collectionId="@collection.Id">Open</a>
+                        </td>
+                        <td class="text-end">
+                            <form method="post" asp-page-handler="DeleteCollection">
+                                <input name="id" type="hidden" value="@collection.Id" />
+                                <button class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
 
 <script id="tag-search-data" type="application/json">
 @Html.Raw(JsonSerializer.Serialize(Model.Tags.Select(tag => new { tag.Id, tag.Name, tag.Description, tag.Color, tag.BookCount })))
@@ -131,8 +192,8 @@
                 const token = getActiveToken(input.value);
                 const query = normalize(token);
                 const matchingTags = query.length === 0
-                    ? tags.slice(0, 8)
-                    : tags.filter((tag) => normalize(`${tag.name ?? tag.Name ?? ""} ${tag.description ?? tag.Description ?? ""}`).includes(query)).slice(0, 8);
+                    ? tags
+                    : tags.filter((tag) => normalize(`${tag.name ?? tag.Name ?? ""} ${tag.description ?? tag.Description ?? ""}`).includes(query));
 
                 filterTable(token);
 
@@ -149,10 +210,12 @@
                     const description = tag.description ?? tag.Description ?? "";
                     const color = tag.color ?? tag.Color ?? "#245f4c";
                     const bookCount = tag.bookCount ?? tag.BookCount ?? 0;
+                    const title = description
+                        ? `${name} - ${description}`
+                        : `${name} - ${bookCount} book${bookCount === 1 ? "" : "s"}`;
                     return `
-                        <button type="button" class="tag-search-item" data-tag-id="${id}">
+                        <button type="button" class="tag-search-item" data-tag-id="${id}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">
                             <span class="tag-pill" style="--tag-color:${escapeHtml(color)}">${escapeHtml(name)}</span>
-                            <span class="tag-search-meta">${bookCount} book${bookCount === 1 ? "" : "s"}${description ? ` · ${escapeHtml(description)}` : ""}</span>
                         </button>`;
                 });
 

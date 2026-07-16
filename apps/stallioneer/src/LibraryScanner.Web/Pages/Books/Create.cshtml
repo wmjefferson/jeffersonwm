@@ -1,4 +1,5 @@
 @page
+@using System.Text.Json
 @model LibraryScanner.Web.Pages.Books.CreateModel
 @{
     ViewData["Title"] = "Add book";
@@ -144,7 +145,7 @@
             <div class="tag-suggestions">
                 @foreach (var tag in Model.AvailableTags.Take(Model.SpeedMode ? 30 : 18))
                 {
-                    <button type="button" class="tag-pill tag-button" style="--tag-color:@tag.Color" data-tag-suggestion="@tag.Name" data-tag-target="#Input_TagNames">@tag.Name</button>
+                    <button type="button" class="tag-pill tag-button" style="--tag-color:@tag.Color" data-tag-suggestion="@tag.Name" data-tag-target="#Input_TagNames" title="@tag.Description">@tag.Name</button>
                 }
             </div>
         }
@@ -276,8 +277,11 @@
         else
         {
             <label asp-for="Input.TagNames"></label>
-            <input asp-for="Input.TagNames" class="form-control" placeholder="signed, hardcover, favorites" />
-            <span class="form-hint">Separate tags with commas. New tags are created when you save.</span>
+            <div class="tag-input-stack" data-live-tag-editor>
+                <input asp-for="Input.TagNames" class="form-control" placeholder="signed, hardcover, paper | paperback" data-live-tag-input />
+                <div class="tag-search-results" data-live-tag-results hidden></div>
+            </div>
+            <span class="form-hint">Separate tags with commas. Optional format: <code>tag | note</code>. New tags are created when you save.</span>
         }
 
         <div class="field-grid">
@@ -399,6 +403,10 @@
         </section>
     }
 </form>
+
+<script id="tag-data" type="application/json">
+@Html.Raw(JsonSerializer.Serialize(Model.AvailableTags.Select(tag => new { tag.Id, tag.Name, tag.Description, tag.Color })))
+</script>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

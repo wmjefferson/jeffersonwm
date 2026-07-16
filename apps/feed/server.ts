@@ -1,6 +1,8 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { randomUUID } from "crypto";
+import { mkdir, writeFile } from "fs/promises";
 import mysql from "mysql2/promise";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -15,6 +17,7 @@ const app = express();
 const PORT = Number(process.env.PORT || "8050");
 const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+const UPLOAD_DIR = process.env.FEED_UPLOAD_DIR || path.join(process.cwd(), "uploads", "feed");
 const parser = new Parser();
 const CHANGELOG_SOURCE_URLS = (process.env.CHANGELOG_SOURCE_URLS || "")
   .split(",")
@@ -39,6 +42,46 @@ app.use(
     },
   }),
 );
+app.use("/uploads/feed", express.static(UPLOAD_DIR));
+app.post("/api/uploads/feed", express.raw({ type: "*/*", limit: "25mb" }), async (req, res) => {
+  const secret = String(req.headers["x-feed-secret"] || "");
+  if (!secret || secret !== process.env.FEED_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const body = req.body as Buffer;
+  if (!Buffer.isBuffer(body) || body.length === 0) {
+    return res.status(400).json({ error: "No file body supplied" });
+  }
+
+  const rawName = String(req.headers["x-file-name"] || "attachment");
+  let decodedRawName = rawName;
+  try {
+    decodedRawName = decodeURIComponent(rawName);
+  } catch {
+    decodedRawName = rawName;
+  }
+  const decodedName = decodedRawName.replace(/[\\/:*?"<>|]+/g, "-").trim() || "attachment";
+  const extension = path.extname(decodedName).toLowerCase().replace(/[^a-z0-9.]/g, "").slice(0, 12);
+  const baseName = path.basename(decodedName, path.extname(decodedName)).replace(/[^a-z0-9-_]+/gi, "-").slice(0, 80) || "attachment";
+  const storedName = `${new Date().toISOString().slice(0, 10)}-${randomUUID()}-${baseName}${extension}`;
+  const targetPath = path.join(UPLOAD_DIR, storedName);
+
+  try {
+    await mkdir(UPLOAD_DIR, { recursive: true });
+    await writeFile(targetPath, body);
+    res.status(201).json({
+      ok: true,
+      name: decodedName,
+      type: req.headers["content-type"] || "application/octet-stream",
+      size: body.length,
+      url: `${PUBLIC_BASE_URL.replace(/\/$/, "")}/uploads/feed/${encodeURIComponent(storedName)}`,
+    });
+  } catch (error: any) {
+    console.error("Failed to save feed upload:", error);
+    res.status(500).json({ error: "Failed to save upload" });
+  }
+});
 app.use(express.json());
 
 // MySQL connection pool
@@ -65,6 +108,7 @@ interface FeedItemRow extends FeedDbRow {
   source: string | null;
   external_id?: string | null;
   created_at: string | Date;
+  pinned_at?: string | Date | null;
 }
 
 interface NormalizedGitHubFeedItem {
@@ -616,9 +660,23 @@ async function initDb() {
         url TEXT,
         source VARCHAR(50),
         external_id VARCHAR(255) UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        pinned_at TIMESTAMP NULL DEFAULT NULL
       )
     `);
+    const [columns] = await pool.query(
+      `
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'feed_items'
+          AND COLUMN_NAME = 'pinned_at'
+        LIMIT 1
+      `,
+    );
+    if (!Array.isArray(columns) || columns.length === 0) {
+      await pool.query(`ALTER TABLE feed_items ADD COLUMN pinned_at TIMESTAMP NULL DEFAULT NULL`);
+    }
     console.log("MySQL Database initialized");
     // Initial fetch
     fetchFeeds();
@@ -782,7 +840,7 @@ app.get("/api/changelog/schema", (_req, res) => {
 
 app.get("/api/feed", async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY created_at DESC");
+    const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY pinned_at IS NULL, pinned_at DESC, created_at DESC");
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -792,7 +850,7 @@ app.get("/api/feed", async (req, res) => {
 
 app.get("/atom.xml", async (_req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY created_at DESC LIMIT 200");
+    const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY pinned_at IS NULL, pinned_at DESC, created_at DESC LIMIT 200");
     const items = (Array.isArray(rows) ? rows : []) as FeedItemRow[];
     res.type("application/atom+xml; charset=utf-8").send(buildAtomFeedXml(items));
   } catch (err) {
@@ -925,6 +983,34 @@ app.put("/api/feed/:id", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update feed item" });
+  }
+});
+
+app.post("/api/feed/:id/pin", async (req, res) => {
+  const { id } = req.params;
+  const { secret, pinned } = req.body || {};
+
+  if (secret !== process.env.FEED_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const [rows] = await pool.query("SELECT id FROM feed_items WHERE id = ? LIMIT 1", [id]);
+    const entry = Array.isArray(rows) ? rows[0] as { id: number } | undefined : undefined;
+
+    if (!entry) {
+      return res.status(404).json({ error: "Feed item not found" });
+    }
+
+    await pool.execute(
+      "UPDATE feed_items SET pinned_at = ? WHERE id = ?",
+      [pinned ? new Date().toISOString().slice(0, 19).replace("T", " ") : null, id],
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update pinned state" });
   }
 });
 

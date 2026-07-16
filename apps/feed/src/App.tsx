@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
@@ -12,12 +12,15 @@ import {
   Info,
   Linkedin,
   MessageSquare,
+  Pin,
+  PinOff,
   RefreshCw,
   Trash2,
   Trophy,
 } from 'lucide-react';
 
 type FeedView = 'all' | 'releases' | 'manual';
+type RichEditorTab = 'write' | 'preview';
 
 interface FeedItem {
   id: number;
@@ -26,6 +29,7 @@ interface FeedItem {
   url: string | null;
   source: string;
   created_at: string;
+  pinned_at?: string | null;
 }
 
 interface ConsolidatedFeedItem {
@@ -65,6 +69,14 @@ interface PostFormState {
   appName: string;
   version: string;
   highlights: string;
+}
+
+interface FeedUploadResponse {
+  ok: boolean;
+  name: string;
+  type: string;
+  size: number;
+  url: string;
 }
 
 const inferredFeedApiBase =
@@ -137,17 +149,32 @@ const feedPacificDatePartsFormatter = new Intl.DateTimeFormat('en-CA', {
   month: '2-digit',
   day: '2-digit',
 });
+const feedPacificTimePartsFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: FEED_TIMEZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+  hourCycle: 'h23',
+});
 const feedWeekRangeFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: 'UTC',
   month: 'short',
   day: 'numeric',
 });
+function getPacificDateInputValue(date = new Date()) {
+  const parts = Object.fromEntries(
+    feedPacificDatePartsFormatter.formatToParts(date).map((part) => [part.type, part.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 const defaultPostState = (): PostFormState => ({
   title: '',
   content: '',
   source: 'log',
   url: '',
-  publishAt: '',
+  publishAt: getPacificDateInputValue(),
   appName: '',
   version: '',
   highlights: '',
@@ -235,6 +262,121 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;');
 }
 
+function isSafeRichUrl(value: string) {
+  if (!value) {
+    return false;
+  }
+
+  if (value.startsWith('/')) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(value);
+    return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeRichHtml(value: string) {
+  if (!value.trim() || typeof window === 'undefined') {
+    return value.trim();
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${value}</div>`, 'text/html');
+  const root = doc.body.firstElementChild;
+  if (!root) {
+    return '';
+  }
+
+  const allowedTags = new Set([
+    'A',
+    'B',
+    'BLOCKQUOTE',
+    'BR',
+    'CODE',
+    'DIV',
+    'EM',
+    'FIGCAPTION',
+    'FIGURE',
+    'H3',
+    'H4',
+    'H5',
+    'I',
+    'IMG',
+    'LI',
+    'OL',
+    'P',
+    'PRE',
+    'S',
+    'SPAN',
+    'STRONG',
+    'U',
+    'UL',
+  ]);
+
+  const cleanNode = (node: Node) => {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType !== Node.ELEMENT_NODE) {
+        return;
+      }
+
+      const element = child as HTMLElement;
+      if (!allowedTags.has(element.tagName)) {
+        const fragment = doc.createDocumentFragment();
+        while (element.firstChild) {
+          fragment.appendChild(element.firstChild);
+        }
+        element.replaceWith(fragment);
+        cleanNode(node);
+        return;
+      }
+
+      const href = element.getAttribute('href') || '';
+      const source = element.getAttribute('src') || '';
+      const alt = element.getAttribute('alt') || '';
+      const className = element.getAttribute('class') || '';
+      [...element.attributes].forEach((attribute) => element.removeAttribute(attribute.name));
+
+      if (element.tagName === 'DIV' && className.split(/\s+/).includes('release-note-body')) {
+        element.className = 'release-note-body';
+      }
+
+      if (element.tagName === 'A') {
+        if (isSafeRichUrl(href)) {
+          (element as HTMLAnchorElement).href = href;
+          element.setAttribute('target', '_blank');
+          element.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+
+      if (element.tagName === 'IMG') {
+        if (!isSafeRichUrl(source)) {
+          element.remove();
+          return;
+        }
+        (element as HTMLImageElement).src = source;
+        (element as HTMLImageElement).alt = alt;
+        element.setAttribute('loading', 'lazy');
+      }
+
+      cleanNode(element);
+    });
+  };
+
+  cleanNode(root);
+
+  const text = root.textContent?.replace(/\u00a0/g, ' ').trim() || '';
+  const hasMediaOrLinks = Boolean(root.querySelector('img, a[href]'));
+  if (!text && !hasMediaOrLinks) {
+    return '';
+  }
+
+  return root.innerHTML.trim();
+}
+
 function normalizeVersion(value: string) {
   return value.trim().replace(/^v\.?/i, '');
 }
@@ -246,11 +388,31 @@ function buildReleaseTitle(appName: string, version: string) {
 }
 
 function formatEditorDate(value: string) {
-  const date = parseFeedDate(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return getPacificDateInputValue(parseFeedDate(value));
+}
+
+function getTimeZoneOffsetMs(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    hourCycle: 'h23',
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(date).map((part) => [part.type, part.value]));
+  const zonedTime = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return zonedTime - date.getTime();
 }
 
 function normalizeEditorDate(value: string) {
@@ -259,38 +421,175 @@ function normalizeEditorDate(value: string) {
     return null;
   }
 
-  const parsedDate = new Date(`${trimmed}T00:00:00`);
-  if (Number.isNaN(parsedDate.getTime())) {
+  const dateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dateMatch) {
     return null;
   }
 
-  const now = new Date();
-  const parsed = new Date(
-    parsedDate.getFullYear(),
-    parsedDate.getMonth(),
-    parsedDate.getDate(),
-    now.getHours(),
-    now.getMinutes(),
-    now.getSeconds(),
-    0,
+  const nowParts = Object.fromEntries(
+    feedPacificTimePartsFormatter.formatToParts(new Date()).map((part) => [part.type, part.value]),
   );
+  const wallClockUtcGuess = Date.UTC(
+    Number(dateMatch[1]),
+    Number(dateMatch[2]) - 1,
+    Number(dateMatch[3]),
+    Number(nowParts.hour),
+    Number(nowParts.minute),
+    Number(nowParts.second),
+  );
+  const offset = getTimeZoneOffsetMs(new Date(wallClockUtcGuess), FEED_TIMEZONE);
+  const parsed = new Date(wallClockUtcGuess - offset);
 
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }
 
-  return parsed.toISOString().slice(0, 19).replace('T', ' ');
+  return parsed.toISOString();
 }
 
 function formatParagraphHtml(value: string) {
-  const blocks = value
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
-    .filter(Boolean);
+  return formatMarkdownHtml(value);
+}
 
-  return blocks
-    .map((block) => `<p>${escapeHtml(block).replace(/\n/g, '<br />')}</p>`)
-    .join('');
+function formatInlineMarkdown(value: string) {
+  let html = escapeHtml(value);
+
+  const codeSegments: string[] = [];
+  html = html.replace(/`([^`]+)`/g, (_match, code) => {
+    const token = `@@CODE${codeSegments.length}@@`;
+    codeSegments.push(`<code>${code}</code>`);
+    return token;
+  });
+
+  html = html.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, alt, url) => {
+    if (!isSafeRichUrl(url)) {
+      return '';
+    }
+    return `<figure><img src="${url}" alt="${alt}" loading="lazy" /><figcaption>${alt}</figcaption></figure>`;
+  });
+  html = html.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_match, label, url) => {
+    if (!isSafeRichUrl(url)) {
+      return label;
+    }
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+  });
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  html = html.replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
+
+  codeSegments.forEach((segment, index) => {
+    html = html.replace(`@@CODE${index}@@`, segment);
+  });
+
+  return html;
+}
+
+function isProbablyHtml(value: string) {
+  return /<\/?[a-z][\s\S]*>/i.test(value);
+}
+
+function formatFeedContentHtml(item: FeedItem) {
+  const content = item.content || '';
+  if (!content.trim()) {
+    return '';
+  }
+
+  if (isReleaseItem(item) || isProbablyHtml(content)) {
+    return sanitizeRichHtml(content);
+  }
+
+  return formatMarkdownHtml(content);
+}
+
+function formatMarkdownHtml(value: string) {
+  const lines = value.replace(/\r\n/g, '\n').split('\n');
+  const html: string[] = [];
+  let paragraph: string[] = [];
+  let listType: 'ul' | 'ol' | null = null;
+  let blockquote: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return;
+    html.push(`<p>${paragraph.map(formatInlineMarkdown).join('<br />')}</p>`);
+    paragraph = [];
+  };
+
+  const closeList = () => {
+    if (!listType) return;
+    html.push(`</${listType}>`);
+    listType = null;
+  };
+
+  const flushBlockquote = () => {
+    if (blockquote.length === 0) return;
+    html.push(`<blockquote><p>${blockquote.map(formatInlineMarkdown).join('<br />')}</p></blockquote>`);
+    blockquote = [];
+  };
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushParagraph();
+      closeList();
+      flushBlockquote();
+      return;
+    }
+
+    if (/^!\[[^\]]*\]\([^)]+\)$/.test(trimmed)) {
+      flushParagraph();
+      closeList();
+      flushBlockquote();
+      html.push(formatInlineMarkdown(trimmed));
+      return;
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      flushParagraph();
+      closeList();
+      flushBlockquote();
+      const level = headingMatch[1].length + 2;
+      html.push(`<h${level}>${formatInlineMarkdown(headingMatch[2])}</h${level}>`);
+      return;
+    }
+
+    const blockquoteMatch = trimmed.match(/^>\s?(.*)$/);
+    if (blockquoteMatch) {
+      flushParagraph();
+      closeList();
+      blockquote.push(blockquoteMatch[1]);
+      return;
+    }
+
+    const unorderedMatch = trimmed.match(/^[-*]\s+(.+)$/);
+    const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (unorderedMatch || orderedMatch) {
+      flushParagraph();
+      flushBlockquote();
+      const nextType = unorderedMatch ? 'ul' : 'ol';
+      if (listType && listType !== nextType) {
+        closeList();
+      }
+      if (!listType) {
+        listType = nextType;
+        html.push(`<${listType}>`);
+      }
+      html.push(`<li>${formatInlineMarkdown((unorderedMatch || orderedMatch)?.[1] || '')}</li>`);
+      return;
+    }
+
+    closeList();
+    flushBlockquote();
+    paragraph.push(trimmed);
+  });
+
+  flushParagraph();
+  closeList();
+  flushBlockquote();
+
+  return html.join('');
 }
 
 function formatReleaseHtml(highlights: string) {
@@ -390,7 +689,7 @@ function buildPostStateFromItem(item: FeedItem): PostFormState {
 
   return {
     title: item.title,
-    content: htmlToEditorText(item.content),
+    content: item.content && isProbablyHtml(item.content) ? htmlToEditorText(item.content) : item.content || '',
     source: item.source,
     url: item.url || '',
     publishAt: formatEditorDate(item.created_at),
@@ -417,12 +716,19 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [newPost, setNewPost] = useState<PostFormState>(defaultPostState);
   const [posting, setPosting] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [richEditorTab, setRichEditorTab] = useState<RichEditorTab>('write');
   const [activeWeekKey, setActiveWeekKey] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const markdownInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
   const resetComposer = () => {
     setNewPost(defaultPostState());
     setEditingItemId(null);
+    setUploadingAttachment(false);
+    setRichEditorTab('write');
     setShowCompose(false);
   };
 
@@ -456,6 +762,125 @@ export default function App() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRichEditorTabChange = (tab: RichEditorTab) => {
+    setRichEditorTab(tab);
+  };
+
+  const updateMarkdownContent = (value: string, selectionStart?: number, selectionEnd?: number) => {
+    setNewPost((current) => ({ ...current, content: value }));
+    window.setTimeout(() => {
+      markdownInputRef.current?.focus();
+      if (selectionStart !== undefined && selectionEnd !== undefined) {
+        markdownInputRef.current?.setSelectionRange(selectionStart, selectionEnd);
+      }
+    }, 0);
+  };
+
+  const insertMarkdownWrap = (before: string, after = '', placeholder = 'text') => {
+    const input = markdownInputRef.current;
+    const value = newPost.content;
+    const start = input?.selectionStart ?? value.length;
+    const end = input?.selectionEnd ?? value.length;
+    const selected = value.slice(start, end) || placeholder;
+    const inserted = `${before}${selected}${after}`;
+    updateMarkdownContent(`${value.slice(0, start)}${inserted}${value.slice(end)}`, start + before.length, start + before.length + selected.length);
+  };
+
+  const insertMarkdownBlock = (prefix: string, placeholder = 'text') => {
+    const input = markdownInputRef.current;
+    const value = newPost.content;
+    const start = input?.selectionStart ?? value.length;
+    const end = input?.selectionEnd ?? value.length;
+    const selected = value.slice(start, end) || placeholder;
+    const inserted = selected
+      .split('\n')
+      .map((line) => `${prefix}${line || placeholder}`)
+      .join('\n');
+    updateMarkdownContent(`${value.slice(0, start)}${inserted}${value.slice(end)}`, start + prefix.length, start + inserted.length);
+  };
+
+  const handleRichLink = () => {
+    const href = window.prompt('Link URL');
+    if (!href) {
+      return;
+    }
+
+    if (!isSafeRichUrl(href)) {
+      setError('Please use a full http, https, mailto, or local upload link.');
+      return;
+    }
+
+    const value = newPost.content;
+    const input = markdownInputRef.current;
+    const start = input?.selectionStart ?? value.length;
+    const end = input?.selectionEnd ?? value.length;
+    const selected = value.slice(start, end) || 'link text';
+    const inserted = `[${selected}](${href})`;
+    updateMarkdownContent(`${value.slice(0, start)}${inserted}${value.slice(end)}`, start + 1, start + 1 + selected.length);
+  };
+
+  const uploadFeedFile = async (file: File) => {
+    const response = await fetch(apiUrl('/api/uploads/feed'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'X-Feed-Secret': secretInput,
+        'X-File-Name': encodeURIComponent(file.name),
+      },
+      body: file,
+    });
+
+    if (response.status === 401) {
+      throw new Error('Invalid secret');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to upload file');
+    }
+
+    return (await response.json()) as FeedUploadResponse;
+  };
+
+  const insertMarkdownLine = (line: string) => {
+    const input = markdownInputRef.current;
+    const value = newPost.content;
+    const start = input?.selectionStart ?? value.length;
+    const end = input?.selectionEnd ?? value.length;
+    const needsLeadingBreak = start > 0 && value[start - 1] !== '\n';
+    const needsTrailingBreak = end < value.length && value[end] !== '\n';
+    const inserted = `${needsLeadingBreak ? '\n' : ''}${line}${needsTrailingBreak ? '\n' : ''}`;
+    const nextStart = start + inserted.length;
+    updateMarkdownContent(`${value.slice(0, start)}${inserted}${value.slice(end)}`, nextStart, nextStart);
+  };
+
+  const handleRichFileUpload = async (event: ChangeEvent<HTMLInputElement>, mode: 'image' | 'attachment') => {
+    const files = [...(event.target.files || [])];
+    event.target.value = '';
+
+    if (files.length === 0) {
+      return;
+    }
+
+    setUploadingAttachment(true);
+    setError(null);
+
+    try {
+      for (const file of files) {
+        const upload = await uploadFeedFile(file);
+        if (mode === 'image') {
+          insertMarkdownLine(`![${upload.name}](${upload.url})`);
+        } else {
+          insertMarkdownLine(`[Attachment: ${upload.name}](${upload.url})`);
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload file');
+    } finally {
+      setUploadingAttachment(false);
     }
   };
 
@@ -513,6 +938,8 @@ export default function App() {
     setShowCompose(false);
     setShowSetup(false);
     setEditingItemId(null);
+    setUploadingAttachment(false);
+    setRichEditorTab('write');
   };
 
   const handlePost = async (event: FormEvent) => {
@@ -524,7 +951,7 @@ export default function App() {
       : newPost.title.trim();
     const resolvedContent = isRelease
       ? formatReleaseHtml(newPost.highlights)
-      : formatParagraphHtml(newPost.content);
+      : newPost.content.trim();
     const createdAt = normalizeEditorDate(newPost.publishAt);
 
     if (!resolvedTitle) {
@@ -576,6 +1003,7 @@ export default function App() {
   const handleEdit = (item: FeedItem) => {
     setEditingItemId(item.id);
     setNewPost(buildPostStateFromItem(item));
+    setRichEditorTab('write');
     setShowCompose(true);
     setError(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -613,6 +1041,34 @@ export default function App() {
       await fetchFeed();
     } catch (err: any) {
       setError(err.message || 'Failed to delete entry');
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handlePinToggle = async (item: FeedItem) => {
+    setPosting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(apiUrl(`/api/feed/${item.id}/pin`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: secretInput, pinned: !item.pinned_at }),
+      });
+
+      if (response.status === 401) {
+        throw new Error('Invalid secret');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update pin');
+      }
+
+      await fetchFeed();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update pin');
     } finally {
       setPosting(false);
     }
@@ -813,10 +1269,22 @@ export default function App() {
     );
   }, [itemsForView, selectedSites]);
 
+  const pinnedItems = useMemo(() => {
+    return visibleItems
+      .filter((item) => Boolean(item.pinned_at))
+      .sort((left, right) => {
+        const leftPinned = left.pinned_at ? parseFeedDate(left.pinned_at).getTime() : 0;
+        const rightPinned = right.pinned_at ? parseFeedDate(right.pinned_at).getTime() : 0;
+        return rightPinned - leftPinned;
+      });
+  }, [visibleItems]);
+
+  const timelineItems = useMemo(() => visibleItems.filter((item) => !item.pinned_at), [visibleItems]);
+
   const weeks = useMemo<FeedWeekGroup[]>(() => {
     const buckets = new Map<string, FeedWeekGroup>();
 
-    for (const item of visibleItems) {
+    for (const item of timelineItems) {
       const meta = getWeekMetadata(item.created_at);
       const existing = buckets.get(meta.key);
       if (existing) {
@@ -834,7 +1302,7 @@ export default function App() {
     }
 
     return [...buckets.values()].sort((left, right) => right.start.getTime() - left.start.getTime());
-  }, [visibleItems]);
+  }, [timelineItems]);
 
   useEffect(() => {
     if (weeks.length === 0) {
@@ -848,6 +1316,56 @@ export default function App() {
   const activeWeekIndex = weeks.findIndex((week) => week.key === activeWeekKey);
   const activeWeek = activeWeekIndex >= 0 ? weeks[activeWeekIndex] : weeks[0] || null;
   const groupedItems = groupFeedItems(activeWeek?.items || []);
+  const renderFeedEntry = (item: FeedItem) => (
+    <div key={item.id} className={item.source === 'release' ? 'release-card' : ''}>
+      <div className="feed-card-head">
+        <div className="feed-source-tag">
+          {item.pinned_at && <Pin size={13} />}
+          {getSourceIcon(item.source)}
+          <span>{item.source}</span>
+        </div>
+        <div className="entry-head-actions">
+          {isLoggedIn && isEditableItem(item) && (
+            <div className="entry-actions">
+              <button type="button" className="feed-link-button" onClick={() => handlePinToggle(item)} disabled={posting}>
+                {item.pinned_at ? <PinOff size={12} /> : <Pin size={12} />}
+                {item.pinned_at ? 'Unpin' : 'Pin'}
+              </button>
+              <button type="button" className="feed-link-button" onClick={() => handleEdit(item)}>
+                <Pencil size={12} />
+                Edit
+              </button>
+              <button type="button" className="feed-link-button feed-link-button--danger" onClick={() => handleDelete(item)}>
+                <Trash2 size={12} />
+                Delete
+              </button>
+            </div>
+          )}
+          <div className="feed-time">
+            <Clock size={12} />
+            <span>{formatDate(item.created_at)}</span>
+          </div>
+        </div>
+      </div>
+
+      <h3 className="entry-title">
+        {item.url ? (
+          <a href={item.url} target="_blank" rel="noreferrer" className="entry-title-link">
+            {item.title}
+          </a>
+        ) : (
+          item.title
+        )}
+      </h3>
+
+      {item.content && (
+        <div
+          className="feed-html"
+          dangerouslySetInnerHTML={{ __html: formatFeedContentHtml(item) }}
+        />
+      )}
+    </div>
+  );
 
   return (
     <div className="feed-shell">
@@ -1104,6 +1622,27 @@ export default function App() {
           </div>
         </section>
 
+        {pinnedItems.length > 0 && (
+          <section className="pinned-stack" aria-label="Pinned feed entries">
+            <div className="pinned-stack-head">
+              <span className="eyebrow">Pinned</span>
+              <span className="pinned-count">{pinnedItems.length}</span>
+            </div>
+            <div className="timeline">
+              {pinnedItems.map((item) => (
+                <motion.article
+                  key={`pinned-${item.id}`}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="feed-card feed-card--pinned"
+                >
+                  {renderFeedEntry(item)}
+                </motion.article>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="feed-weekbar feed-card">
           <div className="feed-weekbar-copy">
             <span className="eyebrow">Calendar Week</span>
@@ -1286,13 +1825,157 @@ export default function App() {
                       <label className="field-label" htmlFor="feed-content-input">
                         Notes
                       </label>
-                      <textarea
-                        id="feed-content-input"
-                        className="feed-textarea"
-                        value={newPost.content}
-                        onChange={(event) => setNewPost({ ...newPost, content: event.target.value })}
-                        placeholder="Write a short public note."
-                      />
+                      <div className="rich-composer">
+                        <div className="rich-editor-bar">
+                          <div className="rich-editor-tabs" role="tablist" aria-label="Manual entry mode">
+                            <button
+                              type="button"
+                              className={`rich-editor-tab ${richEditorTab === 'write' ? 'rich-editor-tab--active' : ''}`}
+                              onClick={() => handleRichEditorTabChange('write')}
+                              role="tab"
+                              aria-selected={richEditorTab === 'write'}
+                              aria-controls="feed-content-input"
+                            >
+                              Write
+                            </button>
+                            <button
+                              type="button"
+                              className={`rich-editor-tab ${richEditorTab === 'preview' ? 'rich-editor-tab--active' : ''}`}
+                              onClick={() => handleRichEditorTabChange('preview')}
+                              role="tab"
+                              aria-selected={richEditorTab === 'preview'}
+                              aria-controls="feed-content-preview"
+                            >
+                              Preview
+                            </button>
+                          </div>
+
+                          <div className="rich-toolbar" aria-label="Manual entry rich text tools">
+                            <button
+                              type="button"
+                              className="rich-tool"
+                              onClick={() => insertMarkdownBlock('## ', 'Heading')}
+                              disabled={richEditorTab === 'preview'}
+                              aria-label="Heading"
+                            >
+                              H
+                            </button>
+                            <button
+                              type="button"
+                              className="rich-tool"
+                              onClick={() => insertMarkdownWrap('**', '**', 'bold text')}
+                              disabled={richEditorTab === 'preview'}
+                              aria-label="Bold"
+                            >
+                              B
+                            </button>
+                            <button
+                              type="button"
+                              className="rich-tool rich-tool--italic"
+                              onClick={() => insertMarkdownWrap('_', '_', 'italic text')}
+                              disabled={richEditorTab === 'preview'}
+                              aria-label="Italic"
+                            >
+                              I
+                            </button>
+                            <button
+                              type="button"
+                              className="rich-tool"
+                              onClick={() => insertMarkdownBlock('- ', 'List item')}
+                              disabled={richEditorTab === 'preview'}
+                            >
+                              List
+                            </button>
+                            <button
+                              type="button"
+                              className="rich-tool"
+                              onClick={() => insertMarkdownBlock('1. ', 'List item')}
+                              disabled={richEditorTab === 'preview'}
+                            >
+                              1.2
+                            </button>
+                            <button
+                              type="button"
+                              className="rich-tool"
+                              onClick={() => insertMarkdownBlock('> ', 'Quote')}
+                              disabled={richEditorTab === 'preview'}
+                            >
+                              Quote
+                            </button>
+                            <button
+                              type="button"
+                              className="rich-tool"
+                              onClick={() => insertMarkdownWrap('`', '`', 'code')}
+                              disabled={richEditorTab === 'preview'}
+                            >
+                              Code
+                            </button>
+                            <button type="button" className="rich-tool" onClick={handleRichLink} disabled={richEditorTab === 'preview'}>
+                              Link
+                            </button>
+                            <button
+                              type="button"
+                              className="rich-tool"
+                              onClick={() => imageInputRef.current?.click()}
+                              disabled={uploadingAttachment || richEditorTab === 'preview'}
+                            >
+                              Image
+                            </button>
+                            <button
+                              type="button"
+                              className="rich-tool"
+                              onClick={() => attachmentInputRef.current?.click()}
+                              disabled={uploadingAttachment || richEditorTab === 'preview'}
+                            >
+                              File
+                            </button>
+                          </div>
+                          <input
+                            ref={imageInputRef}
+                            className="rich-file-input"
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={(event) => handleRichFileUpload(event, 'image')}
+                          />
+                          <input
+                            ref={attachmentInputRef}
+                            className="rich-file-input"
+                            type="file"
+                            multiple
+                            onChange={(event) => handleRichFileUpload(event, 'attachment')}
+                          />
+                        </div>
+
+                        {richEditorTab === 'write' ? (
+                          <div
+                            className="rich-editor-surface"
+                            role="tabpanel"
+                          >
+                            <textarea
+                              id="feed-content-input"
+                              ref={markdownInputRef}
+                              className="markdown-editor-textarea"
+                              value={newPost.content}
+                              onChange={(event) => setNewPost((current) => ({ ...current, content: event.target.value }))}
+                              placeholder="Use Markdown to format your feed entry"
+                              aria-label="Manual entry notes"
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            id="feed-content-preview"
+                            className="rich-preview-surface feed-html"
+                            role="tabpanel"
+                            dangerouslySetInnerHTML={{
+                              __html: newPost.content.trim()
+                                ? formatMarkdownHtml(newPost.content)
+                                : '<p class="rich-preview-empty">Nothing to preview yet.</p>',
+                            }}
+                          />
+                        )}
+                        {uploadingAttachment && <p className="rich-upload-status">Uploading file...</p>}
+                      </div>
                     </div>
                   </>
                 )}
@@ -1391,7 +2074,7 @@ export default function App() {
                               group.items[0].content && (
                                 <div
                                   className="feed-html"
-                                  dangerouslySetInnerHTML={{ __html: group.items[0].content }}
+                                  dangerouslySetInnerHTML={{ __html: formatFeedContentHtml(group.items[0]) }}
                                 />
                               )
                             )}
@@ -1399,51 +2082,7 @@ export default function App() {
                         </div>
                       </div>
                     ) : (
-                      group.items.map((item) => (
-                        <div key={item.id} className={item.source === 'release' ? 'release-card' : ''}>
-                          <div className="feed-card-head">
-                            <div className="feed-source-tag">
-                              {getSourceIcon(item.source)}
-                              <span>{item.source}</span>
-                            </div>
-                            <div className="entry-head-actions">
-                              {isLoggedIn && isEditableItem(item) && (
-                                <div className="entry-actions">
-                                  <button type="button" className="feed-link-button" onClick={() => handleEdit(item)}>
-                                    <Pencil size={12} />
-                                    Edit
-                                  </button>
-                                  <button type="button" className="feed-link-button feed-link-button--danger" onClick={() => handleDelete(item)}>
-                                    <Trash2 size={12} />
-                                    Delete
-                                  </button>
-                                </div>
-                              )}
-                              <div className="feed-time">
-                                <Clock size={12} />
-                                <span>{formatDate(item.created_at)}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <h3 className="entry-title">
-                            {item.url ? (
-                              <a href={item.url} target="_blank" rel="noreferrer" className="entry-title-link">
-                                {item.title}
-                              </a>
-                            ) : (
-                              item.title
-                            )}
-                          </h3>
-
-                          {item.content && (
-                            <div
-                              className="feed-html"
-                              dangerouslySetInnerHTML={{ __html: item.content }}
-                            />
-                          )}
-                        </div>
-                      ))
+                      group.items.map((item) => renderFeedEntry(item))
                     )}
                   </motion.article>
                 ))

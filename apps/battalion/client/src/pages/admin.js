@@ -1010,9 +1010,15 @@ function renderEmotionPicker() {
   let filteredEntries = [...emotionsList];
   if (emotionSearchQuery) {
     const q = emotionSearchQuery.toLowerCase();
+    const categoryMatchesQuery = (categoryId) => {
+      const cat = emotionCategories.find(c => c.category_id === categoryId);
+      const label = cat?.label || categoryId;
+      return label.toLowerCase().includes(q) || categoryId.toLowerCase().includes(q);
+    };
     filteredEntries = filteredEntries.filter(e =>
       e.name.toLowerCase().includes(q) ||
-      (e.brief_description && e.brief_description.toLowerCase().includes(q))
+      (e.brief_description && e.brief_description.toLowerCase().includes(q)) ||
+      categoryMatchesQuery(e.category_id)
     );
   }
 
@@ -1031,7 +1037,7 @@ function renderEmotionPicker() {
     }
   }
 
-  const entries = filteredEntries.map(e => {
+  const emotionEntries = filteredEntries.map(e => {
     const cat = emotionCategoryMap.get(e.category_id);
     const color = EMO_CAT_COLORS[e.category_id] || '#888';
     const modifiers = [];
@@ -1065,6 +1071,35 @@ function renderEmotionPicker() {
       ">${e.name}</button>`
     };
   });
+
+  const visibleCategoryIds = [...new Set(emotionEntries.map(e => e.category))];
+  const categoryEntries = visibleCategoryIds.map(catId => {
+    const cat = emotionCategoryMap.get(catId);
+    const label = cat?.label || catId.replace(/_/g, ' ');
+    const color = EMO_CAT_COLORS[catId] || '#888';
+    const modifiers = [];
+    if (cat?.energy_flat) modifiers.push(`âš¡${cat.energy_flat > 0 ? '+' : ''}${cat.energy_flat}`);
+    if (cat?.health_flat) modifiers.push(`â¤${cat.health_flat > 0 ? '+' : ''}${cat.health_flat}`);
+    if (cat?.stress_flat) modifiers.push(`ðŸ˜°${cat.stress_flat > 0 ? '+' : ''}${cat.stress_flat}`);
+    if (cat?.discipline_flat) modifiers.push(`ðŸŽ¯${cat.discipline_flat > 0 ? '+' : ''}${cat.discipline_flat}`);
+    if (cat?.fun_flat) modifiers.push(`ðŸŽ®${cat.fun_flat > 0 ? '+' : ''}${cat.fun_flat}`);
+    if (cat?.social_flat) modifiers.push(`ðŸ¤${cat.social_flat > 0 ? '+' : ''}${cat.social_flat}`);
+    const catTip = modifiers.join(' ') || 'No stat effects';
+    const isActive = currentEmotion?.emotion === label && currentEmotion?.category_id === catId;
+
+    return {
+      category: catId,
+      markup: `<button class="emo-btn" data-emo-name="${label}" data-emo-cat="${catId}" title="Log ${label} as your current feeling. \n\nGrants: ${catTip}" style="
+        padding:3px 9px; font-size:12px; cursor:pointer; border-radius:12px; white-space:nowrap;
+        border:1px solid ${color};
+        background:${isActive ? color : '#fff'};
+        color:${isActive ? '#fff' : color};
+        font-weight:700;
+        transition:all 0.15s;
+      ">${label}</button>`
+    };
+  });
+  const entries = [...categoryEntries, ...emotionEntries];
 
   const isEmoSorted = emotionsSort !== 'category';
   const markup = isEmoSorted

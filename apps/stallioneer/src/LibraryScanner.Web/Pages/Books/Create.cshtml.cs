@@ -606,13 +606,15 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
 
         var combinedTagNames = selectedTags
             .Select(tag => tag.Name)
-            .Concat(InventoryText.ParseTags(tagNames))
+            .Concat(InventoryText.ParseTagDefinitions(tagNames).Select(definition => definition.Name))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         foreach (var tagName in combinedTagNames)
         {
             var normalized = InventoryText.NormalizeName(tagName);
+            var requestedTag = InventoryText.ParseTagDefinitions(tagNames)
+                .FirstOrDefault(definition => string.Equals(definition.Name, tagName, StringComparison.OrdinalIgnoreCase));
             var tag = await dbContext.Tags.FirstOrDefaultAsync(tag => tag.NormalizedName == normalized);
             if (tag is null)
             {
@@ -620,9 +622,14 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
                 {
                     Name = tagName.Trim(),
                     NormalizedName = normalized,
-                    Color = InventoryText.DefaultTagColor(tagName)
+                    Color = InventoryText.DefaultTagColor(tagName),
+                    Description = requestedTag?.Description
                 };
                 dbContext.Tags.Add(tag);
+            }
+            else if (string.IsNullOrWhiteSpace(tag.Description) && !string.IsNullOrWhiteSpace(requestedTag?.Description))
+            {
+                tag.Description = requestedTag.Description;
             }
 
             book.BookTags.Add(new BookTag { Book = book, Tag = tag });
@@ -659,7 +666,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
             .ToList();
 
         var mergedTagNames = existingTags
-            .Concat(InventoryText.ParseTags(tagNames))
+            .Concat(InventoryText.ParseTagDefinitions(tagNames).Select(definition => definition.Name))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 

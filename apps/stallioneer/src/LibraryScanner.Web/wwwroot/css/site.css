@@ -392,7 +392,7 @@ a {
 }
 
 .bulk-filter-toolbar {
-  grid-template-columns: minmax(240px, 1.4fr) minmax(170px, 0.8fr) minmax(190px, 0.9fr) auto auto;
+  grid-template-columns: minmax(240px, 1.4fr) minmax(160px, 0.8fr) minmax(180px, 0.9fr) minmax(160px, 0.8fr) auto auto;
 }
 
 .panel {
@@ -771,12 +771,44 @@ label {
   padding: 18px 22px;
 }
 
+.bulk-inline-hint {
+  margin-bottom: 0;
+}
+
+.bulk-selection-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px 22px;
+}
+
 .bulk-selection-summary {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
   justify-content: space-between;
+}
+
+.bulk-selection-shared {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+}
+
+.bulk-shared-label {
+  color: #68706a;
+  display: block;
+  font-size: 0.83rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.bulk-actions-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(5, minmax(180px, 1fr));
 }
 
 .bulk-actions {
@@ -791,6 +823,30 @@ label {
   gap: 14px;
   grid-template-columns: minmax(240px, 0.7fr) minmax(320px, 0.9fr);
   margin-top: 14px;
+}
+
+.bulk-admin-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.bulk-manage-search {
+  margin: 6px 0 14px;
+}
+
+.bulk-manage-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+}
+
+.bulk-manage-panel {
+  padding: 18px;
+}
+
+.bulk-manage-panel h3 {
+  margin-bottom: 14px;
 }
 
 .export-form {
@@ -1284,7 +1340,10 @@ label {
   }
 
   .bulk-actions,
+  .bulk-actions-grid,
+  .bulk-selection-shared,
   .import-export-grid,
+  .bulk-manage-grid,
   .inventory-filters,
   .copy-field,
   .wide-inline-form {

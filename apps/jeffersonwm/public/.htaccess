@@ -13,6 +13,16 @@ RewriteRule ^([a-zA-Z0-9]{4})/?$ /perihelion/?share=$1 [R=302,L]
 RewriteCond %{REQUEST_URI} ^/$
 RewriteRule ^(.*)$ /jeffersonwm/ [L]
 
+# JeffersonWM status page
+RewriteCond %{THE_REQUEST} \s/+status/index(\.html)?[\s?]
+RewriteRule ^status/index(\.html)?$ /status/ [R=301,L]
+RewriteRule ^status/?$ /status/index.html [L]
+
+# JeffersonWM development inventory page
+RewriteCond %{THE_REQUEST} \s/+development/index(\.html)?[\s?]
+RewriteRule ^development/index(\.html)?$ /development/ [R=301,L]
+RewriteRule ^development/?$ /development/index.html [L]
+
 # Jeffersonwm landing page SPA routing (if needed)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

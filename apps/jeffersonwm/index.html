@@ -313,6 +313,7 @@
 
       .widget-location,
       .widget-greeting,
+      .widget-located,
       .widget-date {
         display: block;
         width: 100%;
@@ -338,6 +339,10 @@
       }
 
       .widget-greeting {
+        margin-bottom: 0.35rem;
+      }
+
+      .widget-located {
         margin-bottom: 0.35rem;
       }
 
@@ -780,6 +785,7 @@
 
         .widget-time,
         .widget-greeting,
+        .widget-located,
         .widget-weather {
           margin-left: 0;
           margin-right: 0;
@@ -869,7 +875,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            Feed. v.0.2.2
+            Feed. v.0.2.3
           </a>
           <a
             class="app-link"
@@ -949,6 +955,7 @@
 
       <div class="bottom-links" aria-label="Site links">
         <a class="personal-link" href="/status/">Status</a>
+        <a class="personal-link" href="/development/">Development</a>
         <button class="about-trigger" id="about-trigger" type="button">About</button>
         <a
           class="personal-link"
@@ -963,6 +970,7 @@
       <aside class="widget" aria-label="Homepage widget">
         <section class="widget-panel" id="home-widget">
           <div class="widget-greeting" id="widget-greeting">Good Day</div>
+          <div class="widget-located">I am located in</div>
           <button class="widget-location" id="widget-location" type="button" title="Refresh widget">San Francisco, California</button>
           <button class="widget-time" id="widget-time" type="button" title="Toggle 12/24 hour format">--:--</button>
           <div class="widget-date" id="widget-date">Loading date</div>

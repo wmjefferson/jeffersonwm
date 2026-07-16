@@ -416,8 +416,9 @@ public class IndexModel(
     {
         book.BookTags.Clear();
 
-        foreach (var tagName in InventoryText.ParseTags(rawTags))
+        foreach (var tagDefinition in InventoryText.ParseTagDefinitions(rawTags))
         {
+            var tagName = tagDefinition.Name;
             var normalized = InventoryText.NormalizeName(tagName);
             if (!tags.TryGetValue(normalized, out var tag))
             {
@@ -426,10 +427,15 @@ public class IndexModel(
                     Name = tagName.Trim(),
                     NormalizedName = normalized,
                     Color = InventoryText.DefaultTagColor(tagName),
+                    Description = tagDefinition.Description,
                     CreatedAt = now
                 };
                 dbContext.Tags.Add(tag);
                 tags[normalized] = tag;
+            }
+            else if (string.IsNullOrWhiteSpace(tag.Description) && !string.IsNullOrWhiteSpace(tagDefinition.Description))
+            {
+                tag.Description = tagDefinition.Description;
             }
 
             book.BookTags.Add(new BookTag

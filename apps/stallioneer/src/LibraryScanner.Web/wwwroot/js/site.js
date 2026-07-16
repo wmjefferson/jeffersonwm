@@ -313,6 +313,7 @@ document.addEventListener("DOMContentLoaded", () => {
         selectAll.addEventListener("change", () => {
             items.forEach((item) => {
                 item.checked = selectAll.checked;
+                item.dispatchEvent(new Event("change"));
             });
         });
 
@@ -324,8 +325,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    const rawEditTagData = document.getElementById("edit-tag-data")?.textContent ?? "[]";
-    const editTags = JSON.parse(rawEditTagData);
+    const rawTagData = document.getElementById("tag-data")?.textContent
+        ?? document.getElementById("edit-tag-data")?.textContent
+        ?? "[]";
+    const availableTags = JSON.parse(rawTagData);
     const normalizeTagSearch = (value) => value.trim().replace(/\s+/g, " ").toUpperCase();
     const escapeTagHtml = (value) => String(value)
         .replaceAll("&", "&amp;")
@@ -341,6 +344,14 @@ document.addEventListener("DOMContentLoaded", () => {
         .split(/[;,]/)
         .map((item) => item.trim())
         .filter(Boolean);
+    const getTagEntryName = (value) => {
+        const [name] = value.split("|", 1);
+        return name?.trim() ?? "";
+    };
+    const hasMatchingTagName = (entries, candidate) => {
+        const candidateName = normalizeTagSearch(getTagEntryName(candidate));
+        return entries.some((entry) => normalizeTagSearch(getTagEntryName(entry)) === candidateName);
+    };
 
     const addTagToEditor = (editor, tagName) => {
         if (!(editor instanceof HTMLElement)) {
@@ -354,7 +365,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const existingTags = splitTagValues(input.value);
-        if (!existingTags.some((tag) => tag.localeCompare(tagName, undefined, { sensitivity: "accent" }) === 0)) {
+        if (!hasMatchingTagName(existingTags, tagName)) {
             existingTags.push(tagName.trim());
         }
 
@@ -380,10 +391,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const token = getActiveTagToken(input.value);
         const query = normalizeTagSearch(token);
         const matchingTags = query.length === 0
-            ? editTags.slice(0, 8)
-            : editTags
-                .filter((tag) => normalizeTagSearch(`${tag.name ?? tag.Name ?? ""} ${tag.description ?? tag.Description ?? ""}`).includes(query))
-                .slice(0, 8);
+            ? availableTags
+            : availableTags
+                .filter((tag) => normalizeTagSearch(`${tag.name ?? tag.Name ?? ""} ${tag.description ?? tag.Description ?? ""}`).includes(query));
 
         if (matchingTags.length === 0 && query.length === 0) {
             results.hidden = true;
@@ -391,15 +401,15 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const exactExists = query.length > 0 && editTags.some((tag) => normalizeTagSearch(tag.name ?? tag.Name ?? "") === query);
+        const exactExists = query.length > 0 && availableTags.some((tag) => normalizeTagSearch(tag.name ?? tag.Name ?? "") === query);
         const items = matchingTags.map((tag) => {
             const name = tag.name ?? tag.Name;
             const description = tag.description ?? tag.Description ?? "";
             const color = tag.color ?? tag.Color ?? "#245f4c";
+            const title = description ? `${name} - ${description}` : name;
             return `
-                <button type="button" class="tag-search-item" data-live-tag-value="${escapeTagHtml(name)}">
+                <button type="button" class="tag-search-item" data-live-tag-value="${escapeTagHtml(name)}" title="${escapeTagHtml(title)}" aria-label="${escapeTagHtml(title)}">
                     <span class="tag-pill" style="--tag-color:${escapeTagHtml(color)}">${escapeTagHtml(name)}</span>
-                    <span class="tag-search-meta">${description ? escapeTagHtml(description) : "Existing tag"}</span>
                 </button>`;
         });
 
@@ -489,7 +499,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 .map((value) => value.trim())
                 .filter(Boolean);
 
-            if (!existingTags.some((tag) => tag.localeCompare(suggestion, undefined, { sensitivity: "accent" }) === 0)) {
+            if (!hasMatchingTagName(existingTags, suggestion)) {
                 existingTags.push(suggestion);
             }
 
@@ -499,6 +509,115 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     initializeLiveTagEditors(document);
+
+    const bulkSelectionPanel = document.querySelector("[data-bulk-selection-panel]");
+    if (bulkSelectionPanel instanceof HTMLElement) {
+        const rawBulkSelectionData = document.getElementById("bulk-selection-data")?.textContent ?? "[]";
+        const bulkBooks = JSON.parse(rawBulkSelectionData);
+        const bulkBookMap = new Map(bulkBooks.map((book) => [String(book.id ?? book.Id), book]));
+        const selectedCountText = bulkSelectionPanel.querySelector("[data-selected-count-text]");
+        const emptyState = bulkSelectionPanel.querySelector("[data-bulk-empty-state]");
+        const sharedSection = bulkSelectionPanel.querySelector("[data-bulk-shared]");
+        const sharedTags = bulkSelectionPanel.querySelector("[data-shared-tags]");
+        const sharedCollections = bulkSelectionPanel.querySelector("[data-shared-collections]");
+        const sharedStatus = bulkSelectionPanel.querySelector("[data-shared-status]");
+        const sharedLocation = bulkSelectionPanel.querySelector("[data-shared-location]");
+        const selectionInputs = Array.from(document.querySelectorAll("[data-select-item]"))
+            .filter((item) => item instanceof HTMLInputElement);
+
+        const distinctValues = (values) => Array.from(new Set(values.filter((value) => value && value.length > 0)));
+        const getIntersection = (lists, keySelector) => {
+            if (lists.length === 0) {
+                return [];
+            }
+
+            const firstList = lists[0] ?? [];
+            return firstList.filter((item) => {
+                const key = keySelector(item);
+                return lists.every((list) => list.some((candidate) => keySelector(candidate) === key));
+            });
+        };
+        const renderEmpty = (container, message) => {
+            if (!(container instanceof HTMLElement)) {
+                return;
+            }
+
+            container.innerHTML = `<span class="form-hint">${escapeTagHtml(message)}</span>`;
+        };
+        const renderPills = (container, items, className, emptyMessage, titleSelector) => {
+            if (!(container instanceof HTMLElement)) {
+                return;
+            }
+
+            if (items.length === 0) {
+                renderEmpty(container, emptyMessage);
+                return;
+            }
+
+            container.innerHTML = items.map((item) => {
+                const label = item.name ?? item.Name ?? item;
+                const title = titleSelector ? titleSelector(item) : "";
+                return `<span class="${className}"${title ? ` title="${escapeTagHtml(title)}"` : ""}>${escapeTagHtml(label)}</span>`;
+            }).join("");
+        };
+        const renderTextPills = (container, values, className, emptyMessage) => {
+            if (!(container instanceof HTMLElement)) {
+                return;
+            }
+
+            if (values.length === 0) {
+                renderEmpty(container, emptyMessage);
+                return;
+            }
+
+            container.innerHTML = values
+                .map((value) => `<span class="${className}">${escapeTagHtml(value)}</span>`)
+                .join("");
+        };
+        const updateBulkSelectionSummary = () => {
+            const selectedBooks = selectionInputs
+                .filter((input) => input.checked)
+                .map((input) => bulkBookMap.get(input.dataset.bookId ?? input.value))
+                .filter(Boolean);
+
+            if (selectedCountText instanceof HTMLElement) {
+                selectedCountText.textContent = selectedBooks.length === 0
+                    ? "No books selected yet."
+                    : `${selectedBooks.length} book${selectedBooks.length === 1 ? "" : "s"} selected.`;
+            }
+
+            if (!(sharedSection instanceof HTMLElement) || !(emptyState instanceof HTMLElement)) {
+                return;
+            }
+
+            if (selectedBooks.length === 0) {
+                sharedSection.hidden = true;
+                emptyState.hidden = false;
+                return;
+            }
+
+            const tagLists = selectedBooks.map((book) => book.tags ?? book.Tags ?? []);
+            const collectionLists = selectedBooks.map((book) => book.collections ?? book.Collections ?? []);
+            const sharedTagItems = getIntersection(tagLists, (tag) => String(tag.id ?? tag.Id ?? tag.name ?? tag.Name));
+            const sharedCollectionItems = getIntersection(collectionLists, (collection) => String(collection.id ?? collection.Id ?? collection.name ?? collection.Name));
+            const statusValues = distinctValues(selectedBooks.map((book) => book.status ?? book.Status ?? ""));
+            const locationValues = distinctValues(selectedBooks.map((book) => book.locationName ?? book.LocationName ?? "No location"));
+
+            renderPills(sharedTags, sharedTagItems, "tag-pill", "No shared tags", (tag) => tag.description ?? tag.Description ?? "");
+            renderPills(sharedCollections, sharedCollectionItems, "status-pill collection-pill", "No shared collections", (collection) => collection.description ?? collection.Description ?? "");
+            renderTextPills(sharedStatus, statusValues, "status-pill", "No availability set");
+            renderTextPills(sharedLocation, locationValues, "status-pill", "No location");
+
+            sharedSection.hidden = false;
+            emptyState.hidden = true;
+        };
+
+        selectionInputs.forEach((input) => {
+            input.addEventListener("change", updateBulkSelectionSummary);
+        });
+
+        updateBulkSelectionSummary();
+    }
 
     const editInventory = document.querySelector("[data-edit-inventory]");
     if (editInventory instanceof HTMLElement) {

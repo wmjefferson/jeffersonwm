@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>JeffersonWM Development</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Site icon files: swap favicon.svg here if you want a different tab/bookmark icon. -->
+  <link rel="icon" type="image/svg+xml" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+  <link rel="shortcut icon" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Young+Serif&family=IBM+Plex+Sans+Condensed:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --frame: 42px;
+        --ink: #111827;
+        --muted: rgba(17, 24, 39, 0.62);
+        --faint: rgba(17, 24, 39, 0.08);
+        --line: rgba(17, 24, 39, 0.18);
+        --paper: rgba(255, 255, 255, 0.72);
+        --paper-strong: rgba(255, 255, 255, 0.92);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 102px var(--frame) var(--frame);
+        background: #fdfdfd;
+        color: var(--ink);
+        font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        position: relative;
+        isolation: isolate;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("/jeffersonwm/images/backgrounds/jeffwm-feed-lion-pattern-20260627.jpeg");
+        background-repeat: repeat;
+        background-size: 900px auto;
+        opacity: 0.05;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .topline {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: clamp(2rem, 3vw, 2.4rem);
+        font-weight: 400;
+        line-height: 1;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 1rem;
+      }
+
+      .home-link {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.68);
+        color: inherit;
+        font-family: inherit;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        text-decoration: none;
+        padding: 0.75rem 1rem;
+      }
+
+      .home-link:hover {
+        border-color: rgba(17, 24, 39, 0.44);
+      }
+
+      .note {
+        max-width: 54rem;
+        margin: 0 0 1.5rem;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+        margin: 0 0 1.5rem;
+      }
+
+      .summary-card {
+        border: 1px solid var(--line);
+        background: var(--paper);
+        padding: 1rem;
+      }
+
+      .summary-card span {
+        display: block;
+        margin-bottom: 0.4rem;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .summary-card strong {
+        display: block;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: 2rem;
+        font-weight: 400;
+        line-height: 1;
+      }
+
+      .table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        background: var(--paper-strong);
+      }
+
+      table {
+        width: 100%;
+        min-width: 1600px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 0.75rem 0.8rem;
+        border-right: 1px solid var(--faint);
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th:last-child,
+      td:last-child {
+        border-right: 0;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      td {
+        font-size: 0.95rem;
+        line-height: 1.35;
+      }
+
+      .site-name {
+        min-width: 11rem;
+        font-weight: 700;
+      }
+
+      .route,
+      .mono {
+        font-family: "IBM Plex Mono", Consolas, monospace;
+        font-size: 0.82rem;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.7);
+        padding: 0.1rem 0.45rem;
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .yes {
+        border-color: rgba(21, 128, 61, 0.26);
+        background: rgba(220, 252, 231, 0.78);
+        color: #166534;
+      }
+
+      .partial {
+        border-color: rgba(180, 83, 9, 0.25);
+        background: rgba(254, 243, 199, 0.78);
+        color: #92400e;
+      }
+
+      .no {
+        border-color: rgba(153, 27, 27, 0.2);
+        background: rgba(254, 226, 226, 0.72);
+        color: #991b1b;
+      }
+
+      .tbd {
+        border-color: rgba(71, 85, 105, 0.18);
+        background: rgba(241, 245, 249, 0.86);
+        color: #475569;
+      }
+
+      .notes {
+        min-width: 18rem;
+        color: rgba(17, 24, 39, 0.72);
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 1rem 0 0;
+      }
+
+      @media (max-width: 820px) {
+        :root {
+          --frame: 24px;
+        }
+
+        body {
+          padding-top: 72px;
+        }
+
+        .topline {
+          flex-direction: column;
+        }
+
+        .summary-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 520px) {
+        .summary-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="topline">
+        <div>
+          <h1>Development</h1>
+        </div>
+        <div class="actions">
+          <a class="home-link" href="/">Home</a>
+          <a class="home-link" href="/status/">Status</a>
+        </div>
+      </div>
+
+      <p class="note">
+        This page is a working inventory of JeffersonWM site infrastructure. It tracks which pieces exist for each app,
+        where the public routes and APIs live, and what still needs confirmation. It is intentionally practical rather
+        than polished: if a cell says TBD, that is a real follow-up slot.
+      </p>
+
+      <section class="summary-grid" aria-label="Development status summary">
+        <div class="summary-card">
+          <span>Tracked Rows</span>
+          <strong id="tracked-count">0</strong>
+        </div>
+        <div class="summary-card">
+          <span>Known APIs</span>
+          <strong id="api-count">0</strong>
+        </div>
+        <div class="summary-card">
+          <span>Known Tunnels</span>
+          <strong id="tunnel-count">0</strong>
+        </div>
+        <div class="summary-card">
+          <span>Open TBD Cells</span>
+          <strong id="tbd-count">0</strong>
+        </div>
+      </section>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Site / App</th>
+              <th>Version</th>
+              <th>Phase</th>
+              <th>Public Route</th>
+              <th>404</th>
+              <th>Landing</th>
+              <th>README</th>
+              <th>README Image</th>
+              <th>Port</th>
+              <th>CF Tunnel</th>
+              <th>API / Service</th>
+              <th>Auth</th>
+              <th>Data</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="development-rows"></tbody>
+        </table>
+      </div>
+
+      <div class="legend" aria-label="Legend">
+        <span class="pill yes">Yes</span>
+        <span class="pill partial">Partial</span>
+        <span class="pill no">No</span>
+        <span class="pill tbd">TBD</span>
+      </div>
+    </main>
+
+    <script>
+      const rows = [
+        {
+          site: "JeffersonWM Home",
+          version: "0.0.0",
+          phase: "Maintenance",
+          route: "https://jeffersonwm.com/",
+          notFound: "TBD",
+          landing: "Yes",
+          readme: "Partial",
+          readmeImage: "Yes",
+          port: "Static",
+          tunnel: "None",
+          api: "Uses api-lionship widget data",
+          auth: "Public",
+          data: "Static + widget API",
+          notes: "Main index, About modal, Status page, Development page, public app list, and widget surface."
+        },
+        {
+          site: "Feed",
+          version: "0.2.4",
+          phase: "Maintenance",
+          route: "https://jeffersonwm.com/feed/",
+          notFound: "TBD",
+          landing: "No",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "8050",
+          tunnel: "api-feed",
+          api: "https://api-feed.jeffersonwm.com",
+          auth: "Feed secret",
+          data: "MySQL feed_items + uploads",
+          notes: "Weekly feed view, manual/changelog entries, GitHub sync, pinning, Markdown editor, uploads."
+        },
+        {
+          site: "Perihelion",
+          version: "1.4.4",
+          phase: "Maintenance",
+          route: "https://jeffersonwm.com/perihelion/",
+          notFound: "TBD",
+          landing: "Yes",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "8010",
+          tunnel: "api-perihelion",
+          api: "https://api.jeffersonwm.com",
+          auth: "Central auth",
+          data: "E:\\images + thumbnail/cache data",
+          notes: "Image browser with landing/home split, gallery state URLs, shared routes, staging, folder covers."
+        },
+        {
+          site: "Battalion",
+          version: "1.2.35",
+          phase: "Maintenance",
+          route: "https://jeffersonwm.com/battalion/",
+          notFound: "TBD",
+          landing: "Yes",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "8070",
+          tunnel: "api-battalion",
+          api: "https://api-battalion.jeffersonwm.com",
+          auth: "Local app auth",
+          data: "MySQL battalion databases",
+          notes: "RPG tracker/dashboard with public dashboard, admin data editors, moods/emotions, and feed surface."
+        },
+        {
+          site: "Lionship",
+          version: "1.1.0",
+          phase: "Maintenance",
+          route: "https://jeffersonwm.com/lionship/",
+          notFound: "TBD",
+          landing: "No",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "8040",
+          tunnel: "api-lionship",
+          api: "https://api-lionship.jeffersonwm.com",
+          auth: "Public/admin TBD",
+          data: "Widget words/dates/settings",
+          notes: "Widget and linkstream service feeding JeffersonWM home page data."
+        },
+        {
+          site: "Millionfold",
+          version: "0.1.5",
+          phase: "Maintenance",
+          route: "https://jeffersonwm.com/millionfold/",
+          notFound: "TBD",
+          landing: "Yes",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "8090",
+          tunnel: "api-millionfold",
+          api: "https://api-millionfold.jeffersonwm.com",
+          auth: "Central auth ready",
+          data: "Keep-note processing files",
+          notes: "Keep notes trim/expand tool with process cancellation, PID visibility, and feed history limits."
+        },
+        {
+          site: "Vermilion",
+          version: "1.3.0",
+          phase: "Maintenance",
+          route: "https://jeffersonwm.com/vermilion/",
+          notFound: "TBD",
+          landing: "Yes",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "8100",
+          tunnel: "api-vermilion",
+          api: "https://api-vermilion.jeffersonwm.com",
+          auth: "TBD",
+          data: "Local file planning + Python script",
+          notes: "Image/file organizer and Python script explanation page."
+        },
+        {
+          site: "Tourbillion",
+          version: "0.1.1",
+          phase: "Maintenance",
+          route: "https://jeffersonwm.com/tourbillion/",
+          notFound: "TBD",
+          landing: "No",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "Static",
+          tunnel: "None",
+          api: "None",
+          auth: "Public",
+          data: "Static/screensaver config",
+          notes: "Screensaver / visual experiment with split rendering modes."
+        },
+        {
+          site: "Bullion",
+          version: "0.1.0",
+          phase: "Maintenance",
+          route: "https://jeffersonwm.com/bullion/",
+          notFound: "TBD",
+          landing: "No",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "Static",
+          tunnel: "None",
+          api: "None",
+          auth: "Public",
+          data: "Browser-side batch rename state",
+          notes: "Batch rename utility."
+        },
+        {
+          site: "Clionidae",
+          version: "0.1.5",
+          phase: "Maintenance",
+          route: "https://jeffersonwm.com/clionidae/",
+          notFound: "TBD",
+          landing: "Yes",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "8080 dev",
+          tunnel: "None",
+          api: "None / template-ready",
+          auth: "Auth-ready off",
+          data: "JSON/template scaffolds",
+          notes: "Template/reference site with design, standards, everything, and step-by-step documentation."
+        },
+        {
+          site: "Auth / Multimillion",
+          version: "0.1.0",
+          phase: "Maintenance",
+          route: "https://auth.jeffersonwm.com/",
+          notFound: "TBD",
+          landing: "Yes",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "8060",
+          tunnel: "api-auth-jeffersonwm",
+          api: "https://auth.jeffersonwm.com",
+          auth: "Central SSO",
+          data: "SQLite auth DB",
+          notes: "Central login/account/membership surface for private apps and app permissions."
+        },
+        {
+          site: "Dooky Detective",
+          version: "0.1.0",
+          phase: "Maintenance",
+          route: "https://dookydetective.com/",
+          notFound: "TBD",
+          landing: "TBD",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "8020",
+          tunnel: "api-dookydetective",
+          api: "https://api.dookydetective.com",
+          auth: "TBD",
+          data: "Game/image data",
+          notes: "Dog-themed interactive image game/site."
+        },
+        {
+          site: "Jeffershizzle",
+          version: "0.1.0",
+          phase: "Archive",
+          route: "https://jeffershizzle.com/",
+          notFound: "TBD",
+          landing: "Archive",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "8030",
+          tunnel: "api-jeffershizzle",
+          api: "https://api.jeffershizzle.com",
+          auth: "TBD",
+          data: "Legacy photo archive",
+          notes: "Original photo website archive with image API experiments."
+        },
+        {
+          site: "Stallioneer",
+          version: "0.1.4",
+          phase: "Development",
+          route: "GitHub issue / local app",
+          notFound: "TBD",
+          landing: "No",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "5107 local",
+          tunnel: "None",
+          api: "ASP.NET local app",
+          auth: "Local accounts",
+          data: "SQLite app database",
+          notes: "Book scanner/inventory app with copies, tags, collections, import/export, and speed mode."
+        },
+        {
+          site: "Endellionite",
+          version: "0.0.0",
+          phase: "Concept",
+          route: "Concept / TBD",
+          notFound: "TBD",
+          landing: "No",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "TBD",
+          tunnel: "None",
+          api: "TBD",
+          auth: "TBD",
+          data: "TBD",
+          notes: "Windows 95 scanner concept, with possible redevelopment direction toward Windows 98."
+        },
+        {
+          site: "Medallion",
+          version: "0.0.0",
+          phase: "Concept",
+          route: "Concept / TBD",
+          notFound: "TBD",
+          landing: "No",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "TBD",
+          tunnel: "None",
+          api: "TBD",
+          auth: "TBD",
+          data: "TBD",
+          notes: "Chefferson concept / early planning area."
+        },
+        {
+          site: "Rebellion",
+          version: "0.0.0",
+          phase: "Development",
+          route: "Development / TBD",
+          notFound: "TBD",
+          landing: "No",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "TBD",
+          tunnel: "None",
+          api: "TBD",
+          auth: "TBD",
+          data: "Text and image writing tool data TBD",
+          notes: "Text/image writing tool in development."
+        },
+        {
+          site: "Trillions",
+          version: "0.0.0",
+          phase: "Cancelled",
+          route: "Cancelled",
+          notFound: "TBD",
+          landing: "No",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "None",
+          tunnel: "None",
+          api: "None",
+          auth: "Cancelled",
+          data: "Cancelled Google Keep/Firebase experiment",
+          notes: "Cancelled Keep tool; preserved as a reference for possible future reuse."
+        },
+        {
+          site: "JeffersonWM Legacy",
+          version: "0.1.0",
+          phase: "Archive",
+          route: "Archive / TBD",
+          notFound: "TBD",
+          landing: "Archive",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "Static",
+          tunnel: "None",
+          api: "None",
+          auth: "Public",
+          data: "Static legacy site files",
+          notes: "First JeffersonWM version preserved as an archive."
+        },
+        {
+          site: "WMJefferson",
+          version: "1.0.0",
+          phase: "Maintenance",
+          route: "https://wmjefferson.com/",
+          notFound: "TBD",
+          landing: "Yes",
+          readme: "TBD",
+          readmeImage: "TBD",
+          port: "Static",
+          tunnel: "None",
+          api: "None",
+          auth: "Public",
+          data: "Static/professional content",
+          notes: "Professional site/domain linked from JeffersonWM home."
+        }
+      ];
+
+      function statusClass(value) {
+        const normalized = String(value).toLowerCase();
+        if (["yes", "public", "central sso", "feed secret"].some(item => normalized.includes(item))) return "yes";
+        if (["partial", "archive", "ready", "dev"].some(item => normalized.includes(item))) return "partial";
+        if (["no", "none"].some(item => normalized === item || normalized.startsWith(`${item} `))) return "no";
+        if (normalized.includes("tbd") || normalized === "-") return "tbd";
+        return "";
+      }
+
+      function phaseClass(value) {
+        const normalized = String(value).toLowerCase();
+        if (normalized === "maintenance") return "yes";
+        if (normalized === "development") return "partial";
+        if (normalized === "concept") return "tbd";
+        if (normalized === "archive") return "partial";
+        if (normalized === "cancelled") return "no";
+        return "tbd";
+      }
+
+      function phaseCell(value) {
+        return `<span class="pill ${phaseClass(value)}">${value}</span>`;
+      }
+
+      function statusCell(value, extraClass = "") {
+        const className = statusClass(value);
+        if (!className) {
+          return `<span class="${extraClass}">${value}</span>`;
+        }
+        return `<span class="pill ${className}">${value}</span>`;
+      }
+
+      const tbody = document.getElementById("development-rows");
+      tbody.innerHTML = rows.map(row => `
+        <tr>
+          <td class="site-name">${row.site}</td>
+          <td class="mono">v${row.version}</td>
+          <td>${phaseCell(row.phase)}</td>
+          <td><a class="route" href="${row.route.startsWith("http") ? row.route : "#"}" target="_blank" rel="noopener noreferrer">${row.route}</a></td>
+          <td>${statusCell(row.notFound)}</td>
+          <td>${statusCell(row.landing)}</td>
+          <td>${statusCell(row.readme)}</td>
+          <td>${statusCell(row.readmeImage)}</td>
+          <td class="mono">${row.port}</td>
+          <td class="mono">${row.tunnel}</td>
+          <td class="mono">${row.api}</td>
+          <td>${statusCell(row.auth)}</td>
+          <td>${row.data}</td>
+          <td class="notes">${row.notes}</td>
+        </tr>
+      `).join("");
+
+      document.getElementById("tracked-count").textContent = rows.length;
+      document.getElementById("api-count").textContent = rows.filter(row => !["None", "None / template-ready"].includes(row.api)).length;
+      document.getElementById("tunnel-count").textContent = rows.filter(row => !["None"].includes(row.tunnel)).length;
+      document.getElementById("tbd-count").textContent = rows
+        .flatMap(row => [row.notFound, row.landing, row.readme, row.readmeImage, row.auth])
+        .filter(value => String(value).toLowerCase().includes("tbd")).length;
+    </script>
+  </body>
+</html>

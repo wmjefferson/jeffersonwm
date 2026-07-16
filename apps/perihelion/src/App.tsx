@@ -2693,6 +2693,16 @@ export default function App() {
               <button
                 onClick={() => {
                   queueHistoryUpdate('push');
+                  setPage(1);
+                }}
+                disabled={page === 1}
+                className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+              >
+                First
+              </button>
+              <button
+                onClick={() => {
+                  queueHistoryUpdate('push');
                   setPage(p => Math.max(1, p - 1));
                 }}
                 disabled={page === 1}
@@ -2709,6 +2719,16 @@ export default function App() {
                 className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
               >
                 Next
+              </button>
+              <button
+                onClick={() => {
+                  queueHistoryUpdate('push');
+                  setPage(computedTotalPages);
+                }}
+                disabled={page === computedTotalPages}
+                className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+              >
+                Last
               </button>
             </div>
           )}

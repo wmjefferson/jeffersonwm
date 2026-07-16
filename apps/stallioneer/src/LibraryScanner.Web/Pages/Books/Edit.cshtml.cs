@@ -254,23 +254,24 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
 
     private async Task<List<Tag>> ResolveTagsAsync(string? tagNames)
     {
-        var requestedTagNames = InventoryText.ParseTags(tagNames);
-        if (requestedTagNames.Count == 0)
+        var requestedTags = InventoryText.ParseTagDefinitions(tagNames);
+        if (requestedTags.Count == 0)
         {
             return [];
         }
 
-        var normalizedNames = requestedTagNames
-            .Select(InventoryText.NormalizeName)
+        var normalizedNames = requestedTags
+            .Select(tag => InventoryText.NormalizeName(tag.Name))
             .ToList();
         var existingTags = await dbContext.Tags
             .Where(tag => normalizedNames.Contains(tag.NormalizedName))
             .ToDictionaryAsync(tag => tag.NormalizedName);
 
-        var resolvedTags = new List<Tag>(requestedTagNames.Count);
-        for (var index = 0; index < requestedTagNames.Count; index++)
+        var resolvedTags = new List<Tag>(requestedTags.Count);
+        for (var index = 0; index < requestedTags.Count; index++)
         {
-            var tagName = requestedTagNames[index];
+            var requestedTag = requestedTags[index];
+            var tagName = requestedTag.Name;
             var normalizedName = normalizedNames[index];
 
             if (!existingTags.TryGetValue(normalizedName, out var tag))
@@ -279,10 +280,15 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
                 {
                     Name = tagName.Trim(),
                     NormalizedName = normalizedName,
-                    Color = InventoryText.DefaultTagColor(tagName)
+                    Color = InventoryText.DefaultTagColor(tagName),
+                    Description = requestedTag.Description
                 };
                 dbContext.Tags.Add(tag);
                 existingTags[normalizedName] = tag;
+            }
+            else if (string.IsNullOrWhiteSpace(tag.Description) && !string.IsNullOrWhiteSpace(requestedTag.Description))
+            {
+                tag.Description = requestedTag.Description;
             }
 
             resolvedTags.Add(tag);

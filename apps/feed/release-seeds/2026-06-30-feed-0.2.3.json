@@ -1,0 +1,9 @@
+{
+  "appName": "Feed",
+  "version": "0.2.3",
+  "title": "Feed v0.2.3",
+  "content": "<p>Feed now has a richer manual-entry editor for public notes and changelog-adjacent updates. This pass focused on making manual posts easier to compose directly in the browser, while keeping release notes, GitHub-imported entries, and the existing weekly feed structure intact.</p><p>What changed:</p><ul><li><strong>Rich manual composer:</strong> Manual entries can now be written with inline formatting, headings, lists, blockquotes, and direct link insertion instead of relying only on plain text or markdown-style previewing.</li><li><strong>Image and attachment uploads:</strong> The editor can upload images and general attachments through the protected Feed API, insert them into the post body, and preserve them when entries are edited later.</li><li><strong>Safer stored HTML:</strong> Manual content is sanitized before publishing so the feed can support richer posts while stripping unsafe markup and keeping uploaded media links stable.</li><li><strong>Pinned-post visual layer:</strong> Pinned entries now have their own light-blue card treatment with a separate computer-pattern overlay, making them feel intentionally promoted without blending into the main page background.</li></ul><p>This gives Feed a stronger authoring layer for future public notes, project writeups, and screenshot-heavy updates while preserving the current versioned release workflow.</p>",
+  "url": "https://jeffersonwm.com/feed/",
+  "created_at": "2026-06-30 22:02:00",
+  "external_id": "feed-v0.2.3-2026-06-30"
+}

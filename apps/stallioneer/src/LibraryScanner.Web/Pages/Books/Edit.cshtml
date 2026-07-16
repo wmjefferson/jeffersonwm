@@ -54,10 +54,10 @@
 
                 <label asp-for="Input.TagNames"></label>
                 <div class="tag-input-stack" data-live-tag-editor>
-                    <input asp-for="Input.TagNames" class="form-control" placeholder="signed, hardcover, favorites" data-live-tag-input />
+                    <input asp-for="Input.TagNames" class="form-control" placeholder="signed, hardcover, paper | paperback" data-live-tag-input />
                     <div class="tag-search-results" data-live-tag-results hidden></div>
                 </div>
-                <span class="form-hint">Type to search tags live. Press Enter or choose a result to add it here.</span>
+                <span class="form-hint">Type to search tags live. Use commas between tags. Optional format: <code>tag | note</code>.</span>
 
                 <div class="form-actions form-actions--local">
                     <button class="btn btn-primary">Save changes</button>
@@ -359,7 +359,7 @@
     </article>
 </template>
 
-<script id="edit-tag-data" type="application/json">
+<script id="tag-data" type="application/json">
 @Html.Raw(JsonSerializer.Serialize(Model.AvailableTags.Select(tag => new { tag.Id, tag.Name, tag.Description, tag.Color })))
 </script>
 

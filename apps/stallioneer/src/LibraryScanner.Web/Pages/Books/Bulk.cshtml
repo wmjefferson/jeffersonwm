@@ -1,4 +1,5 @@
 @page
+@using System.Text.Json
 @model LibraryScanner.Web.Pages.Books.BulkModel
 @{
     ViewData["Title"] = "Bulk tools";
@@ -40,9 +41,10 @@
 </section>
 
 <form method="get" class="toolbar bulk-filter-toolbar">
-    <input asp-for="Query" class="form-control" placeholder="Search title, ISBN, author, publisher, tags, collections, or location" />
+    <input asp-for="Query" class="form-control" placeholder="Search title, ISBN, author, publisher, tags, collections, status, or location" />
     <select asp-for="TagId" asp-items="Model.TagOptions" class="form-select"></select>
     <select asp-for="CollectionId" asp-items="Model.CollectionOptions" class="form-select"></select>
+    <select asp-for="StatusFilter" asp-items="Model.StatusFilterOptions" class="form-select"></select>
     <button class="btn btn-outline-secondary" type="submit">Filter</button>
     <a class="btn btn-outline-secondary" asp-page="/Books/Bulk">Clear</a>
 </form>
@@ -61,93 +63,84 @@ else
         <input asp-for="Query" type="hidden" />
         <input asp-for="CollectionId" type="hidden" />
         <input asp-for="TagId" type="hidden" />
+        <input asp-for="StatusFilter" type="hidden" />
 
-        <section class="panel bulk-panel">
+        <section class="panel bulk-selection-panel" data-bulk-selection-panel>
             <div class="bulk-selection-summary">
-                <div class="bulk-copy">
-                    <p class="eyebrow">Selection</p>
-                    <h2>Choose books, then run an action</h2>
-                    <span class="form-hint">Showing @Model.Books.Count visible books out of @Model.FilteredCount matching the current filters.</span>
+                <div>
+                    <h2>Selected books</h2>
+                    <p class="form-hint">
+                        Showing @Model.Books.Count visible books out of @Model.FilteredCount matching the current filters.
+                        <span data-selected-count-text>No books selected yet.</span>
+                    </p>
                 </div>
-                <div class="lookup-actions">
-                    <button type="submit" asp-page-handler="ExportSelected" class="btn btn-outline-secondary">Export selected CSV</button>
+                <a class="btn btn-outline-secondary btn-sm" asp-page="/Tags/Index">Manage tags and collections</a>
+            </div>
+
+            <div class="bulk-selection-shared" data-bulk-shared hidden>
+                <div>
+                    <span class="bulk-shared-label">Shared tags</span>
+                    <div class="tag-list" data-shared-tags></div>
+                </div>
+                <div>
+                    <span class="bulk-shared-label">Shared collections</span>
+                    <div class="tag-list" data-shared-collections></div>
+                </div>
+                <div>
+                    <span class="bulk-shared-label">Availability</span>
+                    <div class="tag-list" data-shared-status></div>
+                </div>
+                <div>
+                    <span class="bulk-shared-label">Location</span>
+                    <div class="tag-list" data-shared-location></div>
                 </div>
             </div>
-        </section>
 
-        <section class="entry-grid bulk-tools-grid bulk-action-grid">
-            <section class="panel bulk-action-panel">
-                <p class="eyebrow">Tags</p>
-                <h2>Add or remove tags</h2>
+            <p class="form-hint bulk-inline-hint" data-bulk-empty-state>Select books in the table below to see their shared tags, collections, availability, and location here.</p>
+
+            <div class="bulk-actions-grid">
                 <div class="field-stack">
-                    <div>
-                        <label asp-for="AddTagNames">Add tags</label>
-                        <input asp-for="AddTagNames" class="form-control" placeholder="fiction, favorites, test shelf" />
-                        <span class="form-hint">Comma or semicolon separated. New tags will be created if needed.</span>
+                    <label asp-for="AddTagNames">Add tags</label>
+                    <div class="tag-input-stack" data-live-tag-editor>
+                        <input asp-for="AddTagNames" class="form-control" placeholder="tag | note, another tag" data-live-tag-input />
+                        <div class="tag-search-results" data-live-tag-results hidden></div>
                     </div>
+                    <span class="form-hint">Use commas between tags. Optional format: <code>tag | note</code> for new tag descriptions.</span>
                     <button type="submit" asp-page-handler="AddTags" class="btn btn-primary">Add tags to selected</button>
-                    <div>
-                        <label asp-for="RemoveTagNames">Remove tags</label>
-                        <input asp-for="RemoveTagNames" class="form-control" placeholder="wishlist, duplicate" />
-                        <span class="form-hint">Only matching tags on selected books will be removed.</span>
+                </div>
+
+                <div class="field-stack">
+                    <label asp-for="RemoveTagNames">Remove tags</label>
+                    <div class="tag-input-stack" data-live-tag-editor>
+                        <input asp-for="RemoveTagNames" class="form-control" placeholder="hardcover, wishlist" data-live-tag-input />
+                        <div class="tag-search-results" data-live-tag-results hidden></div>
                     </div>
+                    <span class="form-hint">Live results show your existing tags. Only matching tags on selected books will be removed.</span>
                     <button type="submit" asp-page-handler="RemoveTags" class="btn btn-outline-secondary">Remove tags from selected</button>
                 </div>
-            </section>
 
-            <section class="panel bulk-action-panel">
-                <p class="eyebrow">Grouping</p>
-                <h2>Collection and location</h2>
                 <div class="field-stack">
-                    <div>
-                        <label asp-for="SelectedCollectionId">Add to collection</label>
-                        <select asp-for="SelectedCollectionId" asp-items="Model.CollectionOptions.Skip(1)" class="form-select">
-                            <option value="">Choose collection</option>
-                        </select>
-                    </div>
-                    <button type="submit" asp-page-handler="AddToCollection" class="btn btn-primary">Add selected to collection</button>
-                    <div>
-                        <label asp-for="SelectedLocationId">Move to location</label>
-                        <select asp-for="SelectedLocationId" asp-items="Model.LocationOptions" class="form-select"></select>
-                    </div>
-                    <button type="submit" asp-page-handler="MoveToLocation" class="btn btn-outline-secondary">Move selected to location</button>
+                    <label asp-for="SelectedCollectionId">Add to collection</label>
+                    <select asp-for="SelectedCollectionId" asp-items="Model.CollectionOptions.Skip(1)" class="form-select">
+                        <option value="">Choose collection</option>
+                    </select>
+                    <button type="submit" asp-page-handler="AddToCollection" class="btn btn-outline-secondary">Add selected to collection</button>
                 </div>
-            </section>
 
-            <section class="panel bulk-action-panel">
-                <p class="eyebrow">Status</p>
-                <h2>Shared availability</h2>
                 <div class="field-stack">
-                    <div>
-                        <label asp-for="SelectedStatus">Set status</label>
-                        <select asp-for="SelectedStatus" asp-items="Model.StatusOptions" class="form-select">
-                            <option value="">Choose status</option>
-                        </select>
-                        <span class="form-hint">Updates the book and its copies together.</span>
-                    </div>
-                    <button type="submit" asp-page-handler="SetStatus" class="btn btn-primary">Apply status to selected</button>
+                    <label asp-for="SelectedStatus">Set availability</label>
+                    <select asp-for="SelectedStatus" asp-items="Model.StatusOptions" class="form-select">
+                        <option value="">Choose status</option>
+                    </select>
+                    <button type="submit" asp-page-handler="SetStatus" class="btn btn-outline-secondary">Apply availability</button>
                 </div>
-            </section>
 
-            <section class="panel bulk-action-panel">
-                <p class="eyebrow">Disposition</p>
-                <h2>Sold or disposed</h2>
                 <div class="field-stack">
-                    <div>
-                        <label asp-for="DispositionStatus">Disposition</label>
-                        <select asp-for="DispositionStatus" class="form-select">
-                            <option value="">Choose disposition</option>
-                            <option value="Sold">Sold</option>
-                            <option value="Disposed">Disposed</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label asp-for="DispositionNote">Note</label>
-                        <textarea asp-for="DispositionNote" class="form-control" rows="3" placeholder="Optional note for the history log"></textarea>
-                    </div>
-                    <button type="submit" asp-page-handler="MarkDisposition" class="btn btn-outline-danger">Mark selected</button>
+                    <label asp-for="SelectedLocationId">Move to location</label>
+                    <select asp-for="SelectedLocationId" asp-items="Model.LocationOptions" class="form-select"></select>
+                    <button type="submit" asp-page-handler="MoveToLocation" class="btn btn-outline-secondary">Move selected</button>
                 </div>
-            </section>
+            </div>
         </section>
 
         <div class="table-wrap">
@@ -209,7 +202,7 @@ else
                             <div class="tag-list">
                                 @foreach (var bookTag in book.BookTags.OrderBy(bookTag => bookTag.Tag.Name))
                                 {
-                                    <span class="tag-pill" style="--tag-color:@bookTag.Tag.Color">@bookTag.Tag.Name</span>
+                                    <span class="tag-pill" style="--tag-color:@bookTag.Tag.Color" title="@bookTag.Tag.Description">@bookTag.Tag.Name</span>
                                 }
                             </div>
                         </td>
@@ -217,13 +210,13 @@ else
                             <div class="tag-list">
                                 @foreach (var collectionBook in book.CollectionBooks.OrderBy(item => item.Collection.Name))
                                 {
-                                    <span class="status-pill collection-pill">@collectionBook.Collection.Name</span>
+                                    <span class="status-pill collection-pill" title="@collectionBook.Collection.Description">@collectionBook.Collection.Name</span>
                                 }
                             </div>
                         </td>
                         <td><span class="status-pill">@book.Status</span></td>
                         <td class="selection-column">
-                            <input type="checkbox" name="SelectedBookIds" value="@book.Id" data-select-item aria-label="Select @book.Title" />
+                            <input type="checkbox" name="SelectedBookIds" value="@book.Id" data-select-item data-book-id="@book.Id" aria-label="Select @book.Title" />
                         </td>
                     </tr>
                 }
@@ -231,4 +224,92 @@ else
             </table>
         </div>
     </form>
+
+    <section class="bulk-admin-grid">
+        <details class="details-accordion panel" open>
+            <summary class="details-accordion__summary">
+                <h2>Import / export</h2>
+            </summary>
+            <div class="details-accordion__body">
+                <p class="form-hint">CSV uses Stallioneer's fixed common field set. PDF lets you choose which fields appear in a printable inventory report.</p>
+                <div class="import-export-grid">
+                    <form method="post" asp-page-handler="Export" class="inline-form export-form export-form--simple">
+                        <div class="field-stack">
+                            <label>Export inventory</label>
+                            <span class="form-hint">Downloads the full library as CSV.</span>
+                        </div>
+                        <button type="submit" class="btn btn-outline-secondary">Export CSV</button>
+                    </form>
+
+                    <form method="post" asp-page-handler="ExportPdf" class="pdf-export-form export-form">
+                        <div class="field-stack">
+                            <label>Export PDF fields</label>
+                            <div class="export-field-list">
+                                @foreach (var field in Model.ExportFields)
+                                {
+                                    var isChecked = LibraryScanner.Web.Services.InventoryExportField.DefaultPdfKeys.Contains(field.Key);
+                                    <label class="checkbox-pill">
+                                        <input type="checkbox" name="PdfFieldKeys" value="@field.Key" checked="@isChecked" />
+                                        <span>@field.Label</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-outline-secondary">Export PDF</button>
+                    </form>
+
+                    <form method="post" asp-page-handler="ExportLog" class="export-log-form export-form">
+                        <div class="field-stack">
+                            <label>Export log</label>
+                            <span class="form-hint">Downloads inventory actions over a custom date range.</span>
+                            <div class="field-grid export-log-range">
+                                <div>
+                                    <label asp-for="LogStartDate">From</label>
+                                    <input asp-for="LogStartDate" type="date" class="form-control" />
+                                </div>
+                                <div>
+                                    <label asp-for="LogEndDate">To</label>
+                                    <input asp-for="LogEndDate" type="date" class="form-control" />
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-outline-secondary">Export log CSV</button>
+                    </form>
+
+                    <form method="post" asp-page-handler="Import" enctype="multipart/form-data" class="import-form">
+                        <div class="field-stack">
+                            <label asp-for="ImportFile">Import CSV</label>
+                            <input asp-for="ImportFile" type="file" accept=".csv,text/csv" class="form-control" />
+                            <span class="form-hint">New rows need ISBN-13 and title. Duplicate ISBN-13 rows inside the same file are skipped after the first match.</span>
+                        </div>
+                        <div class="field-stack">
+                            <label>Import mode</label>
+                            <label class="radio-line">
+                                <input type="radio" asp-for="ImportMode" value="@LibraryScanner.Web.Pages.Books.BulkModel.ImportModes.MergeUpdate" checked />
+                                <span>Append new books and update matching ISBN-13 records</span>
+                            </label>
+                            <label class="radio-line">
+                                <input type="radio" asp-for="ImportMode" value="@LibraryScanner.Web.Pages.Books.BulkModel.ImportModes.AppendIgnore" />
+                                <span>Append new books and ignore matching ISBN-13 records</span>
+                            </label>
+                            <label class="radio-line">
+                                <input type="radio" asp-for="ImportMode" value="@LibraryScanner.Web.Pages.Books.BulkModel.ImportModes.Overwrite" />
+                                <span>Overwrite book inventory with this CSV</span>
+                            </label>
+                            <span class="form-hint">Overwrite clears books, book tags, collection links, and inventory history before importing. Accounts and reusable tag/location/collection names remain.</span>
+                        </div>
+                        <button type="submit" class="btn btn-primary" onclick="return confirm('Import this CSV using the selected mode? Overwrite mode clears the current book inventory first.');">Import CSV</button>
+                    </form>
+                </div>
+            </div>
+        </details>
+    </section>
 }
+
+<script id="bulk-selection-data" type="application/json">
+@Html.Raw(JsonSerializer.Serialize(Model.SelectableBooks))
+</script>
+
+<script id="tag-data" type="application/json">
+@Html.Raw(JsonSerializer.Serialize(Model.AvailableTags))
+</script>
