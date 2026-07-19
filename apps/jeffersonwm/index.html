@@ -1326,7 +1326,8 @@
           const weekday = date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
           const month = date.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
           const day = date.getUTCDate();
-          return `${weekday}, ${month} ${day}`;
+          const year = date.getUTCFullYear();
+          return `${weekday}, ${month} ${day}, ${year}`;
         };
 
         const getDaysSince = (dateStr, endDateStr) => {

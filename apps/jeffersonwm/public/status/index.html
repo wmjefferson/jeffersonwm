@@ -264,8 +264,9 @@
               <th>API</th>
               <th>Tunnel</th>
               <th>Origin</th>
-              <th>Use</th>
+              <!-- Message column retained for later:
               <th>Message</th>
+              -->
             </tr>
           </thead>
           <tbody id="service-table-body"></tbody>
@@ -374,8 +375,9 @@
             <td class="service-url"><a href="${service.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(new URL(service.url).hostname)}</a></td>
             <td>${escapeHtml(service.tunnel)}</td>
             <td>${escapeHtml(service.origin)}</td>
-            <td>${escapeHtml(service.app)}</td>
+            <!-- Message column retained for later:
             <td class="service-message" data-message>Waiting for response.</td>
+            -->
           </tr>
         `).join('');
       };
@@ -388,7 +390,9 @@
         const message = row.querySelector('[data-message]');
         pill.className = `status-pill status-${result.state}`;
         pill.textContent = result.label;
-        message.textContent = result.message;
+        if (message) {
+          message.textContent = result.message;
+        }
       };
 
       const fetchWithTimeout = async (url, options = {}) => {

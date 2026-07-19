@@ -144,7 +144,7 @@
 
       table {
         width: 100%;
-        min-width: 1600px;
+        min-width: 1320px;
         border-collapse: collapse;
       }
 
@@ -231,11 +231,6 @@
         color: #475569;
       }
 
-      .notes {
-        min-width: 18rem;
-        color: rgba(17, 24, 39, 0.72);
-      }
-
       .legend {
         display: flex;
         flex-wrap: wrap;
@@ -311,18 +306,16 @@
             <tr>
               <th>Site / App</th>
               <th>Version</th>
-              <th>Phase</th>
               <th>Public Route</th>
-              <th>404</th>
-              <th>Landing</th>
-              <th>README</th>
-              <th>README Image</th>
               <th>Port</th>
               <th>CF Tunnel</th>
               <th>API / Service</th>
               <th>Auth</th>
               <th>Data</th>
-              <th>Notes</th>
+              <th>404</th>
+              <th>Landing</th>
+              <th>README</th>
+              <th>README Image</th>
             </tr>
           </thead>
           <tbody id="development-rows"></tbody>
@@ -342,7 +335,6 @@
         {
           site: "JeffersonWM Home",
           version: "0.0.0",
-          phase: "Maintenance",
           route: "https://jeffersonwm.com/",
           notFound: "TBD",
           landing: "Yes",
@@ -353,12 +345,10 @@
           api: "Uses api-lionship widget data",
           auth: "Public",
           data: "Static + widget API",
-          notes: "Main index, About modal, Status page, Development page, public app list, and widget surface."
         },
         {
           site: "Feed",
           version: "0.2.4",
-          phase: "Maintenance",
           route: "https://jeffersonwm.com/feed/",
           notFound: "TBD",
           landing: "No",
@@ -369,12 +359,10 @@
           api: "https://api-feed.jeffersonwm.com",
           auth: "Feed secret",
           data: "MySQL feed_items + uploads",
-          notes: "Weekly feed view, manual/changelog entries, GitHub sync, pinning, Markdown editor, uploads."
         },
         {
           site: "Perihelion",
           version: "1.4.4",
-          phase: "Maintenance",
           route: "https://jeffersonwm.com/perihelion/",
           notFound: "TBD",
           landing: "Yes",
@@ -385,12 +373,10 @@
           api: "https://api.jeffersonwm.com",
           auth: "Central auth",
           data: "E:\\images + thumbnail/cache data",
-          notes: "Image browser with landing/home split, gallery state URLs, shared routes, staging, folder covers."
         },
         {
           site: "Battalion",
           version: "1.2.35",
-          phase: "Maintenance",
           route: "https://jeffersonwm.com/battalion/",
           notFound: "TBD",
           landing: "Yes",
@@ -401,12 +387,10 @@
           api: "https://api-battalion.jeffersonwm.com",
           auth: "Local app auth",
           data: "MySQL battalion databases",
-          notes: "RPG tracker/dashboard with public dashboard, admin data editors, moods/emotions, and feed surface."
         },
         {
           site: "Lionship",
           version: "1.1.0",
-          phase: "Maintenance",
           route: "https://jeffersonwm.com/lionship/",
           notFound: "TBD",
           landing: "No",
@@ -417,12 +401,10 @@
           api: "https://api-lionship.jeffersonwm.com",
           auth: "Public/admin TBD",
           data: "Widget words/dates/settings",
-          notes: "Widget and linkstream service feeding JeffersonWM home page data."
         },
         {
           site: "Millionfold",
           version: "0.1.5",
-          phase: "Maintenance",
           route: "https://jeffersonwm.com/millionfold/",
           notFound: "TBD",
           landing: "Yes",
@@ -433,12 +415,10 @@
           api: "https://api-millionfold.jeffersonwm.com",
           auth: "Central auth ready",
           data: "Keep-note processing files",
-          notes: "Keep notes trim/expand tool with process cancellation, PID visibility, and feed history limits."
         },
         {
           site: "Vermilion",
           version: "1.3.0",
-          phase: "Maintenance",
           route: "https://jeffersonwm.com/vermilion/",
           notFound: "TBD",
           landing: "Yes",
@@ -449,12 +429,10 @@
           api: "https://api-vermilion.jeffersonwm.com",
           auth: "TBD",
           data: "Local file planning + Python script",
-          notes: "Image/file organizer and Python script explanation page."
         },
         {
           site: "Tourbillion",
           version: "0.1.1",
-          phase: "Maintenance",
           route: "https://jeffersonwm.com/tourbillion/",
           notFound: "TBD",
           landing: "No",
@@ -465,12 +443,10 @@
           api: "None",
           auth: "Public",
           data: "Static/screensaver config",
-          notes: "Screensaver / visual experiment with split rendering modes."
         },
         {
           site: "Bullion",
           version: "0.1.0",
-          phase: "Maintenance",
           route: "https://jeffersonwm.com/bullion/",
           notFound: "TBD",
           landing: "No",
@@ -481,12 +457,10 @@
           api: "None",
           auth: "Public",
           data: "Browser-side batch rename state",
-          notes: "Batch rename utility."
         },
         {
           site: "Clionidae",
           version: "0.1.5",
-          phase: "Maintenance",
           route: "https://jeffersonwm.com/clionidae/",
           notFound: "TBD",
           landing: "Yes",
@@ -497,12 +471,10 @@
           api: "None / template-ready",
           auth: "Auth-ready off",
           data: "JSON/template scaffolds",
-          notes: "Template/reference site with design, standards, everything, and step-by-step documentation."
         },
         {
           site: "Auth / Multimillion",
           version: "0.1.0",
-          phase: "Maintenance",
           route: "https://auth.jeffersonwm.com/",
           notFound: "TBD",
           landing: "Yes",
@@ -513,12 +485,10 @@
           api: "https://auth.jeffersonwm.com",
           auth: "Central SSO",
           data: "SQLite auth DB",
-          notes: "Central login/account/membership surface for private apps and app permissions."
         },
         {
           site: "Dooky Detective",
           version: "0.1.0",
-          phase: "Maintenance",
           route: "https://dookydetective.com/",
           notFound: "TBD",
           landing: "TBD",
@@ -529,12 +499,10 @@
           api: "https://api.dookydetective.com",
           auth: "TBD",
           data: "Game/image data",
-          notes: "Dog-themed interactive image game/site."
         },
         {
           site: "Jeffershizzle",
           version: "0.1.0",
-          phase: "Archive",
           route: "https://jeffershizzle.com/",
           notFound: "TBD",
           landing: "Archive",
@@ -545,12 +513,10 @@
           api: "https://api.jeffershizzle.com",
           auth: "TBD",
           data: "Legacy photo archive",
-          notes: "Original photo website archive with image API experiments."
         },
         {
           site: "Stallioneer",
           version: "0.1.4",
-          phase: "Development",
           route: "GitHub issue / local app",
           notFound: "TBD",
           landing: "No",
@@ -561,12 +527,10 @@
           api: "ASP.NET local app",
           auth: "Local accounts",
           data: "SQLite app database",
-          notes: "Book scanner/inventory app with copies, tags, collections, import/export, and speed mode."
         },
         {
           site: "Endellionite",
           version: "0.0.0",
-          phase: "Concept",
           route: "Concept / TBD",
           notFound: "TBD",
           landing: "No",
@@ -577,12 +541,10 @@
           api: "TBD",
           auth: "TBD",
           data: "TBD",
-          notes: "Windows 95 scanner concept, with possible redevelopment direction toward Windows 98."
         },
         {
           site: "Medallion",
           version: "0.0.0",
-          phase: "Concept",
           route: "Concept / TBD",
           notFound: "TBD",
           landing: "No",
@@ -593,12 +555,10 @@
           api: "TBD",
           auth: "TBD",
           data: "TBD",
-          notes: "Chefferson concept / early planning area."
         },
         {
           site: "Rebellion",
           version: "0.0.0",
-          phase: "Development",
           route: "Development / TBD",
           notFound: "TBD",
           landing: "No",
@@ -609,12 +569,10 @@
           api: "TBD",
           auth: "TBD",
           data: "Text and image writing tool data TBD",
-          notes: "Text/image writing tool in development."
         },
         {
           site: "Trillions",
           version: "0.0.0",
-          phase: "Cancelled",
           route: "Cancelled",
           notFound: "TBD",
           landing: "No",
@@ -625,12 +583,10 @@
           api: "None",
           auth: "Cancelled",
           data: "Cancelled Google Keep/Firebase experiment",
-          notes: "Cancelled Keep tool; preserved as a reference for possible future reuse."
         },
         {
           site: "JeffersonWM Legacy",
           version: "0.1.0",
-          phase: "Archive",
           route: "Archive / TBD",
           notFound: "TBD",
           landing: "Archive",
@@ -641,12 +597,10 @@
           api: "None",
           auth: "Public",
           data: "Static legacy site files",
-          notes: "First JeffersonWM version preserved as an archive."
         },
         {
           site: "WMJefferson",
           version: "1.0.0",
-          phase: "Maintenance",
           route: "https://wmjefferson.com/",
           notFound: "TBD",
           landing: "Yes",
@@ -657,7 +611,6 @@
           api: "None",
           auth: "Public",
           data: "Static/professional content",
-          notes: "Professional site/domain linked from JeffersonWM home."
         }
       ];
 
@@ -668,20 +621,6 @@
         if (["no", "none"].some(item => normalized === item || normalized.startsWith(`${item} `))) return "no";
         if (normalized.includes("tbd") || normalized === "-") return "tbd";
         return "";
-      }
-
-      function phaseClass(value) {
-        const normalized = String(value).toLowerCase();
-        if (normalized === "maintenance") return "yes";
-        if (normalized === "development") return "partial";
-        if (normalized === "concept") return "tbd";
-        if (normalized === "archive") return "partial";
-        if (normalized === "cancelled") return "no";
-        return "tbd";
-      }
-
-      function phaseCell(value) {
-        return `<span class="pill ${phaseClass(value)}">${value}</span>`;
       }
 
       function statusCell(value, extraClass = "") {
@@ -697,18 +636,16 @@
         <tr>
           <td class="site-name">${row.site}</td>
           <td class="mono">v${row.version}</td>
-          <td>${phaseCell(row.phase)}</td>
           <td><a class="route" href="${row.route.startsWith("http") ? row.route : "#"}" target="_blank" rel="noopener noreferrer">${row.route}</a></td>
-          <td>${statusCell(row.notFound)}</td>
-          <td>${statusCell(row.landing)}</td>
-          <td>${statusCell(row.readme)}</td>
-          <td>${statusCell(row.readmeImage)}</td>
           <td class="mono">${row.port}</td>
           <td class="mono">${row.tunnel}</td>
           <td class="mono">${row.api}</td>
           <td>${statusCell(row.auth)}</td>
           <td>${row.data}</td>
-          <td class="notes">${row.notes}</td>
+          <td>${statusCell(row.notFound)}</td>
+          <td>${statusCell(row.landing)}</td>
+          <td>${statusCell(row.readme)}</td>
+          <td>${statusCell(row.readmeImage)}</td>
         </tr>
       `).join("");
 
