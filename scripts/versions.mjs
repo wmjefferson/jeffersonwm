@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = process.env.JEFFWM_ROOT || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dotcomsRoot = path.resolve(repoRoot, '..');
-const publicVersionsPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'public', 'versions.json');
+const versionsManifestPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'versions.json');
 
 const apps = [
   monorepoApp('JeffersonWM Home', 'jeffersonwm'),
@@ -53,11 +53,11 @@ function registryApp(label, key) {
 }
 
 function readPublicVersions() {
-  if (!existsSync(publicVersionsPath)) {
+  if (!existsSync(versionsManifestPath)) {
     return {};
   }
 
-  const parsed = JSON.parse(readFileSync(publicVersionsPath, 'utf8'));
+  const parsed = JSON.parse(readFileSync(versionsManifestPath, 'utf8'));
   return parsed.apps && typeof parsed.apps === 'object' ? parsed.apps : parsed;
 }
 

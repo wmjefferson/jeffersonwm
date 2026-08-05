@@ -8,8 +8,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dotcomsRoot = path.resolve(repoRoot, '..');
 const actionsVersioningPath = '\\\\JEFFERSHIZZLE-D\\Dotcoms E\\other\\actions\\versioning.md';
-const publicVersionsPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'public', 'versions.json');
-const distVersionsPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'dist', 'versions.json');
+const versionsManifestPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'versions.json');
 
 const appRegistry = {
   battalion: monorepoApp('Battalion', 'battalion'),
@@ -148,19 +147,15 @@ function appendBuildEntry(contents, appLabel, entry) {
 }
 
 function readPublicVersions() {
-  if (!existsSync(publicVersionsPath)) {
+  if (!existsSync(versionsManifestPath)) {
     return { updatedAt: null, apps: {} };
   }
 
-  const parsed = JSON.parse(readFileSync(publicVersionsPath, 'utf8'));
+  const parsed = JSON.parse(readFileSync(versionsManifestPath, 'utf8'));
   return {
     ...parsed,
     apps: parsed.apps && typeof parsed.apps === 'object' ? parsed.apps : {},
   };
-}
-
-function writePublicVersionsFile(filePath, data) {
-  writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 }
 
 function updatePublicVersions(appConfig, version, timestamp) {
@@ -172,11 +167,7 @@ function updatePublicVersions(appConfig, version, timestamp) {
     updatedAt: timestamp,
   };
 
-  writePublicVersionsFile(publicVersionsPath, nextVersions);
-
-  if (existsSync(path.dirname(distVersionsPath))) {
-    writePublicVersionsFile(distVersionsPath, nextVersions);
-  }
+  writeFileSync(versionsManifestPath, `${JSON.stringify(nextVersions, null, 2)}\n`, 'utf8');
 }
 
 async function main() {
@@ -223,7 +214,7 @@ async function main() {
   writeFileSync(actionsVersioningPath, appendBuildEntry(current, appConfig.label, entry), 'utf8');
   updatePublicVersions(appConfig, version, timestamp);
   console.log(`Logged ${appConfig.label} v${version} build to ${actionsVersioningPath}`);
-  console.log(`Updated public versions file: ${publicVersionsPath}`);
+  console.log(`Updated versions manifest: ${versionsManifestPath}`);
 }
 
 main().catch((error) => {
