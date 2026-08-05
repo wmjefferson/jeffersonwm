@@ -179,13 +179,15 @@ function readDeployConfig() {
   try {
     const parsed = JSON.parse(readFileSync(deployConfigPath, 'utf8'));
     const remotePath = String(parsed.remotePath || '').trim();
+    const uploadHost = String(parsed.uploadHost || parsed.ftpHost || parsed.host || '').trim();
 
-    if (!parsed.host || !parsed.username || !parsed.password || !remotePath) {
+    if (!uploadHost || !parsed.username || !parsed.password || !remotePath) {
       return null;
     }
 
     return {
       host: String(parsed.host).trim(),
+      uploadHost,
       username: String(parsed.username).trim(),
       password: String(parsed.password),
       remotePath,
@@ -205,7 +207,8 @@ function buildFtpTargetPath(remotePath, fileName) {
 function syncVersionsManifestToHost() {
   const deployConfig = readDeployConfig();
   if (!deployConfig) {
-    console.warn('Versions manifest updated locally, but no deploy config was found for automatic upload.');
+    console.warn('Versions manifest updated locally, but no deploy config with an upload host was found for automatic upload.');
+    console.warn('Set "uploadHost" (or "ftpHost") in .vscode/sftp.json to a DNS-only origin hostname for FTP uploads.');
     return;
   }
 
@@ -215,7 +218,11 @@ function syncVersionsManifestToHost() {
   }
 
   const remoteTarget = buildFtpTargetPath(deployConfig.remotePath, 'versions.json');
-  const ftpUrl = `ftp://${deployConfig.host}${remoteTarget.startsWith('/') ? '' : '/'}${remoteTarget}`;
+  const ftpUrl = `ftp://${deployConfig.uploadHost}${remoteTarget.startsWith('/') ? '' : '/'}${remoteTarget}`;
+  if (deployConfig.uploadHost === deployConfig.host) {
+    console.warn('Using the public host as the FTP upload host. If Cloudflare is proxying that domain, FTP will fail.');
+    console.warn('For the most reliable setup, point "uploadHost" at a DNS-only origin hostname such as ftp.<domain> or origin.<domain>.');
+  }
   const curlResult = spawnSync('curl.exe', [
     '--silent',
     '--show-error',

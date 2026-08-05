@@ -107,6 +107,8 @@ Deploy pattern:
 - version manifest:
   - `versions.json` is maintained by the logged build script and uploaded automatically to the ASO homepage root
   - the homepage reads it from `/versions.json` on every page load
+  - the FTP upload host should be a DNS-only origin hostname, not the public Cloudflare-proxied site hostname
+  - keep the public web host and the upload host separate in `.vscode/sftp.json` by setting `uploadHost` (or `ftpHost`)
 
 Deploy pattern:
 
