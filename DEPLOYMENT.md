@@ -23,6 +23,9 @@ These apps are built locally and uploaded to ASO as static frontend assets.
 - `apps/feed/dist`
   - live frontend path:
     - `https://jeffersonwm.com/feed/`
+- `apps/battalion/dist`
+  - live frontend path:
+    - `https://jeffersonwm.com/battalion/`
 - `apps/jeffersonwm/dist`
   - live homepage root:
     - `https://jeffersonwm.com`
@@ -37,6 +40,15 @@ These apps are built locally and uploaded to ASO as static frontend assets.
     - `https://jeffersonwm.com/bullion/`
 
 Upload the **contents** of each `dist` folder, not the `dist` folder itself.
+For the ASO-hosted frontend sites, the publish scripts can do that upload for you:
+
+```powershell
+npm run publish:battalion
+npm run publish:feed
+npm run publish:perihelion
+npm run publish:lionship
+npm run publish:jeffersonwm
+```
 
 ## Local Build Commands
 
@@ -115,7 +127,7 @@ Deploy pattern:
 1. update `apps/jeffersonwm`
 2. if needed, build locally
 3. run a logged build to bump versions and refresh the manifest
-4. upload the resulting frontend files to the JeffersonWM root on ASO
+4. publish the built frontend with `npm run publish:jeffersonwm`
 
 ### Feed
 
@@ -133,7 +145,7 @@ Deploy pattern:
 Deploy pattern:
 
 1. build locally
-2. upload `apps/feed/dist` to the live `/feed/` path
+2. publish `apps/feed/dist` to the live `/feed/` path with `npm run publish:feed`
 3. point the frontend at the live backend with:
    - `VITE_API_BASE_URL`
 4. restart the feed backend if its API changed
@@ -151,7 +163,7 @@ Bullion is currently frontend-only in this repo.
 Deploy pattern:
 
 1. build locally
-2. upload `apps/bullion/dist`
+2. upload `apps/bullion/dist` manually if you are releasing Bullion
 
 ## Services Outside This Monorepo
 
@@ -176,6 +188,16 @@ Dooky is maintained from its own repo/runtime.
   - `C:\Users\wmjef\Desktop\Precious Box\Dotcoms\dookydetective`
 - live backend:
   - `E:\dookydetective\backend`
+
+### Separate Workspaces
+
+For sites that live in separate workspaces, keep a workspace-local publish config and the same publish helper pattern in that repo. That keeps each repo pointed at its own `dist` output and its own ASO destination without mixing paths across projects.
+
+Good candidates for separate workspace configs:
+
+- `jeffershizzle`
+- `dooky`
+- `wmjefferson`
 
 ### Jeffershizzle
 

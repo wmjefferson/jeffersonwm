@@ -4,13 +4,12 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { readDeployConfig, uploadFileViaFtp } from './ftp-upload.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dotcomsRoot = path.resolve(repoRoot, '..');
 const actionsVersioningPath = '\\\\JEFFERSHIZZLE-D\\Dotcoms E\\other\\actions\\versioning.md';
 const versionsManifestPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'versions.json');
-const deployConfigPath = path.join(repoRoot, '.vscode', 'sftp.json');
-
 const appRegistry = {
   battalion: monorepoApp('Battalion', 'battalion'),
   batt: monorepoApp('Battalion', 'battalion'),
@@ -171,39 +170,6 @@ function updatePublicVersions(appConfig, version, timestamp) {
   writeFileSync(versionsManifestPath, `${JSON.stringify(nextVersions, null, 2)}\n`, 'utf8');
 }
 
-function readDeployConfig() {
-  if (!existsSync(deployConfigPath)) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(readFileSync(deployConfigPath, 'utf8'));
-    const remotePath = String(parsed.remotePath || '').trim();
-    const uploadHost = String(parsed.uploadHost || parsed.ftpHost || parsed.host || '').trim();
-
-    if (!uploadHost || !parsed.username || !parsed.password || !remotePath) {
-      return null;
-    }
-
-    return {
-      host: String(parsed.host).trim(),
-      uploadHost,
-      username: String(parsed.username).trim(),
-      password: String(parsed.password),
-      remotePath,
-      protocol: String(parsed.protocol || 'ftp').trim().toLowerCase(),
-    };
-  } catch (_error) {
-    return null;
-  }
-}
-
-function buildFtpTargetPath(remotePath, fileName) {
-  const normalizedRemotePath = remotePath.replace(/\\/g, '/').replace(/\/+$/, '');
-  const normalizedFileName = fileName.replace(/^\/+/, '');
-  return `${normalizedRemotePath}/${normalizedFileName}`;
-}
-
 function syncVersionsManifestToHost() {
   const deployConfig = readDeployConfig();
   if (!deployConfig) {
@@ -217,29 +183,11 @@ function syncVersionsManifestToHost() {
     return;
   }
 
-  const remoteTarget = buildFtpTargetPath(deployConfig.remotePath, 'versions.json');
-  const ftpUrl = `ftp://${deployConfig.uploadHost}${remoteTarget.startsWith('/') ? '' : '/'}${remoteTarget}`;
   if (deployConfig.uploadHost === deployConfig.host) {
     console.warn('Using the public host as the FTP upload host. If Cloudflare is proxying that domain, FTP will fail.');
     console.warn('For the most reliable setup, point "uploadHost" at a DNS-only origin hostname such as ftp.<domain> or origin.<domain>.');
   }
-  const curlResult = spawnSync('curl.exe', [
-    '--silent',
-    '--show-error',
-    '--fail',
-    '--ftp-create-dirs',
-    '-u',
-    `${deployConfig.username}:${deployConfig.password}`,
-    '-T',
-    versionsManifestPath,
-    ftpUrl,
-  ], {
-    stdio: 'inherit',
-  });
-
-  if (curlResult.status !== 0) {
-    throw new Error(`Automatic upload of versions.json failed for ${ftpUrl}`);
-  }
+  uploadFileViaFtp(deployConfig, versionsManifestPath, 'versions.json');
 }
 
 async function main() {
