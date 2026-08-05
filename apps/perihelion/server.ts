@@ -34,6 +34,12 @@ const listVisibleFiles = (targetDir: string) =>
     .map(item => item.name)
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 
+const listVisibleFolders = (targetDir: string) =>
+  fs.readdirSync(targetDir, { withFileTypes: true })
+    .filter(item => item.isDirectory() && isVisibleName(item.name))
+    .map(item => item.name)
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -80,17 +86,25 @@ async function startServer() {
         const folderPath = path.join(targetDir, name);
         const relativeFolderPath = safePath ? toWebPath(safePath, name) : name;
         const childFiles = listVisibleFiles(folderPath);
+        const childFolders = listVisibleFolders(folderPath);
         const firstFile = childFiles[0];
+        const firstImage = childFiles.find(file => getMediaKind(file) === "image") || null;
         const thumbnailPath = firstFile ? toWebPath(relativeFolderPath, firstFile) : null;
+        const imageThumbnailPath = firstImage ? toWebPath(relativeFolderPath, firstImage) : null;
 
         return {
           name,
           path: relativeFolderPath,
           type: "directory" as const,
-          itemCount: childFiles.length,
+          itemCount: childFiles.length + childFolders.length,
+          fileCount: childFiles.length,
+          folderCount: childFolders.length,
           thumbnailPath,
           thumbnailKind: firstFile ? getMediaKind(firstFile) : null,
           thumbnailExt: firstFile ? extensionOf(firstFile) : "",
+          imageThumbnailPath,
+          imageThumbnailKind: firstImage ? getMediaKind(firstImage) : null,
+          imageThumbnailExt: firstImage ? extensionOf(firstImage) : "",
         };
       });
 

@@ -4,6 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import { defineConfig } from 'vite';
 
+const devApiTarget = process.env.VERMILION_DEV_API_TARGET || 'http://localhost:8105';
+
 export default defineConfig({
   base: '/vermilion/',
   plugins: [
@@ -38,7 +40,7 @@ export default defineConfig({
   server: {
     port: 5175,
     proxy: {
-      '/api': 'http://localhost:8100',
+      '/api': devApiTarget,
     },
   },
 });

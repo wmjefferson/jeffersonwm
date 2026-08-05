@@ -1,7 +1,7 @@
 {
-  "name": "perihelion-image-browser",
+  "name": "perihelion",
   "private": true,
-  "version": "1.4.4",
+  "version": "1.4.10",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",

@@ -1,0 +1,7 @@
+{
+  "title": "JeffersonWM Home version manifest cleanup",
+  "content": "<p>The JeffersonWM homepage now relies only on <code>/versions.json</code> for app labels instead of carrying stale hardcoded fallback versions in the page markup. That means the home page will stay blank when the manifest is missing, rather than showing an out-of-date number, which is a safer default for deployment checks.</p><p>What changed:</p><ul><li><strong>Manifest-first version display:</strong> app labels now hydrate from the shared versions file at page load.</li><li><strong>Stale fallback removed:</strong> the old inline version strings were stripped out of the homepage markup so outdated numbers cannot linger if deployment is incomplete.</li><li><strong>Perihelion alignment confirmed:</strong> Perihelion is already tracked at <code>v1.4.7</code> in the shared manifest, so once the correct <code>versions.json</code> is published at the site root the homepage will show the new number automatically.</li></ul><p>This checkpoint keeps the homepage coordination workflow safer and easier to reason about when builds are copied between machines or deployed in stages.</p>",
+  "url": "https://jeffersonwm.com/",
+  "source": "milestone",
+  "external_id": "jeffersonwm-home-version-manifest-cleanup-2026-08-03"
+}

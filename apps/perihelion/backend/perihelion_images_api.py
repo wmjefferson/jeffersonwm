@@ -171,39 +171,83 @@ def sorted_visible_files(folder: Path) -> list[Path]:
     )
 
 
+def sorted_visible_folders(folder: Path) -> list[Path]:
+    return sorted(
+        [entry for entry in folder.iterdir() if entry.is_dir() and visible_name(entry.name)],
+        key=lambda p: p.name.lower(),
+    )
+
+
 def folder_preview(folder: Path, folder_rel_path: str = "") -> dict:
     files = sorted_visible_files(folder)
+    folders = sorted_visible_folders(folder)
+    file_count = len(files)
+    folder_count = len(folders)
+    item_count = file_count + folder_count
     first = files[0] if files else None
+    second = files[1] if len(files) > 1 else None
     first_image = next((entry for entry in files if guess_kind(entry.suffix.lower()) == "image"), None)
+    second_image = next(
+        (entry for entry in files if guess_kind(entry.suffix.lower()) == "image" and entry != first_image),
+        None,
+    )
 
-    # Check for a manually-set cover image override
-    cover_path: str | None = None
+    # Check for manually-set cover image overrides
+    cover1_path: str | None = None
+    cover2_path: str | None = None
+    folder_title = ""
+    folder_description = ""
     if folder_rel_path:
-        cover_path = get_folder_cover(folder_rel_path)
+        cover_state = get_folder_cover_state(folder_rel_path)
+        cover1_path = cover_state["cover1Path"]
+        cover2_path = cover_state["cover2Path"]
+        folder_detail = get_folder_detail_record(folder_rel_path)
+        folder_title = folder_detail["title"]
+        folder_description = folder_detail["description"]
 
-    if cover_path:
-        thumb_kind = guess_kind(Path(cover_path).suffix.lower())
-        thumb_ext = Path(cover_path).suffix.lower()
-        return {
-            "thumbnailPath": cover_path,
-            "thumbnailKind": thumb_kind,
-            "thumbnailExt": thumb_ext,
-            "imageThumbnailPath": cover_path if thumb_kind == "image" else (rel_url(first_image) if first_image else None),
-            "imageThumbnailKind": thumb_kind if thumb_kind == "image" else (guess_kind(first_image.suffix) if first_image else None),
-            "imageThumbnailExt": thumb_ext if thumb_kind == "image" else (first_image.suffix.lower() if first_image else ""),
-            "itemCount": len(files),
-            "hasCoverOverride": True,
-        }
+    def kind_for(rel: str | None) -> str | None:
+        return guess_kind(Path(rel).suffix.lower()) if rel else None
+
+    def ext_for(rel: str | None) -> str:
+        return Path(rel).suffix.lower() if rel else ""
+
+    def file_rel(entry: Path | None) -> str | None:
+        return rel_url(entry) if entry else None
+
+    preview_1 = cover1_path or file_rel(first_image) or file_rel(first)
+    preview_1_index = next((index for index, entry in enumerate(files) if rel_url(entry) == preview_1), -1) if preview_1 else -1
+
+    if cover2_path:
+        preview_2 = cover2_path
+    elif preview_1_index >= 0 and preview_1_index + 1 < len(files):
+        preview_2 = rel_url(files[preview_1_index + 1])
+    else:
+        preview_2 = file_rel(second_image) or file_rel(second)
+
+    image_preview = file_rel(first_image) if first_image else preview_1
 
     return {
-        "thumbnailPath": rel_url(first) if first else None,
-        "thumbnailKind": guess_kind(first.suffix) if first else None,
-        "thumbnailExt": first.suffix.lower() if first else "",
-        "imageThumbnailPath": rel_url(first_image) if first_image else None,
-        "imageThumbnailKind": guess_kind(first_image.suffix) if first_image else None,
-        "imageThumbnailExt": first_image.suffix.lower() if first_image else "",
-        "itemCount": len(files),
-        "hasCoverOverride": False,
+        "thumbnailPath": preview_1,
+        "thumbnailKind": kind_for(preview_1),
+        "thumbnailExt": ext_for(preview_1),
+        "imageThumbnailPath": image_preview,
+        "imageThumbnailKind": kind_for(image_preview),
+        "imageThumbnailExt": ext_for(image_preview),
+        "secondaryThumbnailPath": preview_2,
+        "secondaryThumbnailKind": kind_for(preview_2),
+        "secondaryThumbnailExt": ext_for(preview_2),
+        "cover1Path": cover1_path,
+        "cover2Path": cover2_path,
+        "cover1Kind": kind_for(cover1_path),
+        "cover2Kind": kind_for(cover2_path),
+        "cover1Ext": ext_for(cover1_path),
+        "cover2Ext": ext_for(cover2_path),
+        "title": folder_title,
+        "description": folder_description,
+        "itemCount": item_count,
+        "fileCount": file_count,
+        "folderCount": folder_count,
+        "hasCoverOverride": bool(cover1_path or cover2_path),
     }
 
 
@@ -287,9 +331,18 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS folder_details (
+                folder_path TEXT PRIMARY KEY,
+                title TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS folder_covers (
                 folder_path TEXT PRIMARY KEY,
                 image_path TEXT NOT NULL,
+                cover1_path TEXT,
+                cover2_path TEXT,
                 updated_at TEXT NOT NULL
             );
             """
@@ -301,6 +354,32 @@ def init_db() -> None:
             conn.execute("ALTER TABLE users ADD COLUMN request_note TEXT")
         if "blocked_at" not in columns:
             conn.execute("ALTER TABLE users ADD COLUMN blocked_at TEXT")
+
+        folder_detail_columns = {row["name"] for row in conn.execute("PRAGMA table_info(folder_details)").fetchall()}
+        if "title" not in folder_detail_columns:
+            conn.execute("ALTER TABLE folder_details ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+        if "description" not in folder_detail_columns:
+            conn.execute("ALTER TABLE folder_details ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+        if "updated_at" not in folder_detail_columns:
+            conn.execute("ALTER TABLE folder_details ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
+
+        cover_columns = {row["name"] for row in conn.execute("PRAGMA table_info(folder_covers)").fetchall()}
+        if "image_path" not in cover_columns:
+            conn.execute("ALTER TABLE folder_covers ADD COLUMN image_path TEXT")
+            cover_columns.add("image_path")
+        if "cover1_path" not in cover_columns:
+            conn.execute("ALTER TABLE folder_covers ADD COLUMN cover1_path TEXT")
+            cover_columns.add("cover1_path")
+        if "cover2_path" not in cover_columns:
+            conn.execute("ALTER TABLE folder_covers ADD COLUMN cover2_path TEXT")
+            cover_columns.add("cover2_path")
+        conn.execute(
+            """
+            UPDATE folder_covers
+            SET cover1_path = COALESCE(cover1_path, image_path),
+                image_path = COALESCE(image_path, cover1_path)
+            """
+        )
         conn.commit()
 
 
@@ -364,29 +443,99 @@ def save_image_detail_record(rel_path: str, title: str, description: str, tags: 
     return payload
 
 
-def get_folder_cover(folder_path: str) -> str | None:
-    """Return the manually-set cover image path for a folder, or None."""
+def get_folder_detail_record(folder_path: str) -> dict:
     with db_connect() as conn:
         row = conn.execute(
-            "SELECT image_path FROM folder_covers WHERE folder_path = ?",
+            "SELECT folder_path, title, description, updated_at FROM folder_details WHERE folder_path = ?",
             (folder_path,),
         ).fetchone()
-    return row["image_path"] if row else None
+    if not row:
+        return {"title": "", "description": ""}
+    return {
+        "title": row["title"] or "",
+        "description": row["description"] or "",
+    }
 
 
-def set_folder_cover(folder_path: str, image_path: str | None) -> None:
-    """Set or clear the manual cover image for a folder."""
+def save_folder_detail_record(folder_path: str, title: str, description: str) -> dict:
+    payload = {
+        "title": str(title or "").strip(),
+        "description": str(description or "").strip(),
+    }
     with db_connect() as conn:
-        if image_path:
+        if payload["title"] or payload["description"]:
             conn.execute(
                 """
-                INSERT INTO folder_covers (folder_path, image_path, updated_at)
-                VALUES (?, ?, ?)
+                INSERT INTO folder_details (folder_path, title, description, updated_at)
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT(folder_path) DO UPDATE SET
-                    image_path = excluded.image_path,
+                    title = excluded.title,
+                    description = excluded.description,
                     updated_at = excluded.updated_at
                 """,
-                (folder_path, image_path, iso_utc()),
+                (folder_path, payload["title"], payload["description"], iso_utc()),
+            )
+        else:
+            conn.execute("DELETE FROM folder_details WHERE folder_path = ?", (folder_path,))
+        conn.commit()
+    return payload
+
+
+def get_folder_cover_state(folder_path: str) -> dict[str, str | None]:
+    """Return the stored folder cover slots for a folder."""
+    with db_connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM folder_covers WHERE folder_path = ?",
+            (folder_path,),
+        ).fetchone()
+    if not row:
+        return {"cover1Path": None, "cover2Path": None}
+
+    keys = set(row.keys())
+    cover1 = row["cover1_path"] if "cover1_path" in keys else None
+    cover2 = row["cover2_path"] if "cover2_path" in keys else None
+    if cover1 is None and "cover1_path" not in keys and "image_path" in keys:
+        cover1 = row["image_path"]
+    return {"cover1Path": cover1, "cover2Path": cover2}
+
+
+def set_folder_cover(folder_path: str, image_path: str | None, slot: int = 1) -> None:
+    """Set or clear a manual cover image slot for a folder."""
+    with db_connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM folder_covers WHERE folder_path = ?",
+            (folder_path,),
+        ).fetchone()
+        keys = set(row.keys()) if row else set()
+        cover1 = row["cover1_path"] if row and "cover1_path" in keys else None
+        cover2 = row["cover2_path"] if row and "cover2_path" in keys else None
+        if row and cover1 is None and "cover1_path" not in keys and "image_path" in keys:
+            cover1 = row["image_path"]
+
+        if image_path:
+            if slot == 2:
+                cover2 = image_path
+            else:
+                cover1 = image_path
+        else:
+            if slot == 2:
+                cover2 = None
+            else:
+                cover1 = None
+
+        primary = cover1 or cover2
+        if primary:
+            conn.execute(
+                """
+                INSERT INTO folder_covers (folder_path, image_path, cover1_path, cover2_path, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(folder_path) DO UPDATE SET
+                    image_path = excluded.image_path,
+                    cover1_path = excluded.cover1_path,
+                    cover2_path = excluded.cover2_path,
+                    updated_at = excluded.updated_at
+                """,
+                (folder_path, primary, cover1, cover2, iso_utc()),
             )
         else:
             conn.execute("DELETE FROM folder_covers WHERE folder_path = ?", (folder_path,))
@@ -403,6 +552,119 @@ def load_image_details_map(paths: list[str]) -> dict[str, dict]:
             tuple(paths),
         ).fetchall()
     return {row["path"]: serialize_image_detail_row(row) for row in rows}
+
+
+def list_files_by_tag(tag_filter: str, search_filter: str = "") -> list[dict]:
+    tag_filter = tag_filter.strip().lower()
+    if not tag_filter:
+        return []
+
+    with db_connect() as conn:
+        rows = conn.execute(
+            "SELECT path, title, description, tags_json, updated_at FROM image_details ORDER BY path COLLATE NOCASE"
+        ).fetchall()
+
+    files: list[dict] = []
+    for row in rows:
+        detail = serialize_image_detail_row(row)
+        if tag_filter not in detail["tags"]:
+            continue
+
+        rel_path = str(row["path"] or "").strip().strip("/")
+        if not rel_path:
+            continue
+
+        try:
+            target = safe_path(rel_path)
+        except Exception:
+            continue
+        if not target.is_file():
+            continue
+
+        ext = target.suffix.lower()
+        stat = target.stat()
+        item = {
+            "name": target.name,
+            "path": rel_url(target),
+            "modified": int(stat.st_mtime),
+            "type": "file",
+            "ext": ext,
+            "size": stat.st_size,
+            "kind": guess_kind(ext),
+            "is_large": is_large_image_file(target),
+            "url": f"/images/{rel_url(target)}",
+            "title": detail["title"],
+            "description": detail["description"],
+            "tags": detail["tags"],
+        }
+
+        if search_filter:
+            haystack = " ".join(
+                [
+                    item.get("name", ""),
+                    item.get("path", ""),
+                    item.get("title", ""),
+                    item.get("description", ""),
+                    " ".join(item.get("tags", [])),
+                ]
+            ).lower()
+            if search_filter not in haystack:
+                continue
+
+        files.append(item)
+
+    return files
+
+
+def list_files_globally(search_filter: str) -> list[dict]:
+    search_filter = search_filter.strip().lower()
+    if not search_filter:
+        return []
+
+    with db_connect() as conn:
+        rows = conn.execute(
+            "SELECT path, title, description, tags_json, updated_at FROM image_details ORDER BY path COLLATE NOCASE"
+        ).fetchall()
+
+    detail_map = {row["path"]: serialize_image_detail_row(row) for row in rows}
+    files: list[dict] = []
+
+    for target in sorted(ROOT.rglob("*"), key=lambda p: p.as_posix().lower()):
+        if not target.is_file():
+            continue
+        rel = rel_url(target)
+        detail = detail_map.get(rel, {"title": "", "description": "", "tags": []})
+        haystack = " ".join(
+            [
+                target.name,
+                rel,
+                detail["title"],
+                detail["description"],
+                " ".join(detail["tags"]),
+            ]
+        ).lower()
+        if search_filter not in haystack:
+            continue
+
+        stat = target.stat()
+        ext = target.suffix.lower()
+        files.append({
+            "name": target.name,
+            "path": rel,
+            "folderPath": posixpath.dirname(rel) or "root",
+            "modified": int(stat.st_mtime),
+            "type": "file",
+            "ext": ext,
+            "size": stat.st_size,
+            "kind": guess_kind(ext),
+            "is_large": is_large_image_file(target),
+            "url": f"/images/{rel}",
+            "title": detail["title"],
+            "description": detail["description"],
+            "tags": detail["tags"],
+        })
+
+    return files
 
 
 def collect_tag_stats() -> tuple[list[str], dict[str, int]]:
@@ -1225,15 +1487,78 @@ class Handler(BaseHTTPRequestHandler):
                 if REQUIRE_AUTH and not user:
                     return
                 rel = unquote(query.get("path", [""])[0])
-                current = safe_path(rel)
-                if not current.exists() or not current.is_dir():
-                    self._send_json({"error": "Folder not found"}, 404)
-                    return
                 tag_filter = (query.get("tag", [""])[0] or "").strip().lower()
                 share_filter = (query.get("list", [""])[0] or "").strip()
                 search_filter = (query.get("search", [""])[0] or "").strip().lower()
                 page = max(1, int(query.get("page", ["1"])[0]))
                 limit = max(1, min(250, int(query.get("limit", ["25"])[0])))
+
+                if search_filter and len(search_filter) >= 4 and not tag_filter and not share_filter:
+                    files = list_files_globally(search_filter)
+                    image_files = [f["path"] for f in files if f["kind"] == "image"]
+                    total = len(files)
+                    start = (page - 1) * limit
+                    end = start + limit
+                    paged_files = files[start:end]
+                    total_pages = max(1, (total + limit - 1) // limit)
+
+                    self._send_json({
+                        "root": ROOT.as_posix(),
+                        "current": "",
+                        "folders": [],
+                        "files": paged_files,
+                        "breadcrumbs": [],
+                        "counts": {
+                            "folders": 0,
+                            "files": total,
+                            "images": len(image_files),
+                            "other": sum(1 for f in files if f["kind"] != "image"),
+                        },
+                        "images": image_files,
+                        "directories": [],
+                        "search": search_filter,
+                        "scope": "global-search",
+                        "page": page,
+                        "totalPages": total_pages,
+                        "total": total,
+                    })
+                    return
+
+                if tag_filter:
+                    files = list_files_by_tag(tag_filter, search_filter)
+                    image_files = [f["path"] for f in files if f["kind"] == "image"]
+                    total = len(files)
+                    start = (page - 1) * limit
+                    end = start + limit
+                    paged_files = files[start:end]
+                    total_pages = max(1, (total + limit - 1) // limit)
+
+                    self._send_json({
+                        "root": ROOT.as_posix(),
+                        "current": "",
+                        "folders": [],
+                        "files": paged_files,
+                        "breadcrumbs": [],
+                        "counts": {
+                            "folders": 0,
+                            "files": total,
+                            "images": len(image_files),
+                            "other": sum(1 for f in files if f["kind"] != "image"),
+                        },
+                        "images": image_files,
+                        "directories": [],
+                        "tag": tag_filter,
+                        "scope": "global-tag",
+                        "page": page,
+                        "totalPages": total_pages,
+                        "total": total,
+                    })
+                    return
+
+                current = safe_path(rel)
+                if not current.exists() or not current.is_dir():
+                    self._send_json({"error": "Folder not found"}, 404)
+                    return
 
                 folders = []
                 files = []
@@ -1420,8 +1745,31 @@ class Handler(BaseHTTPRequestHandler):
                 if REQUIRE_AUTH and not user:
                     return
                 folder_path = (query.get("path", [""])[0] or "").strip().strip("/")
-                cover = get_folder_cover(folder_path) if folder_path else None
-                self._send_json({"ok": True, "folderPath": folder_path, "coverImagePath": cover})
+                cover_state = get_folder_cover_state(folder_path) if folder_path else {"cover1Path": None, "cover2Path": None}
+                details = get_folder_detail_record(folder_path) if folder_path else {"title": "", "description": ""}
+                self._send_json({
+                    "ok": True,
+                    "folderPath": folder_path,
+                    "cover1ImagePath": cover_state["cover1Path"],
+                    "cover2ImagePath": cover_state["cover2Path"],
+                    "coverImagePath": cover_state["cover1Path"],
+                    "title": details["title"],
+                    "description": details["description"],
+                })
+                return
+
+            if path == "/api/folder-details":
+                user = require_access(self)
+                if REQUIRE_AUTH and not user:
+                    return
+                folder_path = (query.get("path", [""])[0] or "").strip().strip("/")
+                details = get_folder_detail_record(folder_path) if folder_path else {"title": "", "description": ""}
+                self._send_json({
+                    "ok": True,
+                    "folderPath": folder_path,
+                    "title": details["title"],
+                    "description": details["description"],
+                })
                 return
 
             if path == "/" or path == "/index.html":
@@ -1839,19 +2187,59 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 payload = load_json_body(self)
                 folder_path = (payload.get("folderPath") or "").strip().strip("/")
+                title = (payload.get("title") or "").strip()
+                description = (payload.get("description") or "").strip()
+                has_cover_update = "imagePath" in payload or "slot" in payload
                 image_path = (payload.get("imagePath") or "").strip() or None
+                slot = int(payload.get("slot") or 1)
                 if not folder_path:
                     self._send_json({"error": "folderPath is required"}, 400)
                     return
-                # Validate that image_path is within our image root (security check)
-                if image_path:
-                    try:
-                        safe_path(image_path)  # will raise ValueError if path traversal
-                    except ValueError:
-                        self._send_json({"error": "Invalid imagePath"}, 400)
+                if has_cover_update:
+                    if slot not in (1, 2):
+                        self._send_json({"error": "slot must be 1 or 2"}, 400)
                         return
-                set_folder_cover(folder_path, image_path)
-                self._send_json({"ok": True, "folderPath": folder_path, "coverImagePath": image_path})
+                    # Validate that image_path is within our image root (security check)
+                    if image_path:
+                        try:
+                            safe_path(image_path)  # will raise ValueError if path traversal
+                        except ValueError:
+                            self._send_json({"error": "Invalid imagePath"}, 400)
+                            return
+                    set_folder_cover(folder_path, image_path, slot=slot)
+                if title or description or not has_cover_update:
+                    save_folder_detail_record(folder_path, title, description)
+                cover_state = get_folder_cover_state(folder_path)
+                details = get_folder_detail_record(folder_path)
+                self._send_json({
+                    "ok": True,
+                    "folderPath": folder_path,
+                    "cover1ImagePath": cover_state["cover1Path"],
+                    "cover2ImagePath": cover_state["cover2Path"],
+                    "coverImagePath": cover_state["cover1Path"],
+                    "title": details["title"],
+                    "description": details["description"],
+                })
+                return
+
+            if path == "/api/folder-details":
+                user = self._require_admin()
+                if not user:
+                    return
+                payload = load_json_body(self)
+                folder_path = (payload.get("folderPath") or "").strip().strip("/")
+                title = (payload.get("title") or "").strip()
+                description = (payload.get("description") or "").strip()
+                if not folder_path:
+                    self._send_json({"error": "folderPath is required"}, 400)
+                    return
+                details = save_folder_detail_record(folder_path, title, description)
+                self._send_json({
+                    "ok": True,
+                    "folderPath": folder_path,
+                    "title": details["title"],
+                    "description": details["description"],
+                })
                 return
 
             if path == "/api/download":

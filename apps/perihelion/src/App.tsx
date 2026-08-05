@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { FolderOpen, X, Check, Download, ArrowLeft, FileImage, Tag, List, Plus, Search, Minus, Copy, BookImage } from 'lucide-react';
+import { FolderOpen, X, Check, Download, ArrowLeft, FileImage, Tag, List, Plus, Search, Minus, Copy, BookImage, PencilLine } from 'lucide-react';
 import StagingView, { DownloadOptions } from './components/StagingView';
 
 const renderableExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg', '.bmp'];
@@ -9,6 +9,7 @@ type MediaKind = 'image' | 'video' | 'other';
 interface MediaEntry {
   path: string;
   name: string;
+  folderPath?: string;
   kind: MediaKind;
   ext: string;
   title?: string;
@@ -22,13 +23,44 @@ interface MediaEntry {
 interface FolderEntry {
   path: string;
   name: string;
+  title?: string;
+  description?: string;
   thumbnailPath: string | null;
   thumbnailKind: MediaKind | null;
   thumbnailExt: string;
   imageThumbnailPath?: string | null;
   imageThumbnailKind?: MediaKind | null;
   imageThumbnailExt?: string;
+  secondaryThumbnailPath?: string | null;
+  secondaryThumbnailKind?: MediaKind | null;
+  secondaryThumbnailExt?: string;
+  cover1Path?: string | null;
+  cover2Path?: string | null;
   itemCount: number;
+  fileCount: number;
+  folderCount: number;
+  hasCoverOverride?: boolean;
+}
+
+interface FolderApiEntry {
+  path?: string;
+  name?: string;
+  title?: string;
+  description?: string;
+  thumbnailPath?: string | null;
+  thumbnailKind?: MediaKind | null;
+  thumbnailExt?: string;
+  imageThumbnailPath?: string | null;
+  imageThumbnailKind?: MediaKind | null;
+  imageThumbnailExt?: string;
+  secondaryThumbnailPath?: string | null;
+  secondaryThumbnailKind?: MediaKind | null;
+  secondaryThumbnailExt?: string;
+  cover1Path?: string | null;
+  cover2Path?: string | null;
+  itemCount?: number;
+  fileCount?: number;
+  folderCount?: number;
   hasCoverOverride?: boolean;
 }
 
@@ -81,6 +113,12 @@ const getMediaKind = (filename: string): MediaKind => {
 };
 
 const basename = (filename: string) => filename.split('/').pop() || filename;
+
+const dirname = (filename: string) => {
+  const parts = filename.split('/').filter(Boolean);
+  if (parts.length <= 1) return 'root';
+  return parts.slice(0, -1).join('/');
+};
 
 const extensionOf = (filename: string) => {
   const name = basename(filename);
@@ -148,6 +186,28 @@ const getFileTypeTone = (filename: string) => {
     label: 'FILE',
   };
 };
+
+const mapFolderApiEntry = (folder: FolderApiEntry): FolderEntry => ({
+  path: folder.path || folder.name || '',
+  name: folder.name || basename(folder.path || ''),
+  title: folder.title || '',
+  description: folder.description || '',
+  thumbnailPath: folder.thumbnailPath ?? null,
+  thumbnailKind: folder.thumbnailKind ?? (folder.thumbnailPath ? getMediaKind(folder.thumbnailPath) : null),
+  thumbnailExt: folder.thumbnailExt || (folder.thumbnailPath ? extensionOf(folder.thumbnailPath) : ''),
+  imageThumbnailPath: folder.imageThumbnailPath ?? null,
+  imageThumbnailKind: folder.imageThumbnailKind ?? (folder.imageThumbnailPath ? getMediaKind(folder.imageThumbnailPath) : null),
+  imageThumbnailExt: folder.imageThumbnailExt || (folder.imageThumbnailPath ? extensionOf(folder.imageThumbnailPath) : ''),
+  secondaryThumbnailPath: folder.secondaryThumbnailPath ?? null,
+  secondaryThumbnailKind: folder.secondaryThumbnailKind ?? (folder.secondaryThumbnailPath ? getMediaKind(folder.secondaryThumbnailPath) : null),
+  secondaryThumbnailExt: folder.secondaryThumbnailExt || (folder.secondaryThumbnailPath ? extensionOf(folder.secondaryThumbnailPath) : ''),
+  cover1Path: folder.cover1Path ?? null,
+  cover2Path: folder.cover2Path ?? null,
+  itemCount: folder.itemCount ?? 0,
+  fileCount: folder.fileCount ?? folder.itemCount ?? 0,
+  folderCount: folder.folderCount ?? 0,
+  hasCoverOverride: folder.hasCoverOverride ?? false,
+});
 
 const APIBASE = 'https://api.jeffersonwm.com';
 const IMAGE_PATH = `${APIBASE}/images`;
@@ -402,6 +462,7 @@ const buildGalleryStateUrl = (state: GalleryLocationState) => {
 const toMediaEntry = (value: string): MediaEntry => ({
   path: value,
   name: basename(value),
+  folderPath: dirname(value),
   kind: getMediaKind(value),
   ext: extensionOf(value),
 });
@@ -433,8 +494,18 @@ export default function App() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [entries, setEntries] = useState<MediaEntry[]>([]);
   const [folders, setFolders] = useState<FolderEntry[]>([]);
+  const [siblingFolders, setSiblingFolders] = useState<FolderEntry[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
-  const [folderCoverPath, setFolderCoverPath] = useState<string | null>(null);
+  const [folderCoverPaths, setFolderCoverPaths] = useState<{ cover1Path: string | null; cover2Path: string | null }>({
+    cover1Path: null,
+    cover2Path: null,
+  });
+  const [folderTitleInput, setFolderTitleInput] = useState('');
+  const [folderDescriptionInput, setFolderDescriptionInput] = useState('');
+  const [folderQuickEditPath, setFolderQuickEditPath] = useState('');
+  const [folderQuickEditTitle, setFolderQuickEditTitle] = useState('');
+  const [folderQuickEditDescription, setFolderQuickEditDescription] = useState('');
+  const [folderQuickEditStatus, setFolderQuickEditStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [setCoverStatus, setSetCoverStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>('');
@@ -459,6 +530,11 @@ export default function App() {
   const [manageTab, setManageTab] = useState<'tags' | 'lists'>('tags');
   const [tagSearch, setTagSearch] = useState('');
   const [listSearch, setListSearch] = useState('');
+  const [activeTagIndex, setActiveTagIndex] = useState(0);
+  const [activeListIndex, setActiveListIndex] = useState(0);
+  const [activeTagInputIndex, setActiveTagInputIndex] = useState(0);
+  const [renamingTag, setRenamingTag] = useState<string | null>(null);
+  const [renamingTagValue, setRenamingTagValue] = useState('');
   const tagsRef = React.useRef<HTMLDivElement>(null);
   const listsRef = React.useRef<HTMLDivElement>(null);
   const rowHeightRef = React.useRef<HTMLDivElement>(null);
@@ -470,6 +546,7 @@ export default function App() {
   const [serverTotalPages, setServerTotalPages] = useState(1);
   const [serverTotalItems, setServerTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingOverlayVisible, setLoadingOverlayVisible] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageMeta, setImageMeta] = useState<{ type: string; size: number; width: number; height: number } | null>(null);
   const [imageMetaState, setImageMetaState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
@@ -518,25 +595,24 @@ export default function App() {
   const [showLimitMenu, setShowLimitMenu] = useState(false);
   const historyModeRef = React.useRef<'replace' | 'push'>('replace');
   const locationHydratedRef = React.useRef(false);
+  const isGlobalSearch = debouncedSearch.trim().length >= 4;
 
   const queueHistoryUpdate = (mode: 'replace' | 'push' = 'push') => {
     historyModeRef.current = mode;
   };
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (searchQuery.trim() !== '') {
-      setSelectedTag('');
-      setSelectedList('');
-      setPage(1);
+  const submitSearch = () => {
+    const nextSearch = searchQuery.trim();
+    if (nextSearch.length < 4) {
+      return;
     }
-  }, [searchQuery]);
+    queueHistoryUpdate('push');
+    setSelectedTag('');
+    setSelectedList('');
+    setCurrentPath('');
+    setPage(1);
+    setDebouncedSearch(nextSearch);
+  };
 
   useEffect(() => {
     if (selectedImages.size === 0) {
@@ -584,11 +660,20 @@ export default function App() {
     return list.filter(entry => includeOtherFiles || entry.kind === 'image');
   }, [showSelectedOnly, computedStagedEntries, entries, includeOtherFiles]);
 
-  const displayFolders = showSelectedOnly ? [] : folders;
+  const displayFolders = showSelectedOnly || Boolean(selectedTag) || isGlobalSearch ? [] : folders;
+  const siblingFolderIndex = useMemo(
+    () => siblingFolders.findIndex(folder => folder.path === currentPath),
+    [siblingFolders, currentPath],
+  );
+  const previousSiblingFolder = siblingFolderIndex > 0 ? siblingFolders[siblingFolderIndex - 1] : null;
+  const nextSiblingFolder = siblingFolderIndex >= 0 && siblingFolderIndex < siblingFolders.length - 1
+    ? siblingFolders[siblingFolderIndex + 1]
+    : null;
 
   const computedTotalPages = showSelectedOnly
     ? Math.max(1, Math.ceil(visibleEntries.length / limit || 1))
     : Math.max(1, serverTotalPages);
+  const showInitialLoading = loading && visibleEntries.length === 0 && folders.length === 0 && !accessError;
   const startIndex = showSelectedOnly ? (page - 1) * limit : 0;
   const endIndex = showSelectedOnly ? startIndex + limit : visibleEntries.length;
   const pagedEntries = showSelectedOnly ? visibleEntries.slice(startIndex, endIndex) : visibleEntries;
@@ -605,6 +690,24 @@ export default function App() {
   const sharedNonRenderable = (sharedImages || []).filter(item => !isRenderable(item));
   const sharedRenderable = (sharedImages || []).filter(item => isRenderable(item));
   const folderThumbnailHeight = Math.max(120, Math.min(220, rowHeight - 30));
+  const filteredTagOptions = useMemo(
+    () => allTags.filter(t => t.includes(tagSearch.trim().toLowerCase())),
+    [allTags, tagSearch],
+  );
+  const filteredListOptions = useMemo(
+    () => allShares.filter(s => s.title.toLowerCase().includes(listSearch.trim().toLowerCase())),
+    [allShares, listSearch],
+  );
+  const filteredEditTagOptions = useMemo(
+    () => allTags.filter(t => t.includes(tagInput.trim().toLowerCase()) && !editTags.includes(t)),
+    [allTags, tagInput, editTags],
+  );
+  const createTagCandidate = tagSearch.trim().toLowerCase();
+  const createListCandidate = listSearch.trim().toLowerCase();
+  const createEditTagCandidate = tagInput.trim().toLowerCase();
+  const canCreateTagCandidate = Boolean(createTagCandidate) && !allTags.includes(createTagCandidate);
+  const canCreateListCandidate = Boolean(createListCandidate) && !allShares.some(s => s.title.toLowerCase() === createListCandidate);
+  const canCreateEditTagCandidate = Boolean(createEditTagCandidate) && !editTags.includes(createEditTagCandidate);
 
   const sharedRenderableFiles = useMemo(() => {
     if (sharedFiles) {
@@ -624,6 +727,7 @@ export default function App() {
     queueHistoryUpdate('push');
     setCurrentPath(path);
     setSearchQuery('');
+    setDebouncedSearch('');
     setPage(1);
   };
 
@@ -636,6 +740,86 @@ export default function App() {
     if (!selectedImage) return;
     queueHistoryUpdate('push');
     setSelectedImage(null);
+  };
+
+  const saveFolderCoverSlot = async (slot: 1 | 2, imagePath: string | null) => {
+    if (!currentPath) return;
+    setSetCoverStatus('saving');
+    try {
+      const res = await fetch(`${API_PATH}/folder-cover`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderPath: currentPath, imagePath, slot }),
+      });
+      if (!res.ok) {
+        setSetCoverStatus('idle');
+        return;
+      }
+
+      const data = await fetch(`${API_PATH}/folder-cover?path=${encodeURIComponent(currentPath)}`, {
+        credentials: 'include',
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .catch(() => null);
+
+      setFolderCoverPaths({
+        cover1Path: data?.cover1ImagePath ?? null,
+        cover2Path: data?.cover2ImagePath ?? null,
+      });
+      setSetCoverStatus('saved');
+      await fetchImages(page, limit, currentPath, selectedTag, selectedList, debouncedSearch);
+      setTimeout(() => setSetCoverStatus('idle'), 2000);
+    } catch {
+      setSetCoverStatus('idle');
+    }
+  };
+
+  const saveFolderDetailsFor = async (folderPath: string, title: string, description: string) => {
+    if (!folderPath) return false;
+    try {
+      const res = await fetch(`${API_PATH}/folder-cover`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          folderPath,
+          title,
+          description,
+        }),
+      });
+      if (!res.ok) {
+        return false;
+      }
+      const data = await res.json().catch(() => null);
+      const nextTitle = data?.title ?? '';
+      const nextDescription = data?.description ?? '';
+      if (folderPath === currentPath) {
+        setFolderTitleInput(nextTitle);
+        setFolderDescriptionInput(nextDescription);
+      }
+      setFolders(prev => prev.map(folder =>
+        folder.path === folderPath
+          ? { ...folder, title: nextTitle, description: nextDescription }
+          : folder
+      ));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const saveQuickFolderDetails = async () => {
+    if (!folderQuickEditPath) return;
+    setFolderQuickEditStatus('saving');
+    const saved = await saveFolderDetailsFor(folderQuickEditPath, folderQuickEditTitle, folderQuickEditDescription);
+    setFolderQuickEditStatus(saved ? 'saved' : 'idle');
+    if (saved) {
+      setTimeout(() => {
+        setFolderQuickEditStatus('idle');
+        setFolderQuickEditPath('');
+      }, 1200);
+    }
   };
 
   const buildSelectionDraftItems = (paths: Iterable<string>) => {
@@ -937,6 +1121,7 @@ export default function App() {
       setSelectedTag(nextState.selectedTag);
       setSelectedList(nextState.selectedList);
       setSearchQuery(nextState.searchQuery);
+      setDebouncedSearch(nextState.searchQuery);
       setSelectedImage(nextState.selectedImage);
       setSelectedImages(nextSelected);
       setSelectedMetadata(nextMeta);
@@ -979,20 +1164,81 @@ export default function App() {
     if (!locationReady || isSharedView) {
       return;
     }
-    fetchImages(page, limit, currentPath, selectedTag, selectedList, debouncedSearch);
-  }, [locationReady, isSharedView, page, limit, currentPath, selectedTag, selectedList, debouncedSearch, authStatus?.user?.id, authStatus?.requireAuth]);
+    const searchPath = isGlobalSearch ? '' : currentPath;
+    const searchText = isGlobalSearch ? debouncedSearch : '';
+    fetchImages(page, limit, searchPath, selectedTag, selectedList, searchText);
+  }, [locationReady, isSharedView, page, limit, currentPath, selectedTag, selectedList, debouncedSearch, isGlobalSearch, authStatus?.user?.id, authStatus?.requireAuth]);
 
-  // Load the manual cover for the current folder whenever the path changes
+  useEffect(() => {
+    let timer: number | undefined;
+    if (loading) {
+      setLoadingOverlayVisible(true);
+    } else {
+      timer = window.setTimeout(() => setLoadingOverlayVisible(false), 100);
+    }
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [loading]);
+
+  // Load the manual cover and metadata for the current folder whenever the path changes
   useEffect(() => {
     if (!currentPath || !authStatus?.user?.isAdmin) {
-      setFolderCoverPath(null);
+      setFolderCoverPaths({ cover1Path: null, cover2Path: null });
+      setFolderTitleInput('');
+      setFolderDescriptionInput('');
       return;
     }
+
     fetch(`${API_PATH}/folder-cover?path=${encodeURIComponent(currentPath)}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
-      .then(data => setFolderCoverPath(data?.coverImagePath ?? null))
-      .catch(() => setFolderCoverPath(null));
+      .then(data => {
+        setFolderTitleInput(data?.title ?? '');
+        setFolderDescriptionInput(data?.description ?? '');
+        setFolderCoverPaths({
+          cover1Path: data?.cover1ImagePath ?? data?.coverImagePath ?? null,
+          cover2Path: data?.cover2ImagePath ?? null,
+        });
+      })
+      .catch(() => {
+        setFolderTitleInput('');
+        setFolderDescriptionInput('');
+        setFolderCoverPaths({ cover1Path: null, cover2Path: null });
+      });
   }, [currentPath, authStatus?.user?.isAdmin]);
+
+  useEffect(() => {
+    if (!currentPath) {
+      setSiblingFolders([]);
+      return;
+    }
+
+    const parentPath = dirname(currentPath);
+    const lookupPath = parentPath === 'root' ? '' : parentPath;
+
+    const controller = new AbortController();
+
+    fetch(`${API_PATH}/images?${new URLSearchParams({
+      page: '1',
+      limit: '1',
+      path: lookupPath,
+    }).toString()}`, {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        const nextFolders = Array.isArray(data?.folders)
+          ? data.folders.map((folder: FolderApiEntry) => mapFolderApiEntry(folder)).filter((folder: FolderEntry) => Boolean(folder.path))
+          : [];
+        setSiblingFolders(nextFolders);
+      })
+      .catch(() => {
+        setSiblingFolders([]);
+      });
+
+    return () => controller.abort();
+  }, [currentPath]);
 
   useEffect(() => {
     if (!locationReady || isSharedView || !locationHydratedRef.current) {
@@ -1094,9 +1340,10 @@ export default function App() {
       const nextEntries: MediaEntry[] = Array.isArray(data.files)
         ? data.files
             .filter((file: { type?: string }) => file.type === 'file')
-            .map((file: { path: string; name?: string; kind?: MediaKind; ext?: string; title?: string; description?: string; tags?: string[]; is_large?: boolean; size?: number }) => ({
+            .map((file: { path: string; name?: string; folderPath?: string; kind?: MediaKind; ext?: string; title?: string; description?: string; tags?: string[]; is_large?: boolean; size?: number }) => ({
               path: file.path,
               name: file.name || basename(file.path),
+              folderPath: file.folderPath || dirname(file.path),
               kind: file.kind || (isRenderable(file.path) ? 'image' : 'other'),
               ext: file.ext || extensionOf(file.path),
               title: file.title || '',
@@ -1108,35 +1355,23 @@ export default function App() {
         : (data.images || []).map((value: string) => toMediaEntry(value));
 
       const nextFolders: FolderEntry[] = Array.isArray(data.folders)
-        ? data.folders.map((folder: {
-            path?: string;
-            name?: string;
-            thumbnailPath?: string | null;
-            thumbnailKind?: MediaKind | null;
-            thumbnailExt?: string;
-            imageThumbnailPath?: string | null;
-            imageThumbnailKind?: MediaKind | null;
-            imageThumbnailExt?: string;
-            itemCount?: number;
-            hasCoverOverride?: boolean;
-          }) => ({
-            path: folder.path || folder.name || '',
-            name: folder.name || basename(folder.path || ''),
-            thumbnailPath: folder.thumbnailPath ?? null,
-            thumbnailKind: folder.thumbnailKind ?? (folder.thumbnailPath ? getMediaKind(folder.thumbnailPath) : null),
-            thumbnailExt: folder.thumbnailExt || (folder.thumbnailPath ? extensionOf(folder.thumbnailPath) : ''),
-            imageThumbnailPath: folder.imageThumbnailPath ?? null,
-            imageThumbnailKind: folder.imageThumbnailKind ?? (folder.imageThumbnailPath ? getMediaKind(folder.imageThumbnailPath) : null),
-            imageThumbnailExt: folder.imageThumbnailExt || (folder.imageThumbnailPath ? extensionOf(folder.imageThumbnailPath) : ''),
-            itemCount: folder.itemCount ?? 0,
-          })).filter((folder: FolderEntry) => Boolean(folder.path))
+        ? data.folders.map((folder: FolderApiEntry) => mapFolderApiEntry(folder)).filter((folder: FolderEntry) => Boolean(folder.path))
         : (data.directories || []).map((dir: string) => ({
             path: dir,
             name: basename(dir),
+            title: '',
+            description: '',
             thumbnailPath: null,
             thumbnailKind: null,
             thumbnailExt: '',
+            secondaryThumbnailPath: null,
+            secondaryThumbnailKind: null,
+            secondaryThumbnailExt: '',
+            cover1Path: null,
+            cover2Path: null,
             itemCount: 0,
+            fileCount: 0,
+            folderCount: 0,
           }));
 
       setEntries(nextEntries);
@@ -1225,6 +1460,22 @@ export default function App() {
       setEditTags(imageDetail.tags || []);
     }
   }, [imageDetailState, imageDetail]);
+
+  useEffect(() => {
+    if (showTagsPopover) {
+      setActiveTagIndex(0);
+    }
+  }, [showTagsPopover, tagSearch]);
+
+  useEffect(() => {
+    if (showListsPopover) {
+      setActiveListIndex(0);
+    }
+  }, [showListsPopover, listSearch]);
+
+  useEffect(() => {
+    setActiveTagInputIndex(0);
+  }, [tagInput, editTags]);
 
   const getTagState = (tagName: string) => {
     const selectedList = Array.from(selectedImages);
@@ -1333,6 +1584,28 @@ export default function App() {
     }
   };
 
+  const handleCommitTagPopoverChoice = async (tagName: string) => {
+    await handleToggleTagBulk(tagName);
+    setShowTagsPopover(false);
+    setTagSearch('');
+    setActiveTagIndex(0);
+  };
+
+  const handleCommitListPopoverChoice = async (shareId: string) => {
+    await handleToggleListBulk(shareId);
+    setShowListsPopover(false);
+    setListSearch('');
+    setActiveListIndex(0);
+  };
+
+  const handleCommitEditTagChoice = (tagName: string) => {
+    const cleanTag = tagName.trim().toLowerCase();
+    if (!cleanTag || editTags.includes(cleanTag)) return;
+    setEditTags([...editTags, cleanTag]);
+    setTagInput('');
+    setActiveTagInputIndex(0);
+  };
+
   const handleCreateListBulk = async (title: string) => {
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
@@ -1364,10 +1637,12 @@ export default function App() {
   };
 
   const handleRenameTag = async (oldTag: string) => {
-    const newTag = window.prompt(`Rename tag #${oldTag} to:`, oldTag);
-    if (!newTag) return;
-    const cleanNew = newTag.trim().toLowerCase();
-    if (!cleanNew || cleanNew === oldTag) return;
+    const cleanNew = renamingTagValue.trim().toLowerCase();
+    if (!cleanNew || cleanNew === oldTag) {
+      setRenamingTag(null);
+      setRenamingTagValue('');
+      return;
+    }
     
     try {
       const res = await fetch(`${API_PATH}/tags/rename`, {
@@ -1377,6 +1652,8 @@ export default function App() {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to rename tag');
+      setRenamingTag(null);
+      setRenamingTagValue('');
       fetchTags();
       fetchImages(page, limit, currentPath, selectedTag === oldTag ? cleanNew : selectedTag, selectedList);
       if (selectedTag === oldTag) setSelectedTag(cleanNew);
@@ -2044,13 +2321,14 @@ export default function App() {
 
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider">
-                <span className="text-[#888]">Filter by Tag</span>
+                <span className="text-[#888]">Global Tag</span>
                 <select
                   value={selectedTag}
                   onChange={e => {
                     setSelectedTag(e.target.value);
                     setSelectedList('');
                     setSearchQuery('');
+                    setDebouncedSearch('');
                     setPage(1);
                   }}
                   className="bg-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] focus:outline-none cursor-pointer"
@@ -2062,6 +2340,11 @@ export default function App() {
                     </option>
                   ))}
                 </select>
+                {selectedTag && (
+                  <span className="text-[10px] text-[#8A5A44]">
+                    showing matches across all folders
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider">
@@ -2072,6 +2355,7 @@ export default function App() {
                     setSelectedList(e.target.value);
                     setSelectedTag('');
                     setSearchQuery('');
+                    setDebouncedSearch('');
                     setPage(1);
                   }}
                   className="bg-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] focus:outline-none cursor-pointer"
@@ -2095,16 +2379,36 @@ export default function App() {
                     onChange={e => {
                       setSearchQuery(e.target.value);
                     }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        submitSearch();
+                      }
+                    }}
                     className="bg-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] focus:outline-none w-36 sm:w-48 font-mono placeholder:text-gray-300"
                   />
                   {searchQuery && (
                     <button
-                      onClick={() => setSearchQuery('')}
+                      onClick={() => {
+                        if (isGlobalSearch) {
+                          window.history.back();
+                          return;
+                        }
+                        setSearchQuery('');
+                        setDebouncedSearch('');
+                      }}
                       className="bg-black text-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] hover:bg-[#333] transition-colors"
                     >
-                      Clear
+                      {isGlobalSearch ? 'Back' : 'Clear'}
                     </button>
                   )}
+                  <button
+                    onClick={submitSearch}
+                    disabled={searchQuery.trim().length < 4}
+                    className="bg-white text-black border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] hover:bg-[#F3F3F3] transition-colors disabled:opacity-50"
+                  >
+                    Search
+                  </button>
                 </div>
               </div>
 
@@ -2194,6 +2498,35 @@ export default function App() {
                             value={tagSearch}
                             onChange={e => setTagSearch(e.target.value)}
                             placeholder="Filter tags..."
+                            onKeyDown={e => {
+                              if (!showTagsPopover) return;
+                              const count = filteredTagOptions.length + (canCreateTagCandidate ? 1 : 0);
+                              if (!count) return;
+
+                              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setActiveTagIndex(prev => {
+                                  const direction = e.key === 'ArrowDown' ? 1 : -1;
+                                  const next = (prev + direction + count) % count;
+                                  return next;
+                                });
+                              }
+
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (filteredTagOptions.length > 0 && activeTagIndex < filteredTagOptions.length) {
+                                  void handleCommitTagPopoverChoice(filteredTagOptions[activeTagIndex]);
+                                  return;
+                                }
+                                if (canCreateTagCandidate) {
+                                  void handleCommitTagPopoverChoice(createTagCandidate);
+                                }
+                              }
+
+                              if (e.key === 'Escape') {
+                                setShowTagsPopover(false);
+                              }
+                            }}
                             className="w-full bg-transparent text-[11px] font-mono focus:outline-none placeholder-gray-400 font-bold uppercase"
                             onClick={e => e.stopPropagation()}
                           />
@@ -2204,15 +2537,13 @@ export default function App() {
                           )}
                         </div>
                         <div className="max-h-48 overflow-y-auto divide-y divide-[#DDD] font-mono text-[10px] lowercase">
-                          {allTags
-                            .filter(t => t.includes(tagSearch.trim().toLowerCase()))
-                            .map(tagName => {
+                          {filteredTagOptions.map((tagName, index) => {
                               const { checked, indeterminate } = getTagState(tagName);
                               return (
                                 <button
                                   key={tagName}
-                                  onClick={() => handleToggleTagBulk(tagName)}
-                                  className="w-full text-left px-2.5 py-2 hover:bg-black hover:text-white transition-colors flex items-center justify-between group"
+                                  onClick={() => void handleCommitTagPopoverChoice(tagName)}
+                                  className={`w-full text-left px-2.5 py-2 transition-colors flex items-center justify-between group ${activeTagIndex === index ? 'bg-black text-white' : 'hover:bg-black hover:text-white'}`}
                                 >
                                   <span className="truncate">#{tagName}</span>
                                   <span className="shrink-0 flex items-center justify-center w-4 h-4 border border-[#DDD] group-hover:border-white">
@@ -2227,16 +2558,13 @@ export default function App() {
                             })}
                           
                           {/* Option to create new tag if query doesn't match */}
-                          {tagSearch.trim() && !allTags.includes(tagSearch.trim().toLowerCase()) && (
+                          {canCreateTagCandidate && (
                             <button
-                              onClick={() => {
-                                handleToggleTagBulk(tagSearch);
-                                setTagSearch('');
-                              }}
-                              className="w-full text-left px-2.5 py-2 hover:bg-black hover:text-white transition-colors flex items-center gap-1.5 text-black bg-[#FFFBEB] font-bold"
+                              onClick={() => void handleCommitTagPopoverChoice(createTagCandidate)}
+                              className={`w-full text-left px-2.5 py-2 transition-colors flex items-center gap-1.5 text-black bg-[#FFFBEB] font-bold ${activeTagIndex === filteredTagOptions.length ? 'bg-black text-white' : 'hover:bg-black hover:text-white'}`}
                             >
                               <Plus size={10} strokeWidth={3} />
-                              <span>Create tag "{tagSearch.trim().toLowerCase()}"</span>
+                              <span>Create tag "{createTagCandidate}"</span>
                             </button>
                           )}
                         </div>
@@ -2265,6 +2593,38 @@ export default function App() {
                             value={listSearch}
                             onChange={e => setListSearch(e.target.value)}
                             placeholder="Filter lists..."
+                            onKeyDown={e => {
+                              if (!showListsPopover) return;
+                              const count = filteredListOptions.length + (canCreateListCandidate ? 1 : 0);
+                              if (!count) return;
+
+                              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setActiveListIndex(prev => {
+                                  const direction = e.key === 'ArrowDown' ? 1 : -1;
+                                  const next = (prev + direction + count) % count;
+                                  return next;
+                                });
+                              }
+
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (filteredListOptions.length > 0 && activeListIndex < filteredListOptions.length) {
+                                  void handleCommitListPopoverChoice(filteredListOptions[activeListIndex].id);
+                                  return;
+                                }
+                                if (canCreateListCandidate) {
+                                  void handleCreateListBulk(createListCandidate);
+                                  setShowListsPopover(false);
+                                  setListSearch('');
+                                  setActiveListIndex(0);
+                                }
+                              }
+
+                              if (e.key === 'Escape') {
+                                setShowListsPopover(false);
+                              }
+                            }}
                             className="w-full bg-transparent text-[11px] font-mono focus:outline-none placeholder-gray-400 font-bold uppercase"
                             onClick={e => e.stopPropagation()}
                           />
@@ -2275,15 +2635,13 @@ export default function App() {
                           )}
                         </div>
                         <div className="max-h-48 overflow-y-auto divide-y divide-[#DDD] font-mono text-[10px] uppercase">
-                          {allShares
-                            .filter(s => s.title.toLowerCase().includes(listSearch.trim().toLowerCase()))
-                            .map(share => {
+                          {filteredListOptions.map((share, index) => {
                               const { checked, indeterminate } = getListState(share.id);
                               return (
                                 <button
                                   key={share.id}
-                                  onClick={() => handleToggleListBulk(share.id)}
-                                  className="w-full text-left px-2.5 py-2 hover:bg-black hover:text-white transition-colors flex items-center justify-between group"
+                                  onClick={() => void handleCommitListPopoverChoice(share.id)}
+                                  className={`w-full text-left px-2.5 py-2 transition-colors flex items-center justify-between group ${activeListIndex === index ? 'bg-black text-white' : 'hover:bg-black hover:text-white'}`}
                                 >
                                   <span className="truncate flex-1 mr-2">{share.title}</span>
                                   <span className="text-[9px] text-gray-400 group-hover:text-gray-300 mr-2 shrink-0">({share.itemCount} items)</span>
@@ -2299,13 +2657,13 @@ export default function App() {
                             })}
                           
                           {/* Option to create new list if query doesn't match */}
-                          {listSearch.trim() && !allShares.some(s => s.title.toLowerCase() === listSearch.trim().toLowerCase()) && (
+                          {canCreateListCandidate && (
                             <button
-                              onClick={() => handleCreateListBulk(listSearch)}
-                              className="w-full text-left px-2.5 py-2 hover:bg-black hover:text-white transition-colors flex items-center gap-1.5 text-black bg-[#FFFBEB] font-bold"
+                              onClick={() => handleCreateListBulk(createListCandidate)}
+                              className={`w-full text-left px-2.5 py-2 transition-colors flex items-center gap-1.5 text-black bg-[#FFFBEB] font-bold ${activeListIndex === filteredListOptions.length ? 'bg-black text-white' : 'hover:bg-black hover:text-white'}`}
                             >
                               <Plus size={10} strokeWidth={3} />
-                              <span>Create list "{listSearch.trim()}"</span>
+                              <span>Create list "{createListCandidate}"</span>
                             </button>
                           )}
                         </div>
@@ -2367,35 +2725,104 @@ export default function App() {
               )}
             </div>
             <div className="font-mono text-xs font-bold uppercase tracking-wider text-[#666] flex flex-wrap items-center gap-y-1">
-              <span>Location:&nbsp;</span>
-              <span className="text-black">
-                <button
-                  onClick={() => navigateToPath('')}
-                  className="hover:text-[#F27D26] transition-colors"
-                >
-                  root
-                </button>
-                {currentPath &&
-                  currentPath.split('/').map((part, index, parts) => {
-                    const path = parts.slice(0, index + 1).join('/');
-                    return (
-                      <React.Fragment key={path}>
-                        <span className="text-[#666]"> / </span>
-                        <button
-                          onClick={() => navigateToPath(path)}
-                          className="hover:text-[#F27D26] transition-colors"
-                        >
-                          {part}
-                        </button>
-                      </React.Fragment>
-                    );
-                  })}
-              </span>
-              {debouncedSearch && <span className="text-[#8A5A44] ml-2">(Searching: "{debouncedSearch}")</span>}
+              {selectedTag ? (
+                <>
+                  <span>Global Tag:&nbsp;</span>
+                  <span className="text-black">#{selectedTag}</span>
+                  <span className="ml-2 text-[#8A5A44]">across all folders</span>
+                  <button
+                    onClick={() => {
+                      setSelectedTag('');
+                      setPage(1);
+                    }}
+                    className="ml-2 text-[#888] transition-colors hover:text-black"
+                  >
+                    Clear Tag
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span>Location:&nbsp;</span>
+                  <span className="text-black">
+                    <button
+                      onClick={() => navigateToPath('')}
+                      className="hover:text-[#F27D26] transition-colors"
+                    >
+                      root
+                    </button>
+                    {currentPath &&
+                      currentPath.split('/').map((part, index, parts) => {
+                        const path = parts.slice(0, index + 1).join('/');
+                        return (
+                          <React.Fragment key={path}>
+                            <span className="text-[#666]"> / </span>
+                            <button
+                              onClick={() => navigateToPath(path)}
+                              className="hover:text-[#F27D26] transition-colors"
+                            >
+                              {part}
+                            </button>
+                          </React.Fragment>
+                        );
+                      })}
+                  </span>
+                </>
+              )}
+              {debouncedSearch && (
+                <span className="text-[#8A5A44] ml-2">
+                  {isGlobalSearch ? `(Global search: "${debouncedSearch}")` : `(Searching: "${debouncedSearch}")`}
+                </span>
+              )}
             </div>
             {(shareCodeNotice || locationNotice) && (
               <div className={`text-[10px] font-bold uppercase tracking-widest ${locationNotice ? 'text-[#8A5A44]' : 'text-[#666]'}`}>
                 {shareCodeNotice || locationNotice}
+              </div>
+            )}
+            {isGlobalSearch && (
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-[2px] border-[#666] bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-widest">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-[#888]">Search Results</span>
+                  <span className="text-black">"{debouncedSearch}"</span>
+                  <span className="text-[#8A5A44]">{serverTotalItems} items</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.history.back()}
+                  className="text-[#888] hover:text-black transition-colors underline"
+                >
+                  Back to previous page
+                </button>
+              </div>
+            )}
+            {(folderTitleInput.trim() || folderDescriptionInput.trim() || authStatus?.user?.isAdmin) && (
+              <div className="mt-2 flex flex-wrap items-start gap-x-3 gap-y-1 text-[11px] font-sans">
+                <div className="min-w-0 max-w-full flex flex-col gap-0.5">
+                  {folderTitleInput.trim() && (
+                    <div className="font-bold text-black tracking-wide">
+                      {folderTitleInput.trim()}
+                    </div>
+                  )}
+                  {folderDescriptionInput.trim() && (
+                    <div className="max-w-4xl text-[#555] leading-relaxed">
+                      {folderDescriptionInput.trim()}
+                    </div>
+                  )}
+                </div>
+                {currentPath && authStatus?.user?.isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFolderQuickEditPath(currentPath);
+                      setFolderQuickEditTitle(folderTitleInput);
+                      setFolderQuickEditDescription(folderDescriptionInput);
+                      setFolderQuickEditStatus('idle');
+                    }}
+                    className="text-[10px] font-bold uppercase tracking-widest text-[#888] hover:text-black transition-colors underline"
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -2416,15 +2843,13 @@ export default function App() {
               </label>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="flex flex-wrap gap-4 items-start">
               {displayFolders.map(folder => {
-                const previewPath = includeOtherFiles
-                  ? (folder.thumbnailPath || folder.imageThumbnailPath || null)
-                  : (folder.imageThumbnailPath || folder.thumbnailPath || null);
-                const previewKind = includeOtherFiles
-                  ? (folder.thumbnailKind || folder.imageThumbnailKind || null)
-                  : (folder.imageThumbnailKind || folder.thumbnailKind || null);
-                const folderRetryKey = `folder:${folder.path}:${previewPath ?? 'empty'}`;
+                const leftPreviewPath = folder.thumbnailPath || folder.cover1Path || null;
+                const rightPreviewPath = folder.secondaryThumbnailPath || folder.cover2Path || null;
+                const leftPreviewKind = folder.thumbnailKind || (leftPreviewPath ? getMediaKind(leftPreviewPath) : null);
+                const rightPreviewKind = folder.secondaryThumbnailKind || (rightPreviewPath ? getMediaKind(rightPreviewPath) : null);
+                const folderRetryKey = `folder:${folder.path}:${leftPreviewPath ?? 'empty'}:${rightPreviewPath ?? 'empty'}`;
                 const folderRetryToken = previewRetryTokens[folderRetryKey] || 0;
 
                 return (
@@ -2441,75 +2866,125 @@ export default function App() {
                       navigateToPath(folder.path);
                     }
                   }}
-                  className="bg-white border-[2px] border-[#666] flex flex-col overflow-hidden hover:border-black hover:shadow-[0_0_0_2px_rgba(0,0,0,1)] transition-all group text-left cursor-pointer touch-manipulation"
+                  className="relative bg-white border-[2px] border-[#666] flex flex-col overflow-hidden hover:border-black hover:shadow-[0_0_0_2px_rgba(0,0,0,1)] transition-all group text-left cursor-pointer touch-manipulation flex-1 min-w-[240px] max-w-[420px]"
+                  style={{ flexBasis: 'clamp(240px, 24vw, 380px)' }}
                 >
+                  {authStatus?.user?.isAdmin && (
+                    <button
+                      type="button"
+                      onClick={event => {
+                        event.stopPropagation();
+                        setFolderQuickEditPath(folder.path);
+                        setFolderQuickEditTitle(folder.title || '');
+                        setFolderQuickEditDescription(folder.description || '');
+                        setFolderQuickEditStatus('idle');
+                      }}
+                      className="absolute right-2 top-2 z-10 rounded-full border-[1px] border-black bg-white/95 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-black opacity-0 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-opacity group-hover:opacity-100 hover:bg-black hover:text-white"
+                    >
+                      <span className="flex items-center gap-1">
+                        <PencilLine size={10} strokeWidth={2.2} />
+                        Edit
+                      </span>
+                    </button>
+                  )}
                   {showFolderThumbnails ? (
                     <div
                       data-image-container
-                      className="w-full border-b-[2px] border-[#666] bg-[#e0e0e0] flex items-center justify-center overflow-hidden"
+                      className="w-full border-b-[2px] border-[#666] bg-[#e0e0e0] overflow-hidden"
                       style={{ height: `${Math.max(120, Math.min(220, rowHeight - 30))}px` }}
                     >
-                      {previewPath && previewKind === 'image' ? (
-                        <>
-                          <img
-                            src={buildThumbUrl(previewPath, folderThumbnailHeight, folderThumbnailHeight * 2, folderRetryToken)}
-                            alt={folder.name}
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                            className="h-full w-full object-contain"
-                            onLoad={handleImageLoad}
-                            onError={(event) => handleThumbImageError(event, buildImageUrl(previewPath, folderRetryToken))}
-                          />
-                          <div
-                            data-image-fallback
-                            className="hidden h-full w-full flex-col items-center justify-center gap-2 bg-[#F3F3F3] px-4 text-center text-[#666]"
-                          >
-                            <FolderOpen size={28} className="text-black" />
-                            <span className="text-[10px] font-bold uppercase tracking-widest">Preview Unavailable</span>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                resetImageFallback(event.currentTarget.closest('[data-image-container]'));
-                                setPreviewRetryTokens(prev => ({ ...prev, [folderRetryKey]: (prev[folderRetryKey] || 0) + 1 }));
-                              }}
-                              className="border-[2px] border-black bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors"
+                      <div className="grid h-full grid-cols-2">
+                        {[
+                          { path: leftPreviewPath, kind: leftPreviewKind, slot: 'left' as const },
+                          { path: rightPreviewPath, kind: rightPreviewKind, slot: 'right' as const },
+                        ].map(({ path: previewPath, kind: previewKind, slot }, index) => {
+                          const slotKey = `${folderRetryKey}:${slot}`;
+                          const slotRetryToken = previewRetryTokens[slotKey] || 0;
+                          const isLast = index === 0;
+
+                          return (
+                            <div
+                              key={slot}
+                              className={`${isLast ? 'border-r-[2px]' : ''} border-[#666] h-full overflow-hidden`}
                             >
-                              Retry
-                            </button>
-                          </div>
-                        </>
-                      ) : previewPath ? (
-                        <div className={`flex flex-col items-center justify-center gap-2 w-full h-full px-4 ${getFileTypeTone(previewPath).accent}`}>
-                          <div className={`w-14 h-14 rounded-full border-[2px] flex items-center justify-center ${getFileTypeTone(previewPath).border} ${getFileTypeTone(previewPath).bg}`}>
-                            <FileImage size={24} strokeWidth={1.5} />
-                          </div>
-                          <div className="flex flex-col items-center gap-1 text-center">
-                            <span className="text-[11px] font-bold uppercase tracking-[0.25em]">
-                              {getFileTypeCode(previewPath)}
-                            </span>
-                            <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">
-                              {includeOtherFiles ? 'First File' : 'First Image'}
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center gap-2 text-[#666]">
-                          <FolderOpen size={28} className="text-black" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest">Empty Folder</span>
-                        </div>
-                      )}
+                              {previewPath && previewKind === 'image' ? (
+                                <>
+                                  <img
+                                    src={buildThumbUrl(previewPath, folderThumbnailHeight, folderThumbnailHeight * 2, slotRetryToken)}
+                                    alt={`${folder.name} ${slot}`}
+                                    loading="lazy"
+                                    referrerPolicy="no-referrer"
+                                    className="h-full w-full object-cover"
+                                    onLoad={handleImageLoad}
+                                    onError={(event) => handleThumbImageError(event, buildImageUrl(previewPath, slotRetryToken))}
+                                  />
+                                  <div
+                                    data-image-fallback
+                                    className="hidden h-full w-full flex-col items-center justify-center gap-2 bg-[#F3F3F3] px-4 text-center text-[#666]"
+                                  >
+                                    <FolderOpen size={28} className="text-black" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">Preview Unavailable</span>
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        resetImageFallback(event.currentTarget.closest('[data-image-container]'));
+                                        setPreviewRetryTokens(prev => ({ ...prev, [slotKey]: (prev[slotKey] || 0) + 1 }));
+                                      }}
+                                      className="border-[2px] border-black bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors"
+                                    >
+                                      Retry
+                                    </button>
+                                  </div>
+                                </>
+                              ) : previewPath ? (
+                                <div className={`flex flex-col items-center justify-center gap-2 w-full h-full px-3 ${getFileTypeTone(previewPath).accent}`}>
+                                  <div className={`w-12 h-12 rounded-full border-[2px] flex items-center justify-center ${getFileTypeTone(previewPath).border} ${getFileTypeTone(previewPath).bg}`}>
+                                    <FileImage size={20} strokeWidth={1.5} />
+                                  </div>
+                                  <div className="flex flex-col items-center gap-1 text-center">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.25em]">
+                                      {getFileTypeCode(previewPath)}
+                                    </span>
+                                    <span className="text-[9px] font-bold uppercase tracking-widest opacity-80">
+                                      {includeOtherFiles ? 'File' : 'Image'}
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex h-full flex-col items-center justify-center gap-2 text-[#666] bg-[#F3F3F3]">
+                                  <FolderOpen size={24} className="text-black" />
+                                  <span className="text-[9px] font-bold uppercase tracking-widest">Empty</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : null}
                   <div className={`p-4 flex items-center gap-3 ${showFolderThumbnails ? '' : 'min-h-[84px]'}`}>
                     {!showFolderThumbnails && <FolderOpen size={20} className="text-black shrink-0" />}
                     <div className="min-w-0 flex-1">
-                      <span className="font-sans text-xs font-bold uppercase truncate block">{folder.name}</span>
-                      {folder.itemCount > 0 && (
-                        <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-[#888] block mt-1">
-                          {folder.itemCount} {folder.itemCount === 1 ? 'Item' : 'Items'}
+                      <span className="font-sans text-sm font-bold uppercase truncate block">{folder.name}</span>
+                      {folder.title ? (
+                        <span className="mt-0.5 block font-sans text-[13px] font-bold normal-case tracking-wide text-black truncate">
+                          {folder.title}
                         </span>
-                      )}
+                      ) : null}
+                      {folder.description ? (
+                        <p className="mt-1 text-[13px] leading-snug text-[#666] truncate" title={folder.description}>
+                          {folder.description}
+                        </p>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="border border-[#BBB] bg-[#F7F7F7] px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-[#666]">
+                          {folder.folderCount} {folder.folderCount === 1 ? 'Folder' : 'Folders'}
+                        </span>
+                        <span className="border border-[#BBB] bg-[#F7F7F7] px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-[#666]">
+                          {folder.fileCount} {folder.fileCount === 1 ? 'File' : 'Files'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2519,11 +2994,7 @@ export default function App() {
         )}
 
         <h2 className="text-xs font-bold uppercase tracking-widest text-[#666] mb-4">{includeOtherFiles ? 'Files' : 'Images'}</h2>
-        {loading ? (
-          <div className="flex items-center justify-center h-[40vh]">
-            <div className="font-sans font-bold text-xl uppercase tracking-widest animate-pulse">Loading...</div>
-          </div>
-        ) : accessError ? (
+        {accessError ? (
           <div className="flex flex-col items-center justify-center h-[40vh] text-center max-w-md mx-auto gap-5">
             <div className="bg-white border-[2px] border-[#666] px-6 py-5 flex flex-col gap-3">
               <h2 className="font-archivo text-2xl uppercase">Private Archive</h2>
@@ -2555,6 +3026,10 @@ export default function App() {
                 )}
               </div>
             </div>
+          </div>
+        ) : showInitialLoading ? (
+          <div className="flex items-center justify-center h-[40vh]">
+            <div className="font-sans font-bold text-xl uppercase tracking-widest animate-pulse">Loading...</div>
           </div>
         ) : visibleEntries.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[40vh] text-center max-w-md mx-auto">
@@ -2636,7 +3111,7 @@ export default function App() {
                           Lrg
                         </div>
                       )}
-                      {folderCoverPath && folderCoverPath === entry.path && (
+                      {(folderCoverPaths.cover1Path === entry.path || folderCoverPaths.cover2Path === entry.path) && (
                         <div
                           className="absolute bottom-2 right-2 z-20 bg-black text-white border-[2px] border-black px-1.5 py-0.5 flex items-center gap-1 text-[9px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] pointer-events-none"
                           title="This image is the folder cover"
@@ -2669,6 +3144,31 @@ export default function App() {
                   >
                     {entry.name}
                   </p>
+                  {isGlobalSearch && entry.folderPath ? (
+                    <button
+                      type="button"
+                      onClick={event => {
+                        event.stopPropagation();
+                        navigateToPath(entry.folderPath === 'root' ? '' : entry.folderPath);
+                      }}
+                      className="mt-1 block max-w-full truncate text-left font-mono text-[10px] font-bold uppercase tracking-wider text-[#8A5A44] transition-colors hover:text-black hover:underline"
+                      title={`Open folder: ${entry.folderPath}`}
+                    >
+                      {entry.folderPath}
+                    </button>
+                  ) : selectedTag && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTag('');
+                        navigateToPath(dirname(entry.path) === 'root' ? '' : dirname(entry.path));
+                      }}
+                      className="mt-1 block max-w-full truncate text-left font-mono text-[10px] font-bold uppercase tracking-wider text-[#8A5A44] transition-colors hover:text-black hover:underline"
+                      title={`Open folder: ${dirname(entry.path)}`}
+                    >
+                      {dirname(entry.path)}
+                    </button>
+                  )}
                   {entry.isMissing && (
                     <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#8A5A44]">
                       Missing from library
@@ -2680,7 +3180,82 @@ export default function App() {
             ))}
           </div>
         )}
+
+        {loadingOverlayVisible && !accessError && (
+          <div
+            className={`fixed inset-0 z-[24] pointer-events-none flex items-center justify-center transition-opacity duration-100 ${loading ? 'opacity-100' : 'opacity-0'}`}
+          >
+            <div className="rounded-full border-[2px] border-black bg-white/70 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.35em] text-black backdrop-blur-sm">
+              LOADING
+            </div>
+          </div>
+        )}
       </main>
+
+      {folderQuickEditPath && (
+        <div
+          className="fixed inset-0 z-[68] bg-[#F0F0F0]/94 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setFolderQuickEditPath('')}
+        >
+          <div
+            className="w-full max-w-[640px] border-[2px] border-[#666] bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b-[2px] border-[#666] px-4 py-3">
+              <div className="min-w-0">
+                <h2 className="font-archivo text-sm uppercase tracking-widest">Edit Folder</h2>
+                <p className="mt-0.5 text-[10px] font-mono text-[#888] truncate">{folderQuickEditPath}</p>
+              </div>
+              <button
+                onClick={() => setFolderQuickEditPath('')}
+                className="text-[#888] hover:text-black transition-colors"
+              >
+                <X size={18} strokeWidth={2.25} />
+              </button>
+            </div>
+
+            <div className="p-4 flex flex-col gap-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Title</span>
+                <input
+                  type="text"
+                  value={folderQuickEditTitle}
+                  onChange={e => setFolderQuickEditTitle(e.target.value)}
+                  placeholder="Folder title"
+                  className="border-[1px] border-[#DDD] bg-[#FAFAFA] px-3 py-2 text-sm outline-none focus:border-black"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Description</span>
+                <textarea
+                  value={folderQuickEditDescription}
+                  onChange={e => setFolderQuickEditDescription(e.target.value)}
+                  placeholder="Folder description"
+                  rows={4}
+                  className="border-[1px] border-[#DDD] bg-[#FAFAFA] px-3 py-2 text-sm outline-none focus:border-black resize-y"
+                />
+              </label>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={saveQuickFolderDetails}
+                  disabled={folderQuickEditStatus === 'saving'}
+                  className="bg-black text-white px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors border-[2px] border-black disabled:bg-[#888] disabled:cursor-not-allowed"
+                >
+                  {folderQuickEditStatus === 'saving' ? 'Saving...' : folderQuickEditStatus === 'saved' ? 'Saved' : 'Save Folder'}
+                </button>
+                <button
+                  onClick={() => setFolderQuickEditPath('')}
+                  className="text-[10px] font-bold uppercase tracking-widest text-[#888] hover:text-black transition-colors underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!showPrivateGate && (
         <footer className="h-[36px] bg-white border-t-[3px] border-black fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between px-4">
@@ -2688,50 +3263,74 @@ export default function App() {
             PAGE {page} OF {computedTotalPages} / {selectedImages.size > 0 ? <span className="text-black bg-[#e0e0e0] px-1.5 py-0.5 mr-1">{selectedImages.size} SELECTED /</span> : null} {pagedEntries.length} SHOWN / {totalVisibleItems} TOTAL
           </div>
 
-          {computedTotalPages > 1 && (
-            <div className="flex items-center gap-4 font-sans text-xs font-bold uppercase tracking-wider">
+          <div className="flex items-center gap-4 font-sans text-xs font-bold uppercase tracking-wider">
+            {previousSiblingFolder && (
               <button
-                onClick={() => {
-                  queueHistoryUpdate('push');
-                  setPage(1);
-                }}
-                disabled={page === 1}
-                className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                type="button"
+                onClick={() => navigateToPath(previousSiblingFolder.path)}
+                className="max-w-[18rem] truncate text-left text-[#666] hover:text-black hover:underline transition-colors"
+                title={previousSiblingFolder.title || previousSiblingFolder.name}
               >
-                First
+                ← {previousSiblingFolder.title || previousSiblingFolder.name}
               </button>
+            )}
+
+            {computedTotalPages > 1 && (
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => {
+                    queueHistoryUpdate('push');
+                    setPage(1);
+                  }}
+                  disabled={page === 1}
+                  className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                >
+                  First
+                </button>
+                <button
+                  onClick={() => {
+                    queueHistoryUpdate('push');
+                    setPage(p => Math.max(1, p - 1));
+                  }}
+                  disabled={page === 1}
+                  className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                >
+                  Prev
+                </button>
+                <button
+                  onClick={() => {
+                    queueHistoryUpdate('push');
+                    setPage(p => Math.min(computedTotalPages, p + 1));
+                  }}
+                  disabled={page === computedTotalPages}
+                  className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                >
+                  Next
+                </button>
+                <button
+                  onClick={() => {
+                    queueHistoryUpdate('push');
+                    setPage(computedTotalPages);
+                  }}
+                  disabled={page === computedTotalPages}
+                  className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                >
+                  Last
+                </button>
+              </div>
+            )}
+
+            {nextSiblingFolder && (
               <button
-                onClick={() => {
-                  queueHistoryUpdate('push');
-                  setPage(p => Math.max(1, p - 1));
-                }}
-                disabled={page === 1}
-                className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                type="button"
+                onClick={() => navigateToPath(nextSiblingFolder.path)}
+                className="max-w-[18rem] truncate text-right text-[#666] hover:text-black hover:underline transition-colors"
+                title={nextSiblingFolder.title || nextSiblingFolder.name}
               >
-                Prev
+                {nextSiblingFolder.title || nextSiblingFolder.name} →
               </button>
-              <button
-                onClick={() => {
-                  queueHistoryUpdate('push');
-                  setPage(p => Math.min(computedTotalPages, p + 1));
-                }}
-                disabled={page === computedTotalPages}
-                className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
-              >
-                Next
-              </button>
-              <button
-                onClick={() => {
-                  queueHistoryUpdate('push');
-                  setPage(computedTotalPages);
-                }}
-                disabled={page === computedTotalPages}
-                className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
-              >
-                Last
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </footer>
       )}
         </>
@@ -2865,6 +3464,61 @@ export default function App() {
                     <Copy size={13} className="text-black" strokeWidth={2.5} />
                   )}
                 </button>
+              </div>
+            )}
+
+            {selectedImage && isRenderable(selectedImage) && currentPath && authStatus?.user?.isAdmin && (
+              <div className="w-full max-w-2xl border-[2px] border-black bg-[#F9F9F9] p-3 flex flex-col gap-3 font-sans text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Folder Covers</span>
+                    <span className="text-[10px] text-[#aaa] uppercase tracking-wider truncate">
+                      {selectedImage ? `Using ${basename(selectedImage)}` : 'No image selected'}
+                    </span>
+                  </div>
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-[#666]">
+                    {setCoverStatus === 'saving' ? 'Saving...' : setCoverStatus === 'saved' ? 'Saved' : 'Ready'}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[
+                    { slot: 1 as const, label: 'Cover 1', current: folderCoverPaths.cover1Path },
+                    { slot: 2 as const, label: 'Cover 2', current: folderCoverPaths.cover2Path },
+                  ].map(({ slot, label, current }) => {
+                    const isCurrent = current === selectedImage;
+                    return (
+                      <div key={slot} className="border-[1px] border-[#DDD] bg-white p-3 flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#888]">{label}</span>
+                          <span className="text-[9px] uppercase tracking-widest text-[#aaa] truncate">
+                            {current ? basename(current) : 'Not set'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => saveFolderCoverSlot(slot, selectedImage)}
+                            disabled={setCoverStatus === 'saving' || isCurrent}
+                            className="bg-black text-white px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors border-[2px] border-black disabled:bg-[#888] disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap"
+                          >
+                            <BookImage size={9} strokeWidth={2.5} />
+                            Set as {label}
+                          </button>
+                          <button
+                            onClick={() => saveFolderCoverSlot(slot, null)}
+                            disabled={setCoverStatus === 'saving' || !current}
+                            className="text-[9px] font-bold uppercase tracking-widest text-[#888] hover:text-black transition-colors underline disabled:text-[#bbb] disabled:hover:text-[#bbb]"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        <div className="text-[9px] font-bold uppercase tracking-widest text-[#666]">
+                          {isCurrent ? 'This image is assigned here' : current ? 'Different image assigned' : 'No image assigned'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -3009,12 +3663,24 @@ export default function App() {
                         value={tagInput}
                         onChange={e => setTagInput(e.target.value)}
                         onKeyDown={e => {
+                          const suggestionCount = filteredEditTagOptions.length + (canCreateEditTagCandidate ? 1 : 0);
+                          if (suggestionCount && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                            e.preventDefault();
+                            setActiveTagInputIndex(prev => {
+                              const direction = e.key === 'ArrowDown' ? 1 : -1;
+                              return (prev + direction + suggestionCount) % suggestionCount;
+                            });
+                            return;
+                          }
+
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            const tag = tagInput.trim().toLowerCase();
-                            if (tag && !editTags.includes(tag)) {
-                              setEditTags([...editTags, tag]);
-                              setTagInput('');
+                            if (filteredEditTagOptions.length > 0 && activeTagInputIndex < filteredEditTagOptions.length) {
+                              handleCommitEditTagChoice(filteredEditTagOptions[activeTagInputIndex]);
+                              return;
+                            }
+                            if (canCreateEditTagCandidate) {
+                              handleCommitEditTagChoice(createEditTagCandidate);
                             }
                           }
                         }}
@@ -3034,102 +3700,30 @@ export default function App() {
                       </button>
 
                       {/* Autocomplete suggestions dropdown */}
-                      {tagInput.trim() && allTags.filter(t => t.includes(tagInput.trim().toLowerCase()) && !editTags.includes(t)).length > 0 && (
+                      {tagInput.trim() && (filteredEditTagOptions.length > 0 || canCreateEditTagCandidate) && (
                         <div className="absolute bottom-full left-0 right-0 z-30 bg-white border-2 border-black max-h-[100px] overflow-y-auto shadow-[3px_-3px_0px_0px_rgba(0,0,0,1)] mb-1 divide-y divide-gray-200">
-                          {allTags
-                            .filter(t => t.includes(tagInput.trim().toLowerCase()) && !editTags.includes(t))
-                            .slice(0, 5)
-                            .map(suggestion => (
-                              <button
-                                key={suggestion}
-                                onClick={() => {
-                                  setEditTags([...editTags, suggestion]);
-                                  setTagInput('');
-                                }}
-                                className="w-full text-left px-2 py-1 text-[10px] font-mono lowercase hover:bg-[#F3F3F3] text-black block"
-                              >
+                          {filteredEditTagOptions.slice(0, 5).map((suggestion, index) => (
+                                <button
+                                  key={suggestion}
+                                  onClick={() => handleCommitEditTagChoice(suggestion)}
+                                  className={`w-full text-left px-2 py-1 text-[10px] font-mono lowercase block transition-colors ${activeTagInputIndex === index ? 'bg-black text-white' : 'hover:bg-[#F3F3F3] text-black'}`}
+                                >
                                 #{suggestion}
                               </button>
-                            ))
-                          }
+                            ))}
+                          {canCreateEditTagCandidate && (
+                            <button
+                              onClick={() => handleCommitEditTagChoice(createEditTagCandidate)}
+                              className={`w-full text-left px-2 py-1 text-[10px] font-mono lowercase block transition-colors ${activeTagInputIndex === filteredEditTagOptions.length ? 'bg-black text-white' : 'hover:bg-[#F3F3F3] text-black'}`}
+                            >
+                              Create "{createEditTagCandidate}"
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
-
-                {/* Folder Cover — admin only, when inside a folder */}
-                {currentPath && authStatus?.user?.isAdmin && selectedImage && isRenderable(selectedImage) && (
-                  <div className="flex items-center justify-between border-t border-[#DDD] pt-3 mt-1 gap-3">
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Folder Cover</span>
-                      {folderCoverPath === selectedImage ? (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-black flex items-center gap-1">
-                          <BookImage size={10} strokeWidth={2.5} /> This is the folder cover
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-[#aaa] uppercase tracking-wider truncate">
-                          {folderCoverPath ? 'Different cover is set' : 'No cover set'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <button
-                        onClick={async () => {
-                          setSetCoverStatus('saving');
-                          try {
-                            const res = await fetch(`${API_PATH}/folder-cover`, {
-                              method: 'POST',
-                              credentials: 'include',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ folderPath: currentPath, imagePath: selectedImage }),
-                            });
-                            if (res.ok) {
-                              setFolderCoverPath(selectedImage);
-                              setSetCoverStatus('saved');
-                              setFolders(prev => prev.map(f =>
-                                f.path === currentPath
-                                  ? { ...f, imageThumbnailPath: selectedImage, imageThumbnailKind: 'image' as const, hasCoverOverride: true }
-                                  : f
-                              ));
-                              setTimeout(() => setSetCoverStatus('idle'), 2000);
-                            } else { setSetCoverStatus('idle'); }
-                          } catch { setSetCoverStatus('idle'); }
-                        }}
-                        disabled={setCoverStatus === 'saving' || folderCoverPath === selectedImage}
-                        className="bg-black text-white px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors border-[2px] border-black disabled:bg-[#888] disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap"
-                      >
-                        <BookImage size={9} strokeWidth={2.5} />
-                        {setCoverStatus === 'saving' ? 'Setting...' : setCoverStatus === 'saved' ? 'Set!' : 'Set as Cover'}
-                      </button>
-                      {folderCoverPath === selectedImage && (
-                        <button
-                          onClick={async () => {
-                            setSetCoverStatus('saving');
-                            try {
-                              const res = await fetch(`${API_PATH}/folder-cover`, {
-                                method: 'POST',
-                                credentials: 'include',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ folderPath: currentPath, imagePath: null }),
-                              });
-                              if (res.ok) {
-                                setFolderCoverPath(null);
-                                setSetCoverStatus('idle');
-                                setFolders(prev => prev.map(f =>
-                                  f.path === currentPath ? { ...f, hasCoverOverride: false } : f
-                                ));
-                              } else { setSetCoverStatus('idle'); }
-                            } catch { setSetCoverStatus('idle'); }
-                          }}
-                          className="text-[9px] font-bold uppercase tracking-widest text-[#888] hover:text-black transition-colors underline"
-                        >
-                          Clear cover
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 <button
                   onClick={handleSaveDetails}
@@ -3191,21 +3785,71 @@ export default function App() {
                         <div className="py-6 text-center text-[11px] font-bold uppercase tracking-widest text-[#888]">No tags found.</div>
                       ) : (
                         allTags.map(tag => (
-                          <div key={tag} className="flex items-center justify-between py-2 text-[11px] font-mono lowercase">
-                            <span className="font-bold text-black">#{tag} <span className="text-[9px] text-[#888] uppercase">({tagCounts[tag] || 0} items)</span></span>
-                            <div className="flex items-center gap-3 uppercase font-sans text-[10px] font-bold">
-                              <button
-                                onClick={() => handleRenameTag(tag)}
-                                className="text-gray-500 hover:text-black transition-colors"
-                              >
-                                Rename
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTag(tag)}
-                                className="text-gray-500 hover:text-red-600 transition-colors"
-                              >
-                                Delete
-                              </button>
+                          <div key={tag} className="flex items-center justify-between gap-3 py-2 text-[11px] font-mono lowercase">
+                            {renamingTag === tag ? (
+                              <div className="flex min-w-0 flex-1 items-center gap-2">
+                                <span className="font-bold text-black">#</span>
+                                <input
+                                  type="text"
+                                  value={renamingTagValue}
+                                  onChange={event => setRenamingTagValue(event.target.value.toLowerCase())}
+                                  onKeyDown={event => {
+                                    if (event.key === 'Enter') {
+                                      event.preventDefault();
+                                      handleRenameTag(tag);
+                                    }
+                                    if (event.key === 'Escape') {
+                                      setRenamingTag(null);
+                                      setRenamingTagValue('');
+                                    }
+                                  }}
+                                  className="min-w-0 flex-1 border-[2px] border-black bg-white px-2 py-1 text-[11px] font-bold lowercase focus:outline-none"
+                                  autoFocus
+                                />
+                              </div>
+                            ) : (
+                              <span className="min-w-0 flex-1 truncate font-bold text-black">
+                                #{tag} <span className="text-[9px] uppercase text-[#888]">({tagCounts[tag] || 0} items)</span>
+                              </span>
+                            )}
+                            <div className="flex shrink-0 items-center gap-3 font-sans text-[10px] font-bold uppercase">
+                              {renamingTag === tag ? (
+                                <>
+                                  <button
+                                    onClick={() => handleRenameTag(tag)}
+                                    className="text-gray-500 transition-colors hover:text-black"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setRenamingTag(null);
+                                      setRenamingTagValue('');
+                                    }}
+                                    className="text-gray-500 transition-colors hover:text-black"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setRenamingTag(tag);
+                                      setRenamingTagValue(tag);
+                                    }}
+                                    className="text-gray-500 transition-colors hover:text-black"
+                                  >
+                                    Rename
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteTag(tag)}
+                                    className="text-gray-500 transition-colors hover:text-red-600"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         ))
@@ -3749,3 +4393,4 @@ export default function App() {
     </div>
   );
 }
+

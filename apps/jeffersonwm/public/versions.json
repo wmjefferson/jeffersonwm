@@ -1,0 +1,85 @@
+{
+  "updatedAt": "2026-08-05T04:04:43.440Z",
+  "apps": {
+    "jeffersonwm": {
+      "label": "JeffersonWM",
+      "version": "0.0.4",
+      "updatedAt": "2026-07-30 21:15 PDT"
+    },
+    "feed": {
+      "label": "Feed",
+      "version": "0.2.4",
+      "updatedAt": "reconciled registry"
+    },
+    "vermilion": {
+      "label": "Vermilion",
+      "version": "1.3.0",
+      "updatedAt": "reconciled registry"
+    },
+    "tourbillion": {
+      "label": "Tourbillion",
+      "version": "0.1.1",
+      "updatedAt": "reconciled registry"
+    },
+    "millionfold": {
+      "label": "Millionfold",
+      "version": "0.1.5",
+      "updatedAt": "reconciled registry"
+    },
+    "battalion": {
+      "label": "Battalion",
+      "version": "1.2.35",
+      "updatedAt": "reconciled registry"
+    },
+    "lionship": {
+      "label": "Lionship",
+      "version": "1.1.1",
+      "updatedAt": "reconciled registry"
+    },
+    "perihelion": {
+      "label": "Perihelion",
+      "version": "1.4.10",
+      "updatedAt": "2026-08-04 21:04 PDT"
+    },
+    "bullion": {
+      "label": "Bullion",
+      "version": "0.1.0",
+      "updatedAt": "reconciled registry"
+    },
+    "clionidae": {
+      "label": "Clionidae",
+      "version": "0.1.5",
+      "updatedAt": "reconciled registry"
+    },
+    "auth": {
+      "label": "Auth / Multimillion",
+      "version": "0.1.0",
+      "updatedAt": "reconciled registry"
+    },
+    "multimillion": {
+      "label": "Auth / Multimillion",
+      "version": "0.1.0",
+      "updatedAt": "reconciled registry"
+    },
+    "stallioneer": {
+      "label": "Stallioneer",
+      "version": "0.1.4",
+      "updatedAt": "reconciled registry"
+    },
+    "dookydetective": {
+      "label": "Dooky Detective",
+      "version": "0.0.6",
+      "updatedAt": "reconciled registry"
+    },
+    "jeffershizzle": {
+      "label": "Jeffershizzle",
+      "version": "0.1.0",
+      "updatedAt": "reconciled registry"
+    },
+    "wmjefferson": {
+      "label": "WM Jefferson",
+      "version": "0.0.0",
+      "updatedAt": "reconciled registry"
+    }
+  }
+}

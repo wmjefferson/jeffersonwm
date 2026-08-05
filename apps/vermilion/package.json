@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "api:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File ./start-api-dev.ps1",
+    "api:live": "powershell -NoProfile -ExecutionPolicy Bypass -File ./start-api-live.ps1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit"

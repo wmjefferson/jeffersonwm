@@ -874,40 +874,30 @@
             href="/feed/"
             target="_blank"
             rel="noopener noreferrer"
+            data-version-key="feed"
+            data-version-label="Feed"
           >
-            Feed. v.0.2.3
-          </a>
-          <a
-            class="app-link"
-            href="/vermilion/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Vermilion. v.1.3.0
+            Feed
           </a>
           <a
             class="app-link"
             href="/tourbillion/"
             target="_blank"
             rel="noopener noreferrer"
+            data-version-key="tourbillion"
+            data-version-label="Tourbillion"
           >
-            Tourbillion. v.0.1.1
-          </a>
-          <a
-            class="app-link"
-            href="/millionfold/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Millionfold. v.0.1.5
+            Tourbillion
           </a>
           <a
             class="app-link"
             href="/battalion/"
             target="_blank"
             rel="noopener noreferrer"
+            data-version-key="battalion"
+            data-version-label="Battalion"
           >
-            Battalion. v.1.2.35
+            Battalion
           </a>
 
           <a
@@ -915,48 +905,46 @@
             href="/lionship/"
             target="_blank"
             rel="noopener noreferrer"
+            data-version-key="lionship"
+            data-version-label="Lionship"
           >
-            Lionship. v.0.1.0
+            Lionship
           </a>
           <a
             class="app-link"
             href="/perihelion/"
             target="_blank"
             rel="noopener noreferrer"
+            data-version-key="perihelion"
+            data-version-label="Perihelion"
           >
-            Perihelion. v.1.4.4
-          </a>
-          <a
-            class="app-link"
-            href="https://github.com/wmjefferson/jeffersonwm/issues/50"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Stallioneer. v.0.1.4
+            Perihelion
           </a>
           <a
             class="app-link"
             href="https://dookydetective.com"
             target="_blank"
             rel="noopener noreferrer"
+            data-version-key="dookydetective"
+            data-version-label="Dooky Detective"
           >
-            Dooky Detective. v.0.1.0
+            Dooky Detective
           </a>
           <a
             class="app-link"
             href="https://jeffershizzle.com"
             target="_blank"
             rel="noopener noreferrer"
+            data-version-key="jeffershizzle"
+            data-version-label="Jeffershizzle"
           >
-            Jeffershizzle. v.0.1.0
+            Jeffershizzle
           </a>
         </nav>
       </main>
 
       <div class="bottom-links" aria-label="Site links">
         <a class="personal-link" href="/status/">Status</a>
-        <a class="personal-link" href="/development/">Development</a>
-        <button class="about-trigger" id="about-trigger" type="button">About</button>
         <a
           class="personal-link"
           href="https://wmjefferson.com"
@@ -1032,136 +1020,49 @@
         </section>
       </aside>
 
-      <section class="about-popup" id="about-popup" aria-label="About JeffersonWM" hidden>
-        <div class="about-shell">
-          <div class="about-header">
-            <h2 class="about-title">About</h2>
-            <button class="about-close" id="about-close" type="button">Close</button>
-          </div>
-          <p class="about-intro">
-            JeffersonWM is a living map of experiments, utilities, archives, personal sites, and development systems.
-            <button class="map-trigger" id="map-trigger" type="button">Map</button>
-          </p>
-          <dl class="about-list">
-            <dt>auth/multimillion</dt>
-            <dd>auth</dd>
-            <dt>battalion</dt>
-            <dd>RPG GAME TWO Ts ONE L</dd>
-            <dt>bullion</dt>
-            <dd>batch rename</dd>
-            <dt>clionidae</dt>
-            <dd>template</dd>
-            <dt>dookydetective</dt>
-            <dd>my dog</dd>
-            <dt>endellionite</dt>
-            <dd>windows 95 scanner (DEVELOPMENT, REDEVELOPMENT WIN 98)</dd>
-            <dt>feed</dt>
-            <dd>rss of development and github project</dd>
-            <dt>jeffershizzle</dt>
-            <dd>original photo website (ARCHIVE)</dd>
-            <dt>jeffersonwm</dt>
-            <dd>experiments</dd>
-            <dt>jeffersonwm-legacy</dt>
-            <dd>first version (ARCHIVE)</dd>
-            <dt>lionship</dt>
-            <dd>linkstream</dd>
-            <dt>medallion</dt>
-            <dd>chefferson (EARLY DEVELOPMENT)</dd>
-            <dt>millionfold</dt>
-            <dd>keep notes trim/expand</dd>
-            <dt>perihelion</dt>
-            <dd>image browser</dd>
-            <dt>rebellion</dt>
-            <dd>Text/image writing tool (DEVELOPMENT)</dd>
-            <dt>stallioneer</dt>
-            <dd>book scanner (IN PROGRESS)</dd>
-            <dt>tourbillion</dt>
-            <dd>screensaver</dd>
-            <dt>trillions</dt>
-            <dd>KEEP tool (CANCELLED)</dd>
-            <dt>vermillion</dt>
-            <dd>image python script</dd>
-            <dt>wmjefferson</dt>
-            <dd>professional</dd>
-          </dl>
-        </div>
-      </section>
-
-      <section class="map-popup" id="map-popup" aria-label="JeffersonWM network map" hidden>
-        <div class="map-shell">
-          <div class="map-header">
-            <h2 class="map-title">Map</h2>
-            <button class="map-close" id="map-close" type="button">Close</button>
-          </div>
-          <img
-            class="map-image"
-            src="/images/about/jeffersonwm-network-map-placeholder.png"
-            alt="JeffersonWM network topography placeholder map"
-          />
-        </div>
-      </section>
     </div>
 
     <script>
       (() => {
-        const aboutElements = {
-          trigger: document.getElementById('about-trigger'),
-          popup: document.getElementById('about-popup'),
-          close: document.getElementById('about-close'),
-          mapTrigger: document.getElementById('map-trigger'),
-          mapPopup: document.getElementById('map-popup'),
-          mapClose: document.getElementById('map-close')
-        };
-
-        const openAbout = () => {
-          aboutElements.popup.hidden = false;
-        };
-
-        const closeAbout = () => {
-          aboutElements.popup.hidden = true;
-          closeMap();
-        };
-
-        const openMap = () => {
-          aboutElements.mapPopup.hidden = false;
-        };
-
-        const closeMap = () => {
-          aboutElements.mapPopup.hidden = true;
-        };
-
-        aboutElements.trigger?.addEventListener('click', openAbout);
-        aboutElements.close?.addEventListener('click', closeAbout);
-        aboutElements.mapTrigger?.addEventListener('click', openMap);
-        aboutElements.mapClose?.addEventListener('click', closeMap);
-
-        aboutElements.popup?.addEventListener('click', event => {
-          if (event.target === aboutElements.popup) {
-            closeAbout();
-          }
-        });
-
-        aboutElements.mapPopup?.addEventListener('click', event => {
-          if (event.target === aboutElements.mapPopup) {
-            closeMap();
-          }
-        });
-
-        document.addEventListener('keydown', event => {
-          if (event.key !== 'Escape') {
-            return;
+        const getVersion = entry => {
+          if (typeof entry === 'string') {
+            return entry;
           }
 
-          if (!aboutElements.mapPopup.hidden) {
-            closeMap();
-            return;
-          }
+          return entry?.version;
+        };
 
-          if (!aboutElements.popup.hidden) {
-            closeAbout();
-          }
-        });
+        const hydrateVersions = async () => {
+          try {
+            const response = await fetch('/versions.json', { cache: 'no-store' });
+            if (!response.ok) {
+              return;
+            }
 
+            const data = await response.json();
+            const versions = data.apps || data;
+
+            document.querySelectorAll('[data-version-key]').forEach(link => {
+              const key = link.getAttribute('data-version-key');
+              const version = getVersion(versions[key]);
+              if (!version) {
+                return;
+              }
+
+              const label = link.getAttribute('data-version-label') || link.textContent.split('. v.')[0];
+              link.textContent = `${label}. v.${version}`;
+            });
+          } catch (_error) {
+            // Static fallback versions stay visible if the server file is unavailable.
+          }
+        };
+
+        hydrateVersions();
+      })();
+    </script>
+
+    <script>
+      (() => {
         const WIDGET_API_BASE = 'https://api-lionship.jeffersonwm.com/api/widget';
         const WEATHER_API_URL = 'https://api.open-meteo.com/v1/forecast?latitude=37.7811&longitude=-122.4883&current_weather=true&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&forecast_days=2';
         const WORD_SOURCES = [

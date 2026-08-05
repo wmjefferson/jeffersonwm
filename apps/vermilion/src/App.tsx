@@ -10,6 +10,7 @@ import RulesPanel from './components/RulesPanel';
 import PreviewTree from './components/PreviewTree';
 import ProgressPanel from './components/ProgressPanel';
 import BrowseModal from './components/BrowseModal';
+import { apiEventSource, apiFetch } from './api';
 
 export interface RenameRule {
   id: string;
@@ -158,7 +159,7 @@ export default function App() {
 
   const fetchPresets = async () => {
     try {
-      const res = await fetch('/api/presets');
+      const res = await apiFetch('/api/presets');
       const data = await res.json();
       if (data.presets) {
         setPresets(data.presets);
@@ -176,7 +177,7 @@ export default function App() {
       renameRules, separator, filters, recursive
     };
     try {
-      const res = await fetch('/api/presets', {
+      const res = await apiFetch('/api/presets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save', name, config })
@@ -196,7 +197,7 @@ export default function App() {
   const handleDeletePreset = async (name: string) => {
     if (!confirm(`Are you sure you want to delete preset "${name}"?`)) return;
     try {
-      const res = await fetch('/api/presets', {
+      const res = await apiFetch('/api/presets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete', name })
@@ -235,7 +236,7 @@ export default function App() {
         folder: sourceDir,
         recursive: String(recursive)
       });
-      const res = await fetch(`/api/scan?${params}`);
+      const res = await apiFetch(`/api/scan?${params}`);
       const data = await res.json();
       if (res.ok) {
         setScanResult(data);
@@ -272,7 +273,7 @@ export default function App() {
     };
 
     try {
-      const res = await fetch('/api/plan', {
+      const res = await apiFetch('/api/plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -315,7 +316,7 @@ export default function App() {
     });
 
     try {
-      const res = await fetch('/api/execute', {
+      const res = await apiFetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -337,7 +338,7 @@ export default function App() {
       const jobId = data.job_id;
       if (esRef.current) esRef.current.close();
 
-      const es = new EventSource(`/api/progress/${jobId}`);
+      const es = apiEventSource(`/api/progress/${jobId}`);
       esRef.current = es;
 
       es.onmessage = (e) => {
@@ -401,7 +402,7 @@ export default function App() {
     });
 
     try {
-      const res = await fetch('/api/undo', {
+      const res = await apiFetch('/api/undo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ undo_log_path: logPath })
@@ -419,7 +420,7 @@ export default function App() {
       const jobId = data.job_id;
       if (esRef.current) esRef.current.close();
 
-      const es = new EventSource(`/api/progress/${jobId}`);
+      const es = apiEventSource(`/api/progress/${jobId}`);
       esRef.current = es;
 
       es.onmessage = (e) => {

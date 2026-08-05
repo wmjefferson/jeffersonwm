@@ -3,6 +3,7 @@ import {
   X, Folder, FolderPlus, ArrowUp, ChevronRight, 
   HardDrive, AlertCircle, RefreshCw 
 } from 'lucide-react';
+import { apiFetch } from '../api';
 
 interface Props {
   onClose: () => void;
@@ -40,7 +41,7 @@ export default function BrowseModal({ onClose, onSelect, title, initialPath = ''
       if (path) {
         params.append('path', path);
       }
-      const res = await fetch(`/api/browse?${params}`);
+      const res = await apiFetch(`/api/browse?${params}`);
       const data = await res.json();
       if (res.ok) {
         if (data.drives) {
@@ -113,7 +114,7 @@ export default function BrowseModal({ onClose, onSelect, title, initialPath = ''
       const separator = currentPath.endsWith('\\') || currentPath.endsWith('/') ? '' : '\\';
       const targetPath = `${currentPath}${separator}${folderName}`;
 
-      const res = await fetch('/api/browse/create', {
+      const res = await apiFetch('/api/browse/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: targetPath })
