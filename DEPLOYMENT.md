@@ -104,12 +104,16 @@ Deploy pattern:
 - data dependencies:
   - Lionship widget endpoints
   - Auth JeffersonWM when account links are used later
+- version manifest:
+  - `versions.json` is maintained by the logged build script and uploaded automatically to the ASO homepage root
+  - the homepage reads it from `/versions.json` on every page load
 
 Deploy pattern:
 
 1. update `apps/jeffersonwm`
 2. if needed, build locally
-3. upload the resulting frontend files to the JeffersonWM root on ASO
+3. run a logged build to bump versions and refresh the manifest
+4. upload the resulting frontend files to the JeffersonWM root on ASO
 
 ### Feed
 

@@ -21,6 +21,7 @@ Use this checklist whenever you deploy one or more apps from the monorepo.
 - [ ] Upload the contents of the app `dist` folder, not the `dist` folder itself
 - [ ] Replace `index.html` in the matching ASO app folder
 - [ ] Replace the `assets` contents in the matching ASO app folder
+- [ ] For JeffersonWM Home, let the logged build sync `versions.json` to the ASO root automatically
 - [ ] For Perihelion, confirm the home-server API/tunnel is running if backend behavior is part of the release
 
 ## Post-Deploy Checks

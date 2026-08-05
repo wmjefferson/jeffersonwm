@@ -9,6 +9,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const dotcomsRoot = path.resolve(repoRoot, '..');
 const actionsVersioningPath = '\\\\JEFFERSHIZZLE-D\\Dotcoms E\\other\\actions\\versioning.md';
 const versionsManifestPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'versions.json');
+const deployConfigPath = path.join(repoRoot, '.vscode', 'sftp.json');
 
 const appRegistry = {
   battalion: monorepoApp('Battalion', 'battalion'),
@@ -170,6 +171,70 @@ function updatePublicVersions(appConfig, version, timestamp) {
   writeFileSync(versionsManifestPath, `${JSON.stringify(nextVersions, null, 2)}\n`, 'utf8');
 }
 
+function readDeployConfig() {
+  if (!existsSync(deployConfigPath)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(deployConfigPath, 'utf8'));
+    const remotePath = String(parsed.remotePath || '').trim();
+
+    if (!parsed.host || !parsed.username || !parsed.password || !remotePath) {
+      return null;
+    }
+
+    return {
+      host: String(parsed.host).trim(),
+      username: String(parsed.username).trim(),
+      password: String(parsed.password),
+      remotePath,
+      protocol: String(parsed.protocol || 'ftp').trim().toLowerCase(),
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function buildFtpTargetPath(remotePath, fileName) {
+  const normalizedRemotePath = remotePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const normalizedFileName = fileName.replace(/^\/+/, '');
+  return `${normalizedRemotePath}/${normalizedFileName}`;
+}
+
+function syncVersionsManifestToHost() {
+  const deployConfig = readDeployConfig();
+  if (!deployConfig) {
+    console.warn('Versions manifest updated locally, but no deploy config was found for automatic upload.');
+    return;
+  }
+
+  if (deployConfig.protocol !== 'ftp') {
+    console.warn(`Versions manifest upload skipped because protocol "${deployConfig.protocol}" is not supported by this script.`);
+    return;
+  }
+
+  const remoteTarget = buildFtpTargetPath(deployConfig.remotePath, 'versions.json');
+  const ftpUrl = `ftp://${deployConfig.host}${remoteTarget.startsWith('/') ? '' : '/'}${remoteTarget}`;
+  const curlResult = spawnSync('curl.exe', [
+    '--silent',
+    '--show-error',
+    '--fail',
+    '--ftp-create-dirs',
+    '-u',
+    `${deployConfig.username}:${deployConfig.password}`,
+    '-T',
+    versionsManifestPath,
+    ftpUrl,
+  ], {
+    stdio: 'inherit',
+  });
+
+  if (curlResult.status !== 0) {
+    throw new Error(`Automatic upload of versions.json failed for ${ftpUrl}`);
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const app = String(args.app || '').toLowerCase();
@@ -213,6 +278,7 @@ async function main() {
   const current = readFileSync(actionsVersioningPath, 'utf8');
   writeFileSync(actionsVersioningPath, appendBuildEntry(current, appConfig.label, entry), 'utf8');
   updatePublicVersions(appConfig, version, timestamp);
+  syncVersionsManifestToHost();
   console.log(`Logged ${appConfig.label} v${version} build to ${actionsVersioningPath}`);
   console.log(`Updated versions manifest: ${versionsManifestPath}`);
 }
