@@ -8,6 +8,7 @@ JeffersonWM is the active monorepo for the JeffersonWM sites, utilities, and sup
 
 Active app directories in [`apps/`](./apps):
 
+- `apps/aphelion`
 - `apps/battalion`
 - `apps/bullion`
 - `apps/feed`
@@ -32,6 +33,7 @@ The root [`package.json`](./package.json) provides convenience scripts for the n
 
 Per-app scripts available from the root today:
 
+- `npm run install:aphelion`
 - `npm run install:battalion`
 - `npm run install:perihelion`
 - `npm run install:bullion`
@@ -39,6 +41,7 @@ Per-app scripts available from the root today:
 - `npm run install:lionship`
 - `npm run install:jeffersonwm`
 - `npm run install:vermilion`
+- `npm run build:aphelion`
 - `npm run build:battalion`
 - `npm run build:perihelion`
 - `npm run build:bullion`
@@ -46,6 +49,7 @@ Per-app scripts available from the root today:
 - `npm run build:lionship`
 - `npm run build:jeffersonwm`
 - `npm run build:vermilion`
+- `npm run publish:aphelion`
 
 Some app folders use their own local runtimes or workflows and are not yet part of the root npm script chain.
 

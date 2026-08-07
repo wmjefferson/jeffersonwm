@@ -8,11 +8,12 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const deployConfigPath = path.join(repoRoot, '.vscode', 'sftp.json');
 
 const appRegistry = {
+  aphelion: app('Aphelion', 'aphelion', 'aphelion'),
   battalion: app('Battalion', 'battalion', 'battalion'),
   bullion: app('Bullion', 'bullion', 'bullion'),
   feed: app('Feed', 'feed', 'feed'),
-  jeffersonwm: app('JeffersonWM', 'jeffersonwm', ''),
-  jeffwm: app('JeffersonWM', 'jeffersonwm', ''),
+  jeffersonwm: app('JeffersonWM', 'jeffersonwm', 'jeffersonwm'),
+  jeffwm: app('JeffersonWM', 'jeffersonwm', 'jeffersonwm'),
   lionship: app('Lionship', 'lionship', 'lionship'),
   perihelion: app('Perihelion', 'perihelion', 'perihelion'),
   peri: app('Perihelion', 'perihelion', 'perihelion'),
@@ -97,6 +98,36 @@ function publishDist(appConfig, deployConfig) {
   }
 }
 
+function isJeffersonwmRootSupportFile(relativePath) {
+  return (
+    relativePath === '.htaccess' ||
+    relativePath === 'versions.json' ||
+    relativePath.startsWith('status/') ||
+    relativePath.startsWith('development/') ||
+    /^map\d+\.(?:png|jpe?g|webp)$/i.test(relativePath) ||
+    /^bookmark-preview\.(?:png|jpe?g|webp)$/i.test(relativePath)
+  );
+}
+
+function publishJeffersonwmRootSupport(appConfig, deployConfig) {
+  if (appConfig.slug !== 'jeffersonwm') {
+    return;
+  }
+
+  const rootSupportFiles = collectFilesRecursively(appConfig.distDir).filter((file) =>
+    isJeffersonwmRootSupportFile(file.relativePath),
+  );
+
+  if (rootSupportFiles.length === 0) {
+    return;
+  }
+
+  console.log(`Uploading ${rootSupportFiles.length} JeffersonWM root support file(s)...`);
+  for (const file of rootSupportFiles) {
+    uploadFileViaFtp(deployConfig, file.absolutePath, file.relativePath);
+  }
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const appName = String(args.app || '').toLowerCase();
@@ -126,7 +157,8 @@ function main() {
   }
 
   publishDist(appConfig, deployConfig);
-  console.log(`Published ${appConfig.label} to ${appConfig.remotePath}`);
+  publishJeffersonwmRootSupport(appConfig, deployConfig);
+  console.log(`Published ${appConfig.label} to ${appConfig.remotePath || '.'}`);
 }
 
 main();

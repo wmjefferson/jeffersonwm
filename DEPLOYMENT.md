@@ -6,6 +6,7 @@ This document reflects the current live split between ASO-hosted frontends, home
 
 This repo currently contains:
 
+- `apps/aphelion`
 - `apps/feed`
 - `apps/jeffersonwm`
 - `apps/perihelion`
@@ -23,6 +24,9 @@ These apps are built locally and uploaded to ASO as static frontend assets.
 - `apps/feed/dist`
   - live frontend path:
     - `https://jeffersonwm.com/feed/`
+- `apps/aphelion/dist`
+  - live frontend path:
+    - `https://jeffersonwm.com/aphelion/`
 - `apps/battalion/dist`
   - live frontend path:
     - `https://jeffersonwm.com/battalion/`
@@ -43,12 +47,15 @@ Upload the **contents** of each `dist` folder, not the `dist` folder itself.
 For the ASO-hosted frontend sites, the publish scripts can do that upload for you:
 
 ```powershell
+npm run publish:aphelion
 npm run publish:battalion
 npm run publish:feed
 npm run publish:perihelion
 npm run publish:lionship
 npm run publish:jeffersonwm
 ```
+
+`npm run publish:perihelion` also syncs the Perihelion Python backend files to the home-server share. Use `npm run publish:perihelion:frontend` when you only want to refresh the ASO frontend.
 
 ## Local Build Commands
 
@@ -76,6 +83,24 @@ npm run verify
 
 ## Current Live Backend Split
 
+### Aphelion
+
+- frontend:
+  - ASO
+- backend:
+  - shared source/runtime folder
+- live API:
+  - `https://api-aphelion.jeffersonwm.com`
+- live runtime/source folder:
+  - `\\JEFFERSHIZZLE-D\Dotcoms E\aphelion`
+
+Deploy pattern:
+
+1. build frontend locally
+2. upload `apps/aphelion/dist` to ASO
+3. sync the live backend source folder on the share
+4. restart the Aphelion backend process and tunnel if the runtime changed
+
 ### Perihelion
 
 - frontend:
@@ -89,8 +114,14 @@ Deploy pattern:
 
 1. build frontend locally
 2. upload `apps/perihelion/dist` to ASO
-3. update the live Python backend script on the home server
+3. sync the live Python backend files on the home server
 4. restart the Perihelion backend process
+
+The monorepo command for the first three steps is:
+
+```powershell
+npm run publish:perihelion
+```
 
 ### Lionship
 
@@ -179,6 +210,14 @@ Auth is no longer part of this monorepo.
   - `https://auth.jeffersonwm.com`
 
 Deploy auth by updating the auth repo/runtime separately.
+
+The monorepo helper can build the auth repo and sync the live runtime folder:
+
+```powershell
+npm run publish:auth
+```
+
+It copies the app source and fresh `dist` output to the live backend folder while preserving runtime-only files such as `.env`, `data`, and `node_modules`.
 
 ### Dooky Detective
 

@@ -459,6 +459,28 @@ const buildGalleryStateUrl = (state: GalleryLocationState) => {
   return `${getPerihelionAppPath()}${query ? `?${query}` : ''}`;
 };
 
+const LAST_FOLDER_PATH_STORAGE_KEY = 'peri_last_folder_path';
+const MAX_MODE_ROW_HEIGHT = 84;
+const MAX_MODE_LIMIT = 100;
+const ROW_HEIGHT_OPTIONS = [150, 200, 250, 300, 400];
+const LIMIT_OPTIONS = [10, 25, 40, 50];
+
+const loadLastFolderPath = () => {
+  try {
+    return window.sessionStorage.getItem(LAST_FOLDER_PATH_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+const saveLastFolderPath = (path: string) => {
+  try {
+    window.sessionStorage.setItem(LAST_FOLDER_PATH_STORAGE_KEY, path);
+  } catch {
+    // Ignore storage failures so browsing still works.
+  }
+};
+
 const toMediaEntry = (value: string): MediaEntry => ({
   path: value,
   name: basename(value),
@@ -563,6 +585,7 @@ export default function App() {
 
   const [rowHeight, setRowHeight] = useState(250);
   const [limit, setLimit] = useState(25);
+  const isMaxMode = rowHeight === MAX_MODE_ROW_HEIGHT && limit === MAX_MODE_LIMIT;
   const [includeOtherFiles, setIncludeOtherFiles] = useState(false);
   const [showFolderThumbnails, setShowFolderThumbnails] = useState(true);
   const [locationReady, setLocationReady] = useState(false);
@@ -595,6 +618,9 @@ export default function App() {
   const [showLimitMenu, setShowLimitMenu] = useState(false);
   const historyModeRef = React.useRef<'replace' | 'push'>('replace');
   const locationHydratedRef = React.useRef(false);
+  const lastFolderPathRef = React.useRef<string>(loadLastFolderPath());
+  const prewarmedPageKeysRef = React.useRef<Set<string>>(new Set());
+  const prewarmImagesRef = React.useRef<HTMLImageElement[]>([]);
   const isGlobalSearch = debouncedSearch.trim().length >= 4;
 
   const queueHistoryUpdate = (mode: 'replace' | 'push' = 'push') => {
@@ -607,6 +633,8 @@ export default function App() {
       return;
     }
     queueHistoryUpdate('push');
+    lastFolderPathRef.current = currentPath;
+    saveLastFolderPath(currentPath);
     setSelectedTag('');
     setSelectedList('');
     setCurrentPath('');
@@ -725,10 +753,23 @@ export default function App() {
 
   const navigateToPath = (path: string) => {
     queueHistoryUpdate('push');
+    lastFolderPathRef.current = path;
+    saveLastFolderPath(path);
     setCurrentPath(path);
     setSearchQuery('');
     setDebouncedSearch('');
     setPage(1);
+  };
+
+  const returnToLastFolderLocation = () => {
+    const targetPath = lastFolderPathRef.current || '';
+    queueHistoryUpdate('push');
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setSelectedTag('');
+    setSelectedList('');
+    setPage(1);
+    setCurrentPath(targetPath);
   };
 
   const openLightbox = (path: string) => {
@@ -1174,12 +1215,102 @@ export default function App() {
     if (loading) {
       setLoadingOverlayVisible(true);
     } else {
-      timer = window.setTimeout(() => setLoadingOverlayVisible(false), 100);
+      timer = window.setTimeout(() => setLoadingOverlayVisible(false), 50);
     }
     return () => {
       if (timer) window.clearTimeout(timer);
     };
   }, [loading]);
+
+  useEffect(() => {
+    if (!locationReady || isSharedView || showSelectedOnly || !isMaxMode || loading || page >= serverTotalPages) {
+      return;
+    }
+
+    const nextPage = page + 1;
+    const searchPath = isGlobalSearch ? '' : currentPath;
+    const searchText = isGlobalSearch ? debouncedSearch.trim() : '';
+    const prewarmKey = JSON.stringify({
+      page: nextPage,
+      limit: MAX_MODE_LIMIT,
+      path: searchPath,
+      tag: selectedTag,
+      list: selectedList,
+      search: searchText,
+      includeOtherFiles,
+    });
+
+    if (prewarmedPageKeysRef.current.has(prewarmKey)) {
+      return;
+    }
+
+    prewarmedPageKeysRef.current.add(prewarmKey);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({
+        page: String(nextPage),
+        limit: String(MAX_MODE_LIMIT),
+        path: searchPath,
+      });
+      if (selectedTag) params.append('tag', selectedTag);
+      if (selectedList) params.append('list', selectedList);
+      if (searchText) params.append('search', searchText);
+
+      fetch(`${API_PATH}/images?${params.toString()}`, {
+        credentials: 'include',
+        signal: controller.signal,
+      })
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => {
+          const preloadPaths = Array.isArray(data?.files)
+            ? data.files
+                .filter((file: { type?: string; path?: string; kind?: MediaKind }) => (
+                  file.type === 'file' &&
+                  typeof file.path === 'string' &&
+                  (includeOtherFiles || (file.kind || getMediaKind(file.path)) === 'image') &&
+                  isRenderable(file.path)
+                ))
+                .map((file: { path: string }) => file.path)
+            : Array.isArray(data?.images)
+              ? data.images.filter((value: unknown): value is string => typeof value === 'string' && isRenderable(value))
+              : [];
+
+          const nextPreloads = preloadPaths.slice(0, MAX_MODE_LIMIT).map(path => {
+            const img = new Image();
+            img.decoding = 'async';
+            img.loading = 'eager';
+            img.src = buildThumbUrl(path, MAX_MODE_ROW_HEIGHT, MAX_MODE_ROW_HEIGHT * 2);
+            return img;
+          });
+
+          prewarmImagesRef.current = nextPreloads;
+        })
+        .catch(err => {
+          if (err.name !== 'AbortError') {
+            prewarmedPageKeysRef.current.delete(prewarmKey);
+          }
+        });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    locationReady,
+    isSharedView,
+    showSelectedOnly,
+    isMaxMode,
+    loading,
+    page,
+    serverTotalPages,
+    isGlobalSearch,
+    currentPath,
+    debouncedSearch,
+    selectedTag,
+    selectedList,
+    includeOtherFiles,
+  ]);
 
   // Load the manual cover and metadata for the current folder whenever the path changes
   useEffect(() => {
@@ -1295,6 +1426,15 @@ export default function App() {
     debouncedSearch,
     selectedImage,
   ]);
+
+  useEffect(() => {
+    if (!locationReady || isSharedView || !currentPath || isGlobalSearch) {
+      return;
+    }
+
+    lastFolderPathRef.current = currentPath;
+    saveLastFolderPath(currentPath);
+  }, [locationReady, isSharedView, currentPath, isGlobalSearch]);
 
   useEffect(() => {
     if (page > computedTotalPages) {
@@ -2212,7 +2352,7 @@ export default function App() {
         </h1>
         <div className="flex items-center gap-3 font-sans text-[11px] font-bold uppercase tracking-widest">
           {authLoading ? (
-            <span className="text-[#888]">Checking Account…</span>
+            <span className="text-[#888]">Checking AccountÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦</span>
           ) : authStatus?.user ? (
             <>
               {authStatus.user.isAdmin && (
@@ -2272,39 +2412,71 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 px-[42px] pt-[24px] pb-[42px] max-w-none mx-auto w-full">
+      <main className="flex-1 px-[42px] pt-[24px] pb-[42px] max-w-none mx-auto w-full text-[15px]">
         {!showPrivateGate && (
-          <div className="flex flex-col gap-1 mb-6 border-b-[2px] border-[#DDD] pb-2">
-            <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider">
-              <span className="text-[#888]">Image Height</span>
-              {[150, 200, 250, 300, 400].map(num => (
+          <div className="mb-6 flex flex-col gap-1 border-b-[2px] border-[#DDD] pb-2">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isMaxMode) {
+                    setRowHeight(250);
+                    setLimit(25);
+                  } else {
+                    setRowHeight(MAX_MODE_ROW_HEIGHT);
+                    setLimit(MAX_MODE_LIMIT);
+                  }
+                  setPage(1);
+                }}
+                className={isMaxMode ? 'text-black font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#888] hover:text-black'}
+              >
+                Max Mode
+              </button>
+              <span className={isMaxMode ? 'text-[#C8C8C8]' : 'text-[#888]'}>Image Height</span>
+              {ROW_HEIGHT_OPTIONS.map(num => (
                 <button
                   key={num}
-                  onClick={() => setRowHeight(num)}
-                  className={rowHeight === num ? 'text-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#888] hover:text-black'}
+                  onClick={() => {
+                    setRowHeight(num);
+                    if (isMaxMode) setLimit(25);
+                  }}
+                  className={
+                    isMaxMode
+                      ? 'text-[#C8C8C8] hover:text-[#888]'
+                      : rowHeight === num
+                        ? 'text-black underline decoration-[1.5px] underline-offset-[3px]'
+                        : 'text-[#888] hover:text-black'
+                  }
                 >
                   {num}px
                 </button>
               ))}
             </div>
 
-            <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider">
-              <span className="text-[#888]">Items per page</span>
-              {Array.from(new Set([...[10, 25, 40, 50], limit])).sort((a, b) => a - b).map(num => (
+            <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
+              <span className={isMaxMode ? 'text-[#C8C8C8]' : 'text-[#888]'}>Items per page</span>
+              {Array.from(new Set([...LIMIT_OPTIONS, ...(isMaxMode ? [MAX_MODE_LIMIT] : []), limit])).sort((a, b) => a - b).map(num => (
                 <button
                   key={num}
                   onClick={() => {
+                    if (isMaxMode && num !== MAX_MODE_LIMIT) setRowHeight(250);
                     setLimit(num);
                     setPage(1);
                   }}
-                  className={limit === num ? 'text-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#888] hover:text-black'}
+                  className={
+                    isMaxMode
+                      ? num === MAX_MODE_LIMIT
+                        ? 'text-black font-black underline decoration-[1.5px] underline-offset-[3px]'
+                        : 'text-[#C8C8C8] hover:text-[#888]'
+                      : limit === num
+                        ? 'text-black underline decoration-[1.5px] underline-offset-[3px]'
+                        : 'text-[#888] hover:text-black'
+                  }
                 >
                   {num}
                 </button>
               ))}
-            </div>
-
-            <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider">
               <label className="flex items-center gap-2 cursor-pointer text-[#888] hover:text-black transition-colors">
                 <input
                   type="checkbox"
@@ -2315,12 +2487,55 @@ export default function App() {
                   }}
                   className="w-4 h-4 accent-black border-[2px] border-[#666]"
                 />
-                Include Other Files
+                INCLUDE OTHERS
               </label>
             </div>
 
+            <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
+              <span className="text-[#888]">SHARE CODE</span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  maxLength={4}
+                  placeholder="CODE"
+                  value={shareCodeInput}
+                  onChange={e => {
+                    setShareCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                    if (shareCodeError) setShareCodeError('');
+                    if (shareCodeNotice) setShareCodeNotice('');
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && shareCodeInput.length === 4 && !isValidatingCode) {
+                      handleOpenShareCode();
+                    }
+                  }}
+                  className="bg-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[13px] focus:outline-none w-16 text-center font-mono placeholder:text-gray-300"
+                />
+                <button
+                  onClick={handleOpenShareCode}
+                  disabled={shareCodeInput.length !== 4 || isValidatingCode}
+                  className="bg-black text-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[13px] hover:bg-[#333] transition-colors disabled:opacity-50 min-w-[32px] text-center"
+                >
+                  {isValidatingCode ? '...' : 'Go'}
+                </button>
+                <button
+                  onClick={handleLoadShareCode}
+                  disabled={shareCodeInput.length !== 4 || isValidatingCode}
+                  className="bg-white text-black border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[13px] hover:bg-[#F3F3F3] transition-colors disabled:opacity-50 min-w-[52px] text-center"
+                >
+                  Load
+                </button>
+              </div>
+              {shareCodeError && (
+                <span className="text-red-600 font-bold text-[11px] uppercase ml-1 animate-pulse">
+                  {shareCodeError}
+                </span>
+              )}
+            </div>
+          </div>
+
             <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
                 <span className="text-[#888]">Global Tag</span>
                 <select
                   value={selectedTag}
@@ -2347,7 +2562,7 @@ export default function App() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
                 <span className="text-[#888]">Filter by List</span>
                 <select
                   value={selectedList}
@@ -2369,7 +2584,7 @@ export default function App() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider">
+              <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
                 <span className="text-[#888]">Search</span>
                 <div className="flex items-center gap-1.5">
                   <input
@@ -2391,7 +2606,7 @@ export default function App() {
                     <button
                       onClick={() => {
                         if (isGlobalSearch) {
-                          window.history.back();
+                          returnToLastFolderLocation();
                           return;
                         }
                         setSearchQuery('');
@@ -2412,50 +2627,9 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider">
-                <span className="text-[#888]">View Share Code</span>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    maxLength={4}
-                    placeholder="CODE"
-                    value={shareCodeInput}
-                    onChange={e => {
-                      setShareCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
-                      if (shareCodeError) setShareCodeError('');
-                      if (shareCodeNotice) setShareCodeNotice('');
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && shareCodeInput.length === 4 && !isValidatingCode) {
-                        handleOpenShareCode();
-                      }
-                    }}
-                    className="bg-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] focus:outline-none w-16 text-center font-mono placeholder:text-gray-300"
-                  />
-                  <button
-                    onClick={handleOpenShareCode}
-                    disabled={shareCodeInput.length !== 4 || isValidatingCode}
-                    className="bg-black text-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] hover:bg-[#333] transition-colors disabled:opacity-50 min-w-[32px] text-center"
-                  >
-                    {isValidatingCode ? '...' : 'Go'}
-                  </button>
-                  <button
-                    onClick={handleLoadShareCode}
-                    disabled={shareCodeInput.length !== 4 || isValidatingCode}
-                    className="bg-white text-black border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] hover:bg-[#F3F3F3] transition-colors disabled:opacity-50 min-w-[52px] text-center"
-                  >
-                    Load
-                  </button>
-                </div>
-                {shareCodeError && (
-                  <span className="text-red-600 font-bold text-[10px] uppercase ml-1 animate-pulse">
-                    {shareCodeError}
-                  </span>
-                )}
-              </div>
             </div>
 
-            <div className="flex items-center gap-3 font-sans text-xs font-bold uppercase tracking-wider mt-0.5 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider mt-0.5 flex-wrap sm:flex-nowrap">
               <span className="text-[#888]">Selection</span>
               <button onClick={handleSelectAll} className="text-[#888] hover:text-black">Select Page</button>
               <button onClick={handleDeselectAll} className="text-[#888] hover:text-black">Deselect Page</button>
@@ -2531,8 +2705,8 @@ export default function App() {
                             onClick={e => e.stopPropagation()}
                           />
                           {tagSearch && (
-                            <button onClick={() => setTagSearch('')} className="hover:text-red-500 font-bold text-xs">
-                              <X size={12} />
+                            <button onClick={() => setTagSearch('')} className="hover:text-red-500 font-bold text-[13px]">
+                              <X size={13} />
                             </button>
                           )}
                         </div>
@@ -2629,8 +2803,8 @@ export default function App() {
                             onClick={e => e.stopPropagation()}
                           />
                           {listSearch && (
-                            <button onClick={() => setListSearch('')} className="hover:text-red-500 font-bold text-xs">
-                              <X size={12} />
+                            <button onClick={() => setListSearch('')} className="hover:text-red-500 font-bold text-[13px]">
+                              <X size={13} />
                             </button>
                           )}
                         </div>
@@ -2788,10 +2962,10 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => window.history.back()}
+                  onClick={returnToLastFolderLocation}
                   className="text-[#888] hover:text-black transition-colors underline"
                 >
-                  Back to previous page
+                  Back to folder
                 </button>
               </div>
             )}
@@ -3139,7 +3313,7 @@ export default function App() {
                 </div>
                 <div className="p-3 bg-white shrink-0" style={{ width: '0', minWidth: '100%' }}>
                   <p
-                    className={`font-sans text-xs font-bold uppercase truncate w-full block ${selectedImages.has(entry.path) ? 'text-black' : 'text-[#888]'}`}
+                    className={`font-sans text-sm font-bold uppercase truncate w-full block ${selectedImages.has(entry.path) ? 'text-black' : 'text-[#888]'}`}
                     title={entry.path}
                   >
                     {entry.name}
@@ -3151,7 +3325,7 @@ export default function App() {
                         event.stopPropagation();
                         navigateToPath(entry.folderPath === 'root' ? '' : entry.folderPath);
                       }}
-                      className="mt-1 block max-w-full truncate text-left font-mono text-[10px] font-bold uppercase tracking-wider text-[#8A5A44] transition-colors hover:text-black hover:underline"
+                       className="mt-1 block max-w-full truncate text-left font-mono text-[12px] font-bold uppercase tracking-wider text-[#8A5A44] transition-colors hover:text-black hover:underline"
                       title={`Open folder: ${entry.folderPath}`}
                     >
                       {entry.folderPath}
@@ -3163,7 +3337,7 @@ export default function App() {
                         setSelectedTag('');
                         navigateToPath(dirname(entry.path) === 'root' ? '' : dirname(entry.path));
                       }}
-                      className="mt-1 block max-w-full truncate text-left font-mono text-[10px] font-bold uppercase tracking-wider text-[#8A5A44] transition-colors hover:text-black hover:underline"
+                       className="mt-1 block max-w-full truncate text-left font-mono text-[12px] font-bold uppercase tracking-wider text-[#8A5A44] transition-colors hover:text-black hover:underline"
                       title={`Open folder: ${dirname(entry.path)}`}
                     >
                       {dirname(entry.path)}
@@ -3183,9 +3357,9 @@ export default function App() {
 
         {loadingOverlayVisible && !accessError && (
           <div
-            className={`fixed inset-0 z-[24] pointer-events-none flex items-center justify-center transition-opacity duration-100 ${loading ? 'opacity-100' : 'opacity-0'}`}
+            className={`fixed inset-0 z-[24] pointer-events-none flex items-center justify-center transition-opacity ${loading ? 'duration-100' : 'duration-50'} bg-[#AFAFAF]/40 ${loading ? 'opacity-100' : 'opacity-0'}`}
           >
-            <div className="rounded-full border-[2px] border-black bg-white/70 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.35em] text-black backdrop-blur-sm">
+            <div className="rounded-full border-[2px] border-[#6B6B6B] bg-[#E5E5E5]/80 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.35em] text-black backdrop-blur-sm">
               LOADING
             </div>
           </div>
@@ -3259,11 +3433,10 @@ export default function App() {
 
       {!showPrivateGate && (
         <footer className="h-[36px] bg-white border-t-[3px] border-black fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between px-4">
-          <div className="font-sans text-xs font-bold uppercase tracking-wider">
+          <div className="font-sans text-[13px] font-bold uppercase tracking-wider">
             PAGE {page} OF {computedTotalPages} / {selectedImages.size > 0 ? <span className="text-black bg-[#e0e0e0] px-1.5 py-0.5 mr-1">{selectedImages.size} SELECTED /</span> : null} {pagedEntries.length} SHOWN / {totalVisibleItems} TOTAL
           </div>
-
-          <div className="flex items-center gap-4 font-sans text-xs font-bold uppercase tracking-wider">
+          <div className="flex items-center gap-1 font-sans text-[13px] font-bold uppercase tracking-wider whitespace-nowrap">
             {previousSiblingFolder && (
               <button
                 type="button"
@@ -3271,12 +3444,16 @@ export default function App() {
                 className="max-w-[18rem] truncate text-left text-[#666] hover:text-black hover:underline transition-colors"
                 title={previousSiblingFolder.title || previousSiblingFolder.name}
               >
-                ← {previousSiblingFolder.title || previousSiblingFolder.name}
+                {previousSiblingFolder.title || previousSiblingFolder.name}
               </button>
             )}
 
+            {previousSiblingFolder && (computedTotalPages > 1 || nextSiblingFolder) && (
+              <span className="select-none px-0.5 text-[#888]">|</span>
+            )}
+
             {computedTotalPages > 1 && (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
                     queueHistoryUpdate('push');
@@ -3320,6 +3497,14 @@ export default function App() {
               </div>
             )}
 
+            {computedTotalPages > 1 && nextSiblingFolder && (
+              <span className="select-none px-0.5 text-[#888]">|</span>
+            )}
+
+            {computedTotalPages <= 1 && previousSiblingFolder && nextSiblingFolder && (
+              <span className="select-none px-0.5 text-[#888]">|</span>
+            )}
+
             {nextSiblingFolder && (
               <button
                 type="button"
@@ -3327,7 +3512,7 @@ export default function App() {
                 className="max-w-[18rem] truncate text-right text-[#666] hover:text-black hover:underline transition-colors"
                 title={nextSiblingFolder.title || nextSiblingFolder.name}
               >
-                {nextSiblingFolder.title || nextSiblingFolder.name} →
+                {nextSiblingFolder.title || nextSiblingFolder.name}
               </button>
             )}
           </div>
@@ -3586,7 +3771,7 @@ export default function App() {
                     
                     <div className="flex items-center gap-1">
                       <span className="text-[#888]">Resolution:</span>
-                      <span className="text-black font-bold">{imageDetail.exif.width} × {imageDetail.exif.height} px</span>
+                      <span className="text-black font-bold">{imageDetail.exif.width} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {imageDetail.exif.height} px</span>
                     </div>
                   </>
                 )}
@@ -3649,7 +3834,7 @@ export default function App() {
                               className="hover:text-red-600 font-bold ml-0.5 text-xs text-[#888] transition-colors"
                               title="Remove tag"
                             >
-                              ×
+                              ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
                             </button>
                           </span>
                         ))
@@ -3864,7 +4049,7 @@ export default function App() {
                           <div key={share.id} className="flex items-center justify-between py-2 text-[11px] font-mono uppercase">
                             <div className="flex flex-col min-w-0 pr-2">
                               <span className="font-bold text-black truncate">{share.title || share.id}</span>
-                              <span className="text-[9px] text-[#888] mt-0.5">{share.itemCount} items • {share.id}</span>
+                              <span className="text-[9px] text-[#888] mt-0.5">{share.itemCount} items ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {share.id}</span>
                             </div>
                             <div className="flex items-center gap-3 uppercase font-sans text-[10px] font-bold shrink-0">
                               <button
@@ -3910,7 +4095,7 @@ export default function App() {
                       <div className="text-[11px] font-bold uppercase tracking-widest text-black">Multimillion</div>
                       <p className="text-xs font-sans text-[#666] leading-relaxed">
                         Perihelion now uses the central account system at <span className="font-bold">{authBaseUrl}</span>.
-                        Sign in there, request access there, and make sure your account has Perihelion access. After sign-in, you’ll come right back here.
+                        Sign in there, request access there, and make sure your account has Perihelion access. After sign-in, youÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll come right back here.
                       </p>
                     </div>
                     <div className="flex items-center gap-3 justify-end">
@@ -3988,7 +4173,7 @@ export default function App() {
                       </label>
 
                       <label className="flex flex-col gap-2">
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-[#888]">Who You Are / Why You’re Requesting Access</span>
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-[#888]">Who You Are / Why YouÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢re Requesting Access</span>
                         <textarea
                           value={requestNoteInput}
                           onChange={event => setRequestNoteInput(event.target.value)}
@@ -4042,7 +4227,7 @@ export default function App() {
                   <>
                     <div className="border-[2px] border-[#666] bg-[#F7F7F7] px-4 py-4 flex flex-col gap-3">
                       <div className="text-[11px] font-bold uppercase tracking-widest text-black">
-                        Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' • Admin' : ''}
+                        Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Admin' : ''}
                       </div>
                       <p className="text-xs font-sans text-[#666] leading-relaxed">
                         Your settings, history, approvals, and password changes now live in Multimillion. Sign out here if you want to switch to a different account. If this archive still stays locked, ask for Perihelion access in the central dashboard.
@@ -4067,7 +4252,7 @@ export default function App() {
                 <>
                   <div className="border-[2px] border-[#666] bg-[#F7F7F7] px-4 py-4 flex flex-col gap-2">
                     <div className="text-[11px] font-bold uppercase tracking-widest text-black">
-                      Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' • Admin' : ''}
+                      Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Admin' : ''}
                     </div>
                     <div className="text-xs font-sans text-[#666] leading-relaxed">
                       Sign out completely before moving into another account. Downloads tied to this account will appear below.
@@ -4165,7 +4350,7 @@ export default function App() {
                       <div className="text-[11px] font-bold uppercase tracking-widest text-black">Download History</div>
                     </div>
                     {historyLoading ? (
-                      <div className="px-4 py-6 text-xs font-bold uppercase tracking-widest text-[#888] animate-pulse">Loading History…</div>
+                      <div className="px-4 py-6 text-xs font-bold uppercase tracking-widest text-[#888] animate-pulse">Loading HistoryÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦</div>
                     ) : historyEntries.length === 0 ? (
                       <div className="px-4 py-6 text-center text-xs font-bold uppercase tracking-widest text-[#888]">
                         No tracked downloads yet.
@@ -4178,7 +4363,7 @@ export default function App() {
                               <span className="text-[11px] font-bold uppercase tracking-widest text-black">{basename(entry.output_name || entry.file_path)}</span>
                               <span className="text-[10px] font-bold uppercase tracking-widest text-[#888]">{new Date(entry.created_at).toLocaleString()}</span>
                             </div>
-                            <span className="text-[11px] font-bold uppercase tracking-widest text-[#888]">{entry.action} • {entry.output_name || entry.file_path}</span>
+                            <span className="text-[11px] font-bold uppercase tracking-widest text-[#888]">{entry.action} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {entry.output_name || entry.file_path}</span>
                           </div>
                         ))}
                       </div>
@@ -4218,7 +4403,7 @@ export default function App() {
                     This dashboard keeps the whole approval flow in one place: review incoming requests, approve or block them, and remove accounts that should no longer exist.
                   </p>
                   {adminLoading ? (
-                    <div className="text-xs font-bold uppercase tracking-widest text-[#888] animate-pulse">Loading Accounts…</div>
+                    <div className="text-xs font-bold uppercase tracking-widest text-[#888] animate-pulse">Loading AccountsÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦</div>
                   ) : (
                     <div className="flex flex-col gap-4">
                       <div className="border-[2px] border-[#666]">
@@ -4242,7 +4427,7 @@ export default function App() {
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="min-w-0">
                                     <div className="text-[11px] font-bold uppercase tracking-widest text-black truncate">
-                                      {user.username} {user.isAdmin ? '• Admin' : ''}
+                                      {user.username} {user.isAdmin ? 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Admin' : ''}
                                     </div>
                                     <div className="text-[10px] font-bold uppercase tracking-widest text-[#888]">
                                       Requested {new Date(user.createdAt).toLocaleString()}
@@ -4298,7 +4483,7 @@ export default function App() {
                               <div key={user.id} className="px-4 py-3 flex items-center justify-between gap-4">
                                 <div className="min-w-0">
                                   <div className="text-[11px] font-bold uppercase tracking-widest text-black truncate">
-                                    {user.username} {user.isAdmin ? '• Admin' : ''}
+                                    {user.username} {user.isAdmin ? 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Admin' : ''}
                                   </div>
                                   <div className="text-[10px] font-bold uppercase tracking-widest text-[#888]">
                                     Approved {user.approvedAt ? new Date(user.approvedAt).toLocaleString() : 'Recently'}
@@ -4350,7 +4535,7 @@ export default function App() {
                               <div key={user.id} className="px-4 py-3 flex items-center justify-between gap-4">
                                 <div className="min-w-0">
                                   <div className="text-[11px] font-bold uppercase tracking-widest text-black truncate">
-                                    {user.username} {user.isAdmin ? '• Admin' : ''}
+                                    {user.username} {user.isAdmin ? 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Admin' : ''}
                                   </div>
                                   <div className="text-[10px] font-bold uppercase tracking-widest text-[#888]">
                                     Blocked {user.blockedAt ? new Date(user.blockedAt).toLocaleString() : 'Recently'}

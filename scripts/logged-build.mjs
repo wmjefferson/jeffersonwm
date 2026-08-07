@@ -8,9 +8,11 @@ import { readDeployConfig, uploadFileViaFtp } from './ftp-upload.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dotcomsRoot = path.resolve(repoRoot, '..');
+const deployConfigPath = path.join(repoRoot, '.vscode', 'sftp.json');
 const actionsVersioningPath = '\\\\JEFFERSHIZZLE-D\\Dotcoms E\\other\\actions\\versioning.md';
 const versionsManifestPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'versions.json');
 const appRegistry = {
+  aphelion: monorepoApp('Aphelion', 'aphelion'),
   battalion: monorepoApp('Battalion', 'battalion'),
   batt: monorepoApp('Battalion', 'battalion'),
   bullion: monorepoApp('Bullion', 'bullion'),
@@ -171,7 +173,7 @@ function updatePublicVersions(appConfig, version, timestamp) {
 }
 
 function syncVersionsManifestToHost() {
-  const deployConfig = readDeployConfig();
+  const deployConfig = readDeployConfig(deployConfigPath);
   if (!deployConfig) {
     console.warn('Versions manifest updated locally, but no deploy config with an upload host was found for automatic upload.');
     console.warn('Set "uploadHost" (or "ftpHost") in .vscode/sftp.json to a DNS-only origin hostname for FTP uploads.');

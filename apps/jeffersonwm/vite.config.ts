@@ -5,13 +5,15 @@ import react from '@vitejs/plugin-react'
 
 const dummyFileName = 'dummyjeffersonwm02'
 
-function copyRootDummyToDist() {
+function copyStaticRuntimeFilesToDist() {
   return {
-    name: 'copy-root-dummy-to-dist',
+    name: 'copy-static-runtime-files-to-dist',
     closeBundle() {
       const rootDummyPath = resolve(__dirname, dummyFileName)
+      const versionsPath = resolve(__dirname, 'versions.json')
       const distDir = resolve(__dirname, 'dist')
       const distDummyPath = resolve(distDir, dummyFileName)
+      const distVersionsPath = resolve(distDir, 'versions.json')
       const legacyDistDummyPath = resolve(distDir, 'dummyjeffersonwm')
 
       try {
@@ -28,11 +30,15 @@ function copyRootDummyToDist() {
           copyFileSync(rootDummyPath, distDummyPath)
         }
 
+        if (existsSync(versionsPath)) {
+          copyFileSync(versionsPath, distVersionsPath)
+        }
+
         if (existsSync(legacyDistDummyPath)) {
           rmSync(legacyDistDummyPath)
         }
       } catch (error) {
-        console.warn('[vite] Dist dummy sync was skipped.', error)
+        console.warn('[vite] Dist runtime file sync was skipped.', error)
       }
     },
   }
@@ -41,5 +47,5 @@ function copyRootDummyToDist() {
 // https://vite.dev/config/
 export default defineConfig({
   base: '/jeffersonwm/',
-  plugins: [react(), copyRootDummyToDist()],
+  plugins: [react(), copyStaticRuntimeFilesToDist()],
 })

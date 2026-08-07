@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "KeepVerm reorganized into alphabetical batches",
+  "content": "<p>The shared KeepVerm image library was reorganized into exact 1,000-file alphabetical batches inside the new <code>keep</code> folder so browsing and maintenance are easier.</p><p>The approved source set remains intact at 9,170 images, with the older structure retained only as a backup copy outside daily use.</p>",
+  "url": "https://jeffersonwm.com/",
+  "source": "milestone",
+  "external_id": "keepverm-alphabetical-batches-2026-08-05"
+}

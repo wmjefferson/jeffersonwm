@@ -15,6 +15,7 @@ import {
   Pin,
   PinOff,
   RefreshCw,
+  Share2,
   Trash2,
   Trophy,
 } from 'lucide-react';
@@ -720,6 +721,8 @@ export default function App() {
   const [richEditorTab, setRichEditorTab] = useState<RichEditorTab>('write');
   const [activeWeekKey, setActiveWeekKey] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [copiedEntryId, setCopiedEntryId] = useState<number | null>(null);
+  const [highlightedEntryId, setHighlightedEntryId] = useState<number | null>(null);
   const markdownInputRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
@@ -742,8 +745,12 @@ export default function App() {
     setAuthError(null);
     setError(null);
     setPasswordInput('');
+    setHighlightedEntryId(null);
     setActiveWeekKey(weeks[0]?.key || null);
     resetComposer();
+    if (window.location.hash) {
+      history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1111,6 +1118,41 @@ export default function App() {
     return `${feedDateFormatter.format(date)}, ${feedTimeFormatter.format(date)} ${timezonePart}`;
   };
 
+  const getEntryAnchorId = (item: Pick<FeedItem, 'id'>) => `entry-${item.id}`;
+
+  const getEntryShareUrl = (item: Pick<FeedItem, 'id'>) => {
+    const baseUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    return `${baseUrl}#${getEntryAnchorId(item)}`;
+  };
+
+  const handleShareEntry = async (item: FeedItem) => {
+    const url = getEntryShareUrl(item);
+    const shareData = {
+      title: item.title,
+      text: item.title,
+      url,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare?.(shareData)) {
+        await navigator.share(shareData);
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        window.prompt('Copy feed entry link', url);
+      }
+
+      setCopiedEntryId(item.id);
+      window.setTimeout(() => {
+        setCopiedEntryId((current) => (current === item.id ? null : current));
+      }, 1800);
+    } catch (err) {
+      if ((err as Error)?.name !== 'AbortError') {
+        window.prompt('Copy feed entry link', url);
+      }
+    }
+  };
+
   const getGitHubRepo = (item: FeedItem): string | null => {
     if (item.source.toLowerCase() !== 'github') {
       return null;
@@ -1317,7 +1359,13 @@ export default function App() {
   const activeWeek = activeWeekIndex >= 0 ? weeks[activeWeekIndex] : weeks[0] || null;
   const groupedItems = groupFeedItems(activeWeek?.items || []);
   const renderFeedEntry = (item: FeedItem) => (
-    <div key={item.id} className={item.source === 'release' ? 'release-card' : ''}>
+    <div
+      key={item.id}
+      id={getEntryAnchorId(item)}
+      className={`${item.source === 'release' ? 'release-card' : ''} ${
+        highlightedEntryId === item.id ? 'feed-entry--highlighted' : ''
+      }`}
+    >
       <div className="feed-card-head">
         <div className="feed-source-tag">
           {item.pinned_at && <Pin size={13} />}
@@ -1344,6 +1392,16 @@ export default function App() {
           <div className="feed-time">
             <Clock size={12} />
             <span>{formatDate(item.created_at)}</span>
+            <button
+              type="button"
+              className="icon-link feed-share-button"
+              onClick={() => handleShareEntry(item)}
+              aria-label={`Share feed entry: ${item.title}`}
+              title={copiedEntryId === item.id ? 'Copied link' : 'Share entry'}
+            >
+              <Share2 size={12} />
+              <span className="share-label">{copiedEntryId === item.id ? 'Copied' : 'Share'}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1366,6 +1424,44 @@ export default function App() {
       )}
     </div>
   );
+
+  useEffect(() => {
+    if (loading || items.length === 0 || typeof window === 'undefined') {
+      return;
+    }
+
+    const hashMatch = window.location.hash.match(/^#entry-(\d+)$/);
+    if (!hashMatch) {
+      return;
+    }
+
+    const entryId = Number(hashMatch[1]);
+    const item = items.find((candidate) => candidate.id === entryId);
+    if (!item) {
+      return;
+    }
+
+    if (!item.pinned_at) {
+      const targetWeek = getWeekMetadata(item.created_at).key;
+      if (targetWeek !== activeWeekKey) {
+        setActiveWeekKey(targetWeek);
+        return;
+      }
+    }
+
+    window.setTimeout(() => {
+      const element = document.getElementById(getEntryAnchorId(item));
+      if (!element) {
+        return;
+      }
+
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedEntryId(item.id);
+      window.setTimeout(() => {
+        setHighlightedEntryId((current) => (current === item.id ? null : current));
+      }, 2600);
+    }, 100);
+  }, [activeWeekKey, items, loading]);
 
   return (
     <div className="feed-shell">

@@ -7,6 +7,7 @@ const dotcomsRoot = path.resolve(repoRoot, '..');
 const versionsManifestPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'versions.json');
 
 const apps = [
+  monorepoApp('Aphelion', 'aphelion'),
   monorepoApp('JeffersonWM Home', 'jeffersonwm'),
   monorepoApp('Feed', 'feed'),
   monorepoApp('Perihelion', 'perihelion'),
