@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Tourbillion publish wiring and control cleanup",
+  "content": "<p>Tourbillion got a small but useful cleanup pass focused on day-to-day control and release workflow.</p><p>What changed:</p><ul><li>Added a fullscreen toggle beside the settings trigger so the screensaver surface can be expanded without relying on browser chrome.</li><li>Removed the bottom-center overlay elements and trimmed the mode picker to the three active options, while leaving the other mode code in place for later use.</li><li>Wired Tourbillion into the JeffersonWM ASO publish flow with <code>publish:tourbillion</code>, <code>publish:tourb</code>, and inclusion in <code>publish:all</code>, while keeping the existing buildlog and version-history commands.</li></ul><p>This keeps Tourbillion lighter on screen and easier to publish from the shared JeffersonWM workflow.</p>",
+  "url": "https://jeffersonwm.com/tourbillion/",
+  "source": "manual",
+  "external_id": "tourbillion-publish-and-ui-pass-2026-08-09",
+  "created_at": "2026-08-09 14:35:00"
+}

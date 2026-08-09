@@ -10,9 +10,22 @@ interface HoverPreviewCardProps {
 export const HoverPreviewCard: React.FC<HoverPreviewCardProps> = ({ hover }) => {
   const [imgError, setImgError] = useState(false);
   const [previewSrc, setPreviewSrc] = useState<string>('');
-  const image = hover?.image ?? null;
+  const [settledImage, setSettledImage] = useState<HoverState['image'] | null>(null);
+  const image = settledImage;
 
   const imgWidth = 640;
+
+  useEffect(() => {
+    if (!hover?.image) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setSettledImage(hover.image);
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [hover?.image]);
 
   useEffect(() => {
     if (!image) {
@@ -42,7 +55,7 @@ export const HoverPreviewCard: React.FC<HoverPreviewCardProps> = ({ hover }) => 
     };
   }, [image?.imageUrl, image?.thumbUrl, imgWidth]);
 
-  if (!hover || !image) return null;
+  if (!image) return null;
 
   return (
     <AnimatePresence>
@@ -61,7 +74,7 @@ export const HoverPreviewCard: React.FC<HoverPreviewCardProps> = ({ hover }) => 
           zIndex: 50,
           pointerEvents: 'none',
         }}
-        className="overflow-hidden border border-[#e5e5e5]"
+        className="relative overflow-hidden border border-[#e5e5e5]"
       >
         {previewSrc && !imgError ? (
           <img
@@ -71,7 +84,13 @@ export const HoverPreviewCard: React.FC<HoverPreviewCardProps> = ({ hover }) => 
             className="w-full h-full object-cover"
             loading="eager"
           />
-        ) : null}
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#FAFAFA]">
+            <span className="font-sans text-sm font-semibold leading-none tracking-normal text-gray-500">
+              Loading
+            </span>
+          </div>
+        )}
       </motion.div>
     </AnimatePresence>
   );

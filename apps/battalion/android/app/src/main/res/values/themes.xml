@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark theme matching Battalion web app color palette.
+         We use Material.Light.NoActionBar as the parent because it's available
+         on all API 26+ devices. Compose draws its own UI on top of this, so
+         the parent theme only affects system bars and window chrome. -->
+    <style name="Theme.BattalionCompanion" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#1a1a2e</item>
+        <item name="android:statusBarColor">#0d1117</item>
+        <item name="android:navigationBarColor">#0d1117</item>
+    </style>
+</resources>

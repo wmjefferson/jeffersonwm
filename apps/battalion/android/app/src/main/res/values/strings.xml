@@ -1,0 +1,9 @@
+﻿<resources>
+    <string name="app_name">Battalion Companion</string>
+    <string name="widget_description">Battalion stats and quick actions</string>
+    <string name="login_hint">Password</string>
+    <string name="login_button">Connect to Battalion</string>
+    <string name="section_feeling">HOW ARE YOU FEELING?</string>
+    <string name="section_action">WHAT DID YOU DO?</string>
+    <string name="search_hint">Search actions...</string>
+</resources>

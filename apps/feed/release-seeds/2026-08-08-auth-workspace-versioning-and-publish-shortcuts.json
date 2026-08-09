@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Auth workspace publish/version shortcuts and standalone bump parity",
+  "content": "<p>Today focused on workflow cleanup rather than UI changes. The goal was to make versioning and publish steps easier to run from the workspace that is already open, especially for Auth JeffersonWM and the other standalone sites outside the JeffersonWM monorepo.</p><p>What changed:</p><ul><li><strong>Auth workspace publish shortcut:</strong> added a local <code>publish:auth</code> script inside Auth JeffersonWM so the shared auth publish flow can be triggered directly from that workspace.</li><li><strong>Auth version/log helpers:</strong> added local <code>buildlog</code>, <code>buildlog:auth</code>, <code>jeffvers</code>, and <code>jeffvers:auth</code> scripts so auth can use the shared JeffersonWM logging and version-history tools without switching folders.</li><li><strong>Local version bump commands:</strong> added <code>version:patch</code>, <code>version:minor</code>, and <code>version:major</code> to Auth JeffersonWM and the other standalone workspaces.</li><li><strong>Standalone parity:</strong> Clionidae, Dooky Detective, Jeffershizzle, Multimillion, WM Jefferson, and the JeffersonWM root now all expose the same local npm version bump pattern.</li><li><strong>Jeffershizzle compatibility:</strong> seeded <code>jeffershizzle/package.json</code> with version <code>0.0.0</code> so npm version commands can run there cleanly.</li></ul><p>This pass keeps the deployment logic centralized where it already belongs, while making everyday version bumps and publish commands much easier to remember when moving between workspaces.</p>",
+  "url": "https://auth.jeffersonwm.com/home",
+  "source": "manual",
+  "external_id": "auth-workspace-versioning-and-publish-shortcuts-2026-08-08",
+  "created_at": "2026-08-08 11:57:14"
+}

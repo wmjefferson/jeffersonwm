@@ -5,22 +5,36 @@ import { fileURLToPath } from 'node:url';
 import { collectFilesRecursively, readDeployConfig, uploadFileViaFtp } from './ftp-upload.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const dotcomsRoot = path.resolve(repoRoot, '..');
 const deployConfigPath = path.join(repoRoot, '.vscode', 'sftp.json');
 
 const appRegistry = {
   aphelion: app('Aphelion', 'aphelion', 'aphelion'),
   battalion: app('Battalion', 'battalion', 'battalion'),
   bullion: app('Bullion', 'bullion', 'bullion'),
+  clionidae: standaloneApp('Clionidae', 'clionidae', 'clionidae'),
+  clio: standaloneApp('Clionidae', 'clionidae', 'clionidae'),
   feed: app('Feed', 'feed', 'feed'),
   jeffersonwm: app('JeffersonWM', 'jeffersonwm', 'jeffersonwm'),
   jeffwm: app('JeffersonWM', 'jeffersonwm', 'jeffersonwm'),
   lionship: app('Lionship', 'lionship', 'lionship'),
   perihelion: app('Perihelion', 'perihelion', 'perihelion'),
   peri: app('Perihelion', 'perihelion', 'perihelion'),
+  tourbillion: app('Tourbillion', 'tourbillion', 'tourbillion'),
+  tourb: app('Tourbillion', 'tourbillion', 'tourbillion'),
 };
 
 function app(label, slug, remotePath) {
   const cwd = path.join(repoRoot, 'apps', slug);
+  return createAppConfig(label, slug, remotePath, cwd);
+}
+
+function standaloneApp(label, folderName, remotePath) {
+  const cwd = path.join(dotcomsRoot, folderName);
+  return createAppConfig(label, folderName, remotePath, cwd);
+}
+
+function createAppConfig(label, slug, remotePath, cwd) {
   return {
     label,
     slug,

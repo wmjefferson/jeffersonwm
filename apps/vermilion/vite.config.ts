@@ -1,6 +1,5 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import fs from 'fs';
 import path from 'path';
 import { defineConfig } from 'vite';
 
@@ -16,14 +15,7 @@ export default defineConfig({
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
           const urlPath = req.url ? req.url.split('?')[0] : '';
-          if (urlPath === '/' || urlPath === '/vermilion' || urlPath === '/vermilion/') {
-            const landingPath = path.resolve(__dirname, 'public', 'landing.html');
-            if (fs.existsSync(landingPath)) {
-              res.setHeader('Content-Type', 'text/html');
-              res.end(fs.readFileSync(landingPath, 'utf8'));
-              return;
-            }
-          }
+          // Landing page is paused for now; keep root on the SPA entry.
           if (urlPath === '/home' || urlPath === '/vermilion/home' || urlPath === '/vermilion/home/') {
             req.url = '/vermilion/index.html';
           }

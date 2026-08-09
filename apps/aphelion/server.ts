@@ -1,5 +1,5 @@
 import express from 'express';
-import { access, mkdir, readdir, stat, writeFile } from 'node:fs/promises';
+import { access, appendFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import dotenv from 'dotenv';
 import sharp from 'sharp';
@@ -92,7 +92,7 @@ async function startServer() {
   app.use(express.json({ limit: '10mb' }));
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', corsOrigin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,POST,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     if (req.method === 'OPTIONS') {
       res.sendStatus(204);
@@ -104,6 +104,7 @@ async function startServer() {
   let cachedCatalog: ImageItem[] | null = null;
   let cachedCatalogAt = 0;
   const weeklogDir = process.env.APHELION_WEEKLOG_DIR || 'E:\\aphelion\\weeklog';
+  const highlightLogDir = process.env.APHELION_HIGHLIGHT_LOG_DIR || 'E:\\aphelion\\logs';
 
   async function getImageRoot() {
     if (resolvedImageRoot) {
@@ -304,6 +305,187 @@ async function startServer() {
       catalogSize: cachedCatalog?.length || 0
     };
   }
+
+  function getMonthLogName(date = new Date()) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function extractImagePath(imageUrl: string) {
+    try {
+      const url = new URL(imageUrl, 'http://aphelion.local');
+      return url.searchParams.get('path') || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function cleanLogText(value: unknown, maxLength = 500) {
+    return String(value || '').replace(/[\r\n]+/g, ' ').slice(0, maxLength);
+  }
+
+  async function readHighlightEvents(limit = 5000) {
+    try {
+      await access(highlightLogDir);
+    } catch {
+      return [];
+    }
+
+    const entries = await readdir(highlightLogDir, { withFileTypes: true });
+    const logFiles = entries
+      .filter((entry) => entry.isFile() && /^highlight-events-\d{4}-\d{2}\.jsonl$/.test(entry.name))
+      .map((entry) => entry.name)
+      .sort()
+      .reverse();
+    const events: any[] = [];
+
+    for (const fileName of logFiles) {
+      const text = await readFile(path.join(highlightLogDir, fileName), 'utf8');
+      const lines = text.split(/\r?\n/).filter(Boolean).reverse();
+
+      for (const line of lines) {
+        try {
+          events.push(JSON.parse(line));
+        } catch {
+          // Ignore malformed log lines rather than breaking the public summary.
+        }
+
+        if (events.length >= limit) {
+          return events;
+        }
+      }
+    }
+
+    return events;
+  }
+
+  function summarizeHighlightEvents(events: any[]) {
+    const selectedEvents = events.filter((event) => event.action === 'selected' && event.image);
+    const imageMap = new Map<string, any>();
+    const folderMap = new Map<string, { folder: string; count: number }>();
+    const dailyMap = new Map<string, { date: string; selected: number; cleared: number }>();
+
+    for (const event of events) {
+      const date = String(event.timestamp || '').slice(0, 10) || 'unknown';
+      const day = dailyMap.get(date) || { date, selected: 0, cleared: 0 };
+      if (event.action === 'selected') {
+        day.selected += 1;
+      } else if (event.action === 'cleared' || event.action === 'cleared-all') {
+        day.cleared += 1;
+      }
+      dailyMap.set(date, day);
+
+      if (event.action !== 'selected' || !event.image) {
+        continue;
+      }
+
+      const imagePath = cleanLogText(event.image.path, 1000);
+      const key = imagePath || cleanLogText(event.image.code, 100);
+      const imageSummary = imageMap.get(key) || {
+        key,
+        count: 0,
+        lastSelectedAt: event.timestamp,
+        blockIndex: event.blockIndex,
+        image: {
+          id: event.image.id ?? null,
+          code: cleanLogText(event.image.code, 80),
+          title: cleanLogText(event.image.title, 200),
+          path: imagePath,
+          folder: cleanLogText(event.image.folder, 200),
+          thumbUrl: imagePath ? `/api/image?path=${encodeURIComponent(imagePath)}` : '',
+        },
+      };
+
+      imageSummary.count += 1;
+      if (String(event.timestamp || '') > String(imageSummary.lastSelectedAt || '')) {
+        imageSummary.lastSelectedAt = event.timestamp;
+        imageSummary.blockIndex = event.blockIndex;
+      }
+      imageMap.set(key, imageSummary);
+
+      const folder = cleanLogText(event.image.folder, 200) || 'Unknown folder';
+      const folderSummary = folderMap.get(folder) || { folder, count: 0 };
+      folderSummary.count += 1;
+      folderMap.set(folder, folderSummary);
+    }
+
+    const topImages = Array.from(imageMap.values())
+      .sort((a, b) => b.count - a.count || String(b.lastSelectedAt).localeCompare(String(a.lastSelectedAt)))
+      .slice(0, 60);
+    const topFolders = Array.from(folderMap.values())
+      .sort((a, b) => b.count - a.count || a.folder.localeCompare(b.folder))
+      .slice(0, 20);
+    const daily = Array.from(dailyMap.values())
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 30);
+
+    return {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      totalEvents: events.length,
+      selectedCount: selectedEvents.length,
+      clearedCount: events.filter((event) => event.action === 'cleared' || event.action === 'cleared-all').length,
+      topImages,
+      topFolders,
+      daily,
+      recentEvents: events.slice(0, 200),
+    };
+  }
+
+  app.post('/api/highlight-events', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const timestamp = new Date();
+      const action = cleanLogText(body.action, 40);
+      const allowedActions = new Set(['selected', 'cleared', 'cleared-all']);
+
+      if (!allowedActions.has(action)) {
+        res.status(400).json({ ok: false, error: 'Unsupported highlight action.' });
+        return;
+      }
+
+      const image = body.image && typeof body.image === 'object' ? body.image : {};
+      const event = {
+        timestamp: timestamp.toISOString(),
+        app: 'aphelion',
+        action,
+        blockIndex: Number.isFinite(Number(body.blockIndex)) ? Number(body.blockIndex) : null,
+        clearedCount: Number.isFinite(Number(body.clearedCount)) ? Number(body.clearedCount) : null,
+        image: action === 'cleared-all'
+          ? null
+          : {
+              id: Number.isFinite(Number(image.id)) ? Number(image.id) : null,
+              code: cleanLogText(image.code, 80),
+              title: cleanLogText(image.title, 200),
+              path: extractImagePath(cleanLogText(image.imageUrl, 1000)),
+              folder: cleanLogText(image.cameraInfo, 200),
+            },
+        isoWeek: getIsoWeekInfo(timestamp).label,
+      };
+
+      await mkdir(highlightLogDir, { recursive: true });
+      await appendFile(
+        path.join(highlightLogDir, `highlight-events-${getMonthLogName(timestamp)}.jsonl`),
+        `${JSON.stringify(event)}\n`,
+        'utf8'
+      );
+
+      res.json({ ok: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown highlight logging error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.get('/api/highlight-events/summary', async (req, res) => {
+    try {
+      const limit = Math.min(20000, Math.max(100, Number(req.query.limit || 5000)));
+      const events = await readHighlightEvents(limit);
+      res.json(summarizeHighlightEvents(events));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown highlight summary error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
 
   app.get('/health', async (_req, res) => {
     try {

@@ -15,9 +15,10 @@ import { ControlToolbar } from './components/ControlToolbar';
 import { ImageDetailModal } from './components/ImageDetailModal';
 import { UploadModal } from './components/UploadModal';
 import { StatsDrawer } from './components/StatsDrawer';
+import { HighlightsPage } from './components/HighlightsPage';
 
-const TOP_BANNER_HEIGHT = 48;
-const BOTTOM_BANNER_HEIGHT = 42;
+const TOP_BANNER_HEIGHT = 36;
+const BOTTOM_BANNER_HEIGHT = 36;
 const TOTAL_BANNER_HEIGHT = TOP_BANNER_HEIGHT + BOTTOM_BANNER_HEIGHT;
 const SIDE_GUTTER = BOTTOM_BANNER_HEIGHT;
 const TOTAL_SIDE_GUTTER = SIDE_GUTTER * 2;
@@ -25,6 +26,8 @@ const PREVIEW_SQUARE_SIZE = 640;
 
 export default function App() {
   const apiBaseUrl = import.meta.env.VITE_APHELION_API_BASE_URL || '';
+  const [currentHash, setCurrentHash] = useState(window.location.hash);
+  const isHighlightsPage = currentHash === '#highlights';
   const [viewport, setViewport] = useState({
     width: Math.max(100, window.innerWidth - TOTAL_SIDE_GUTTER),
     height: Math.max(100, window.innerHeight - TOTAL_BANNER_HEIGHT),
@@ -47,6 +50,12 @@ export default function App() {
       return new Set();
     }
   });
+
+  useEffect(() => {
+    const handleHashChange = () => setCurrentHash(window.location.hash);
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Resize Listener for dynamic grid recalculation
   useEffect(() => {
@@ -181,11 +190,42 @@ export default function App() {
     });
   }, []);
 
+  const logHighlightEvent = useCallback((payload: {
+    action: 'selected' | 'cleared' | 'cleared-all';
+    blockIndex?: number;
+    clearedCount?: number;
+    image?: ImageItem;
+  }) => {
+    const url = `${apiBaseUrl}/api/highlight-events`;
+    void fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: payload.action,
+        blockIndex: payload.blockIndex,
+        clearedCount: payload.clearedCount,
+        image: payload.image
+          ? {
+              id: payload.image.id,
+              code: payload.image.code,
+              title: payload.image.title,
+              imageUrl: payload.image.imageUrl,
+              cameraInfo: payload.image.cameraInfo,
+            }
+          : null,
+      }),
+      keepalive: true,
+    }).catch((error) => {
+      console.warn('Aphelion highlight event could not be logged.', error);
+    });
+  }, [apiBaseUrl]);
+
   useEffect(() => {
     localStorage.setItem('aphelion_highlighted_blocks', JSON.stringify([...highlightedBlocks]));
   }, [highlightedBlocks]);
 
   const handleBlockClick = useCallback((image: ImageItem, blockIndex: number) => {
+    const action = highlightedBlocks.has(blockIndex) ? 'cleared' : 'selected';
     setHighlightedBlocks((current) => {
       const next = new Set(current);
       if (next.has(blockIndex)) {
@@ -195,8 +235,9 @@ export default function App() {
       }
       return next;
     });
+    logHighlightEvent({ action, blockIndex, image });
     setSelectedImage(image);
-  }, []);
+  }, [highlightedBlocks, logHighlightEvent]);
 
   const selectedImages = useMemo(() => {
     return [...highlightedBlocks]
@@ -205,15 +246,20 @@ export default function App() {
   }, [highlightedBlocks]);
 
   const handleClearHighlights = () => {
+    logHighlightEvent({ action: 'cleared-all', clearedCount: highlightedBlocks.size });
     setHighlightedBlocks(new Set());
     setHoverState(null);
     setPage('grid');
   };
 
+  if (isHighlightsPage) {
+    return <HighlightsPage apiBaseUrl={apiBaseUrl} />;
+  }
+
   if (page === 'selected') {
     return (
       <div className="min-h-screen bg-[#FAFAFA] text-slate-800">
-        <header className="h-[48px] px-6 bg-[#FAFAFA] flex items-center justify-start shrink-0 relative z-20">
+        <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-start shrink-0 relative z-20">
           <button
             type="button"
             onClick={() => setPage('grid')}
@@ -223,8 +269,8 @@ export default function App() {
           </button>
         </header>
 
-        <main className="min-h-[calc(100vh-48px)] border-t border-[#e5e5e5] bg-[#FAFAFA] px-[42px] py-[42px]">
-          <div className="grid grid-cols-2 gap-[42px] min-[1180px]:grid-cols-4 min-[1700px]:grid-cols-5">
+        <main className="min-h-[calc(100vh-36px)] border-t border-[#e5e5e5] bg-[#FAFAFA] px-[36px] py-[36px]">
+          <div className="grid grid-cols-2 gap-[36px] min-[1180px]:grid-cols-4 min-[1700px]:grid-cols-5">
             {selectedImages.map(({ blockIndex, image }) => (
               <figure key={blockIndex} className="m-0">
                 <img
@@ -243,7 +289,7 @@ export default function App() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#FAFAFA] text-slate-800">
-      <header className="h-[48px] px-6 bg-[#FAFAFA] flex items-center justify-start shrink-0 relative z-20">
+      <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-start shrink-0 relative z-20">
         <a
           href="/aphelion/"
           className="font-sans font-semibold text-sm leading-none tracking-normal text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
@@ -251,7 +297,7 @@ export default function App() {
           Aphelion
         </a>
         {highlightedBlocks.size > 0 && (
-          <div className="absolute left-6 top-[28px] flex items-center gap-3 font-sans text-[11px] leading-none text-gray-500">
+          <div className="ml-5 flex items-center gap-3 font-sans text-[11px] leading-none text-gray-500">
             <button
               type="button"
               onClick={() => setPage('selected')}
@@ -270,9 +316,9 @@ export default function App() {
         )}
       </header>
 
-      <main className="relative h-[calc(100vh-90px)] overflow-hidden bg-[#FAFAFA] px-[42px] z-10">
-        <div className="pointer-events-none absolute left-[42px] top-0 bottom-0 z-[55] border-l border-[#e5e5e5]" />
-        <div className="pointer-events-none absolute right-[42px] top-0 bottom-0 z-[55] border-r border-[#e5e5e5]" />
+      <main className="relative h-[calc(100vh-72px)] overflow-hidden bg-[#FAFAFA] px-[36px] z-10">
+        <div className="pointer-events-none absolute left-[36px] top-0 bottom-0 z-[55] border-l border-[#e5e5e5]" />
+        <div className="pointer-events-none absolute right-[36px] top-0 bottom-0 z-[55] border-r border-[#e5e5e5]" />
         <div className="pointer-events-none absolute left-0 right-0 top-0 z-[55] border-t border-[#e5e5e5]" />
         <div className="pointer-events-none absolute left-0 right-0 bottom-0 z-[55] border-b border-[#e5e5e5]" />
         <div className="pointer-events-none fixed left-1/2 top-1/2 z-[60] h-[640px] w-[640px] -translate-x-1/2 -translate-y-1/2 border border-[#e5e5e5]" />
@@ -290,9 +336,17 @@ export default function App() {
         />
       </main>
 
-      <footer className="h-[42px] px-6 bg-[#FAFAFA] flex items-center justify-start shrink-0 relative z-20">
+      <footer className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-between shrink-0 relative z-20">
         <p className="m-0 leading-none text-gray-500 text-sm font-sans">
-          Aphelion &copy; {new Date().getFullYear()}{' '}
+          <a
+            href="/aphelion/#highlights"
+            className="text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+          >
+            Highlights
+          </a>
+        </p>
+        <p className="m-0 leading-none text-gray-500 text-sm font-sans">
+          &copy; {new Date().getFullYear()}{' '}
           <a
             href="https://jeffersonwm.com"
             target="_blank"

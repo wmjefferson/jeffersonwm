@@ -1,0 +1,116 @@
+import React, { useEffect, useState } from 'react';
+
+interface HighlightImageSummary {
+  key: string;
+  count: number;
+  lastSelectedAt: string;
+  blockIndex: number | null;
+  image: {
+    code: string;
+    title: string;
+    path: string;
+    folder: string;
+    thumbUrl: string;
+  };
+}
+
+interface HighlightEvent {
+  timestamp: string;
+  action: 'selected' | 'cleared' | 'cleared-all';
+  blockIndex: number | null;
+  clearedCount: number | null;
+  image: HighlightImageSummary['image'] | null;
+}
+
+interface HighlightSummary {
+  ok: boolean;
+  generatedAt: string;
+  totalEvents: number;
+  selectedCount: number;
+  clearedCount: number;
+  topImages: HighlightImageSummary[];
+  topFolders: Array<{ folder: string; count: number }>;
+  daily: Array<{ date: string; selected: number; cleared: number }>;
+  recentEvents: HighlightEvent[];
+}
+
+export function HighlightsPage({ apiBaseUrl }: { apiBaseUrl: string }) {
+  const [summary, setSummary] = useState<HighlightSummary | null>(null);
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSummary() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/highlight-events/summary`);
+        if (!response.ok) {
+          throw new Error(`Highlight summary returned ${response.status}`);
+        }
+
+        const payload = (await response.json()) as HighlightSummary;
+        if (!cancelled) {
+          setSummary(payload);
+          setError('');
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : 'Highlights could not be loaded.');
+        }
+      }
+    }
+
+    void loadSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl]);
+
+  return (
+    <div className="min-h-screen bg-[#FAFAFA] text-gray-950">
+      <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-between border-b border-[#e5e5e5]">
+        <a href="/aphelion/" className="font-sans text-sm font-semibold text-gray-900">
+          Aphelion
+        </a>
+        <a href="/aphelion/" className="font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7]">
+          Back
+        </a>
+      </header>
+
+      <main className="px-[36px] py-[36px]">
+        {error && (
+          <div className="mb-[36px] border border-red-200 bg-red-50 p-4 font-sans text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {!summary && !error && (
+          <div className="font-sans text-sm text-gray-500">Loading highlight activity...</div>
+        )}
+
+        {summary && (
+          summary.topImages.length === 0 ? (
+            <div className="font-sans text-sm text-gray-500">No highlights have been recorded yet.</div>
+          ) : (
+            <div className="grid grid-cols-2 gap-[36px] min-[1180px]:grid-cols-4 min-[1700px]:grid-cols-5">
+              {summary.topImages.map((item) => (
+                <figure key={item.key} className="group relative m-0" title={`${item.count} selected`}>
+                  <img
+                    src={`${apiBaseUrl}${item.image.thumbUrl}`}
+                    alt={item.image.title || item.image.code}
+                    className="block aspect-square w-full border border-[#e5e5e5] object-cover"
+                    loading="lazy"
+                  />
+                  <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-[#FAFAFA]/85 px-3 py-2 font-sans text-sm font-semibold text-gray-900 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    {item.count} selected
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          )
+        )}
+      </main>
+    </div>
+  );
+}

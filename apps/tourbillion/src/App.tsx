@@ -61,6 +61,7 @@ export default function App() {
   
   const [showSettings, setShowSettings] = useState(false);
   const [isMouseIdle, setIsMouseIdle] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(() => Boolean(document.fullscreenElement));
   
   const starsRef = useRef<Star[]>([]);
   const matrixRef = useRef<MatrixColumn[]>([]);
@@ -93,6 +94,14 @@ export default function App() {
   useEffect(() => { resetTimeMaxRef.current = resetTimeMax; }, [resetTimeMax]);
   useEffect(() => { resetTilesLimitRef.current = resetTilesLimit; }, [resetTilesLimit]);
   useEffect(() => { qualityRef.current = quality; }, [quality]);
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   const initStars = useCallback(() => {
     const { innerWidth: width, innerHeight: height } = window;
@@ -350,6 +359,15 @@ export default function App() {
     setResetTilesLimit(200);
   };
 
+  const toggleFullscreen = async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    await document.documentElement.requestFullscreen();
+  };
+
   return (
     <div 
       className={`fixed inset-0 bg-black transition-all duration-700 ${isMouseIdle ? 'cursor-none' : 'cursor-default'}`}
@@ -368,7 +386,14 @@ export default function App() {
         id="main-canvas"
       />
 
-      <SettingsTrigger hidden={isMouseIdle} onOpen={() => setShowSettings(true)} />
+      <SettingsTrigger
+        hidden={isMouseIdle}
+        isFullscreen={isFullscreen}
+        onOpen={() => setShowSettings(true)}
+        onToggleFullscreen={() => {
+          toggleFullscreen().catch(() => undefined);
+        }}
+      />
 
       <AnimatePresence>
         <SettingsPanel

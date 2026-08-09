@@ -30,6 +30,7 @@ const appRegistry = {
   verm: monorepoApp('Vermilion', 'vermilion'),
   auth: standaloneApp('Auth / Multimillion', 'auth-jeffersonwm'),
   'auth-jeffersonwm': standaloneApp('Auth / Multimillion', 'auth-jeffersonwm'),
+  copy: standaloneApp('Copy', 'copy'),
   clionidae: standaloneApp('Clionidae', 'clionidae'),
   clio: standaloneApp('Clionidae', 'clionidae'),
   dookydetective: standaloneApp('Dooky Detective', 'dookydetective'),

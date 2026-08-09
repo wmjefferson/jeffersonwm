@@ -8,7 +8,7 @@ const versionsManifestPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'version
 
 const apps = [
   monorepoApp('Aphelion', 'aphelion'),
-  monorepoApp('JeffersonWM Home', 'jeffersonwm'),
+  monorepoApp('JeffersonWM', 'jeffersonwm'),
   monorepoApp('Feed', 'feed'),
   monorepoApp('Perihelion', 'perihelion'),
   monorepoApp('Battalion', 'battalion'),
@@ -18,9 +18,10 @@ const apps = [
   monorepoApp('Tourbillion', 'tourbillion'),
   monorepoApp('Bullion', 'bullion'),
   standaloneApp('Auth / Multimillion', 'auth-jeffersonwm', 'auth'),
+  standaloneApp('Copy', 'copy'),
   standaloneApp('Clionidae', 'clionidae'),
   standaloneApp('Dooky Detective', 'dookydetective'),
-  standaloneApp('WM Jefferson', 'wmjefferson'),
+  standaloneApp('WMJefferson', 'wmjefferson'),
   standaloneApp('Multimillion', 'multimillion'),
   registryApp('Stallioneer', 'stallioneer'),
   registryApp('Jeffershizzle', 'jeffershizzle'),

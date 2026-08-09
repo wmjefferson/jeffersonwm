@@ -1,0 +1,136 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#CC1a1a2e"
+    android:padding="10dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+            android:id="@+id/widget_level"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⚔ Lv.1 Recruit"
+            android:textColor="#4fc3f7"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/widget_mood"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="😐 okay"
+            android:textColor="#90caf9"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/widget_stats_area"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="6dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <TextView
+                android:id="@+id/widget_hp_text"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:text="HP 35/100"
+                android:textColor="#90caf9"
+                android:textSize="11sp" />
+            <ProgressBar
+                android:id="@+id/widget_hp_bar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="0dp"
+                android:layout_height="6dp"
+                android:layout_weight="1"
+                android:progressTint="#66bb6a"
+                android:progressBackgroundTint="#2a2a4a"
+                android:max="100"
+                android:progress="35" />
+            <TextView
+                android:id="@+id/widget_gold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="50g"
+                android:textColor="#ffd54f"
+                android:textSize="11sp"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="4dp">
+            <TextView
+                android:id="@+id/widget_xp_text"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:text="XP 0/500"
+                android:textColor="#90caf9"
+                android:textSize="11sp" />
+            <ProgressBar
+                android:id="@+id/widget_xp_bar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="0dp"
+                android:layout_height="6dp"
+                android:layout_weight="1"
+                android:progressTint="#4fc3f7"
+                android:progressBackgroundTint="#2a2a4a"
+                android:max="500"
+                android:progress="0" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+        <Button
+            android:id="@+id/widget_btn_action1"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:text="Water"
+            android:textSize="10sp"
+            android:textColor="#1a1a2e"
+            android:backgroundTint="#4fc3f7"
+            android:padding="0dp" />
+        <Button
+            android:id="@+id/widget_btn_action2"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:text="Bed"
+            android:textSize="10sp"
+            android:textColor="#1a1a2e"
+            android:backgroundTint="#4fc3f7"
+            android:padding="0dp" />
+        <Button
+            android:id="@+id/widget_btn_action3"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:text="Walk"
+            android:textSize="10sp"
+            android:textColor="#1a1a2e"
+            android:backgroundTint="#4fc3f7"
+            android:padding="0dp" />
+    </LinearLayout>
+
+</LinearLayout>

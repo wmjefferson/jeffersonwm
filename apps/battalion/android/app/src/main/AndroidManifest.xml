@@ -1,0 +1,79 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AndroidManifest.xml
+  The "table of contents" for the Android app. Every Activity,
+  Service, BroadcastReceiver, and permission must be declared here.
+  Android reads this file to know what components exist before
+  it ever runs any of your code.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- INTERNET: required to make network calls to the Battalion API -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- RECEIVE_BOOT_COMPLETED: lets us reschedule the widget alarm after a reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BattalionCompanion"
+        android:usesCleartextTraffic="false">
+
+        <!--
+          LoginActivity: the entry point of the app (MAIN + LAUNCHER).
+          This is the first screen shown when the user taps the app icon.
+          It immediately redirects to MainActivity if already logged in.
+        -->
+        <activity
+            android:name=".LoginActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          MainActivity: the main content screen (stats, emotions, actions).
+          Not exported — only accessible from within the app or from the widget.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop" />
+
+        <!--
+          BattalionWidget: the home screen widget.
+
+          CONCEPT: A widget is an AppWidgetProvider, which is a special
+          BroadcastReceiver. Android sends it broadcasts for events like
+          "update now", "widget added", "widget removed".
+
+          The intent-filter for APPWIDGET_UPDATE is what makes Android
+          recognize this class as a widget provider.
+
+          android:meta-data points to battalion_widget_info.xml which
+          tells the launcher the widget's size and update frequency.
+        -->
+        <receiver
+            android:name=".BattalionWidget"
+            android:exported="true">
+            <intent-filter>
+                <!-- Standard system broadcast: "time to update the widget" -->
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <!-- Our custom broadcast: "a quick-action button was tapped" -->
+                <action android:name="com.jeffersonwm.battalion.PERFORM_ACTION" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/battalion_widget_info" />
+        </receiver>
+
+    </application>
+
+</manifest>

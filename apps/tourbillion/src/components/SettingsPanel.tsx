@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Activity, Bird, Code, Pipette, RotateCcw, Stars, TrainFront, X } from 'lucide-react';
+import { Code, RotateCcw, Stars, TrainFront, X } from 'lucide-react';
 
 import type { Mode, QualityLevel, ResetTrigger } from '../types';
 
@@ -39,9 +39,9 @@ interface SettingsPanelProps {
 const modeOptions = [
   { id: 'starfield', icon: Stars, label: 'Stars' },
   { id: 'matrix', icon: Code, label: 'Code' },
-  { id: 'mystify', icon: Activity, label: 'Vector' },
-  { id: 'pipes', icon: Pipette, label: 'Pipes' },
-  { id: 'toasters', icon: Bird, label: 'Wings' },
+  // { id: 'mystify', icon: Activity, label: 'Vector' },
+  // { id: 'pipes', icon: Pipette, label: 'Pipes' },
+  // { id: 'toasters', icon: Bird, label: 'Wings' },
   { id: 'trains', icon: TrainFront, label: 'Trains' },
 ] as const satisfies ReadonlyArray<{ id: Mode; icon: typeof Stars; label: string }>;
 
