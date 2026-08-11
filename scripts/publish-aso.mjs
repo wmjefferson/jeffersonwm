@@ -18,10 +18,14 @@ const appRegistry = {
   jeffersonwm: app('JeffersonWM', 'jeffersonwm', 'jeffersonwm'),
   jeffwm: app('JeffersonWM', 'jeffersonwm', 'jeffersonwm'),
   lionship: app('Lionship', 'lionship', 'lionship'),
+  millionfold: app('Millionfold', 'millionfold', 'millionfold'),
+  mill: app('Millionfold', 'millionfold', 'millionfold'),
   perihelion: app('Perihelion', 'perihelion', 'perihelion'),
   peri: app('Perihelion', 'perihelion', 'perihelion'),
   tourbillion: app('Tourbillion', 'tourbillion', 'tourbillion'),
   tourb: app('Tourbillion', 'tourbillion', 'tourbillion'),
+  vermilion: app('Vermilion', 'vermilion', 'vermilion'),
+  verm: app('Vermilion', 'vermilion', 'vermilion'),
 };
 
 function app(label, slug, remotePath) {

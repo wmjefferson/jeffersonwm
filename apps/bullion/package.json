@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "publish": "node ..\\..\\scripts\\publish-aso.mjs --app bullion",
+    "preview": "vite preview",
+    "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version"
   },
   "dependencies": {
     "react-dom": "^19.2.4",

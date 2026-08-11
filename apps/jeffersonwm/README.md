@@ -22,6 +22,27 @@ cd apps/jeffersonwm
 npm run dev
 ```
 
+For the future JeffersonWM-owned widget API:
+
+```powershell
+cd apps/jeffersonwm
+npm run dev:api
+npm run typecheck:api
+```
+
+The widget API reads from `.env.development` or `.env.production`. Start from `.env.example` when the new MySQL database is created.
+
+## Widget Migration
+
+The homepage widget is moving out of Lionship and into JeffersonWM. During the migration, the public widget markup remains in `index.html`, but the widget is paused so the live homepage does not depend on Lionship widget endpoints.
+
+Database setup files:
+
+- `database/widget-schema.sql` creates the future JeffersonWM widget tables.
+- `database/widget-migration-from-legacy.sql` documents how to copy old `jeffers4_dates` and `jeffers4_fonts` data into the new widget database.
+
+Do not delete the legacy databases until the new JeffersonWM API is verified live and cPanel/env references have been checked.
+
 ## Deployment
 
 Hosted path:

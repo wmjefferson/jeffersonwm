@@ -462,8 +462,8 @@ const buildGalleryStateUrl = (state: GalleryLocationState) => {
 const LAST_FOLDER_PATH_STORAGE_KEY = 'peri_last_folder_path';
 const MAX_MODE_ROW_HEIGHT = 84;
 const MAX_MODE_LIMIT = 100;
-const ROW_HEIGHT_OPTIONS = [150, 200, 250, 300, 400];
-const LIMIT_OPTIONS = [10, 25, 40, 50];
+const ROW_HEIGHT_OPTIONS = [100, 150, 200, 250, 300, 400];
+const LIMIT_OPTIONS = [10, 25, 40, 50, 100];
 
 const loadLastFolderPath = () => {
   try {
@@ -2235,7 +2235,7 @@ export default function App() {
         ) : (
           <>
             {/* Copy-to-clipboard Short URL widget */}
-            <div className="flex items-center gap-2 border-[2px] border-black bg-white px-3 py-1.5 font-mono text-[10px] sm:text-xs shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] max-w-full overflow-x-auto mt-4">
+            <div className="flex items-center gap-2 border-[2px] border-black bg-white px-3 py-1.5 font-sans text-[10px] sm:text-xs shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] max-w-full overflow-x-auto mt-4">
               <span className="text-[#888] uppercase font-bold tracking-wider mr-1">Share Link:</span>
               <a href={shareUrl} className="text-black hover:underline font-bold" target="_blank" rel="noopener noreferrer">
                 {shareUrl}
@@ -2260,7 +2260,7 @@ export default function App() {
             {(sharedTitle || sharedDescription) && (
               <div className="flex flex-col items-center text-center w-full max-w-4xl mt-8 mb-4">
                 {sharedTitle && (
-                  <h1 className="text-2xl font-serif font-bold break-words">
+                  <h1 className="text-2xl font-sans font-bold break-words">
                     {sharedTitle}
                   </h1>
                 )}
@@ -2331,7 +2331,7 @@ export default function App() {
 
 
   return (
-    <div className="min-h-screen text-black flex flex-col selection:bg-black selection:text-white bg-[#F0F0F0]">
+    <div className={`min-h-screen text-black flex flex-col selection:bg-black selection:text-white bg-[#fafafa] ${view === 'staging' ? '' : 'peri-shell'}`}>
       {view === 'staging' ? (
         <StagingView
           selectedImages={stagedImages}
@@ -2344,13 +2344,14 @@ export default function App() {
         />
       ) : (
         <>
-          <header className="h-[36px] bg-white border-b-[3px] border-black sticky top-0 z-40 flex items-center justify-between px-4 shrink-0 gap-4">
-        <h1 className="font-archivo text-[15px] uppercase tracking-wider font-bold">
-          <a href={getPerihelionAppUrl()} className="hover:opacity-70 transition-opacity">
+          <header className="page-banner page-banner--top">
+        <div className="page-banner__inner shell-frame">
+        <h1 className="font-sans text-[15px] font-bold">
+          <a href={getPerihelionAppUrl()} className="page-banner__brand">
             Perihelion
           </a>
         </h1>
-        <div className="flex items-center gap-3 font-sans text-[11px] font-bold uppercase tracking-widest">
+        <div className="flex items-center gap-3 font-sans text-[11px] font-bold">
           {authLoading ? (
             <span className="text-[#888]">Checking AccountÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦</span>
           ) : authStatus?.user ? (
@@ -2410,13 +2411,63 @@ export default function App() {
             </button>
           )}
         </div>
+        </div>
       </header>
 
-      <main className="flex-1 px-[42px] pt-[24px] pb-[42px] max-w-none mx-auto w-full text-[15px]">
+      <div className="shell-gutters" aria-hidden="true">
+        <div className="shell-gutter shell-gutter--left" />
+        <div className="shell-gutter shell-gutter--right" />
+      </div>
+
+      <main className="peri-shell__body text-[15px]">
         {!showPrivateGate && (
-          <div className="mb-6 flex flex-col gap-1 border-b-[2px] border-[#DDD] pb-2">
+          <div className="peri-toolbar-divider mb-6 flex flex-col gap-1 pb-2">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
+            <div className="peri-toolbar-group">
+              <span className={`peri-control-label ${isMaxMode ? 'text-[#c8c8c8]' : 'text-[#6a716b]'}`}>Image Height</span>
+              {ROW_HEIGHT_OPTIONS.map(num => (
+                <button
+                  key={num}
+                  onClick={() => {
+                    setRowHeight(num);
+                    if (isMaxMode) setLimit(25);
+                  }}
+                  className={
+                    isMaxMode
+                      ? 'text-[#c8c8c8] hover:text-[#888]'
+                      : rowHeight === num
+                        ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
+                        : 'text-[#888] hover:text-black'
+                  }
+                >
+                  {num}px
+                </button>
+              ))}
+            </div>
+
+            <div className="peri-toolbar-group">
+              <span className={`peri-control-label ${isMaxMode ? 'text-[#c8c8c8]' : 'text-[#6a716b]'}`}>Items per page</span>
+              {Array.from(new Set([...LIMIT_OPTIONS, ...(isMaxMode ? [MAX_MODE_LIMIT] : []), limit])).sort((a, b) => a - b).map(num => (
+                <button
+                  key={num}
+                  onClick={() => {
+                    if (isMaxMode && num !== MAX_MODE_LIMIT) setRowHeight(250);
+                    setLimit(num);
+                    setPage(1);
+                  }}
+                  className={
+                    isMaxMode
+                      ? num === MAX_MODE_LIMIT
+                        ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
+                        : 'text-[#C8C8C8] hover:text-[#888]'
+                      : limit === num
+                        ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
+                        : 'text-[#888] hover:text-black'
+                  }
+                >
+                  {num}
+                </button>
+              ))}
               <button
                 type="button"
                 onClick={() => {
@@ -2429,55 +2480,11 @@ export default function App() {
                   }
                   setPage(1);
                 }}
-                className={isMaxMode ? 'text-black font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#888] hover:text-black'}
+                className={`peri-control-label ${isMaxMode ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] hover:text-black'}`}
               >
                 Max Mode
               </button>
-              <span className={isMaxMode ? 'text-[#C8C8C8]' : 'text-[#888]'}>Image Height</span>
-              {ROW_HEIGHT_OPTIONS.map(num => (
-                <button
-                  key={num}
-                  onClick={() => {
-                    setRowHeight(num);
-                    if (isMaxMode) setLimit(25);
-                  }}
-                  className={
-                    isMaxMode
-                      ? 'text-[#C8C8C8] hover:text-[#888]'
-                      : rowHeight === num
-                        ? 'text-black underline decoration-[1.5px] underline-offset-[3px]'
-                        : 'text-[#888] hover:text-black'
-                  }
-                >
-                  {num}px
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
-              <span className={isMaxMode ? 'text-[#C8C8C8]' : 'text-[#888]'}>Items per page</span>
-              {Array.from(new Set([...LIMIT_OPTIONS, ...(isMaxMode ? [MAX_MODE_LIMIT] : []), limit])).sort((a, b) => a - b).map(num => (
-                <button
-                  key={num}
-                  onClick={() => {
-                    if (isMaxMode && num !== MAX_MODE_LIMIT) setRowHeight(250);
-                    setLimit(num);
-                    setPage(1);
-                  }}
-                  className={
-                    isMaxMode
-                      ? num === MAX_MODE_LIMIT
-                        ? 'text-black font-black underline decoration-[1.5px] underline-offset-[3px]'
-                        : 'text-[#C8C8C8] hover:text-[#888]'
-                      : limit === num
-                        ? 'text-black underline decoration-[1.5px] underline-offset-[3px]'
-                        : 'text-[#888] hover:text-black'
-                  }
-                >
-                  {num}
-                </button>
-              ))}
-              <label className="flex items-center gap-2 cursor-pointer text-[#888] hover:text-black transition-colors">
+              <label className="peri-control-label flex items-center gap-2 cursor-pointer hover:text-black transition-colors whitespace-nowrap">
                 <input
                   type="checkbox"
                   checked={includeOtherFiles}
@@ -2485,14 +2492,14 @@ export default function App() {
                     setIncludeOtherFiles(event.target.checked);
                     setPage(1);
                   }}
-                  className="w-4 h-4 accent-black border-[2px] border-[#666]"
+                  className="w-4 h-4 shrink-0 accent-black border-[2px] border-[#666]"
                 />
-                INCLUDE OTHERS
+                <span className="whitespace-nowrap">Include Others</span>
               </label>
             </div>
 
-            <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
-              <span className="text-[#888]">SHARE CODE</span>
+            <div className="peri-toolbar-group">
+              <span className="peri-control-label">Share Code</span>
               <div className="flex items-center gap-1.5">
                 <input
                   type="text"
@@ -2509,19 +2516,19 @@ export default function App() {
                       handleOpenShareCode();
                     }
                   }}
-                  className="bg-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[13px] focus:outline-none w-16 text-center font-mono placeholder:text-gray-300"
+                  className="peri-input px-2 py-0.5 text-[13px] uppercase w-16 text-center font-sans placeholder:text-gray-300"
                 />
                 <button
                   onClick={handleOpenShareCode}
                   disabled={shareCodeInput.length !== 4 || isValidatingCode}
-                  className="bg-black text-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[13px] hover:bg-[#333] transition-colors disabled:opacity-50 min-w-[32px] text-center"
+                  className="peri-button px-2 py-0.5 text-[13px] uppercase disabled:opacity-50 min-w-[32px] text-center"
                 >
                   {isValidatingCode ? '...' : 'Go'}
                 </button>
                 <button
                   onClick={handleLoadShareCode}
                   disabled={shareCodeInput.length !== 4 || isValidatingCode}
-                  className="bg-white text-black border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[13px] hover:bg-[#F3F3F3] transition-colors disabled:opacity-50 min-w-[52px] text-center"
+                  className="peri-button--secondary px-2 py-0.5 text-[13px] uppercase disabled:opacity-50 min-w-[52px] text-center"
                 >
                   Load
                 </button>
@@ -2534,9 +2541,9 @@ export default function App() {
             </div>
           </div>
 
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
-                <span className="text-[#888]">Global Tag</span>
+              <div className="peri-inline-actions gap-4">
+              <div className="peri-toolbar-group">
+                <span className="peri-control-label">Global Tag</span>
                 <select
                   value={selectedTag}
                   onChange={e => {
@@ -2546,7 +2553,7 @@ export default function App() {
                     setDebouncedSearch('');
                     setPage(1);
                   }}
-                  className="bg-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] focus:outline-none cursor-pointer"
+                    className="peri-select px-2 py-0.5 text-[11px] cursor-pointer"
                 >
                   <option value="">All Items</option>
                   {allTags.map(tag => (
@@ -2562,8 +2569,8 @@ export default function App() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
-                <span className="text-[#888]">Filter by List</span>
+              <div className="peri-toolbar-group">
+                <span className="peri-control-label">Filter by List</span>
                 <select
                   value={selectedList}
                   onChange={e => {
@@ -2573,7 +2580,7 @@ export default function App() {
                     setDebouncedSearch('');
                     setPage(1);
                   }}
-                  className="bg-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] focus:outline-none cursor-pointer"
+                    className="peri-select px-2 py-0.5 text-[11px] cursor-pointer"
                 >
                   <option value="">All Items</option>
                   {allShares.map(share => (
@@ -2584,8 +2591,8 @@ export default function App() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider">
-                <span className="text-[#888]">Search</span>
+              <div className="peri-toolbar-group">
+                <span className="peri-control-label">Search</span>
                 <div className="flex items-center gap-1.5">
                   <input
                     type="text"
@@ -2600,7 +2607,7 @@ export default function App() {
                         submitSearch();
                       }
                     }}
-                    className="bg-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] focus:outline-none w-36 sm:w-48 font-mono placeholder:text-gray-300"
+                    className="peri-input px-2 py-0.5 text-[11px] w-36 sm:w-48 font-sans placeholder:text-gray-300"
                   />
                   {searchQuery && (
                     <button
@@ -2612,7 +2619,7 @@ export default function App() {
                         setSearchQuery('');
                         setDebouncedSearch('');
                       }}
-                      className="bg-black text-white border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] hover:bg-[#333] transition-colors"
+                      className="peri-button px-2 py-0.5 text-[11px] uppercase"
                     >
                       {isGlobalSearch ? 'Back' : 'Clear'}
                     </button>
@@ -2620,7 +2627,7 @@ export default function App() {
                   <button
                     onClick={submitSearch}
                     disabled={searchQuery.trim().length < 4}
-                    className="bg-white text-black border-[2px] border-black px-2 py-0.5 font-bold uppercase text-[11px] hover:bg-[#F3F3F3] transition-colors disabled:opacity-50"
+                    className="peri-button--secondary px-2 py-0.5 text-[11px] uppercase disabled:opacity-50"
                   >
                     Search
                   </button>
@@ -2629,12 +2636,12 @@ export default function App() {
 
             </div>
 
-            <div className="flex items-center gap-3 font-sans text-[13px] font-bold uppercase tracking-wider mt-0.5 flex-wrap sm:flex-nowrap">
-              <span className="text-[#888]">Selection</span>
-              <button onClick={handleSelectAll} className="text-[#888] hover:text-black">Select Page</button>
-              <button onClick={handleDeselectAll} className="text-[#888] hover:text-black">Deselect Page</button>
+            <div className="peri-toolbar-group mt-0.5 flex-wrap sm:flex-nowrap">
+              <span className="peri-control-label">Selection</span>
+              <button onClick={handleSelectAll} className="font-sans text-[0.82rem] font-semibold text-[#6a716b] hover:text-black">Select Page</button>
+              <button onClick={handleDeselectAll} className="font-sans text-[0.82rem] font-semibold text-[#6a716b] hover:text-black">Deselect Page</button>
               {selectedImages.size > 0 && (
-                <button onClick={() => setSelectedImages(new Set())} className="text-[#888] hover:text-black">Clear All</button>
+                <button onClick={() => setSelectedImages(new Set())} className="font-sans text-[0.82rem] font-semibold text-[#6a716b] hover:text-black">Clear All</button>
               )}
               
               <span className="text-[#DDD]">|</span>
@@ -2644,7 +2651,7 @@ export default function App() {
                   setPage(1);
                 }}
                 disabled={selectedImages.size === 0}
-                className={`flex items-center gap-1 border-[2px] border-black px-1.5 py-0.5 text-[10px] font-bold uppercase transition-colors ${showSelectedOnly ? 'bg-black text-white' : 'bg-white text-black hover:bg-[#F3F3F3]'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`peri-toggle flex items-center gap-1 px-1.5 py-0.5 text-[10px] uppercase ${showSelectedOnly ? 'is-active' : ''} disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {showSelectedOnly ? 'Showing Selected Only' : 'Show Selected Only'}
               </button>
@@ -2658,14 +2665,14 @@ export default function App() {
                         setShowTagsPopover(!showTagsPopover);
                         setShowListsPopover(false);
                       }}
-                      className={`flex items-center gap-1.5 border-[2px] border-black px-2.5 py-1 text-[11px] font-bold uppercase transition-colors ${showTagsPopover ? 'bg-black text-white' : 'bg-white text-black hover:bg-[#F3F3F3]'}`}
+                      className={`peri-toggle flex items-center gap-1.5 px-2.5 py-1 text-[11px] uppercase ${showTagsPopover ? 'is-active' : ''}`}
                     >
                       <Tag size={12} />
                       Tags
                     </button>
                     {showTagsPopover && (
-                      <div className="absolute left-0 mt-1.5 z-50 w-64 bg-white border-[2px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-black normal-case font-sans">
-                        <div className="p-2 border-b-[2px] border-black flex items-center gap-1.5 bg-[#F9F9F9]">
+                      <div className="peri-popover absolute left-0 mt-1.5 z-50 w-64 text-black normal-case font-sans">
+                        <div className="peri-popover__header p-2 flex items-center gap-1.5">
                           <Search size={12} className="text-[#888]" />
                           <input
                             type="text"
@@ -2701,7 +2708,7 @@ export default function App() {
                                 setShowTagsPopover(false);
                               }
                             }}
-                            className="w-full bg-transparent text-[11px] font-mono focus:outline-none placeholder-gray-400 font-bold uppercase"
+                            className="w-full bg-transparent text-[11px] font-sans focus:outline-none placeholder-gray-400 font-bold uppercase"
                             onClick={e => e.stopPropagation()}
                           />
                           {tagSearch && (
@@ -2710,7 +2717,7 @@ export default function App() {
                             </button>
                           )}
                         </div>
-                        <div className="max-h-48 overflow-y-auto divide-y divide-[#DDD] font-mono text-[10px] lowercase">
+                        <div className="max-h-48 overflow-y-auto divide-y divide-[#DDD] font-sans text-[10px] lowercase">
                           {filteredTagOptions.map((tagName, index) => {
                               const { checked, indeterminate } = getTagState(tagName);
                               return (
@@ -2753,14 +2760,14 @@ export default function App() {
                         setShowListsPopover(!showListsPopover);
                         setShowTagsPopover(false);
                       }}
-                      className={`flex items-center gap-1.5 border-[2px] border-black px-2.5 py-1 text-[11px] font-bold uppercase transition-colors ${showListsPopover ? 'bg-black text-white' : 'bg-white text-black hover:bg-[#F3F3F3]'}`}
+                      className={`peri-toggle flex items-center gap-1.5 px-2.5 py-1 text-[11px] uppercase ${showListsPopover ? 'is-active' : ''}`}
                     >
                       <List size={12} />
                       Lists
                     </button>
                     {showListsPopover && (
-                      <div className="absolute left-0 mt-1.5 z-50 w-64 bg-white border-[2px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-black normal-case font-sans">
-                        <div className="p-2 border-b-[2px] border-black flex items-center gap-1.5 bg-[#F9F9F9]">
+                      <div className="peri-popover absolute left-0 mt-1.5 z-50 w-64 text-black normal-case font-sans">
+                        <div className="peri-popover__header p-2 flex items-center gap-1.5">
                           <Search size={12} className="text-[#888]" />
                           <input
                             type="text"
@@ -2799,7 +2806,7 @@ export default function App() {
                                 setShowListsPopover(false);
                               }
                             }}
-                            className="w-full bg-transparent text-[11px] font-mono focus:outline-none placeholder-gray-400 font-bold uppercase"
+                            className="w-full bg-transparent text-[11px] font-sans focus:outline-none placeholder-gray-400 font-bold uppercase"
                             onClick={e => e.stopPropagation()}
                           />
                           {listSearch && (
@@ -2808,7 +2815,7 @@ export default function App() {
                             </button>
                           )}
                         </div>
-                        <div className="max-h-48 overflow-y-auto divide-y divide-[#DDD] font-mono text-[10px] uppercase">
+                        <div className="max-h-48 overflow-y-auto divide-y divide-[#DDD] font-sans text-[10px] uppercase">
                           {filteredListOptions.map((share, index) => {
                               const { checked, indeterminate } = getListState(share.id);
                               return (
@@ -2898,7 +2905,7 @@ export default function App() {
                 </>
               )}
             </div>
-            <div className="font-mono text-xs font-bold uppercase tracking-wider text-[#666] flex flex-wrap items-center gap-y-1">
+            <div className="font-sans text-xs font-bold uppercase tracking-wider text-[#666] flex flex-wrap items-center gap-y-1">
               {selectedTag ? (
                 <>
                   <span>Global Tag:&nbsp;</span>
@@ -3005,8 +3012,8 @@ export default function App() {
         {displayFolders.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center justify-between gap-4 mb-4">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[#666]">Folders</h2>
-              <label className="flex items-center gap-2 cursor-pointer font-sans text-[11px] font-bold uppercase tracking-widest text-[#888] hover:text-black transition-colors">
+              <h2 className="peri-section-title">Folders</h2>
+              <label className="flex items-center gap-2 cursor-pointer font-sans text-[0.82rem] font-semibold text-[#6a716b] hover:text-black transition-colors">
                 <input
                   type="checkbox"
                   checked={showFolderThumbnails}
@@ -3040,7 +3047,7 @@ export default function App() {
                       navigateToPath(folder.path);
                     }
                   }}
-                  className="relative bg-white border-[2px] border-[#666] flex flex-col overflow-hidden hover:border-black hover:shadow-[0_0_0_2px_rgba(0,0,0,1)] transition-all group text-left cursor-pointer touch-manipulation flex-1 min-w-[240px] max-w-[420px]"
+                  className="peri-card relative flex flex-col overflow-hidden group text-left cursor-pointer touch-manipulation flex-1 min-w-[240px] max-w-[420px]"
                   style={{ flexBasis: 'clamp(240px, 24vw, 380px)' }}
                 >
                   {authStatus?.user?.isAdmin && (
@@ -3053,7 +3060,7 @@ export default function App() {
                         setFolderQuickEditDescription(folder.description || '');
                         setFolderQuickEditStatus('idle');
                       }}
-                      className="absolute right-2 top-2 z-10 rounded-full border-[1px] border-black bg-white/95 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-black opacity-0 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-opacity group-hover:opacity-100 hover:bg-black hover:text-white"
+                       className="absolute right-2 top-2 z-10 rounded-full border border-[#d4d4d8] bg-white/95 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-black opacity-0 transition-opacity group-hover:opacity-100 hover:border-[#9faab4] hover:bg-[#f8fafc]"
                     >
                       <span className="flex items-center gap-1">
                         <PencilLine size={10} strokeWidth={2.2} />
@@ -3064,7 +3071,7 @@ export default function App() {
                   {showFolderThumbnails ? (
                     <div
                       data-image-container
-                      className="w-full border-b-[2px] border-[#666] bg-[#e0e0e0] overflow-hidden"
+                      className="peri-card__divider w-full bg-[#eef2f6] overflow-hidden"
                       style={{ height: `${Math.max(120, Math.min(220, rowHeight - 30))}px` }}
                     >
                       <div className="grid h-full grid-cols-2">
@@ -3079,7 +3086,7 @@ export default function App() {
                           return (
                             <div
                               key={slot}
-                              className={`${isLast ? 'border-r-[2px]' : ''} border-[#666] h-full overflow-hidden`}
+                              className={`${isLast ? 'border-r' : ''} border-[#d4d4d8] h-full overflow-hidden`}
                             >
                               {previewPath && previewKind === 'image' ? (
                                 <>
@@ -3105,7 +3112,7 @@ export default function App() {
                                         resetImageFallback(event.currentTarget.closest('[data-image-container]'));
                                         setPreviewRetryTokens(prev => ({ ...prev, [slotKey]: (prev[slotKey] || 0) + 1 }));
                                       }}
-                                      className="border-[2px] border-black bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-colors"
+                                      className="peri-button--secondary px-3 py-1 text-[10px] uppercase tracking-widest"
                                     >
                                       Retry
                                     </button>
@@ -3140,22 +3147,22 @@ export default function App() {
                   <div className={`p-4 flex items-center gap-3 ${showFolderThumbnails ? '' : 'min-h-[84px]'}`}>
                     {!showFolderThumbnails && <FolderOpen size={20} className="text-black shrink-0" />}
                     <div className="min-w-0 flex-1">
-                      <span className="font-sans text-sm font-bold uppercase truncate block">{folder.name}</span>
+                      <span className="peri-card-name truncate block">{folder.name}</span>
                       {folder.title ? (
-                        <span className="mt-0.5 block font-sans text-[13px] font-bold normal-case tracking-wide text-black truncate">
+                        <span className="peri-card-title mt-0.5 block truncate">
                           {folder.title}
                         </span>
                       ) : null}
                       {folder.description ? (
-                        <p className="mt-1 text-[13px] leading-snug text-[#666] truncate" title={folder.description}>
+                        <p className="peri-card-description mt-1 truncate" title={folder.description}>
                           {folder.description}
                         </p>
                       ) : null}
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        <span className="border border-[#BBB] bg-[#F7F7F7] px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-[#666]">
+                        <span className="peri-chip px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-widest text-[#666]">
                           {folder.folderCount} {folder.folderCount === 1 ? 'Folder' : 'Folders'}
                         </span>
-                        <span className="border border-[#BBB] bg-[#F7F7F7] px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-[#666]">
+                        <span className="peri-chip px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-widest text-[#666]">
                           {folder.fileCount} {folder.fileCount === 1 ? 'File' : 'Files'}
                         </span>
                       </div>
@@ -3167,11 +3174,11 @@ export default function App() {
           </div>
         )}
 
-        <h2 className="text-xs font-bold uppercase tracking-widest text-[#666] mb-4">{includeOtherFiles ? 'Files' : 'Images'}</h2>
+        <h2 className="peri-section-title mb-4">{includeOtherFiles ? 'Files' : 'Images'}</h2>
         {accessError ? (
           <div className="flex flex-col items-center justify-center h-[40vh] text-center max-w-md mx-auto gap-5">
-            <div className="bg-white border-[2px] border-[#666] px-6 py-5 flex flex-col gap-3">
-              <h2 className="font-archivo text-2xl uppercase">Private Archive</h2>
+            <div className="peri-card px-6 py-5 flex flex-col gap-3">
+              <h2 className="font-sans text-2xl font-bold uppercase">Private Archive</h2>
               <p className="font-sans text-sm leading-relaxed text-[#666]">{accessError}</p>
               <div className="flex items-center justify-center gap-3">
                 <button
@@ -3181,7 +3188,7 @@ export default function App() {
                     setAuthError('');
                     setAuthMessage('');
                   }}
-                  className="bg-black text-white px-4 py-2 text-[11px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors"
+                  className="peri-button px-4 py-2 text-[11px] uppercase tracking-widest"
                 >
                   {usesCentralAuth ? 'Open Auth' : 'Sign In'}
                 </button>
@@ -3193,7 +3200,7 @@ export default function App() {
                       setAuthError('');
                       setAuthMessage('');
                     }}
-                    className="border-[2px] border-[#666] px-4 py-2 text-[11px] font-bold uppercase tracking-widest hover:border-black transition-colors"
+                    className="peri-button--secondary px-4 py-2 text-[11px] uppercase tracking-widest"
                   >
                     Create Admin
                   </button>
@@ -3207,11 +3214,11 @@ export default function App() {
           </div>
         ) : visibleEntries.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[40vh] text-center max-w-md mx-auto">
-            <div className="bg-white p-4 border-[2px] border-[#666] mb-6">
+            <div className="peri-card p-4 mb-6">
               <FolderOpen size={40} className="text-black" strokeWidth={1.5} />
             </div>
-            <h2 className="font-archivo text-2xl uppercase mb-3">{includeOtherFiles ? 'No files found' : 'No images found'}</h2>
-            <p className="font-serif text-lg leading-relaxed">
+            <h2 className="font-sans text-2xl font-bold uppercase mb-3">{includeOtherFiles ? 'No files found' : 'No images found'}</h2>
+            <p className="font-sans text-lg leading-relaxed">
               Drop {includeOtherFiles ? 'files' : 'image files'} into the <code className="bg-white border border-[#666] px-1.5 py-0.5 text-sm font-sans">images</code> folder on the backend.
             </p>
           </div>
@@ -3224,17 +3231,17 @@ export default function App() {
                 return (
               <div
                 key={entry.path || idx}
-                className={`bg-white border-[2px] flex flex-col transition-all group ${selectedImages.has(entry.path) ? 'border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-10' : 'border-[#666] hover:border-black'}`}
+                className={`peri-card flex flex-col transition-all group ${selectedImages.has(entry.path) ? 'is-selected z-10' : ''}`}
               >
                 <div
                   data-image-container
-                  className={`border-b-[2px] ${selectedImages.has(entry.path) ? 'border-black' : 'border-[#666]'} bg-[#e0e0e0] relative flex items-center justify-center overflow-hidden cursor-pointer`}
+                  className={`peri-card__divider bg-[#eef2f6] relative flex items-center justify-center overflow-hidden cursor-pointer`}
                   style={{ height: `${rowHeight}px` }}
                   onClick={() => openLightbox(entry.path)}
                 >
                   <button
                     onClick={e => toggleSelection(entry.path, e)}
-                    className={`absolute top-2 left-2 z-20 w-6 h-6 border-[2px] flex items-center justify-center transition-colors ${selectedImages.has(entry.path) ? 'bg-black border-black' : 'bg-white border-[#666] hover:border-black'}`}
+                    className={`absolute top-2 left-2 z-20 w-6 h-6 border flex items-center justify-center transition-colors ${selectedImages.has(entry.path) ? 'bg-[#202522] border-[#202522]' : 'bg-white border-[#9faab4] hover:border-[#202522]'}`}
                   >
                     {selectedImages.has(entry.path) && <Check size={16} className="text-white" strokeWidth={3} />}
                   </button>
@@ -3313,7 +3320,7 @@ export default function App() {
                 </div>
                 <div className="p-3 bg-white shrink-0" style={{ width: '0', minWidth: '100%' }}>
                   <p
-                    className={`font-sans text-sm font-bold uppercase truncate w-full block ${selectedImages.has(entry.path) ? 'text-black' : 'text-[#888]'}`}
+                    className={`peri-card-name truncate w-full block ${selectedImages.has(entry.path) ? 'text-black' : 'text-[#6a716b]'}`}
                     title={entry.path}
                   >
                     {entry.name}
@@ -3325,7 +3332,7 @@ export default function App() {
                         event.stopPropagation();
                         navigateToPath(entry.folderPath === 'root' ? '' : entry.folderPath);
                       }}
-                       className="mt-1 block max-w-full truncate text-left font-mono text-[12px] font-bold uppercase tracking-wider text-[#8A5A44] transition-colors hover:text-black hover:underline"
+                       className="peri-path-link mt-1 block max-w-full truncate text-left transition-colors hover:text-black hover:underline"
                       title={`Open folder: ${entry.folderPath}`}
                     >
                       {entry.folderPath}
@@ -3337,7 +3344,7 @@ export default function App() {
                         setSelectedTag('');
                         navigateToPath(dirname(entry.path) === 'root' ? '' : dirname(entry.path));
                       }}
-                       className="mt-1 block max-w-full truncate text-left font-mono text-[12px] font-bold uppercase tracking-wider text-[#8A5A44] transition-colors hover:text-black hover:underline"
+                       className="peri-path-link mt-1 block max-w-full truncate text-left transition-colors hover:text-black hover:underline"
                       title={`Open folder: ${dirname(entry.path)}`}
                     >
                       {dirname(entry.path)}
@@ -3372,13 +3379,13 @@ export default function App() {
           onClick={() => setFolderQuickEditPath('')}
         >
           <div
-            className="w-full max-w-[640px] border-[2px] border-[#666] bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+            className="peri-card w-full max-w-[640px]"
             onClick={event => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b-[2px] border-[#666] px-4 py-3">
+            <div className="peri-card__divider flex items-center justify-between px-4 py-3 bg-[#fafafa]">
               <div className="min-w-0">
-                <h2 className="font-archivo text-sm uppercase tracking-widest">Edit Folder</h2>
-                <p className="mt-0.5 text-[10px] font-mono text-[#888] truncate">{folderQuickEditPath}</p>
+                <h2 className="font-sans text-sm font-bold uppercase tracking-wide">Edit Folder</h2>
+                <p className="mt-0.5 text-[10px] font-sans text-[#888] truncate">{folderQuickEditPath}</p>
               </div>
               <button
                 onClick={() => setFolderQuickEditPath('')}
@@ -3396,7 +3403,7 @@ export default function App() {
                   value={folderQuickEditTitle}
                   onChange={e => setFolderQuickEditTitle(e.target.value)}
                   placeholder="Folder title"
-                  className="border-[1px] border-[#DDD] bg-[#FAFAFA] px-3 py-2 text-sm outline-none focus:border-black"
+                  className="peri-input bg-[#fafafa] px-3 py-2 text-sm"
                 />
               </label>
 
@@ -3407,7 +3414,7 @@ export default function App() {
                   onChange={e => setFolderQuickEditDescription(e.target.value)}
                   placeholder="Folder description"
                   rows={4}
-                  className="border-[1px] border-[#DDD] bg-[#FAFAFA] px-3 py-2 text-sm outline-none focus:border-black resize-y"
+                  className="peri-input bg-[#fafafa] px-3 py-2 text-sm resize-y"
                 />
               </label>
 
@@ -3415,7 +3422,7 @@ export default function App() {
                 <button
                   onClick={saveQuickFolderDetails}
                   disabled={folderQuickEditStatus === 'saving'}
-                  className="bg-black text-white px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors border-[2px] border-black disabled:bg-[#888] disabled:cursor-not-allowed"
+                  className="peri-button px-3 py-2 text-[10px] uppercase tracking-widest disabled:bg-[#888] disabled:border-[#888] disabled:cursor-not-allowed"
                 >
                   {folderQuickEditStatus === 'saving' ? 'Saving...' : folderQuickEditStatus === 'saved' ? 'Saved' : 'Save Folder'}
                 </button>
@@ -3432,11 +3439,12 @@ export default function App() {
       )}
 
       {!showPrivateGate && (
-        <footer className="h-[36px] bg-white border-t-[3px] border-black fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between px-4">
-          <div className="font-sans text-[13px] font-bold uppercase tracking-wider">
+        <footer className="page-banner page-banner--bottom">
+          <div className="page-banner__inner shell-frame">
+          <div className="font-sans text-[13px] font-bold uppercase tracking-wider text-[#202522]">
             PAGE {page} OF {computedTotalPages} / {selectedImages.size > 0 ? <span className="text-black bg-[#e0e0e0] px-1.5 py-0.5 mr-1">{selectedImages.size} SELECTED /</span> : null} {pagedEntries.length} SHOWN / {totalVisibleItems} TOTAL
           </div>
-          <div className="flex items-center gap-1 font-sans text-[13px] font-bold uppercase tracking-wider whitespace-nowrap">
+          <div className="flex items-center gap-1 font-sans text-[13px] font-bold uppercase tracking-wider whitespace-nowrap text-[#202522]">
             {previousSiblingFolder && (
               <button
                 type="button"
@@ -3515,6 +3523,7 @@ export default function App() {
                 {nextSiblingFolder.title || nextSiblingFolder.name}
               </button>
             )}
+          </div>
           </div>
         </footer>
       )}
@@ -3622,7 +3631,7 @@ export default function App() {
 
             {/* Copy Link Widget */}
             {selectedImage && (
-              <div className="w-full max-w-2xl bg-white border-[2px] border-black px-3 py-1.5 font-mono text-[10px] sm:text-xs shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between gap-2">
+              <div className="w-full max-w-2xl bg-white border-[2px] border-black px-3 py-1.5 font-sans text-[10px] sm:text-xs shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between gap-2">
                 <div className="truncate flex-1">
                   <span className="text-[#888] uppercase font-bold tracking-wider mr-1">Direct URL:</span>
                   <a 
@@ -3711,10 +3720,10 @@ export default function App() {
             <div className="w-full max-w-2xl bg-white border-[2px] border-black p-4 flex flex-col gap-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-left font-sans">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <h3 className="font-archivo text-sm font-bold uppercase tracking-wide truncate" title={labelWithoutExtension(selectedImage)}>
+                  <h3 className="font-sans text-sm font-bold uppercase tracking-wide truncate" title={labelWithoutExtension(selectedImage)}>
                     {editTitle || labelWithoutExtension(selectedImage)}
                   </h3>
-                  <span className="text-[10px] font-mono text-[#888] break-all block mt-0.5">
+                  <span className="text-[10px] font-sans text-[#888] break-all block mt-0.5">
                     {selectedImage}
                   </span>
                 </div>
@@ -3739,7 +3748,7 @@ export default function App() {
                   {editTags.map(tag => (
                     <span
                       key={tag}
-                      className="bg-[#F3F3F3] border border-[#666] text-black px-1.5 py-0.5 text-[10px] font-mono lowercase"
+                      className="bg-[#F3F3F3] border border-[#666] text-black px-1.5 py-0.5 text-[10px] font-sans lowercase"
                     >
                       #{tag}
                     </span>
@@ -3750,7 +3759,7 @@ export default function App() {
               <hr className="border-t border-[#DDD]" />
 
               {/* Image Properties */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-mono uppercase text-[#666]">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-sans uppercase text-[#666]">
                 <div className="flex items-center gap-1">
                   <span className="text-[#888]">Size:</span>
                   <span className="text-black font-bold">
@@ -3826,7 +3835,7 @@ export default function App() {
                         editTags.map(tag => (
                           <span
                             key={tag}
-                            className="inline-flex items-center gap-1 bg-white border border-black text-black px-1.5 py-0.5 text-[10px] font-mono lowercase"
+                            className="inline-flex items-center gap-1 bg-white border border-black text-black px-1.5 py-0.5 text-[10px] font-sans lowercase"
                           >
                             #{tag}
                             <button
@@ -3891,7 +3900,7 @@ export default function App() {
                                 <button
                                   key={suggestion}
                                   onClick={() => handleCommitEditTagChoice(suggestion)}
-                                  className={`w-full text-left px-2 py-1 text-[10px] font-mono lowercase block transition-colors ${activeTagInputIndex === index ? 'bg-black text-white' : 'hover:bg-[#F3F3F3] text-black'}`}
+                                  className={`w-full text-left px-2 py-1 text-[10px] font-sans lowercase block transition-colors ${activeTagInputIndex === index ? 'bg-black text-white' : 'hover:bg-[#F3F3F3] text-black'}`}
                                 >
                                 #{suggestion}
                               </button>
@@ -3899,7 +3908,7 @@ export default function App() {
                           {canCreateEditTagCandidate && (
                             <button
                               onClick={() => handleCommitEditTagChoice(createEditTagCandidate)}
-                              className={`w-full text-left px-2 py-1 text-[10px] font-mono lowercase block transition-colors ${activeTagInputIndex === filteredEditTagOptions.length ? 'bg-black text-white' : 'hover:bg-[#F3F3F3] text-black'}`}
+                              className={`w-full text-left px-2 py-1 text-[10px] font-sans lowercase block transition-colors ${activeTagInputIndex === filteredEditTagOptions.length ? 'bg-black text-white' : 'hover:bg-[#F3F3F3] text-black'}`}
                             >
                               Create "{createEditTagCandidate}"
                             </button>
@@ -3933,7 +3942,7 @@ export default function App() {
             onClick={event => event.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b-[2px] border-[#666] px-4 py-3">
-              <h2 className="font-archivo text-sm uppercase tracking-widest">{accountPanelTitle}</h2>
+              <h2 className="font-sans text-sm font-bold uppercase tracking-wide">{accountPanelTitle}</h2>
               <button
                 onClick={() => setAccountPanel(null)}
                 className="text-[#888] hover:text-black transition-colors"
@@ -3970,7 +3979,7 @@ export default function App() {
                         <div className="py-6 text-center text-[11px] font-bold uppercase tracking-widest text-[#888]">No tags found.</div>
                       ) : (
                         allTags.map(tag => (
-                          <div key={tag} className="flex items-center justify-between gap-3 py-2 text-[11px] font-mono lowercase">
+                          <div key={tag} className="flex items-center justify-between gap-3 py-2 text-[11px] font-sans lowercase">
                             {renamingTag === tag ? (
                               <div className="flex min-w-0 flex-1 items-center gap-2">
                                 <span className="font-bold text-black">#</span>
@@ -4046,7 +4055,7 @@ export default function App() {
                         <div className="py-6 text-center text-[11px] font-bold uppercase tracking-widest text-[#888]">No lists found.</div>
                       ) : (
                         allShares.map(share => (
-                          <div key={share.id} className="flex items-center justify-between py-2 text-[11px] font-mono uppercase">
+                          <div key={share.id} className="flex items-center justify-between py-2 text-[11px] font-sans uppercase">
                             <div className="flex flex-col min-w-0 pr-2">
                               <span className="font-bold text-black truncate">{share.title || share.id}</span>
                               <span className="text-[9px] text-[#888] mt-0.5">{share.itemCount} items ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {share.id}</span>

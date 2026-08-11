@@ -9,7 +9,12 @@
     "dev:client": "vite",
     "start": "node server.ts",
     "build": "vite build",
-    "preview": "vite preview"
+    "publish": "node ..\\..\\scripts\\publish-aso.mjs --app lionship",
+    "preview": "vite preview",
+    "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version"
   },
   "dependencies": {
     "@google/genai": "^1.37.0",

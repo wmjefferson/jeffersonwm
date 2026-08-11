@@ -1,14 +1,19 @@
 {
   "name": "perihelion",
   "private": true,
-  "version": "1.4.15",
+  "version": "1.5.1",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
     "start": "node server.ts",
     "build": "vite build",
+    "publish": "node ..\\..\\scripts\\publish-perihelion.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
+    "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

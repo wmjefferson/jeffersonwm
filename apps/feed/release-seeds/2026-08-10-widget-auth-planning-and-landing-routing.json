@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Widget auth planning and landing-page routing checkpoint",
+  "content": "<p>This checkpoint was about system direction more than visual polish. We used the session to lock in how the JeffersonWM homepage widget should grow into Auth JeffersonWM, while also simplifying how several public apps are entered from the web.</p><p>What changed:</p><ul><li><strong>Widget personalization plan:</strong> the homepage widget is set to stay inside <code>lionship</code> for now, but with a clear auth-aware module shape: public defaults for signed-out visitors, per-user location and special dates for signed-in users, and admin-managed global defaults.</li><li><strong>Implementation map:</strong> the data model, route layout, and build order were drafted in detail, including <code>widget_defaults</code>, per-user preference tables, resolved widget API responses, and separate user/admin route groups for future implementation.</li><li><strong>Landing-page bypass pass:</strong> public routing was simplified so several apps can skip their landing pages and go directly to <code>/home</code>, with Clionidae's server root now redirecting there as well.</li></ul><p>This gives the platform a clearer next step: Auth can start powering real user-facing personalization without adding a whole new tunnel or service too early, while public app entry points become simpler and more direct.</p>",
+  "url": "https://jeffersonwm.com/",
+  "source": "manual",
+  "external_id": "widget-auth-planning-and-landing-routing-2026-08-10",
+  "created_at": "2026-08-10 09:10:00"
+}

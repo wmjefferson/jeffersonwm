@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-09T04:16:41.574Z",
+  "updatedAt": "2026-08-10T04:28:19.686Z",
   "apps": {
     "jeffersonwm": {
       "label": "JeffersonWM",
@@ -38,8 +38,8 @@
     },
     "perihelion": {
       "label": "Perihelion",
-      "version": "1.4.15",
-      "updatedAt": "2026-08-06 12:59 PDT"
+      "version": "1.5.1",
+      "updatedAt": "2026-08-09 21:28 PDT"
     },
     "bullion": {
       "label": "Bullion",

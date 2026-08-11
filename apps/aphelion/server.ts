@@ -1,9 +1,18 @@
 import express from 'express';
 import { access, appendFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
 import path from 'node:path';
 import dotenv from 'dotenv';
 import sharp from 'sharp';
 import type { ImageItem } from './src/types';
+import { createCurationDb } from './curationDb';
+import type {
+  AdminCatalogPayload,
+  CardCatalogItem,
+  CardMetadataRecord,
+  CatalogStats,
+  SaveCardPayload,
+} from './src/curationTypes';
 
 const envFile = process.env.APHELION_ENV_FILE || (process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development');
 dotenv.config({ path: path.join(process.cwd(), envFile) });
@@ -34,6 +43,30 @@ const IMAGE_EXTENSIONS = new Set([
 ]);
 
 const SERVED_IMAGE_SIZE = 1024;
+
+function normalizeConfiguredPath(value: string) {
+  const trimmed = value.trim().replace(/^"+|"+$/g, '');
+  if (!trimmed) {
+    return '';
+  }
+
+  if (process.platform === 'win32') {
+    if (/^[A-Za-z]:[\\/]/.test(trimmed)) {
+      const drive = trimmed.slice(0, 2);
+      const segments = trimmed.slice(2).split(/[\\/]+/).filter(Boolean);
+      return segments.length ? `${drive}\\${segments.join('\\')}` : `${drive}\\`;
+    }
+
+    if (/^[\\/]{2,}/.test(trimmed)) {
+      const segments = trimmed.split(/[\\/]+/).filter(Boolean);
+      return segments.length ? `\\\\${segments.join('\\')}` : '\\\\';
+    }
+
+    return trimmed.replace(/[\\/]+/g, '\\');
+  }
+
+  return trimmed;
+}
 
 function seededShuffleRandom(seed: number) {
   let value = seed >>> 0;
@@ -77,12 +110,13 @@ function shuffleBySeed<T>(items: T[], seed: number): T[] {
 
 async function startServer() {
   const app = express();
+  const curationDb = createCurationDb();
   const PORT = Number(process.env.APHELION_PORT || process.env.PORT || '8120');
   const imageRootCandidates = Array.from(
     new Set(
       String(process.env.APHELION_IMAGE_DIRS || process.env.APHELION_IMAGE_DIR || path.join(process.cwd(), 'images', 'keep'))
         .split(/[;,]/)
-        .map((value) => value.trim().replace(/^"+|"+$/g, ''))
+        .map(normalizeConfiguredPath)
         .filter(Boolean)
     )
   );
@@ -103,8 +137,63 @@ async function startServer() {
 
   let cachedCatalog: ImageItem[] | null = null;
   let cachedCatalogAt = 0;
-  const weeklogDir = process.env.APHELION_WEEKLOG_DIR || 'E:\\aphelion\\weeklog';
-  const highlightLogDir = process.env.APHELION_HIGHLIGHT_LOG_DIR || 'E:\\aphelion\\logs';
+  const weeklogDir = process.env.APHELION_WEEKLOG_DIR || path.join(process.cwd(), 'data', 'weeklog');
+  const highlightLogDir = process.env.APHELION_HIGHLIGHT_LOG_DIR || path.join(process.cwd(), 'data', 'logs');
+
+  async function mergeCatalogWithMetadata(items: ImageItem[]): Promise<AdminCatalogPayload> {
+    const metadataByPath = new Map<string, CardMetadataRecord>();
+    for (const record of await curationDb.listCardMetadata()) {
+      metadataByPath.set(record.imagePath, record);
+    }
+
+    const cards: CardCatalogItem[] = items.map((item) => {
+      const imagePath = decodeURIComponent(item.imageUrl.split('path=').slice(1).join('path=') || '');
+      const metadata = metadataByPath.get(imagePath);
+
+      return {
+        id: metadata?.id ?? item.id,
+        cardUid: metadata?.cardUid || null,
+        imagePath,
+        imageCode: item.code,
+        folderPath: item.cameraInfo || '',
+        sourceTitle: item.title,
+        sourceTags: item.tags,
+        imageUrl: item.imageUrl,
+        thumbUrl: item.thumbUrl,
+        title: metadata?.title || '',
+        description: metadata?.description || '',
+        rarity: metadata?.rarity || null,
+        seriesName: metadata?.seriesName || '',
+        editionSize: metadata?.editionSize ?? null,
+        reviewStatus: metadata?.reviewStatus || 'untagged',
+        attributes: metadata?.attributes || [],
+        updatedAt: metadata?.updatedAt || null,
+      };
+    });
+
+    const stats: CatalogStats = {
+      total: cards.length,
+      reviewed: cards.filter((item) => item.reviewStatus === 'reviewed').length,
+      untagged: cards.filter((item) => item.reviewStatus !== 'reviewed').length,
+      withRarity: cards.filter((item) => Boolean(item.rarity)).length,
+      withSeries: cards.filter((item) => Boolean(item.seriesName)).length,
+      withAttributes: cards.filter((item) => item.attributes.length > 0).length,
+      rarityCounts: cards.reduce<Record<string, number>>((accumulator, item) => {
+        if (item.rarity) {
+          accumulator[item.rarity] = (accumulator[item.rarity] || 0) + 1;
+        }
+        return accumulator;
+      }, {}),
+    };
+
+    return {
+      ok: true,
+      cards,
+      attributes: await curationDb.listAttributes(),
+      series: await curationDb.listSeries(),
+      stats,
+    };
+  }
 
   async function getImageRoot() {
     if (resolvedImageRoot) {
@@ -113,7 +202,11 @@ async function startServer() {
 
     for (const candidate of imageRootCandidates) {
       try {
-        await access(candidate);
+        await access(candidate, fsConstants.R_OK);
+        const details = await stat(candidate);
+        if (!details.isDirectory()) {
+          continue;
+        }
         resolvedImageRoot = candidate;
         return candidate;
       } catch {
@@ -296,13 +389,15 @@ async function startServer() {
 
   async function getHealthSnapshot() {
     const imageRoot = await getImageRoot();
+    const dbStatus = await curationDb.getStatus();
     return {
       ok: true,
       app: 'aphelion',
       publicBaseUrl: process.env.VITE_APHELION_API_BASE_URL || `http://127.0.0.1:${PORT}`,
       imageRoot,
       imageRootCandidates,
-      catalogSize: cachedCatalog?.length || 0
+      catalogSize: cachedCatalog?.length || 0,
+      curationDb: dbStatus,
     };
   }
 
@@ -516,6 +611,123 @@ async function startServer() {
     }
   });
 
+  app.get('/api/admin/catalog', async (req, res) => {
+    try {
+      const forceRefresh = String(req.query.refresh || '').toLowerCase() === 'true' || req.query.refresh === '1';
+      const items = await getCatalog(forceRefresh);
+      res.json(await mergeCatalogWithMetadata(items));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown admin catalog error';
+      const statusCode = /not configured/i.test(message) ? 503 : 500;
+      res.status(statusCode).json({ ok: false, error: message });
+    }
+  });
+
+  app.post('/api/admin/cards', async (req, res) => {
+    try {
+      const payload = req.body as SaveCardPayload;
+      if (!payload?.imagePath || !payload?.imageCode) {
+        res.status(400).json({ ok: false, error: 'imagePath and imageCode are required.' });
+        return;
+      }
+
+      const card = await curationDb.saveCard({
+        imagePath: String(payload.imagePath),
+        imageCode: String(payload.imageCode),
+        folderPath: String(payload.folderPath || ''),
+        title: payload.title,
+        description: payload.description,
+        rarity: payload.rarity || null,
+        seriesName: payload.seriesName,
+        editionSize: payload.editionSize ?? null,
+        reviewStatus: payload.reviewStatus || 'untagged',
+        attributes: Array.isArray(payload.attributes) ? payload.attributes.map(String) : [],
+      });
+
+      res.json({
+        ok: true,
+        card,
+        attributes: await curationDb.listAttributes(),
+        series: await curationDb.listSeries(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown card save error';
+      const statusCode = /not configured/i.test(message) ? 503 : 500;
+      res.status(statusCode).json({ ok: false, error: message });
+    }
+  });
+
+  app.post('/api/admin/attributes', async (_req, res) => {
+    try {
+      const body = _req.body as { label?: string };
+      const attributes = await curationDb.createAttribute(String(body?.label || ''));
+      res.json({ ok: true, attributes });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown attribute create error';
+      const statusCode = /not configured/i.test(message) ? 503 : 400;
+      res.status(statusCode).json({ ok: false, error: message });
+    }
+  });
+
+  app.patch('/api/admin/attributes/:id', async (req, res) => {
+    try {
+      const attributes = await curationDb.renameAttribute(Number(req.params.id), String(req.body?.label || ''));
+      res.json({ ok: true, attributes });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown attribute rename error';
+      const statusCode = /not configured/i.test(message) ? 503 : 400;
+      res.status(statusCode).json({ ok: false, error: message });
+    }
+  });
+
+  app.delete('/api/admin/attributes/:id', async (req, res) => {
+    try {
+      const attributes = await curationDb.deleteAttribute(Number(req.params.id));
+      res.json({ ok: true, attributes });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown attribute delete error';
+      const statusCode = /not configured/i.test(message) ? 503 : 400;
+      res.status(statusCode).json({ ok: false, error: message });
+    }
+  });
+
+  app.post('/api/admin/series', async (req, res) => {
+    try {
+      const series = await curationDb.createSeries(String(req.body?.label || ''));
+      res.json({ ok: true, series });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown series create error';
+      const statusCode = /not configured/i.test(message) ? 503 : 400;
+      res.status(statusCode).json({ ok: false, error: message });
+    }
+  });
+
+  app.patch('/api/admin/series/:id', async (req, res) => {
+    try {
+      const series = await curationDb.renameSeries(
+        Number(req.params.id),
+        String(req.body?.label || ''),
+        String(req.body?.previousLabel || '')
+      );
+      res.json({ ok: true, series });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown series rename error';
+      const statusCode = /not configured/i.test(message) ? 503 : 400;
+      res.status(statusCode).json({ ok: false, error: message });
+    }
+  });
+
+  app.delete('/api/admin/series/:id', async (req, res) => {
+    try {
+      const series = await curationDb.deleteSeries(Number(req.params.id), String(req.body?.label || ''));
+      res.json({ ok: true, series });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown series delete error';
+      const statusCode = /not configured/i.test(message) ? 503 : 400;
+      res.status(statusCode).json({ ok: false, error: message });
+    }
+  });
+
   app.get('/api/image', async (req, res) => {
     try {
       const requestedPath = String(req.query.path || '').trim();
@@ -562,7 +774,10 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Aphelion server running on http://0.0.0.0:${PORT}`);
+    console.log(`Aphelion server running on:`);
+    console.log(`  Local:   http://127.0.0.1:${PORT}`);
+    console.log(`  Local:   http://localhost:${PORT}`);
+    console.log(`  Network: http://0.0.0.0:${PORT} (bind address)`);
     console.log(`Image root candidates: ${imageRootCandidates.join(' | ')}`);
     console.log(`Catalog refresh time: ${cachedCatalogAt || 'not loaded yet'}`);
   });

@@ -912,16 +912,6 @@
 
           <a
             class="app-link"
-            href="/lionship/"
-            target="_blank"
-            rel="noopener noreferrer"
-            data-version-key="lionship"
-            data-version-label="Lionship"
-          >
-            Lionship
-          </a>
-          <a
-            class="app-link"
             href="/perihelion/"
             target="_blank"
             rel="noopener noreferrer"
@@ -965,7 +955,8 @@
         </a>
       </div>
 
-      <aside class="widget" aria-label="Homepage widget">
+      <!-- Widget is paused while it moves from Lionship ownership into JeffersonWM. -->
+      <aside class="widget" aria-label="Homepage widget" hidden>
         <section class="widget-panel" id="home-widget">
           <div class="widget-greeting" id="widget-greeting">Good Day</div>
           <div class="widget-located">I am located in</div>
@@ -1071,9 +1062,14 @@
       })();
     </script>
 
-    <script>
+    <script type="module">
       (() => {
-        const WIDGET_API_BASE = 'https://api-lionship.jeffersonwm.com/api/widget';
+        const WIDGET_MIGRATION_PAUSED = true;
+        if (WIDGET_MIGRATION_PAUSED) {
+          return;
+        }
+
+        const WIDGET_API_BASE = (import.meta.env.VITE_WIDGET_API_BASE || '/api/widget').replace(/\/$/, '');
         const WEATHER_API_URL = 'https://api.open-meteo.com/v1/forecast?latitude=37.7811&longitude=-122.4883&current_weather=true&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&forecast_days=2';
         const WORD_SOURCES = [
           {
@@ -1126,6 +1122,7 @@
         let weatherState = null;
         let widgetEvents = [];
         let widgetFonts = [];
+        let widgetState = null;
         let currentWidgetFont = null;
         let eventsLoaded = false;
         let editingEventId = null;
@@ -1200,6 +1197,8 @@
           elements.weather.setAttribute('aria-pressed', showNextHour ? 'true' : 'false');
         };
 
+        const getEventTitle = event => String(event?.title || event?.name || '').trim();
+
         const renderWords = words => {
           const sources = WORD_SOURCES.map(source => {
             const label = String(words?.[source.key] || source.fallbackLabel).trim() || source.fallbackLabel;
@@ -1251,13 +1250,14 @@
         };
 
         const renderEvent = event => {
-          if (!event || !event.name || !event.date) {
+          const eventTitle = getEventTitle(event);
+          if (!event || !eventTitle || !event.date) {
             elements.event.hidden = true;
             return;
           }
 
           elements.event.hidden = false;
-          elements.event.textContent = `${formatEventDate(event.date)}${getDaysSince(event.date, event.end_date)} - ${event.name}`;
+          elements.event.textContent = `${formatEventDate(event.date)}${getDaysSince(event.date, event.end_date)} - ${eventTitle}`;
           elements.event.title = 'Show all special dates.';
         };
 
@@ -1296,7 +1296,7 @@
         };
 
         const renderEventItemMarkup = event => {
-          const dateLabel = `${formatEventDate(event.date)}${getDaysSince(event.date, event.end_date)} - ${event.name}`;
+          const dateLabel = `${formatEventDate(event.date)}${getDaysSince(event.date, event.end_date)} - ${getEventTitle(event)}`;
           const description = event.description?.trim();
           return `
             <div class="widget-events-item-text">
@@ -1307,12 +1307,25 @@
         };
 
         const renderEventsPopup = () => {
+          const canEditDefaults = Boolean(widgetState?.auth?.canEditDefaults);
+          elements.eventsAdd.hidden = !canEditDefaults;
+
           if (!widgetEvents.length) {
             elements.eventsList.innerHTML = '<div class="widget-events-empty">No dates available yet.</div>';
             return;
           }
 
           elements.eventsList.innerHTML = widgetEvents.map(event => {
+            if (!canEditDefaults) {
+              return `
+                <div class="widget-events-item widget-events-item--row">
+                  <div class="widget-events-label">
+                    ${renderEventItemMarkup(event)}
+                  </div>
+                </div>
+              `;
+            }
+
             return `
               <div class="widget-events-item widget-events-item--row">
                 <button class="widget-events-label" type="button" data-event-edit="${event.id}">
@@ -1321,6 +1334,10 @@
               </div>
             `;
           }).join('');
+
+          if (!canEditDefaults) {
+            return;
+          }
 
           elements.eventsList.querySelectorAll('[data-event-edit]').forEach(button => {
             button.addEventListener('click', async clickEvent => {
@@ -1354,30 +1371,24 @@
 
         const openEventsPopup = async () => {
           if (!eventsLoaded) {
-            widgetEvents = await fetchJson(`${WIDGET_API_BASE}/all-events`, []);
-            eventsLoaded = true;
-            renderEventsPopup();
+            await refreshWidgetData();
           }
 
+          renderEventsPopup();
           elements.eventsPopup.hidden = false;
           elements.event.setAttribute('aria-expanded', 'true');
         };
 
         const reloadEvents = async () => {
-          const [allEvents, nextEvent] = await Promise.all([
-            fetchJson(`${WIDGET_API_BASE}/all-events`, []),
-            fetchJson(`${WIDGET_API_BASE}/next-event`, null)
-          ]);
-
-          widgetEvents = allEvents;
-          eventsLoaded = true;
+          await refreshWidgetData();
           renderEventsPopup();
-          renderEvent(nextEvent);
         };
+
+        const isWidgetApiRequest = url => typeof url === 'string' && url.startsWith(WIDGET_API_BASE);
 
         const fetchJson = async (url, fallback) => {
           try {
-            const response = await fetch(url);
+            const response = await fetch(url, isWidgetApiRequest(url) ? { credentials: 'include' } : undefined);
             if (!response.ok) {
               return fallback;
             }
@@ -1393,7 +1404,10 @@
         };
 
         const requestJson = async (url, options) => {
-          const response = await fetch(url, options);
+          const response = await fetch(url, {
+            credentials: isWidgetApiRequest(url) ? 'include' : 'same-origin',
+            ...options,
+          });
           if (!response.ok) {
             throw new Error(`Request failed: ${response.status}`);
           }
@@ -1518,18 +1532,41 @@
           loadGoogleFont(currentWidgetFont.name);
         };
 
+        const buildWeatherApiUrl = resolvedPayload => {
+          const source = resolvedPayload?.resolved || {};
+          const latitude = Number.isFinite(Number(source.latitude)) ? Number(source.latitude) : 37.7811;
+          const longitude = Number.isFinite(Number(source.longitude)) ? Number(source.longitude) : -122.4883;
+          const unit = String(source.weatherUnit || 'fahrenheit').trim().toLowerCase() === 'celsius'
+            ? 'celsius'
+            : 'fahrenheit';
+
+          return `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}&current_weather=true&hourly=temperature_2m,weathercode&temperature_unit=${encodeURIComponent(unit)}&forecast_days=2`;
+        };
+
+        const applyResolvedWidgetState = resolvedPayload => {
+          widgetState = resolvedPayload;
+          const resolved = resolvedPayload?.resolved || {};
+          const locationLabel = String(resolved.locationLabel || 'San Francisco, California').trim();
+          elements.location.textContent = locationLabel;
+
+          widgetEvents = Array.isArray(resolved.specialDates) ? resolved.specialDates : [];
+          eventsLoaded = true;
+          renderEvent(resolved.nextSpecialDate || null);
+          elements.eventsAdd.hidden = !Boolean(resolvedPayload?.auth?.canEditDefaults);
+        };
+
         const refreshWidgetData = async () => {
-          const [fonts, words, nextEvent, weather] = await Promise.all([
+          const resolvedWidget = await fetchJson(`${WIDGET_API_BASE}/resolved`, null);
+          const [fonts, words, weather] = await Promise.all([
             fetchJson(`${WIDGET_API_BASE}/fonts`, []),
             fetchDailyWords(),
-            fetchJson(`${WIDGET_API_BASE}/next-event`, null),
-            fetchJson(WEATHER_API_URL, null)
+            fetchJson(buildWeatherApiUrl(resolvedWidget), null)
           ]);
 
           renderGreeting();
           applyRandomFont(fonts);
           renderWords(words || FALLBACK_WORDS);
-          renderEvent(nextEvent);
+          applyResolvedWidgetState(resolvedWidget);
 
           if (weather && weather.current_weather && weather.hourly) {
             const currentTime = weather.current_weather.time;
@@ -1575,6 +1612,9 @@
           elements.fontsClose.addEventListener('click', closeFontsPopup);
 
           elements.eventsAdd.addEventListener('click', () => {
+            if (!widgetState?.auth?.canEditDefaults) {
+              return;
+            }
             openEventEditor(null);
           });
 

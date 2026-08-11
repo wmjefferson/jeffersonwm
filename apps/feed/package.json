@@ -7,8 +7,13 @@
     "dev": "tsx server.ts",
     "server": "tsx server.ts",
     "build": "vite build",
+    "publish": "node ..\\..\\scripts\\publish-aso.mjs --app feed",
     "preview": "vite preview",
     "clean": "rm -rf dist",
+    "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

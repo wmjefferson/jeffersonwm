@@ -39,9 +39,11 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^lionship(/.*)?$ /lionship/index.html [L]
 
 # Battalion app routing split
-# 1. Serve landing.html at battalion root
+# 1. Landing page paused; send battalion root straight to /home
+# RewriteCond %{REQUEST_URI} ^/battalion/?$
+# RewriteRule ^(.*)$ /battalion/landing.html [L]
 RewriteCond %{REQUEST_URI} ^/battalion/?$
-RewriteRule ^(.*)$ /battalion/landing.html [L]
+RewriteRule ^battalion/?$ /battalion/home [R=302,L]
 
 # 2. Rewrite /battalion/home to index.html (the SPA)
 RewriteCond %{REQUEST_FILENAME} !-f
@@ -58,9 +60,11 @@ RewriteRule ^battalion(/.*)?$ /battalion/index.html [L]
 RewriteCond %{QUERY_STRING} share=([a-zA-Z0-9]{4})
 RewriteRule ^perihelion/?$ /perihelion/home [QSA,L,R=302]
 
-# 2. Serve landing.html at perihelion root
+# 2. Landing page paused; send perihelion root straight to /home
+# RewriteCond %{REQUEST_URI} ^/perihelion/?$
+# RewriteRule ^(.*)$ /perihelion/landing.html [L]
 RewriteCond %{REQUEST_URI} ^/perihelion/?$
-RewriteRule ^(.*)$ /perihelion/landing.html [L]
+RewriteRule ^perihelion/?$ /perihelion/home [R=302,L]
 
 # 3. Rewrite /perihelion/home to index.html (the SPA)
 RewriteCond %{REQUEST_FILENAME} !-f
@@ -73,9 +77,11 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^perihelion(/.*)?$ /perihelion/index.html [L]
 
 # Clionidae app routing split
-# 1. Serve landing.html at clionidae root
+# 1. Landing page paused; send clionidae root straight to /home
+# RewriteCond %{REQUEST_URI} ^/clionidae/?$
+# RewriteRule ^(.*)$ /clionidae/landing.html [L]
 RewriteCond %{REQUEST_URI} ^/clionidae/?$
-RewriteRule ^(.*)$ /clionidae/landing.html [L]
+RewriteRule ^clionidae/?$ /clionidae/home [R=302,L]
 
 # 2. Rewrite /clionidae/home to index.html (the SPA)
 RewriteCond %{REQUEST_FILENAME} !-f
@@ -88,9 +94,11 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^clionidae(/.*)?$ /clionidae/index.html [L]
 
 # Vermilion app routing split
-# 1. Serve landing.html at vermilion root
+# 1. Landing page paused; send vermilion root straight to /home
+# RewriteCond %{REQUEST_URI} ^/vermilion/?$
+# RewriteRule ^(.*)$ /vermilion/landing.html [L]
 RewriteCond %{REQUEST_URI} ^/vermilion/?$
-RewriteRule ^(.*)$ /vermilion/landing.html [L]
+RewriteRule ^vermilion/?$ /vermilion/home [R=302,L]
 
 # 2. Rewrite /vermilion/home to index.html (the SPA)
 RewriteCond %{REQUEST_FILENAME} !-f
@@ -103,9 +111,11 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^vermilion(/.*)?$ /vermilion/index.html [L]
 
 # Millionfold app routing split
-# 1. Serve landing.html at millionfold root
+# 1. Landing page paused; send millionfold root straight to /home
+# RewriteCond %{REQUEST_URI} ^/millionfold/?$
+# RewriteRule ^(.*)$ /millionfold/landing.html [L]
 RewriteCond %{REQUEST_URI} ^/millionfold/?$
-RewriteRule ^(.*)$ /millionfold/landing.html [L]
+RewriteRule ^millionfold/?$ /millionfold/home [R=302,L]
 
 # 2. Rewrite /millionfold/home to index.html (the SPA)
 RewriteCond %{REQUEST_FILENAME} !-f

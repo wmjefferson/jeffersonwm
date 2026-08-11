@@ -8,7 +8,12 @@
     "api:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File ./start-api-dev.ps1",
     "api:live": "powershell -NoProfile -ExecutionPolicy Bypass -File ./start-api-live.ps1",
     "build": "tsc --noEmit && vite build",
+    "publish": "node ..\\..\\scripts\\publish-aso.mjs --app vermilion",
     "preview": "vite preview",
+    "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

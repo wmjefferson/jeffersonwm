@@ -12,7 +12,12 @@
     "server": "cd backend && node index.js",
     "start": "cd backend && node index.js",
     "prod": "set NODE_ENV=production && cd backend && node index.js",
-    "tunnel": "cloudflared tunnel run --token %BATALLION_TUNNEL_TOKEN%"
+    "tunnel": "cloudflared tunnel run --token %BATALLION_TUNNEL_TOKEN%",
+    "publish": "node ..\\..\\scripts\\publish-aso.mjs --app battalion",
+    "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

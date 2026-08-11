@@ -16,6 +16,7 @@ import { ImageDetailModal } from './components/ImageDetailModal';
 import { UploadModal } from './components/UploadModal';
 import { StatsDrawer } from './components/StatsDrawer';
 import { HighlightsPage } from './components/HighlightsPage';
+import { AdminPage } from './components/AdminPage';
 
 const TOP_BANNER_HEIGHT = 36;
 const BOTTOM_BANNER_HEIGHT = 36;
@@ -28,6 +29,7 @@ export default function App() {
   const apiBaseUrl = import.meta.env.VITE_APHELION_API_BASE_URL || '';
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const isHighlightsPage = currentHash === '#highlights';
+  const isAdminPage = currentHash.startsWith('#admin');
   const [viewport, setViewport] = useState({
     width: Math.max(100, window.innerWidth - TOTAL_SIDE_GUTTER),
     height: Math.max(100, window.innerHeight - TOTAL_BANNER_HEIGHT),
@@ -256,6 +258,10 @@ export default function App() {
     return <HighlightsPage apiBaseUrl={apiBaseUrl} />;
   }
 
+  if (isAdminPage) {
+    return <AdminPage apiBaseUrl={apiBaseUrl} />;
+  }
+
   if (page === 'selected') {
     return (
       <div className="min-h-screen bg-[#FAFAFA] text-slate-800">
@@ -343,6 +349,13 @@ export default function App() {
             className="text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
           >
             Highlights
+          </a>
+          {' · '}
+          <a
+            href="/aphelion/#admin"
+            className="text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+          >
+            Admin
           </a>
         </p>
         <p className="m-0 leading-none text-gray-500 text-sm font-sans">
