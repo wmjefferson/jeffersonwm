@@ -79,6 +79,7 @@ let serverImageStore: ImageItem[] = [];
 const browserThumbCache = new Map<string, string>();
 const browserThumbPending = new Map<string, Promise<string>>();
 const BROWSER_THUMB_LIMIT = 96;
+export const BACKGROUND_PLACEHOLDER_URL = `${import.meta.env.BASE_URL}background.png`;
 
 /**
  * Generates or retrieves an ImageItem deterministically by its index (0 to 11,168+).
@@ -113,11 +114,8 @@ export function getImageByIndex(index: number): ImageItem {
   const camera = CAMERAS[Math.floor(r4 * CAMERAS.length)];
 
   const code = `IMG-${String(index + 1).padStart(5, '0')}`;
-  const seed = `art-${index + 1000}`;
-
-  // Picsum Photos URLs with deterministic seed
-  const imageUrl = `https://picsum.photos/seed/${seed}/800/600`;
-  const thumbUrl = `https://picsum.photos/seed/${seed}/300/200`;
+  const imageUrl = BACKGROUND_PLACEHOLDER_URL;
+  const thumbUrl = BACKGROUND_PLACEHOLDER_URL;
 
   const tags = [
     category.toLowerCase(),

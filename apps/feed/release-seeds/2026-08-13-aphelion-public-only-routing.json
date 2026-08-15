@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Aphelion public-only routing pass",
+  "content": "<p>Aphelion got one small publish-safety pass after the curation handoff. For now, the public site is being narrowed to the home and highlights experience while the admin curation tools stay preserved in the codebase for a later private workflow pass.</p><ul><li>Removed the visible Admin link from the Aphelion home page.</li><li>Kept the admin/options code intact rather than deleting the curation work.</li><li>Added a route guard so only <code>/aphelion/</code> and <code>/aphelion/#highlights</code> remain visible public routes.</li><li>Redirected any other Aphelion URL back to the main page.</li></ul><p>This keeps the publishable surface simple and public-facing without losing the deeper admin work we built.</p>",
+  "url": "https://jeffersonwm.com/aphelion/",
+  "source": "manual",
+  "external_id": "aphelion-public-only-routing-2026-08-13"
+}

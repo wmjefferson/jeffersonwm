@@ -225,6 +225,48 @@
         opacity: 0.48;
       }
 
+      .bottom-links {
+        position: fixed;
+        left: var(--frame);
+        bottom: var(--frame);
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+      }
+
+      .personal-link {
+        position: relative;
+        color: #111827;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        font-family: inherit;
+        font-size: 0.92rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .personal-link::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.1rem;
+        width: 100%;
+        height: 1px;
+        background: #d4d4d4;
+        transform-origin: left;
+        transform: scaleX(0);
+        transition: transform 0.15s ease-out;
+      }
+
+      .personal-link:hover::after {
+        transform: scaleX(1);
+      }
+
       @media (max-width: 760px) {
         body {
           padding: 24px;
@@ -238,6 +280,11 @@
           justify-content: flex-start;
           flex-wrap: wrap;
         }
+
+        .bottom-links {
+          position: static;
+          margin-top: 4rem;
+        }
       }
     </style>
   </head>
@@ -245,10 +292,6 @@
     <main class="shell">
       <header class="topline">
         <h1>Status</h1>
-        <div class="actions">
-          <a class="home-link" href="/">Home</a>
-          <a class="home-link" href="/development/">Development</a>
-        </div>
       </header>
 
       <p class="note">
@@ -278,10 +321,31 @@
       </p>
     </main>
 
+    <div class="bottom-links" aria-label="Site links">
+      <a class="personal-link" href="/">Home</a>
+      <a class="personal-link" href="/account/">Account</a>
+      <a
+        class="personal-link"
+        href="https://wmjefferson.com"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        William Jefferson
+      </a>
+    </div>
+
     <script>
       const CHECK_TIMEOUT_MS = 8000;
 
       const services = [
+        {
+          name: 'JeffersonWM',
+          app: 'home widget API',
+          tunnel: 'api-jeffersonwm',
+          origin: '127.0.0.1:8110',
+          url: 'https://api-jeffersonwm.jeffersonwm.com/health',
+          fallbackUrl: 'https://api-jeffersonwm.jeffersonwm.com/api/widget/resolved'
+        },
         {
           name: 'Auth / Multimillion',
           app: 'auth',

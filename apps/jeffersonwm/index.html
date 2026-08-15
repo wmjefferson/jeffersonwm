@@ -71,8 +71,8 @@
 
       .logo {
         display: block;
-        max-width: 84px;
-        max-height: 48px;
+        width: 84px;
+        height: 84px;
       }
 
       h1 {
@@ -420,6 +420,33 @@
         background: transparent;
         cursor: pointer;
         text-align: inherit;
+      }
+
+      .widget-typeface-row {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.25rem;
+      }
+
+      .widget-refresh {
+        border: 0;
+        padding: 0 0 0 0.25rem;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 700;
+        line-height: 1;
+        opacity: 0.48;
+        transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+      }
+
+      .widget-refresh:hover,
+      .widget-refresh:focus-visible {
+        opacity: 1;
+        transform: rotate(18deg);
       }
 
       .widget-events-popup {
@@ -945,6 +972,7 @@
 
       <div class="bottom-links" aria-label="Site links">
         <a class="personal-link" href="/status/">Status</a>
+        <a class="personal-link" href="/account/">Account</a>
         <a
           class="personal-link"
           href="https://wmjefferson.com"
@@ -955,19 +983,19 @@
         </a>
       </div>
 
-      <!-- Widget is paused while it moves from Lionship ownership into JeffersonWM. -->
+      <!-- Widget now reads from the JeffersonWM-owned API. -->
       <aside class="widget" aria-label="Homepage widget" hidden>
         <section class="widget-panel" id="home-widget">
           <div class="widget-greeting" id="widget-greeting">Good Day</div>
           <div class="widget-located">I am located in</div>
-          <button class="widget-location" id="widget-location" type="button" title="Refresh widget">San Francisco, California</button>
+          <div class="widget-location" id="widget-location">San Francisco, California</div>
           <button class="widget-time" id="widget-time" type="button" title="Toggle 12/24 hour format">--:--</button>
           <div class="widget-date" id="widget-date">Loading date</div>
           <button class="widget-event" id="widget-event" type="button" hidden></button>
-          <button class="widget-weather" id="widget-weather" type="button" title="Show next-hour weather">
-            <span class="widget-weather-icon" id="widget-weather-icon">•</span>
-            <span class="widget-weather-temp" id="widget-weather-temp">--°F</span>
-          </button>
+            <button class="widget-weather" id="widget-weather" type="button" title="Show weather 2+ hours ahead">
+              <span class="widget-weather-icon" id="widget-weather-icon">•</span>
+              <span class="widget-weather-temp" id="widget-weather-temp">--°</span>
+            </button>
           <div class="widget-words" id="widget-words"></div>
           <div class="widget-fonts-popup" id="widget-fonts-popup" hidden>
             <div class="widget-fonts-shell">
@@ -1064,10 +1092,7 @@
 
     <script type="module">
       (() => {
-        const WIDGET_MIGRATION_PAUSED = true;
-        if (WIDGET_MIGRATION_PAUSED) {
-          return;
-        }
+        document.querySelector('.widget')?.removeAttribute('hidden');
 
         const WIDGET_API_BASE = (import.meta.env.VITE_WIDGET_API_BASE || '/api/widget').replace(/\/$/, '');
         const WEATHER_API_URL = 'https://api.open-meteo.com/v1/forecast?latitude=37.7811&longitude=-122.4883&current_weather=true&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&forecast_days=2';
@@ -1116,6 +1141,41 @@
           eventsCancel: document.getElementById('widget-events-cancel'),
           eventsEditorTitle: document.getElementById('widget-events-editor-title')
         };
+
+        const AUTH_ORIGIN = 'https://auth.jeffersonwm.com';
+        const AUTH_RETURN_TO = new URL('/account/', window.location.origin).toString();
+
+        const openAuthPopup = mode => {
+          const authUrl = new URL(AUTH_ORIGIN);
+          authUrl.searchParams.set('mode', mode);
+          authUrl.searchParams.set('returnTo', AUTH_RETURN_TO);
+          authUrl.searchParams.set('popup', '1');
+
+          const width = 440;
+          const height = 620;
+          const left = Math.max(0, Math.round(window.screenX + ((window.outerWidth - width) / 2)));
+          const top = Math.max(0, Math.round(window.screenY + ((window.outerHeight - height) / 2)));
+          const features = `width=${width},height=${height},left=${left},top=${top}`;
+          const popup = window.open(authUrl.toString(), 'jeffwm-auth-popup', features);
+
+          if (!popup) {
+            window.location.assign(authUrl.toString().replace('popup=1', 'popup=0'));
+          }
+        };
+
+        window.addEventListener('message', event => {
+          if (event.origin !== AUTH_ORIGIN) {
+            return;
+          }
+          if (event.data?.type !== 'auth:success') {
+            return;
+          }
+
+          const returnTo = typeof event.data.returnTo === 'string' && event.data.returnTo
+            ? event.data.returnTo
+            : AUTH_RETURN_TO;
+          window.location.assign(returnTo);
+        });
 
         let is24Hour = true;
         let showNextHour = false;
@@ -1174,6 +1234,10 @@
             return;
           }
 
+          const weatherUnitLabel = String(widgetState?.resolved?.weatherUnit || 'fahrenheit').trim().toLowerCase() === 'celsius'
+            ? 'C'
+            : 'F';
+
           let weatherColor = '#111827';
           let weatherHoverColor = '#6b7280';
 
@@ -1188,12 +1252,12 @@
           }
 
           elements.weatherIcon.textContent = getWeatherIcon(view.code);
-          elements.weatherTemp.textContent = `${Math.round(view.temp)}\u00b0F`;
+          elements.weatherTemp.textContent = `${Math.round(view.temp)}\u00b0${weatherUnitLabel}`;
           elements.weather.style.setProperty('--weather-hover-color', weatherHoverColor);
           elements.weather.style.color = weatherColor;
           elements.weather.title = showNextHour && weatherState.next
-            ? 'Showing next-hour weather. Click to return to current weather.'
-            : 'Showing current weather. Click to preview the next hour.';
+            ? 'Showing weather 2+ hours ahead. Click to return to current weather.'
+            : 'Showing current weather. Click to preview weather 2+ hours ahead.';
           elements.weather.setAttribute('aria-pressed', showNextHour ? 'true' : 'false');
         };
 
@@ -1217,10 +1281,14 @@
           const typefaceLabel = escapeHtml(currentWidgetFont?.name || 'IBM Plex Sans Condensed');
 
           elements.words.innerHTML = `${wordsMarkup}
-            <button class="widget-word widget-word--button" id="widget-typeface" type="button">${typefaceLabel}</button>
+            <span class="widget-typeface-row">
+              <button class="widget-word widget-word--button" id="widget-typeface" type="button">${typefaceLabel}</button>
+              <button class="widget-refresh" id="widget-refresh" type="button" title="Refresh widget" aria-label="Refresh widget">&#8635;</button>
+            </span>
           `;
 
           const typefaceButton = document.getElementById('widget-typeface');
+          const refreshButton = document.getElementById('widget-refresh');
           typefaceButton?.addEventListener('click', event => {
             event.preventDefault();
             if (elements.fontsPopup.hidden) {
@@ -1228,6 +1296,10 @@
             } else {
               closeFontsPopup();
             }
+          });
+          refreshButton?.addEventListener('click', async event => {
+            event.preventDefault();
+            await refreshWidgetData();
           });
         };
 
@@ -1425,15 +1497,20 @@
           return fonts
             .map(font => {
               if (typeof font === 'string') {
-                return { name: font.trim(), weight: 2 };
+                return { name: font.trim(), weight: 2, probability: 2 };
               }
               if (font && typeof font.name === 'string') {
                 const parsedWeight = Number(font.weight);
+                const parsedProbability = Number(font.probability);
+                const normalizedWeight = Number.isFinite(parsedWeight)
+                  ? Math.min(WIDGET_FONT_WEIGHT_MAX, Math.max(WIDGET_FONT_WEIGHT_MIN, Math.round(parsedWeight)))
+                  : 2;
                 return {
                   name: font.name.trim(),
-                  weight: Number.isFinite(parsedWeight)
-                    ? Math.min(WIDGET_FONT_WEIGHT_MAX, Math.max(WIDGET_FONT_WEIGHT_MIN, Math.round(parsedWeight)))
-                    : 2
+                  weight: normalizedWeight,
+                  probability: Number.isFinite(parsedProbability)
+                    ? Math.min(WIDGET_FONT_WEIGHT_MAX, Math.max(WIDGET_FONT_WEIGHT_MIN, Math.round(parsedProbability)))
+                    : normalizedWeight
                 };
               }
               return null;
@@ -1457,17 +1534,17 @@
 
           const font = widgetFonts.find(entry => entry.name === currentWidgetFont.name) || currentWidgetFont;
           const buttons = Array.from({ length: WIDGET_FONT_WEIGHT_MAX }, (_value, index) => {
-            const weight = index + WIDGET_FONT_WEIGHT_MIN;
-            const isActive = weight === font.weight;
+            const probability = index + WIDGET_FONT_WEIGHT_MIN;
+            const isActive = probability === font.probability;
             const isCurrent = currentWidgetFont?.name === font.name;
             return `
               <button
                 class="widget-fonts-weight${isActive ? ' is-active' : ''}${isCurrent ? ' is-current-font' : ''}"
                 type="button"
                 data-font-name="${escapeHtml(font.name)}"
-                data-font-weight="${weight}"
+                data-font-probability="${probability}"
                 ${savingFontName === font.name ? 'disabled' : ''}
-              >${weight}</button>
+              >${probability}</button>
             `;
           }).join('');
 
@@ -1478,12 +1555,13 @@
             </div>
           `;
 
-          elements.fontsList.querySelectorAll('[data-font-name][data-font-weight]').forEach(button => {
+          elements.fontsList.querySelectorAll('[data-font-name][data-font-probability]').forEach(button => {
             button.addEventListener('click', async clickEvent => {
               const target = clickEvent.currentTarget;
               const fontName = target.getAttribute('data-font-name');
-              const weight = Number(target.getAttribute('data-font-weight'));
-              if (!fontName || !Number.isFinite(weight)) {
+              const probability = Number(target.getAttribute('data-font-probability'));
+              const font = widgetFonts.find(entry => entry.name === fontName) || currentWidgetFont;
+              if (!fontName || !Number.isFinite(probability)) {
                 return;
               }
 
@@ -1494,14 +1572,20 @@
                 await requestJson(`${WIDGET_API_BASE}/fonts/${encodeURIComponent(fontName)}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ weight })
+                  body: JSON.stringify({
+                    weight: font?.weight ?? 2,
+                    probability
+                  })
                 });
 
                 widgetFonts = widgetFonts.map(font => (
                   font.name === fontName
-                    ? { ...font, weight }
+                    ? { ...font, probability }
                     : font
                 ));
+                if (currentWidgetFont?.name === fontName) {
+                  currentWidgetFont = { ...currentWidgetFont, probability };
+                }
               } catch (_error) {
                 // Keep the current values in place if the request fails.
               } finally {
@@ -1521,11 +1605,11 @@
             return;
           }
 
-          const totalWeight = normalizedFonts.reduce((sum, font) => sum + font.weight, 0);
+          const totalWeight = normalizedFonts.reduce((sum, font) => sum + font.probability, 0);
           let threshold = Math.random() * totalWeight;
           currentWidgetFont =
             normalizedFonts.find(candidate => {
-              threshold -= candidate.weight;
+              threshold -= candidate.probability;
               return threshold < 0;
             }) || normalizedFonts[normalizedFonts.length - 1];
 
@@ -1570,7 +1654,11 @@
 
           if (weather && weather.current_weather && weather.hourly) {
             const currentTime = weather.current_weather.time;
-            const nextIndex = weather.hourly.time.findIndex(time => time > currentTime);
+            const currentTimestamp = new Date(currentTime).getTime();
+            const nextIndex = weather.hourly.time.findIndex(time => {
+              const forecastTimestamp = new Date(time).getTime();
+              return Number.isFinite(forecastTimestamp) && forecastTimestamp >= currentTimestamp + (2 * 60 * 60 * 1000);
+            });
             weatherState = {
               current: {
                 temp: weather.current_weather.temperature,
@@ -1589,10 +1677,6 @@
           renderGreeting();
           renderTime();
           setInterval(renderTime, 1000);
-
-          elements.location.addEventListener('click', async () => {
-            await refreshWidgetData();
-          });
 
           elements.time.addEventListener('click', () => {
             is24Hour = !is24Hour;
@@ -1703,6 +1787,12 @@
 
         renderWords(FALLBACK_WORDS);
         loadWidget();
+
+        document.querySelectorAll('[data-auth-mode]').forEach(button => {
+          button.addEventListener('click', () => {
+            openAuthPopup(button.getAttribute('data-auth-mode'));
+          });
+        });
       })();
     </script>
   </body>

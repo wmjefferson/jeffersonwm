@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ImageItem } from '../types';
 import { X, Download, Copy, Check, Camera, Calendar, Tag, ExternalLink, Layers, Grid } from 'lucide-react';
-import { generateProceduralThumbnail } from '../utils/imageDatabase';
+import { BACKGROUND_PLACEHOLDER_URL, generateProceduralThumbnail } from '../utils/imageDatabase';
 
 interface ImageDetailModalProps {
   image: ImageItem | null;
@@ -17,6 +17,7 @@ export const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [placeholderError, setPlaceholderError] = useState(false);
 
   if (!image) return null;
 
@@ -55,12 +56,27 @@ export const ImageDetailModal: React.FC<ImageDetailModalProps> = ({
 
           {/* Left Column: Image Display */}
           <div className="w-full md:w-3/5 bg-slate-950 flex items-center justify-center relative min-h-[300px] md:min-h-[500px]">
-            <img
-              src={imgError ? fallbackDataUrl : image.imageUrl}
-              alt={image.title}
-              onError={() => setImgError(true)}
-              className="max-w-full max-h-[70vh] object-contain p-4"
-            />
+            {!imgError ? (
+              <img
+                src={image.imageUrl}
+                alt={image.title}
+                onError={() => setImgError(true)}
+                className="max-w-full max-h-[70vh] object-contain p-4"
+              />
+            ) : !placeholderError ? (
+              <img
+                src={BACKGROUND_PLACEHOLDER_URL}
+                alt={image.title}
+                onError={() => setPlaceholderError(true)}
+                className="max-w-full max-h-[70vh] object-contain p-4"
+              />
+            ) : (
+              <img
+                src={fallbackDataUrl}
+                alt={image.title}
+                className="max-w-full max-h-[70vh] object-contain p-4"
+              />
+            )}
 
             <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/60 text-xs font-mono">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: image.colorHex }} />

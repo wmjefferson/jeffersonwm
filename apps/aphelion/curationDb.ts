@@ -2,7 +2,9 @@ import mysql from 'mysql2/promise';
 import type { CardMetadataRecord, ControlledLibraryItem, SaveCardPayload } from './src/curationTypes';
 
 const DEFAULT_ATTRIBUTE_SEED = ['face', 'blue'];
+const DEFAULT_SERIES_SEED = ['01', '02'];
 const ATTRIBUTE_SEPARATOR = '||__APHELION_ATTR__||';
+const SERIES_SEPARATOR = ' | ';
 
 type CardRow = {
   id: number;
@@ -50,6 +52,21 @@ function splitAttributes(value: string | null) {
     .split(ATTRIBUTE_SEPARATOR)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function splitSeriesNames(value: string | null | undefined) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split('|')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function joinSeriesNames(values: string[]) {
+  return Array.from(new Set(values.map((item) => normalizeText(item)).filter(Boolean))).join(SERIES_SEPARATOR);
 }
 
 function toSlug(value: string) {
@@ -250,6 +267,19 @@ export function createCurationDb() {
           [toSlug(label), label, timestamp, timestamp],
         );
       }
+
+      for (const label of DEFAULT_SERIES_SEED) {
+        await db.execute(
+          `
+            INSERT INTO card_series_library (slug, name, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+              name = VALUES(name),
+              updated_at = VALUES(updated_at)
+          `,
+          [toSlug(label) || `series-${label}`, label, timestamp, timestamp],
+        );
+      }
     })();
 
     return schemaReady;
@@ -305,7 +335,8 @@ export function createCurationDb() {
     const timestamp = toMysqlDateTime(new Date())!;
     const title = normalizeText(payload.title);
     const description = normalizeText(payload.description);
-    const seriesName = normalizeText(payload.seriesName);
+    const selectedSeriesNames = splitSeriesNames(payload.seriesName);
+    const seriesName = joinSeriesNames(selectedSeriesNames);
     const reviewStatus = payload.reviewStatus === 'reviewed' ? 'reviewed' : 'untagged';
     const editionSize = normalizeNumber(payload.editionSize);
     const uniqueAttributes = Array.from(
@@ -397,7 +428,7 @@ export function createCurationDb() {
         );
       }
 
-      if (seriesName) {
+      for (const selectedSeriesName of selectedSeriesNames) {
         await connection.execute(
           `
             INSERT INTO card_series_library (slug, name, created_at, updated_at)
@@ -406,7 +437,7 @@ export function createCurationDb() {
               name = VALUES(name),
               updated_at = VALUES(updated_at)
           `,
-          [toSlug(seriesName) || `series-${Date.now()}`, seriesName, timestamp, timestamp],
+          [toSlug(selectedSeriesName) || `series-${Date.now()}`, selectedSeriesName, timestamp, timestamp],
         );
       }
 
@@ -563,6 +594,17 @@ export function createCurationDb() {
       `,
       [cleaned, timestamp, normalizeText(previousName)],
     );
+    const previous = normalizeText(previousName);
+    const [cardRows] = await db.query('SELECT id, series_name FROM card_master WHERE series_name IS NOT NULL');
+    for (const row of cardRows as Array<{ id: number; series_name: string | null }>) {
+      const nextSeriesName = joinSeriesNames(splitSeriesNames(row.series_name).map((item) => (item === previous ? cleaned : item)));
+      if (nextSeriesName !== normalizeText(row.series_name)) {
+        await db.execute(
+          'UPDATE card_master SET series_name = ?, updated_at = ? WHERE id = ?',
+          [nextSeriesName || null, timestamp, row.id],
+        );
+      }
+    }
     return listSeries();
   }
 
@@ -578,6 +620,17 @@ export function createCurationDb() {
       `,
       [timestamp, normalizeText(name)],
     );
+    const cleaned = normalizeText(name);
+    const [cardRows] = await db.query('SELECT id, series_name FROM card_master WHERE series_name IS NOT NULL');
+    for (const row of cardRows as Array<{ id: number; series_name: string | null }>) {
+      const nextSeriesName = joinSeriesNames(splitSeriesNames(row.series_name).filter((item) => item !== cleaned));
+      if (nextSeriesName !== normalizeText(row.series_name)) {
+        await db.execute(
+          'UPDATE card_master SET series_name = ?, updated_at = ? WHERE id = ?',
+          [nextSeriesName || null, timestamp, row.id],
+        );
+      }
+    }
     await db.execute('DELETE FROM card_series_library WHERE id = ?', [id]);
     return listSeries();
   }

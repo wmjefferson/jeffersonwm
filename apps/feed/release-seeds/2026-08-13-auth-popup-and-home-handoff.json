@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "JeffersonWM auth popup and home handoff checkpoint",
+  "content": "<p>This checkpoint records the end-of-night pass where JeffersonWM Home and Auth were brought into a cleaner popup-first login flow. The broader goal is to keep the auth system present across the ecosystem without making it visually loud on every page.</p><p>What worked:</p><ul><li><strong>Compact popup auth:</strong> Auth now supports a <code>popup=1</code> mode that renders as a small member-area card instead of a full page.</li><li><strong>Home-page cleanup:</strong> JeffersonWM Home keeps only the essential bottom links and launches auth as a popup from Account.</li><li><strong>Session-aware account link:</strong> the account page now flips between Login/Register and Sign Out depending on whether a session is active.</li></ul><p>What changed:</p><ul><li>Removed the old Login/Register links from the JeffersonWM home footer.</li><li>Added popup launch and message handling so the auth card can return control to the opener after sign-in.</li><li>Kept the account page visually simple so login, register, and sign-out all live behind one predictable entry point.</li></ul><p>What this means next is that Auth can stay central in the architecture without needing to be visually prominent unless a site specifically asks for it.</p>",
+  "url": "https://jeffersonwm.com/",
+  "source": "manual",
+  "external_id": "jeffersonwm-auth-popup-and-home-handoff-2026-08-13",
+  "created_at": "2026-08-13 20:40:00"
+}

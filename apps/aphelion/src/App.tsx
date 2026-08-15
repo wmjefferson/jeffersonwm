@@ -29,7 +29,7 @@ export default function App() {
   const apiBaseUrl = import.meta.env.VITE_APHELION_API_BASE_URL || '';
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const isHighlightsPage = currentHash === '#highlights';
-  const isAdminPage = currentHash.startsWith('#admin');
+  const isAdminPage = false;
   const [viewport, setViewport] = useState({
     width: Math.max(100, window.innerWidth - TOTAL_SIDE_GUTTER),
     height: Math.max(100, window.innerHeight - TOTAL_BANNER_HEIGHT),
@@ -59,6 +59,21 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  useEffect(() => {
+    const basePath = import.meta.env.BASE_URL || '/aphelion/';
+    const normalizedBasePath = basePath.endsWith('/') ? basePath : `${basePath}/`;
+    const currentPath = window.location.pathname.endsWith('/')
+      ? window.location.pathname
+      : `${window.location.pathname}/`;
+    const isHomeRoute = currentPath === normalizedBasePath && currentHash === '';
+    const isHighlightsRoute = currentPath === normalizedBasePath && currentHash === '#highlights';
+
+    if (!isHomeRoute && !isHighlightsRoute) {
+      window.history.replaceState(null, '', normalizedBasePath);
+      setCurrentHash('');
+    }
+  }, [currentHash]);
+
   // Resize Listener for dynamic grid recalculation
   useEffect(() => {
     const handleResize = () => {
@@ -87,7 +102,7 @@ export default function App() {
         setServerImages(items);
         setTargetCount(items.length);
       } catch (error) {
-        console.warn('Aphelion image catalog could not be loaded. Falling back to generated placeholders.', error);
+        console.warn('Aphelion image catalog could not be loaded. Falling back to the background placeholder image.', error);
       }
     }
 
@@ -295,31 +310,42 @@ export default function App() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#FAFAFA] text-slate-800">
-      <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-start shrink-0 relative z-20">
-        <a
-          href="/aphelion/"
-          className="font-sans font-semibold text-sm leading-none tracking-normal text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
-        >
-          Aphelion
-        </a>
-        {highlightedBlocks.size > 0 && (
+      <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-between shrink-0 relative z-20">
+        <div className="flex items-center">
+          <a
+            href="/aphelion/"
+            className="font-sans font-semibold text-sm leading-none tracking-normal text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+          >
+            Aphelion
+          </a>
           <div className="ml-5 flex items-center gap-3 font-sans text-[11px] leading-none text-gray-500">
-            <button
-              type="button"
-              onClick={() => setPage('selected')}
-              className="font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
-            >
-              Selected
-            </button>
-            <button
-              type="button"
-              onClick={handleClearHighlights}
-              className="font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
-            >
-              Clear
-            </button>
+          {highlightedBlocks.size > 0 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setPage('selected')}
+                className="font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+              >
+                Selected
+              </button>
+              <button
+                type="button"
+                onClick={handleClearHighlights}
+                className="font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+              >
+                Clear
+              </button>
+            </>
+          ) : (
+            <span className="font-semibold text-gray-900">Click</span>
+          )}
           </div>
-        )}
+        </div>
+        <div className="flex items-center gap-4 font-sans text-sm font-semibold text-gray-900">
+          <a href="/aphelion/#highlights" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
+            Highlights
+          </a>
+        </div>
       </header>
 
       <main className="relative h-[calc(100vh-72px)] overflow-hidden bg-[#FAFAFA] px-[36px] z-10">
@@ -342,22 +368,7 @@ export default function App() {
         />
       </main>
 
-      <footer className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-between shrink-0 relative z-20">
-        <p className="m-0 leading-none text-gray-500 text-sm font-sans">
-          <a
-            href="/aphelion/#highlights"
-            className="text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
-          >
-            Highlights
-          </a>
-          {' · '}
-          <a
-            href="/aphelion/#admin"
-            className="text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
-          >
-            Admin
-          </a>
-        </p>
+      <footer className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-end shrink-0 relative z-20">
         <p className="m-0 leading-none text-gray-500 text-sm font-sans">
           &copy; {new Date().getFullYear()}{' '}
           <a

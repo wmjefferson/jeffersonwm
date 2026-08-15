@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-08-10T04:28:19.686Z",
+  "updatedAt": "2026-08-15T04:42:24.373Z",
   "apps": {
     "jeffersonwm": {
       "label": "JeffersonWM",
-      "version": "0.0.7",
-      "updatedAt": "2026-08-05 11:35 PDT"
+      "version": "0.1.0",
+      "updatedAt": "2026-08-14 20:54 PDT"
     },
     "feed": {
       "label": "Feed",
@@ -48,8 +48,8 @@
     },
     "clionidae": {
       "label": "Clionidae",
-      "version": "0.2.0",
-      "updatedAt": "2026-08-08 21:16 PDT"
+      "version": "0.4.0",
+      "updatedAt": "2026-08-14 21:42 PDT"
     },
     "auth": {
       "label": "Auth / Multimillion",
@@ -83,13 +83,13 @@
     },
     "aphelion": {
       "label": "Aphelion",
-      "version": "0.1.4",
-      "updatedAt": "2026-08-07 13:50 PDT"
+      "version": "0.3.0",
+      "updatedAt": "2026-08-13 18:12 PDT"
     },
     "auth-jeffersonwm": {
       "label": "Auth / Multimillion",
-      "version": "0.2.0",
-      "updatedAt": "2026-08-08 21:14 PDT"
+      "version": "0.3.1",
+      "updatedAt": "2026-08-13 19:27 PDT"
     }
   }
 }

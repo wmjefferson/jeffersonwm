@@ -38,7 +38,7 @@ Do not consolidate this into one giant Lionship database. Use separate live/dev 
 
 The current `jeffers4_dates` and `jeffers4_fonts` databases should be copied into the new JeffersonWM widget database, verified, and then treated as legacy archives until it is safe to retire them.
 
-The old `jeffers4_jefferson` database appears to be a legacy Lionship-style links database. It should not be deleted until cPanel, live environment files, backups, and runtime behavior confirm nothing still reads from it.
+The old `jeffers4_jefferson` database was verified as a legacy links-only database. Current link data lives in the dedicated links database, so `jeffers4_jefferson` can be exported for safety and removed from cPanel when convenient.
 
 ## Runtime Direction
 
@@ -64,4 +64,4 @@ Those routes can be served by a future JeffersonWM API/tunnel or by a fuller Jef
 
 ## Temporary State
 
-The JeffersonWM homepage widget is intentionally paused while this separation happens. The widget markup is still present so the visual work can be restored, but the script exits before it fetches live widget data.
+The JeffersonWM homepage widget now reads from JeffersonWM's own API and database. The widget markup remains in `index.html`, but it should no longer depend on Lionship widget endpoints for normal page loading.

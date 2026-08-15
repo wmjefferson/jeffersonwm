@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { HoverState } from '../types';
-import { getBrowserThumbnailUrl } from '../utils/imageDatabase';
+import { BACKGROUND_PLACEHOLDER_URL, getBrowserThumbnailUrl } from '../utils/imageDatabase';
 
 interface HoverPreviewCardProps {
   hover: HoverState | null;
@@ -9,6 +9,7 @@ interface HoverPreviewCardProps {
 
 export const HoverPreviewCard: React.FC<HoverPreviewCardProps> = ({ hover }) => {
   const [imgError, setImgError] = useState(false);
+  const [placeholderError, setPlaceholderError] = useState(false);
   const [previewSrc, setPreviewSrc] = useState<string>('');
   const [settledImage, setSettledImage] = useState<HoverState['image'] | null>(null);
   const image = settledImage;
@@ -30,12 +31,14 @@ export const HoverPreviewCard: React.FC<HoverPreviewCardProps> = ({ hover }) => 
   useEffect(() => {
     if (!image) {
       setImgError(false);
+      setPlaceholderError(false);
       setPreviewSrc('');
       return;
     }
 
     let cancelled = false;
     setImgError(false);
+    setPlaceholderError(false);
     setPreviewSrc('');
 
     getBrowserThumbnailUrl(image.imageUrl, imgWidth)
@@ -84,12 +87,24 @@ export const HoverPreviewCard: React.FC<HoverPreviewCardProps> = ({ hover }) => 
             className="w-full h-full object-cover"
             loading="eager"
           />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#FAFAFA]">
-            <span className="font-sans text-sm font-semibold leading-none tracking-normal text-gray-500">
-              Loading
-            </span>
-          </div>
+          ) : (
+          <>
+            {!placeholderError ? (
+              <img
+                src={BACKGROUND_PLACEHOLDER_URL}
+                alt=""
+                onError={() => setPlaceholderError(true)}
+                className="w-full h-full object-cover"
+                loading="eager"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-[#FAFAFA]">
+                <span className="font-sans text-sm font-semibold leading-none tracking-normal text-gray-500">
+                  Loading
+                </span>
+              </div>
+            )}
+          </>
         )}
       </motion.div>
     </AnimatePresence>

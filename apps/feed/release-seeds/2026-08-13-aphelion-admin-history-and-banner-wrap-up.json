@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Aphelion admin history and banner wrap-up",
+  "content": "<p>Aphelion ended the night with a steadier curation workflow and a cleaner shell. The options page now keeps an action history, the top banners across the public/admin/highlights surfaces line up more consistently, and the hover timing was pulled back after a flashier delay proved less comfortable in practice.</p><p>What worked:</p><ul><li><strong>Action history on Admin:</strong> saves, adds, renames, deletes, and series/attribute assignments now leave a local audit trail so the curation work is easier to resume.</li><li><strong>Header alignment:</strong> Highlights, Admin, Public, Back, and Options were reorganized so the page shells feel like one system instead of several unrelated layouts.</li><li><strong>Workflow polish:</strong> the curation page stayed focused on the working image and metadata surface instead of spreading into more panels than necessary.</li></ul><p>What we learned:</p><ul><li><strong>The 400ms hover experiment was too floaty:</strong> it made the page feel like it was flashing during block selection, so it was returned to the calmer 250ms settle.</li><li><strong>A blank-square loading swap was unnecessary for now:</strong> the existing loading treatment was the safer choice, so that test was backed out before it became part of the public flow.</li></ul><p>The next pass can stay focused on curation and layout details; the bookkeeping is now in better shape for picking up later.</p>",
+  "url": "https://jeffersonwm.com/feed/",
+  "source": "manual",
+  "external_id": "aphelion-admin-history-banner-wrap-up-2026-08-13"
+}

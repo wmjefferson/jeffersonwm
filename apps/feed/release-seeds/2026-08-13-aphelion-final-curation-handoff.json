@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Aphelion final curation handoff",
+  "content": "<p>Aphelion closed this pass with a quieter and more consistent admin shell. The main curation work was already in place: MySQL-backed card identity records, folder-aware queues, live metadata editing, multi-select rarity/series/attribute filters, direct image URL handling, and a practical one-screen review surface. This final cleanup focused on making the page frame stop getting in the way.</p><p>What changed at the handoff:</p><ul><li><strong>Admin and Options banners:</strong> both pages now use the same Aphelion header structure as the main curation page, with the leftover <code>Click</code> prompt removed.</li><li><strong>Clear navigation roles:</strong> the Admin page now shows <em>Highlights / Options / Public</em>, while the Options page shows <em>Highlights / Admin / Public</em>, so each page points to the other working surfaces without duplicating its own role.</li><li><strong>Frame consistency:</strong> the top banner bottom border was restored, matching the visual boundary used elsewhere in the app.</li><li><strong>Scrollbar behavior clarified:</strong> the layout is intended to keep scrolling inside the main content area between the 36px top and bottom banners, rather than letting page scrollbars overlay the banners themselves.</li></ul><p>This leaves Aphelion in a good place to pause: the curation direction is established, the admin/options shell is calmer, and the next pass can move back into card workflow details rather than layout repair.</p>",
+  "url": "https://jeffersonwm.com/aphelion/",
+  "source": "manual",
+  "external_id": "aphelion-final-curation-handoff-2026-08-13"
+}

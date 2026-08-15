@@ -14,6 +14,11 @@ RewriteCond %{REQUEST_URI} ^/$
 RewriteRule ^(.*)$ /jeffersonwm/ [L]
 
 # JeffersonWM status page
+RewriteCond %{THE_REQUEST} \s/+account/index(\.html)?[\s?]
+RewriteRule ^account/index(\.html)?$ /account/ [R=301,L]
+RewriteRule ^account/?$ /account/index.html [L]
+
+# JeffersonWM status page
 RewriteCond %{THE_REQUEST} \s/+status/index(\.html)?[\s?]
 RewriteRule ^status/index(\.html)?$ /status/ [R=301,L]
 RewriteRule ^status/?$ /status/index.html [L]

@@ -14,8 +14,13 @@ dotenv.config();
 
 const app = express();
 const port = Number(process.env.JEFFERSONWM_PORT || process.env.PORT || 3000);
-const allowedOrigin = process.env.JEFFERSONWM_ALLOWED_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = (process.env.JEFFERSONWM_ALLOWED_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 const adminToken = process.env.JEFFERSONWM_WIDGET_ADMIN_TOKEN || '';
+const geoapifyApiKey = process.env.GEOAPIFY_API_KEY || '';
+const authBaseUrl = (process.env.JEFFERSONWM_AUTH_BASE_URL || 'https://auth.jeffersonwm.com').replace(/\/$/, '');
 
 type WidgetFont = {
   id?: number;
@@ -33,18 +38,63 @@ type WidgetEvent = {
   is_public?: number | boolean;
 };
 
+type UserWidgetPreference = {
+  auth_user_id: string;
+  location_label?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  weather_unit?: string | null;
+};
+
+type LocationSuggestion = {
+  label: string;
+  city: string;
+  region: string;
+  country: string;
+  countryCode: string;
+  latitude: number;
+  longitude: number;
+  weatherUnit: 'fahrenheit' | 'celsius';
+};
+
+type WidgetWords = {
+  dictionary: string;
+  merriam: string;
+  oxford: string;
+  wiktionary: string;
+};
+
+type AuthStatusUser = {
+  id?: string;
+  username?: string;
+  displayName?: string | null;
+  isAdmin?: boolean;
+  isApproved?: boolean;
+  isBlocked?: boolean;
+  isDeleted?: boolean;
+};
+
 const fallbackFonts: WidgetFont[] = [
   { name: 'IBM Plex Sans Condensed', weight: 2, probability: 3 },
   { name: 'Newsreader', weight: 2, probability: 2 },
   { name: 'Gelasio', weight: 2, probability: 1 },
 ];
 
-const fallbackWords = {
-  dictionary: 'serendipity',
-  merriam: 'resilience',
-  oxford: 'constellation',
-  wiktionary: 'half-baked',
+const fallbackWords: WidgetWords = {
+  dictionary: 'Dictionary.com',
+  merriam: 'Merriam-Webster',
+  oxford: 'Oxford',
+  wiktionary: 'Wiktionary',
 };
+
+const defaultWidgetPreference = {
+  location_label: 'San Francisco',
+  latitude: 37.7749,
+  longitude: -122.4194,
+  weather_unit: 'fahrenheit',
+};
+
+let wotdCache: { data: WidgetWords; timestamp: number } | null = null;
 
 const dbConfig = {
   host: process.env.JEFFERSONWM_WIDGET_DB_HOST || process.env.MYSQL_HOST,
@@ -65,16 +115,47 @@ const pool = isDbConfigured
     })
   : null;
 
-function hasAdminAccess(req: express.Request) {
-  if (!adminToken) {
-    return false;
+async function getAuthUser(req: express.Request): Promise<AuthStatusUser | null> {
+  const cookieHeader = req.get('cookie') || '';
+  if (!cookieHeader) {
+    return null;
   }
 
-  return req.get('x-widget-admin-token') === adminToken;
+  try {
+    const response = await fetch(`${authBaseUrl}/api/auth/status`, {
+      headers: {
+        cookie: cookieHeader,
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await response.json() as { user?: AuthStatusUser | null };
+    const user = payload.user;
+    if (!user || !user.isApproved || user.isBlocked || user.isDeleted) {
+      return null;
+    }
+
+    return user;
+  } catch (error) {
+    console.error('JeffersonWM auth status check failed:', error);
+    return null;
+  }
 }
 
-function requireWidgetAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (hasAdminAccess(req)) {
+async function hasAdminAccess(req: express.Request, user?: AuthStatusUser | null) {
+  if (adminToken && req.get('x-widget-admin-token') === adminToken) {
+    return true;
+  }
+
+  const resolvedUser = user === undefined ? await getAuthUser(req) : user;
+  return Boolean(resolvedUser?.isAdmin);
+}
+
+async function requireWidgetAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (await hasAdminAccess(req)) {
     next();
     return;
   }
@@ -97,12 +178,109 @@ function requireDb(res: express.Response) {
   return pool;
 }
 
+function getCurrentUserId() {
+  return process.env.JEFFERSONWM_DEV_USERNAME || 'jefferson';
+}
+
+function getWidgetUserId(user: AuthStatusUser | null) {
+  return user?.username || user?.id || getCurrentUserId();
+}
+
 function normalizeDateValue(value: unknown) {
   if (value instanceof Date) {
     return value.toISOString().slice(0, 10);
   }
 
   return String(value || '').slice(0, 10);
+}
+
+function normalizeOptionalDateValue(value: unknown) {
+  const normalized = normalizeDateValue(value);
+  return normalized || null;
+}
+
+function getFirstString(...values: unknown[]) {
+  for (const value of values) {
+    const text = String(value || '').trim();
+    if (text) {
+      return text;
+    }
+  }
+
+  return '';
+}
+
+function normalizeGeoapifyResult(result: Record<string, unknown>): LocationSuggestion | null {
+  const city = getFirstString(result.city, result.town, result.village, result.municipality, result.county, result.name);
+  const region = getFirstString(result.state, result.region, result.county);
+  const country = getFirstString(result.country);
+  const countryCode = getFirstString(result.country_code).toLowerCase();
+  const latitude = Number(result.lat);
+  const longitude = Number(result.lon);
+
+  if (!city || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+
+  const labelParts = [city, region, country].filter(Boolean);
+
+  return {
+    label: labelParts.join(', '),
+    city,
+    region,
+    country,
+    countryCode,
+    latitude,
+    longitude,
+    weatherUnit: getDefaultWeatherUnit(countryCode),
+  };
+}
+
+function getDefaultWeatherUnit(countryCode: string): 'fahrenheit' | 'celsius' {
+  const fahrenheitCountries = new Set([
+    'bs',
+    'bz',
+    'ky',
+    'lr',
+    'pw',
+    'us',
+  ]);
+
+  return fahrenheitCountries.has(countryCode.toLowerCase()) ? 'fahrenheit' : 'celsius';
+}
+
+function scoreLocationSuggestion(suggestion: LocationSuggestion, query: string) {
+  const normalizedQuery = query.toLowerCase();
+  const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+  const city = suggestion.city.toLowerCase();
+  const label = suggestion.label.toLowerCase();
+  let score = 0;
+
+  if (city === normalizedQuery) {
+    score += 1000;
+  }
+
+  if (city.startsWith(normalizedQuery)) {
+    score += 500;
+  }
+
+  if (label.includes(normalizedQuery)) {
+    score += 250;
+  }
+
+  for (const token of tokens) {
+    if (city.startsWith(token)) {
+      score += 75;
+    } else if (city.includes(token)) {
+      score += 35;
+    }
+
+    if (label.includes(token)) {
+      score += 20;
+    }
+  }
+
+  return score;
 }
 
 function sortEventsByNextOccurrence(events: WidgetEvent[]) {
@@ -138,6 +316,42 @@ async function getEvents() {
   }));
 }
 
+async function getUserEvents(authUserId: string) {
+  if (!pool) {
+    return [];
+  }
+
+  const [rows] = await pool.query(
+    `SELECT id, auth_user_id, name, description, date, end_date
+     FROM user_widget_special_dates
+     WHERE auth_user_id = ?
+     ORDER BY MONTH(date) ASC, DAY(date) ASC, name ASC`,
+    [authUserId],
+  );
+
+  return (rows as WidgetEvent[]).map(event => ({
+    ...event,
+    date: normalizeDateValue(event.date),
+    end_date: event.end_date ? normalizeDateValue(event.end_date) : null,
+  }));
+}
+
+async function getUserPreference(authUserId: string) {
+  if (!pool) {
+    return null;
+  }
+
+  const [rows] = await pool.query(
+    `SELECT auth_user_id, location_label, latitude, longitude, weather_unit
+     FROM user_widget_preferences
+     WHERE auth_user_id = ?
+     LIMIT 1`,
+    [authUserId],
+  );
+
+  return (rows as UserWidgetPreference[])[0] || null;
+}
+
 async function getFonts() {
   if (!pool) {
     return fallbackFonts;
@@ -152,7 +366,129 @@ async function getFonts() {
   return rows as WidgetFont[];
 }
 
-app.use(cors({ origin: allowedOrigin, credentials: true }));
+async function getWidgetWords() {
+  if (wotdCache && Date.now() - wotdCache.timestamp < 60 * 60 * 1000) {
+    return wotdCache.data;
+  }
+
+  const fetchOptions = {
+    headers: {
+      'User-Agent': 'Mozilla/5.0',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+  };
+
+  const result: WidgetWords = { ...fallbackWords };
+
+  try {
+    const dictionaryResponse = await fetch('https://www.dictionary.com/e/word-of-the-day/', fetchOptions);
+    const dictionaryHtml = await dictionaryResponse.text();
+    const dictionaryMatch =
+      dictionaryHtml.match(/<div class="otd-item-headword__word">[\s\S]*?<h1>(.*?)<\/h1>/i) ||
+      dictionaryHtml.match(/<title>Word of the Day: (.*?) \| Dictionary\.com<\/title>/i);
+
+    if (dictionaryMatch?.[1]) {
+      result.dictionary = dictionaryMatch[1].replace(/<[^>]*>/g, '').trim();
+    }
+  } catch (error) {
+    console.error('Dictionary WOTD fetch failed:', error);
+  }
+
+  try {
+    const merriamResponse = await fetch('https://www.merriam-webster.com/wotd/feed/rss2', fetchOptions);
+    const merriamXml = await merriamResponse.text();
+    const merriamMatch = merriamXml.match(/<item>[\s\S]*?<title>(?:Word of the Day: )?(.*?)<\/title>/i);
+
+    if (merriamMatch?.[1]) {
+      result.merriam = merriamMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+    }
+  } catch (error) {
+    console.error('Merriam WOTD fetch failed:', error);
+  }
+
+  try {
+    const wiktionaryResponse = await fetch('https://en.wiktionary.org/w/api.php?action=featuredfeed&feed=wotd&format=xml', fetchOptions);
+    const wiktionaryXml = await wiktionaryResponse.text();
+    const items = wiktionaryXml.split('<item>');
+    const lastItem = items[items.length - 1] || wiktionaryXml;
+    const wiktionaryMatch =
+      lastItem.match(/id=&quot;WOTD-rss-title&quot;&gt;(.*?)&lt;\/span&gt;/i) ||
+      lastItem.match(/id="WOTD-rss-title">(.*?)<\/span>/i) ||
+      lastItem.match(/<title>(?:Word of the day for .*: )?(.*?)<\/title>/i);
+
+    if (wiktionaryMatch?.[1]) {
+      result.wiktionary = wiktionaryMatch[1].replace(/<[^>]*>/g, '').trim();
+    }
+  } catch (error) {
+    console.error('Wiktionary WOTD fetch failed:', error);
+  }
+
+  wotdCache = {
+    data: result,
+    timestamp: Date.now(),
+  };
+
+  return result;
+}
+
+async function buildWidgetAccountPayload(authUserId: string, useStoredPreference = true) {
+  if (!useStoredPreference) {
+    return {
+      ok: true,
+      authUserId: 'guest',
+      preference: {
+        auth_user_id: 'guest',
+        ...defaultWidgetPreference,
+      },
+      personalDates: [],
+    };
+  }
+
+  const [preference, personalDates] = await Promise.all([
+    getUserPreference(authUserId),
+    getUserEvents(authUserId),
+  ]);
+
+  return {
+    ok: true,
+    authUserId,
+    preference: preference || {
+      auth_user_id: authUserId,
+      ...defaultWidgetPreference,
+    },
+    personalDates,
+  };
+}
+
+async function buildWidgetResolvedPayload(req: express.Request) {
+  const authUser = await getAuthUser(req);
+  const authUserId = getWidgetUserId(authUser);
+  const canEditDefaults = await hasAdminAccess(req, authUser);
+  const [publicEvents, personalEvents, preference] = await Promise.all([
+    canEditDefaults ? getEvents() : Promise.resolve([]),
+    authUser ? getUserEvents(authUserId) : Promise.resolve([]),
+    authUser ? getUserPreference(authUserId) : Promise.resolve(null),
+  ]);
+  const events = [...publicEvents, ...personalEvents];
+  const sortedEvents = sortEventsByNextOccurrence(events);
+
+  return {
+    ok: true,
+    auth: {
+      canEditDefaults,
+    },
+    resolved: {
+      locationLabel: preference?.location_label || 'San Francisco, California',
+      latitude: Number(preference?.latitude ?? defaultWidgetPreference.latitude),
+      longitude: Number(preference?.longitude ?? defaultWidgetPreference.longitude),
+      weatherUnit: preference?.weather_unit || defaultWidgetPreference.weather_unit,
+      specialDates: events,
+      nextSpecialDate: sortedEvents[0] || null,
+    },
+  };
+}
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
 app.get('/', (_req, res) => {
@@ -208,29 +544,244 @@ app.get('/api/widget/schema', (_req, res) => {
       'user_widget_special_dates',
     ],
     migrationSources: ['jeffers4_dates.events', 'jeffers4_fonts.fonts'],
-    legacyReview: ['jeffers4_jefferson'],
   });
+});
+
+app.get('/api/account/me', (_req, res) => {
+  const username = getCurrentUserId();
+
+  res.json({
+    ok: true,
+    authenticated: false,
+    username,
+    displayName: process.env.JEFFERSONWM_DEV_DISPLAY_NAME || username,
+    authProvider: 'pending',
+  });
+});
+
+app.get('/api/account/widget', async (req, res) => {
+  try {
+    const authUser = await getAuthUser(req);
+    res.json(await buildWidgetAccountPayload(getWidgetUserId(authUser), Boolean(authUser)));
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Account widget data could not be loaded.',
+    });
+  }
+});
+
+app.get('/api/widget/preferences', async (req, res) => {
+  try {
+    const authUser = await getAuthUser(req);
+    res.json(await buildWidgetAccountPayload(getWidgetUserId(authUser), Boolean(authUser)));
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Widget preferences could not be loaded.',
+    });
+  }
+});
+
+app.get('/api/locations/search', async (req, res) => {
+  const query = String(req.query.q || '').trim();
+
+  if (query.length < 3) {
+    res.json({ ok: true, suggestions: [] });
+    return;
+  }
+
+  if (!geoapifyApiKey) {
+    res.status(503).json({
+      ok: false,
+      error: 'Geoapify is not configured.',
+    });
+    return;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      text: query,
+      type: 'city',
+      format: 'json',
+      limit: '6',
+      bias: 'countrycode:us',
+      apiKey: geoapifyApiKey,
+    });
+    const response = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?${params.toString()}`);
+
+    if (!response.ok) {
+      res.status(response.status).json({
+        ok: false,
+        error: `Geoapify returned HTTP ${response.status}.`,
+      });
+      return;
+    }
+
+    const payload = await response.json() as { results?: Record<string, unknown>[] };
+    const seen = new Set<string>();
+    const suggestions = (payload.results || [])
+      .map(normalizeGeoapifyResult)
+      .filter((suggestion): suggestion is LocationSuggestion => Boolean(suggestion))
+      .filter(suggestion => {
+        const key = `${suggestion.city}|${suggestion.region}|${suggestion.country}`.toLowerCase();
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => scoreLocationSuggestion(b, query) - scoreLocationSuggestion(a, query));
+
+    res.json({ ok: true, suggestions });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Location search failed.',
+    });
+  }
+});
+
+app.put('/api/account/widget/preferences', async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  const authUser = await getAuthUser(req);
+  if (!authUser) {
+    res.status(401).json({ ok: false, error: 'Sign in before saving widget preferences.' });
+    return;
+  }
+
+  const authUserId = getWidgetUserId(authUser);
+  const locationLabel = String(req.body?.location_label || '').trim() || null;
+  const latitude = req.body?.latitude === '' || req.body?.latitude === null ? null : Number(req.body?.latitude);
+  const longitude = req.body?.longitude === '' || req.body?.longitude === null ? null : Number(req.body?.longitude);
+  const weatherUnit = String(req.body?.weather_unit || 'fahrenheit').toLowerCase() === 'celsius' ? 'celsius' : 'fahrenheit';
+
+  if ((latitude !== null && !Number.isFinite(latitude)) || (longitude !== null && !Number.isFinite(longitude))) {
+    res.status(400).json({ ok: false, error: 'Latitude and longitude must be numbers when provided.' });
+    return;
+  }
+
+  await db.execute(
+    `INSERT INTO user_widget_preferences (auth_user_id, location_label, latitude, longitude, weather_unit)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       location_label = VALUES(location_label),
+       latitude = VALUES(latitude),
+       longitude = VALUES(longitude),
+       weather_unit = VALUES(weather_unit)`,
+    [authUserId, locationLabel, latitude, longitude, weatherUnit],
+  );
+
+  res.json({ ok: true });
+});
+
+app.put('/api/widget/preferences', async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  const authUser = await getAuthUser(req);
+  if (!authUser) {
+    res.status(401).json({ ok: false, error: 'Sign in before saving widget preferences.' });
+    return;
+  }
+
+  const authUserId = getWidgetUserId(authUser);
+  const locationLabel = String(req.body?.location_label || '').trim() || null;
+  const latitude = req.body?.latitude === '' || req.body?.latitude === null ? null : Number(req.body?.latitude);
+  const longitude = req.body?.longitude === '' || req.body?.longitude === null ? null : Number(req.body?.longitude);
+  const weatherUnit = String(req.body?.weather_unit || 'fahrenheit').toLowerCase() === 'celsius' ? 'celsius' : 'fahrenheit';
+
+  if ((latitude !== null && !Number.isFinite(latitude)) || (longitude !== null && !Number.isFinite(longitude))) {
+    res.status(400).json({ ok: false, error: 'Latitude and longitude must be numbers when provided.' });
+    return;
+  }
+
+  await db.execute(
+    `INSERT INTO user_widget_preferences (auth_user_id, location_label, latitude, longitude, weather_unit)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       location_label = VALUES(location_label),
+       latitude = VALUES(latitude),
+       longitude = VALUES(longitude),
+       weather_unit = VALUES(weather_unit)`,
+    [authUserId, locationLabel, latitude, longitude, weatherUnit],
+  );
+
+  res.json({ ok: true });
+});
+
+app.post('/api/account/widget/special-dates', async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  const authUser = await getAuthUser(req);
+  if (!authUser) {
+    res.status(401).json({ ok: false, error: 'Sign in before saving personal dates.' });
+    return;
+  }
+
+  const authUserId = getWidgetUserId(authUser);
+  const name = String(req.body?.name || '').trim();
+  const description = String(req.body?.description || '').trim() || null;
+  const date = normalizeOptionalDateValue(req.body?.date);
+  const endDate = normalizeOptionalDateValue(req.body?.end_date);
+
+  if (!name || !date) {
+    res.status(400).json({ ok: false, error: 'Expected name and date.' });
+    return;
+  }
+
+  await db.execute(
+    `INSERT INTO user_widget_special_dates (auth_user_id, name, description, date, end_date)
+     VALUES (?, ?, ?, ?, ?)`,
+    [authUserId, name, description, date, endDate],
+  );
+
+  res.json({ ok: true });
+});
+
+app.delete('/api/account/widget/special-dates/:id', async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  const authUser = await getAuthUser(req);
+  if (!authUser) {
+    res.status(401).json({ ok: false, error: 'Sign in before deleting personal dates.' });
+    return;
+  }
+
+  await db.execute('DELETE FROM user_widget_special_dates WHERE id = ? AND auth_user_id = ?', [
+    req.params.id,
+    getWidgetUserId(authUser),
+  ]);
+
+  res.json({ ok: true });
 });
 
 app.get('/api/widget/resolved', async (req, res) => {
   try {
-    const events = await getEvents();
-    const sortedEvents = sortEventsByNextOccurrence(events);
-
-    res.json({
-      ok: true,
-      auth: {
-        canEditDefaults: hasAdminAccess(req),
-      },
-      resolved: {
-        locationLabel: 'San Francisco, California',
-        latitude: 37.7811,
-        longitude: -122.4883,
-        weatherUnit: 'fahrenheit',
-        specialDates: events,
-        nextSpecialDate: sortedEvents[0] || null,
-      },
+    res.json(await buildWidgetResolvedPayload(req));
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Widget state could not be resolved.',
     });
+  }
+});
+
+app.get('/api/widget/state', async (req, res) => {
+  try {
+    res.json(await buildWidgetResolvedPayload(req));
   } catch (error) {
     res.status(500).json({
       ok: false,
@@ -257,7 +808,7 @@ app.put('/api/widget/fonts/:name', requireWidgetAdmin, async (req, res) => {
   }
 
   const weight = Number(req.body?.weight);
-  const probability = Number(req.body?.probability);
+  const probability = Number(req.body?.probability ?? req.body?.weight);
 
   if (!Number.isFinite(weight) || weight < 1 || weight > 5 || !Number.isFinite(probability)) {
     res.status(400).json({ ok: false, error: 'Expected weight 1-5 and numeric probability.' });
@@ -272,7 +823,7 @@ app.put('/api/widget/fonts/:name', requireWidgetAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/widget/all-events', async (_req, res) => {
+app.get('/api/widget/all-events', requireWidgetAdmin, async (_req, res) => {
   try {
     res.json(await getEvents());
   } catch (error) {
@@ -283,7 +834,7 @@ app.get('/api/widget/all-events', async (_req, res) => {
   }
 });
 
-app.get('/api/widget/next-event', async (_req, res) => {
+app.get('/api/widget/next-event', requireWidgetAdmin, async (_req, res) => {
   try {
     const events = await getEvents();
     res.json(sortEventsByNextOccurrence(events)[0] || null);
@@ -343,8 +894,13 @@ app.delete('/api/widget/events/:id', requireWidgetAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/widget/wotd', (_req, res) => {
-  res.json(fallbackWords);
+app.get('/api/widget/wotd', async (_req, res) => {
+  try {
+    res.json(await getWidgetWords());
+  } catch (error) {
+    console.error('Widget WOTD could not be loaded:', error);
+    res.json(fallbackWords);
+  }
 });
 
 app.listen(port, () => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AdminCatalogPayload,
   CardCatalogItem,
@@ -15,10 +15,17 @@ const FILTER_OPTIONS = [
   { id: 'untagged', label: 'Only Untagged' },
   { id: 'reviewed', label: 'Only Reviewed' },
 ] as const;
-
-const QUICK_ATTRIBUTES = ['face', 'blue'];
+const SERIES_SEPARATOR = ' | ';
 
 type FilterMode = (typeof FILTER_OPTIONS)[number]['id'];
+type CountPanel = 'rarity' | 'series' | 'attributes' | '';
+
+type AdminActionRecord = {
+  id: string;
+  timestamp: string;
+  action: string;
+  detail: string;
+};
 
 type EditorState = {
   title: string;
@@ -47,6 +54,9 @@ const EMPTY_EDITOR: EditorState = {
   attributes: [],
 };
 
+const ACTION_HISTORY_STORAGE_KEY = 'aphelion_admin_action_history';
+const ACTION_HISTORY_LIMIT = 80;
+
 function prefixApiUrl(apiBaseUrl: string, url: string) {
   if (!url) {
     return '';
@@ -58,6 +68,32 @@ function prefixApiUrl(apiBaseUrl: string, url: string) {
 
   const base = apiBaseUrl.trim().replace(/\/$/, '');
   return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+function titleCase(value: string) {
+  return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatRarityLabel(option: CardRarity, index: number) {
+  return `${index + 1} - ${titleCase(option)}`;
+}
+
+function splitSeriesNames(value: string) {
+  return value
+    .split('|')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function joinSeriesNames(values: string[]) {
+  return Array.from(new Set(values.map((item) => item.trim()).filter(Boolean))).join(SERIES_SEPARATOR);
+}
+
+function toggleSeriesName(value: string, label: string) {
+  const current = splitSeriesNames(value);
+  return current.includes(label)
+    ? joinSeriesNames(current.filter((item) => item !== label))
+    : joinSeriesNames([...current, label]);
 }
 
 function cardToEditor(card: CardCatalogItem | null): EditorState {
@@ -155,21 +191,68 @@ function collectAncestorPaths(folderPath: string) {
   return paths;
 }
 
+function loadActionHistory(): AdminActionRecord[] {
+  try {
+    const raw = window.localStorage.getItem(ACTION_HISTORY_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((item) => item && typeof item === 'object' && typeof item.id === 'string' && typeof item.timestamp === 'string' && typeof item.action === 'string' && typeof item.detail === 'string')
+      .slice(0, ACTION_HISTORY_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function formatActionTimestamp(timestamp: string) {
+  return new Date(timestamp).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
 export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
+  const [currentHash, setCurrentHash] = useState(window.location.hash);
   const [cards, setCards] = useState<CardCatalogItem[]>([]);
   const [attributes, setAttributes] = useState<ControlledLibraryItem[]>([]);
   const [series, setSeries] = useState<ControlledLibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('untagged');
+  const [countPanel, setCountPanel] = useState<CountPanel>('');
   const [search, setSearch] = useState('');
   const [selectedFolder, setSelectedFolder] = useState('');
+  const [selectedRarityFilters, setSelectedRarityFilters] = useState<string[]>([]);
+  const [selectedSeriesFilters, setSelectedSeriesFilters] = useState<string[]>([]);
+  const [selectedAttributeFilters, setSelectedAttributeFilters] = useState<string[]>([]);
   const [selectedPath, setSelectedPath] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
+  const [folderPanelOpen, setFolderPanelOpen] = useState(false);
+  const [copiedDirectUrl, setCopiedDirectUrl] = useState(false);
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [editor, setEditor] = useState<EditorState>(EMPTY_EDITOR);
+  const [seriesEntry, setSeriesEntry] = useState('');
+  const [attributeEntry, setAttributeEntry] = useState('');
   const [saving, setSaving] = useState(false);
-  const [newAttribute, setNewAttribute] = useState('');
-  const [newSeries, setNewSeries] = useState('');
+  const [pendingSaveField, setPendingSaveField] = useState('');
+  const [savedField, setSavedField] = useState('');
+  const [actionHistory, setActionHistory] = useState<AdminActionRecord[]>(() => loadActionHistory());
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadedEditorPathRef = useRef('');
+
+  useEffect(() => {
+    const handleHashChange = () => setCurrentHash(window.location.hash);
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,12 +299,61 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
 
   const folderTree = useMemo(() => buildFolderTree(cards), [cards]);
   const expandedFolderSet = useMemo(() => new Set(expandedFolders), [expandedFolders]);
+  const quickAttributes = useMemo(() => attributes.slice(0, 6).map((item) => item.label), [attributes]);
+  const rarityCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const rarity of RARITY_OPTIONS) {
+      counts.set(rarity, 0);
+    }
+    for (const card of cards) {
+      if (card.rarity) {
+        counts.set(card.rarity, (counts.get(card.rarity) || 0) + 1);
+      }
+    }
+
+    return Array.from(counts.entries());
+  }, [cards]);
+  const seriesCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of series) {
+      counts.set(item.label, 0);
+    }
+    for (const card of cards) {
+      for (const name of splitSeriesNames(card.seriesName)) {
+        counts.set(name, (counts.get(name) || 0) + 1);
+      }
+    }
+
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }));
+  }, [cards, series]);
+  const attributeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of attributes) {
+      counts.set(item.label, 0);
+    }
+    for (const card of cards) {
+      for (const attribute of card.attributes) {
+        counts.set(attribute, (counts.get(attribute) || 0) + 1);
+      }
+    }
+
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }));
+  }, [attributes, cards]);
 
   const filteredCards = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
     return cards.filter((card) => {
       if (selectedFolder && card.folderPath !== selectedFolder && !card.folderPath.startsWith(`${selectedFolder}/`)) {
+        return false;
+      }
+      if (selectedRarityFilters.length > 0 && (!card.rarity || !selectedRarityFilters.includes(card.rarity))) {
+        return false;
+      }
+      if (selectedSeriesFilters.length > 0 && !splitSeriesNames(card.seriesName).some((item) => selectedSeriesFilters.includes(item))) {
+        return false;
+      }
+      if (selectedAttributeFilters.length > 0 && !card.attributes.some((item) => selectedAttributeFilters.includes(item))) {
         return false;
       }
 
@@ -252,7 +384,7 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
 
       return haystack.includes(normalizedSearch);
     });
-  }, [cards, filterMode, search, selectedFolder]);
+  }, [cards, filterMode, search, selectedAttributeFilters, selectedFolder, selectedRarityFilters, selectedSeriesFilters]);
 
   const selectedCard = useMemo(() => {
     return filteredCards.find((card) => card.imagePath === selectedPath)
@@ -260,21 +392,44 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
       || filteredCards[0]
       || null;
   }, [cards, filteredCards, selectedPath]);
+  const selectedDirectUrl = selectedCard ? prefixApiUrl(apiBaseUrl, selectedCard.imageUrl) : '';
 
   const stats = useMemo(() => buildStats(cards), [cards]);
   const filteredStats = useMemo(() => buildStats(filteredCards), [filteredCards]);
-  const currentIndex = useMemo(
-    () => filteredCards.findIndex((card) => card.imagePath === selectedCard?.imagePath),
-    [filteredCards, selectedCard]
-  );
+  const selectedRarityCount = selectedRarityFilters.length > 0
+    ? cards.filter((card) => card.rarity && selectedRarityFilters.includes(card.rarity)).length
+    : stats.withRarity;
+  const selectedSeriesCount = selectedSeriesFilters.length > 0
+    ? cards.filter((card) => splitSeriesNames(card.seriesName).some((item) => selectedSeriesFilters.includes(item))).length
+    : stats.withSeries;
+  const selectedAttributeCount = selectedAttributeFilters.length > 0
+    ? cards.filter((card) => card.attributes.some((item) => selectedAttributeFilters.includes(item))).length
+    : stats.withAttributes;
+  const selectedRarityHeader = selectedRarityFilters.length > 0
+    ? selectedRarityFilters.map((label) => {
+        const selectedRarityIndex = RARITY_OPTIONS.indexOf(label as CardRarity);
+        return selectedRarityIndex >= 0 ? formatRarityLabel(label as CardRarity, selectedRarityIndex) : label;
+      }).join(', ')
+    : 'With Rarity';
+  const selectedSeriesHeader = selectedSeriesFilters.length > 0 ? selectedSeriesFilters.join(', ') : 'With Series';
+  const selectedAttributeHeader = selectedAttributeFilters.length > 0 ? selectedAttributeFilters.map((item) => `#${item}`).join(', ') : 'With Attributes';
+  const isOptionsPage = currentHash === '#options';
 
   useEffect(() => {
     if (!selectedCard) {
+      loadedEditorPathRef.current = '';
+      setPendingSaveField('');
+      setSavedField('');
       setEditor(EMPTY_EDITOR);
       return;
     }
 
-    setEditor(cardToEditor(selectedCard));
+    if (selectedCard.imagePath !== loadedEditorPathRef.current) {
+      loadedEditorPathRef.current = selectedCard.imagePath;
+      setPendingSaveField('');
+      setSavedField('');
+      setEditor(cardToEditor(selectedCard));
+    }
     if (selectedCard.imagePath !== selectedPath) {
       setSelectedPath(selectedCard.imagePath);
     }
@@ -290,6 +445,11 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && imagePreviewOpen) {
+        setImagePreviewOpen(false);
+        return;
+      }
+
       if (!selectedCard || saving) {
         return;
       }
@@ -303,14 +463,17 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
         if (['1', '2', '3', '4', '5'].includes(key)) {
           event.preventDefault();
           const rarity = RARITY_OPTIONS[Number(key) - 1];
-          setEditor((current) => ({ ...current, rarity }));
+          updateEditor('Rarity', (current) => ({ ...current, rarity }));
           return;
         }
 
         if (key === 'f' || key === 'b') {
           event.preventDefault();
-          const label = key === 'f' ? 'face' : 'blue';
-          setEditor((current) => ({
+          const label = key === 'f' ? quickAttributes[0] : quickAttributes[1];
+          if (!label) {
+            return;
+          }
+          updateEditor('Attributes', (current) => ({
             ...current,
             attributes: current.attributes.includes(label)
               ? current.attributes.filter((item) => item !== label)
@@ -318,16 +481,11 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
           }));
         }
       }
-
-      if (!isTextArea && event.key === 'Enter') {
-        event.preventDefault();
-        void handleSave(true);
-      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCard, saving, editor]);
+  }, [selectedCard, saving, editor, quickAttributes, imagePreviewOpen]);
 
   function updateCardLocally(record: CardMetadataRecord) {
     setCards((current) => current.map((card) => (
@@ -349,16 +507,25 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
     )));
   }
 
-  async function handleSave(autoAdvance = false) {
+  function showSaved(fieldLabel: string) {
+    setSavedField(fieldLabel);
+    if (savedTimerRef.current) {
+      clearTimeout(savedTimerRef.current);
+    }
+    savedTimerRef.current = setTimeout(() => setSavedField(''), 1000);
+  }
+
+  function updateEditor(fieldLabel: string, updater: (current: EditorState) => EditorState) {
+    setPendingSaveField(fieldLabel);
+    setEditor(updater);
+  }
+
+  async function handleSave(fieldLabel = '') {
     if (!selectedCard) {
       return;
     }
 
     setSaving(true);
-    const nextPath = autoAdvance
-      ? filteredCards[currentIndex + 1]?.imagePath || filteredCards[currentIndex - 1]?.imagePath || selectedCard.imagePath
-      : selectedCard.imagePath;
-
     try {
       const payload: SaveCardPayload = {
         imagePath: selectedCard.imagePath,
@@ -393,14 +560,69 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
       updateCardLocally(result.card);
       setAttributes(result.attributes);
       setSeries(result.series);
-      if (autoAdvance) {
-        setSelectedPath(nextPath);
+      setPendingSaveField('');
+      if (fieldLabel) {
+        showSaved(fieldLabel);
+        recordAction(
+          'Save',
+          `${fieldLabel} saved for ${selectedCard.title || selectedCard.sourceTitle || selectedCard.imageCode}`
+        );
       }
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Card metadata could not be saved.');
     } finally {
       setSaving(false);
     }
+  }
+
+  useEffect(() => {
+    if (!selectedCard || !pendingSaveField || saving) {
+      return;
+    }
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    saveTimerRef.current = setTimeout(() => {
+      void handleSave(pendingSaveField);
+    }, 450);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [editor, pendingSaveField, saving, selectedCard?.imagePath]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+      if (savedTimerRef.current) {
+        clearTimeout(savedTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ACTION_HISTORY_STORAGE_KEY, JSON.stringify(actionHistory.slice(0, ACTION_HISTORY_LIMIT)));
+    } catch {
+      // Ignore storage errors in restricted browser contexts.
+    }
+  }, [actionHistory]);
+
+  function recordAction(action: string, detail: string) {
+    const entry: AdminActionRecord = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      timestamp: new Date().toISOString(),
+      action,
+      detail,
+    };
+
+    setActionHistory((current) => [entry, ...current].slice(0, ACTION_HISTORY_LIMIT));
   }
 
   async function postLibrary(endpoint: string, label: string, setter: (items: ControlledLibraryItem[]) => void, stateReset?: () => void) {
@@ -421,6 +643,7 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
 
     setter(result.attributes || result.series);
     stateReset?.();
+    recordAction('Add', `${cleaned} added to ${endpoint.includes('/series') ? 'Series Library' : 'Attribute Library'}`);
   }
 
   async function patchLibrary(
@@ -447,7 +670,7 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
     setter(result.attributes || result.series);
     setCards((current) => current.map((card) => (
       endpoint.includes('/series')
-        ? card.seriesName === currentLabel ? { ...card, seriesName: nextLabel.trim() } : card
+        ? { ...card, seriesName: joinSeriesNames(splitSeriesNames(card.seriesName).map((item) => (item === currentLabel ? nextLabel.trim() : item))) }
         : {
             ...card,
             attributes: card.attributes.map((item) => (item === currentLabel ? nextLabel.trim() : item)),
@@ -455,11 +678,17 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
     )));
     setEditor((current) => ({
       ...current,
-      seriesName: endpoint.includes('/series') && current.seriesName === currentLabel ? nextLabel.trim() : current.seriesName,
+      seriesName: endpoint.includes('/series')
+        ? joinSeriesNames(splitSeriesNames(current.seriesName).map((item) => (item === currentLabel ? nextLabel.trim() : item)))
+        : current.seriesName,
       attributes: endpoint.includes('/attributes')
         ? current.attributes.map((item) => (item === currentLabel ? nextLabel.trim() : item))
         : current.attributes,
     }));
+    recordAction(
+      'Rename',
+      `${currentLabel} renamed to ${nextLabel.trim()} in ${endpoint.includes('/series') ? 'Series Library' : 'Attribute Library'}`
+    );
   }
 
   async function deleteLibrary(
@@ -468,7 +697,15 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
     label: string,
     setter: (items: ControlledLibraryItem[]) => void
   ) {
-    if (!window.confirm(`Delete "${label}" from the library?`)) {
+    const isAttributeDelete = endpoint.includes('/attributes');
+    const assignedCount = isAttributeDelete
+      ? cards.filter((card) => card.attributes.includes(label)).length
+      : 0;
+    const confirmation = isAttributeDelete
+      ? `Delete "${label}" from the Attribute Library?\n\nIt is currently assigned to ${assignedCount} image${assignedCount === 1 ? '' : 's'}. Deleting it will remove that attribute from those card records too.`
+      : `Delete "${label}" from the library?`;
+
+    if (!window.confirm(confirmation)) {
       return;
     }
 
@@ -485,20 +722,26 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
     setter(result.attributes || result.series);
     setCards((current) => current.map((card) => (
       endpoint.includes('/series')
-        ? card.seriesName === label ? { ...card, seriesName: '' } : card
+        ? { ...card, seriesName: joinSeriesNames(splitSeriesNames(card.seriesName).filter((item) => item !== label)) }
         : { ...card, attributes: card.attributes.filter((item) => item !== label) }
     )));
     setEditor((current) => ({
       ...current,
-      seriesName: endpoint.includes('/series') && current.seriesName === label ? '' : current.seriesName,
+      seriesName: endpoint.includes('/series')
+        ? joinSeriesNames(splitSeriesNames(current.seriesName).filter((item) => item !== label))
+        : current.seriesName,
       attributes: endpoint.includes('/attributes')
         ? current.attributes.filter((item) => item !== label)
         : current.attributes,
     }));
+    recordAction(
+      'Delete',
+      `${label} removed from ${endpoint.includes('/series') ? 'Series Library' : 'Attribute Library'}${isAttributeDelete ? ` (${assignedCount} affected images)` : ''}`
+    );
   }
 
   function toggleAttribute(label: string) {
-    setEditor((current) => ({
+    updateEditor('Attributes', (current) => ({
       ...current,
       attributes: current.attributes.includes(label)
         ? current.attributes.filter((item) => item !== label)
@@ -512,6 +755,80 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
         ? current.filter((item) => item !== folderPath)
         : [...current, folderPath]
     ));
+  }
+
+  function handleFolderSelect(folderPath: string) {
+    setSelectedFolder(folderPath);
+    setFolderPanelOpen(false);
+  }
+
+  async function handleDirectUrlCopy() {
+    if (!selectedDirectUrl) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(selectedDirectUrl);
+    setCopiedDirectUrl(true);
+    window.setTimeout(() => setCopiedDirectUrl(false), 1200);
+  }
+
+  async function handleAddAttributeFromPanel() {
+    const label = window.prompt('Add attribute');
+    if (!label || !label.trim()) {
+      return;
+    }
+
+    await postLibrary('/api/admin/attributes', label, setAttributes);
+  }
+
+  async function handleAttributeEntryAdd() {
+    const label = attributeEntry.trim();
+    if (!label) {
+      return;
+    }
+
+    const exists = attributes.some((attribute) => attribute.label.toLowerCase() === label.toLowerCase());
+    if (!exists) {
+      await postLibrary('/api/admin/attributes', label, setAttributes);
+    }
+
+    updateEditor('Attributes', (current) => ({
+      ...current,
+      attributes: current.attributes.includes(label) ? current.attributes : [...current.attributes, label],
+    }));
+    setAttributeEntry('');
+    recordAction('Assign', `#${label} added to the current card`);
+  }
+
+  async function handleSeriesEntryAdd() {
+    const label = seriesEntry.trim();
+    if (!label) {
+      return;
+    }
+
+    const existing = series.find((item) => item.label.toLowerCase() === label.toLowerCase());
+    const finalLabel = existing?.label || label;
+    if (!existing) {
+      await postLibrary('/api/admin/series', label, setSeries);
+    }
+
+    updateEditor('Series', (current) => ({
+      ...current,
+      seriesName: splitSeriesNames(current.seriesName).includes(finalLabel)
+        ? current.seriesName
+        : joinSeriesNames([...splitSeriesNames(current.seriesName), finalLabel]),
+    }));
+    setSeriesEntry('');
+    recordAction('Assign', `${finalLabel} added to the current card series`);
+  }
+
+  async function handleAddSeriesFromPanel() {
+    const label = window.prompt('Add series');
+    if (!label || !label.trim()) {
+      return;
+    }
+
+    await postLibrary('/api/admin/series', label, setSeries);
   }
 
   function renderFolderNode(node: FolderTreeNode, depth = 0): React.ReactNode {
@@ -539,7 +856,7 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
           </button>
           <button
             type="button"
-            onClick={() => setSelectedFolder(node.path)}
+            onClick={() => handleFolderSelect(node.path)}
             className={`min-w-0 flex-1 text-left font-sans text-sm ${
               isSelected ? 'font-semibold text-blue-700' : 'text-gray-800 hover:text-[#de8bf7]'
             }`}
@@ -555,57 +872,315 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
     );
   }
 
+  function savedNotice(fieldLabel: string) {
+    return (
+      <span
+        className={`ml-2 font-sans text-[10px] font-semibold normal-case tracking-normal text-gray-500 transition-opacity ${
+          savedField === fieldLabel ? 'opacity-100 duration-100' : 'opacity-0 duration-1000'
+        }`}
+      >
+        Saved
+      </span>
+    );
+  }
+
+  function renderLibraryOptions(
+    title: string,
+    items: ControlledLibraryItem[],
+    endpoint: string,
+    setter: (items: ControlledLibraryItem[]) => void
+  ) {
+    return (
+      <section className="border border-[#e5e5e5] bg-white">
+        <div className="flex items-center justify-between border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+          <span>{title}</span>
+          <button
+            type="button"
+            onClick={() => {
+              const label = window.prompt(`Add ${title.toLowerCase().replace(' library', '')}`);
+              if (label) {
+                void postLibrary(endpoint, label, setter);
+              }
+            }}
+            className="font-sans text-xs font-semibold normal-case tracking-normal text-gray-700 hover:text-[#de8bf7]"
+          >
+            Add
+          </button>
+        </div>
+        <div className="grid gap-2 p-4">
+          {items.map((item) => (
+            <div key={item.id} className="flex items-center gap-3 border border-[#efefef] px-3 py-2">
+              <span className="min-w-0 flex-1 truncate font-sans text-sm text-gray-900">{item.label}</span>
+              <button
+                type="button"
+                onClick={() => void patchLibrary(endpoint, item.id, item.label, setter)}
+                className="font-sans text-xs font-semibold text-gray-500 hover:text-[#de8bf7]"
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteLibrary(endpoint, item.id, item.label, setter)}
+                className="font-sans text-xs font-semibold text-red-600"
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+          {items.length === 0 && (
+            <div className="font-sans text-sm text-gray-500">No entries yet.</div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  function renderActionHistory() {
+    return (
+      <section className="border border-[#e5e5e5] bg-white xl:col-span-2">
+        <div className="flex items-center justify-between border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+          <span>Action History</span>
+          <span className="text-[10px] normal-case tracking-normal text-gray-400">
+            {actionHistory.length} entries
+          </span>
+        </div>
+        <div className="max-h-[320px] overflow-y-auto p-4">
+          {actionHistory.length === 0 ? (
+            <div className="font-sans text-sm text-gray-500">No actions recorded yet.</div>
+          ) : (
+            <div className="grid gap-2">
+              {actionHistory.map((entry) => (
+                <article key={entry.id} className="border border-[#efefef] px-3 py-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="font-sans text-xs font-semibold uppercase tracking-[0.16em] text-gray-700">
+                        {entry.action}
+                      </div>
+                      <div className="mt-1 font-sans text-sm text-gray-900">{entry.detail}</div>
+                    </div>
+                    <div className="shrink-0 font-sans text-[10px] uppercase tracking-[0.12em] text-gray-400">
+                      {formatActionTimestamp(entry.timestamp)}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <div
       className="min-h-screen overflow-x-hidden bg-[#FAFAFA] text-gray-950"
-      style={{ scrollbarGutter: 'stable both-edges' }}
+      style={{ scrollbarGutter: 'stable' }}
     >
-      <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-between border-b border-[#e5e5e5]">
-        <a href="/aphelion/" className="font-sans text-sm font-semibold text-gray-900">
-          Aphelion
-        </a>
-        <div className="flex items-center gap-4 font-sans text-sm font-semibold text-gray-900">
-          <a href="/aphelion/" className="hover:text-[#de8bf7]">
-            Visitor
+      <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-between shrink-0 relative z-20 border-b border-[#e5e5e5]">
+        <div className="flex items-center">
+          <a
+            href="/aphelion/"
+            className="font-sans font-semibold text-sm leading-none tracking-normal text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+          >
+            Aphelion
           </a>
-          <a href="/aphelion/#highlights" className="hover:text-[#de8bf7]">
+        </div>
+        <div className="flex items-center gap-4 font-sans text-sm font-semibold text-gray-900">
+          <a href="/aphelion/#highlights" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
             Highlights
           </a>
-          <a href="/aphelion/#admin" className="hover:text-[#de8bf7]">
-            Admin
+          {isOptionsPage ? (
+            <a href="/aphelion/#admin" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
+              Admin
+            </a>
+          ) : (
+            <a href="/aphelion/#options" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
+              Options
+            </a>
+          )}
+          <a href="/aphelion/" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
+            Public
           </a>
         </div>
       </header>
 
-      <main className="px-[36px] py-[24px]">
-        <div className="mb-6 grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-          <div className="border border-[#e5e5e5] bg-white p-4">
-            <div className="font-sans text-[11px] uppercase tracking-[0.16em] text-gray-500">Total</div>
-            <div className="mt-2 font-sans text-2xl font-semibold text-gray-900">{stats.total}</div>
+      {isOptionsPage ? (
+        <main className="h-[calc(100vh-72px)] overflow-y-auto px-[36px] py-[16px]">
+          <div className="mb-4 border-b border-[#e5e5e5] pb-2 font-sans text-sm text-gray-900">
+            <span className="font-semibold">Admin</span> - edit card libraries, set labels, and the property standards used by curation.
           </div>
-          <div className="border border-[#e5e5e5] bg-white p-4">
-            <div className="font-sans text-[11px] uppercase tracking-[0.16em] text-gray-500">Reviewed</div>
-            <div className="mt-2 font-sans text-2xl font-semibold text-gray-900">{stats.reviewed}</div>
+          <div className="grid gap-6 xl:grid-cols-2">
+            {renderLibraryOptions('Attribute Library', attributes, '/api/admin/attributes', setAttributes)}
+            {renderLibraryOptions('Series Library', series, '/api/admin/series', setSeries)}
+            <section className="border border-[#e5e5e5] bg-white">
+              <div className="border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+                Image Properties
+              </div>
+              <div className="grid gap-2 p-4 font-sans text-sm text-gray-800">
+                <div><span className="font-semibold">Title</span> - display name for the card.</div>
+                <div><span className="font-semibold">Description</span> - descriptive notes and curation text.</div>
+                <div><span className="font-semibold">Rarity</span> - common, uncommon, rare, epic, legendary.</div>
+                <div><span className="font-semibold">Attributes</span> - reusable descriptive tags managed above.</div>
+              </div>
+            </section>
+            <section className="border border-[#e5e5e5] bg-white">
+              <div className="border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+                Set Properties
+              </div>
+              <div className="grid gap-2 p-4 font-sans text-sm text-gray-800">
+                <div><span className="font-semibold">Series</span> - grouping or season label assigned to cards.</div>
+                <div><span className="font-semibold">Folder</span> - source folder path from the Keep image library.</div>
+                <div><span className="font-semibold">Card ID</span> - generated card identifier for durable reference.</div>
+                <div><span className="font-semibold">Direct URL</span> - browser-accessible image route for review and sharing.</div>
+              </div>
+            </section>
+            {renderActionHistory()}
           </div>
-          <div className="border border-[#e5e5e5] bg-white p-4">
-            <div className="font-sans text-[11px] uppercase tracking-[0.16em] text-gray-500">Untagged</div>
-            <div className="mt-2 font-sans text-2xl font-semibold text-gray-900">{stats.untagged}</div>
+        </main>
+      ) : (
+      <main className="h-[calc(100vh-72px)] overflow-hidden px-[36px] py-[12px]">
+        <div className="relative mb-1 grid grid-cols-6 border-b border-[#e5e5e5] pb-1 font-sans text-xs text-gray-900">
+          <div className="min-w-0 text-center"><span className="font-semibold">Total</span> - {stats.total}</div>
+          <div className="min-w-0 text-center"><span className="font-semibold">Reviewed</span> - {stats.reviewed}</div>
+          <div className="min-w-0 text-center"><span className="font-semibold">Untagged</span> - {stats.untagged}</div>
+          <div className="min-w-0 text-center">
+            <button
+              type="button"
+              onClick={() => setCountPanel((current) => (current === 'rarity' ? '' : 'rarity'))}
+              className={`font-semibold hover:text-[#de8bf7] ${countPanel === 'rarity' ? 'text-blue-700' : ''}`}
+            >
+              {selectedRarityHeader}
+            </button>
+            {' - '}
+            {selectedRarityCount}
           </div>
-          <div className="border border-[#e5e5e5] bg-white p-4">
-            <div className="font-sans text-[11px] uppercase tracking-[0.16em] text-gray-500">With Rarity</div>
-            <div className="mt-2 font-sans text-2xl font-semibold text-gray-900">{stats.withRarity}</div>
+          <div className="min-w-0 text-center">
+            <button
+              type="button"
+              onClick={() => setCountPanel((current) => (current === 'series' ? '' : 'series'))}
+              className={`font-semibold hover:text-[#de8bf7] ${countPanel === 'series' ? 'text-blue-700' : ''}`}
+            >
+              {selectedSeriesHeader}
+            </button>
+            {' - '}
+            {selectedSeriesCount}
           </div>
-          <div className="border border-[#e5e5e5] bg-white p-4">
-            <div className="font-sans text-[11px] uppercase tracking-[0.16em] text-gray-500">With Series</div>
-            <div className="mt-2 font-sans text-2xl font-semibold text-gray-900">{stats.withSeries}</div>
+          <div className="min-w-0 text-center">
+            <button
+              type="button"
+              onClick={() => setCountPanel((current) => (current === 'attributes' ? '' : 'attributes'))}
+              className={`font-semibold hover:text-[#de8bf7] ${countPanel === 'attributes' ? 'text-blue-700' : ''}`}
+            >
+              {selectedAttributeHeader}
+            </button>
+            {' - '}
+            {selectedAttributeCount}
           </div>
-          <div className="border border-[#e5e5e5] bg-white p-4">
-            <div className="font-sans text-[11px] uppercase tracking-[0.16em] text-gray-500">With Attributes</div>
-            <div className="mt-2 font-sans text-2xl font-semibold text-gray-900">{stats.withAttributes}</div>
-          </div>
+
+          {countPanel && (
+            <>
+              <button
+                type="button"
+                aria-label="Close filter options"
+                className="fixed inset-0 z-30 cursor-default bg-transparent"
+                onClick={() => setCountPanel('')}
+              />
+              <div
+                className="absolute top-[calc(100%+6px)] z-40 max-h-[220px] w-[280px] overflow-y-auto border border-[#d8d8d8] bg-white/85 p-3 font-sans text-xs text-gray-800 shadow-sm backdrop-blur-sm"
+                style={{
+                  right: countPanel === 'attributes' ? '0' : countPanel === 'series' ? '13%' : '28%',
+                }}
+                onClick={(event) => event.stopPropagation()}
+              >
+              <div className="mb-2 flex items-center justify-between gap-3 uppercase tracking-[0.16em] text-gray-500">
+                <span>{countPanel === 'rarity' ? 'Rarity' : countPanel === 'series' ? 'Series' : 'Attributes'}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (countPanel === 'rarity') {
+                      setSelectedRarityFilters([]);
+                    } else if (countPanel === 'series') {
+                      setSelectedSeriesFilters([]);
+                    } else {
+                      setSelectedAttributeFilters([]);
+                    }
+                  }}
+                  className="normal-case tracking-normal text-gray-500 hover:text-gray-900"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="grid gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (countPanel === 'rarity') {
+                      setSelectedRarityFilters([]);
+                    } else if (countPanel === 'series') {
+                      setSelectedSeriesFilters([]);
+                    } else {
+                      setSelectedAttributeFilters([]);
+                    }
+                  }}
+                  className={`flex justify-between gap-4 text-left leading-5 hover:text-[#de8bf7] ${
+                    (countPanel === 'rarity' && selectedRarityFilters.length === 0)
+                    || (countPanel === 'series' && selectedSeriesFilters.length === 0)
+                    || (countPanel === 'attributes' && selectedAttributeFilters.length === 0)
+                      ? 'font-semibold text-blue-700'
+                      : 'text-gray-800'
+                  }`}
+                >
+                  <span>
+                    {countPanel === 'rarity' ? 'With Rarity' : countPanel === 'series' ? 'With Series' : 'With Attributes'}
+                  </span>
+                  <span className="text-gray-500">
+                    {countPanel === 'rarity' ? stats.withRarity : countPanel === 'series' ? stats.withSeries : stats.withAttributes}
+                  </span>
+                </button>
+                {(countPanel === 'rarity' ? rarityCounts : countPanel === 'series' ? seriesCounts : attributeCounts).map(([label, count], index) => {
+                  const selected = countPanel === 'rarity'
+                    ? selectedRarityFilters.includes(label)
+                    : countPanel === 'series'
+                      ? selectedSeriesFilters.includes(label)
+                      : selectedAttributeFilters.includes(label);
+                  const displayLabel = countPanel === 'rarity'
+                    ? formatRarityLabel(label as CardRarity, index)
+                    : countPanel === 'attributes'
+                      ? `#${label}`
+                      : label;
+
+                  return (
+                    <button
+                    key={`${countPanel}-${label}`}
+                    type="button"
+                    onClick={() => {
+                      if (countPanel === 'rarity') {
+                          setSelectedRarityFilters((current) => (current.includes(label) ? current.filter((item) => item !== label) : [...current, label]));
+                        } else if (countPanel === 'series') {
+                          setSelectedSeriesFilters((current) => (current.includes(label) ? current.filter((item) => item !== label) : [...current, label]));
+                        } else {
+                          setSelectedAttributeFilters((current) => (current.includes(label) ? current.filter((item) => item !== label) : [...current, label]));
+                        }
+                      }}
+                      className={`flex justify-between gap-4 text-left leading-5 hover:text-[#de8bf7] ${
+                        selected ? 'font-semibold text-blue-700' : 'text-gray-800'
+                      }`}
+                    >
+                      <span className="flex items-start gap-2">
+                        <span className={`mt-[2px] inline-block h-[12px] w-[12px] border ${selected ? 'border-blue-700 bg-blue-700' : 'border-[#b8b8b8] bg-transparent'}`} />
+                        <span>{displayLabel}</span>
+                      </span>
+                      <span className="text-gray-500">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            </>
+          )}
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-3 border border-[#e5e5e5] bg-white px-4 py-3">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
           {selectedFolder && (
             <button
               type="button"
@@ -615,12 +1190,42 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
               {selectedFolder} x
             </button>
           )}
+          {selectedRarityFilters.map((label) => (
+            <button
+              key={`rarity-filter-${label}`}
+              type="button"
+              onClick={() => setSelectedRarityFilters((current) => current.filter((item) => item !== label))}
+              className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500 hover:text-[#de8bf7]"
+            >
+              {label} x
+            </button>
+          ))}
+          {selectedSeriesFilters.map((label) => (
+            <button
+              key={`series-filter-${label}`}
+              type="button"
+              onClick={() => setSelectedSeriesFilters((current) => current.filter((item) => item !== label))}
+              className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500 hover:text-[#de8bf7]"
+            >
+              {label} x
+            </button>
+          ))}
+          {selectedAttributeFilters.map((label) => (
+            <button
+              key={`attribute-filter-${label}`}
+              type="button"
+              onClick={() => setSelectedAttributeFilters((current) => current.filter((item) => item !== label))}
+              className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500 hover:text-[#de8bf7]"
+            >
+              #{label} x
+            </button>
+          ))}
           {FILTER_OPTIONS.map((option) => (
             <button
               key={option.id}
               type="button"
               onClick={() => setFilterMode(option.id)}
-              className={`font-sans text-sm font-semibold ${
+              className={`font-sans text-xs font-semibold ${
                 filterMode === option.id ? 'text-blue-700' : 'text-gray-700 hover:text-[#de8bf7]'
               }`}
             >
@@ -635,7 +1240,7 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search code, path, title, tags, attributes"
-              className="min-w-[320px] border border-[#d8d8d8] px-3 py-2 font-sans text-sm text-gray-900 outline-none focus:border-gray-900"
+              className="min-w-[320px] border border-[#d8d8d8] px-2 py-1 font-sans text-xs text-gray-900 outline-none focus:border-gray-900"
             />
           </div>
         </div>
@@ -646,42 +1251,111 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
           </div>
         )}
 
+        {folderPanelOpen && (
+          <div className="fixed inset-0 z-50 bg-black/15" onClick={() => setFolderPanelOpen(false)}>
+            <div
+              className="absolute left-[36px] top-[120px] max-h-[calc(100vh-160px)] w-[360px] overflow-hidden border border-[#d8d8d8] bg-white shadow-sm"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+                <span>Browse Folders</span>
+                <button
+                  type="button"
+                  onClick={() => setFolderPanelOpen(false)}
+                  className="font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 hover:text-gray-900"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="max-h-[calc(100vh-212px)] overflow-y-auto py-2">
+                <div className="px-3 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => handleFolderSelect('')}
+                    className={`w-full text-left font-sans text-sm ${
+                      selectedFolder === '' ? 'font-semibold text-blue-700' : 'text-gray-800 hover:text-[#de8bf7]'
+                    }`}
+                  >
+                    All folders
+                    <span className="ml-2 font-sans text-[11px] uppercase tracking-[0.12em] text-gray-400">
+                      {cards.length}
+                    </span>
+                  </button>
+                </div>
+                <div className="grid gap-1">
+                  {folderTree.map((node) => renderFolderNode(node))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="font-sans text-sm text-gray-500">Loading curation catalog...</div>
         ) : (
-          <div className="grid gap-6 xl:grid-cols-[minmax(420px,620px)_minmax(0,1fr)]">
-            <section className="grid gap-6 xl:grid-cols-[minmax(180px,220px)_minmax(0,1fr)]">
-              <div className="border border-[#e5e5e5] bg-white">
-                <div className="border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
-                  Folders
-                </div>
-                <div className="max-h-[calc(100vh-250px)] overflow-y-auto py-2">
-                  <div className="px-3 pb-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedFolder('')}
-                      className={`w-full text-left font-sans text-sm ${
-                        selectedFolder === '' ? 'font-semibold text-blue-700' : 'text-gray-800 hover:text-[#de8bf7]'
-                      }`}
-                    >
-                      All folders
-                      <span className="ml-2 font-sans text-[11px] uppercase tracking-[0.12em] text-gray-400">
-                        {cards.length}
+          <div className="grid h-[calc(100vh-164px)] min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,460px)]">
+            <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 xl:order-2">
+              {selectedCard && (
+                <div className="border border-[#e5e5e5] bg-white p-3">
+                  <button
+                    type="button"
+                    onClick={() => setImagePreviewOpen(true)}
+                    className="mx-auto block aspect-square h-[180px] w-[180px] cursor-zoom-in border border-[#e5e5e5] bg-white"
+                    aria-label="Open image preview"
+                  >
+                    <img
+                      src={prefixApiUrl(apiBaseUrl, selectedCard.imageUrl)}
+                      alt={selectedCard.title || selectedCard.sourceTitle || selectedCard.imageCode}
+                      className="h-full w-full object-contain"
+                    />
+                  </button>
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center gap-2 border border-[#d8d8d8] px-2 py-1">
+                      <span className="shrink-0 font-sans text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                        Direct URL:
                       </span>
-                    </button>
-                  </div>
-                  <div className="grid gap-1">
-                    {folderTree.map((node) => renderFolderNode(node))}
+                      <a
+                        href={selectedDirectUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="min-w-0 flex-1 break-all font-sans text-xs font-semibold text-gray-900 hover:text-[#de8bf7]"
+                      >
+                        {selectedDirectUrl}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleDirectUrlCopy();
+                        }}
+                        className="shrink-0 font-sans text-sm font-semibold text-gray-500 hover:text-gray-900"
+                        aria-label="Copy direct URL"
+                      >
+                        {copiedDirectUrl ? '✓' : '⧉'}
+                      </button>
+                    </div>
+                    <div className="mt-4 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">Source Path</div>
+                    <div className="break-all font-sans text-sm text-gray-900">{selectedCard.imagePath}</div>
+                    <div className="font-sans text-xs text-gray-500">
+                      {selectedCard.cardUid || 'Card ID pending'}
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="border border-[#e5e5e5] bg-white">
-                <div className="border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
-                  Card Queue
-                  <span className="ml-2 text-[10px] text-gray-400">{selectedFolder || 'All folders'}</span>
+              )}
+              <div className="flex min-h-0 flex-col border border-[#e5e5e5] bg-white">
+                <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+                  <div>
+                    Card Queue
+                    <span className="ml-2 text-[10px] text-gray-400">{selectedFolder || 'All folders'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFolderPanelOpen(true)}
+                    className="whitespace-nowrap text-[10px] font-semibold normal-case tracking-normal text-gray-700 hover:text-[#de8bf7]"
+                  >
+                    Browse folders
+                  </button>
                 </div>
-                <div className="max-h-[calc(100vh-250px)] overflow-y-auto">
+                <div className="min-h-0 flex-1 overflow-y-auto">
                   {filteredCards.map((card) => {
                     const isSelected = selectedCard?.imagePath === card.imagePath;
                     return (
@@ -707,23 +1381,18 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
                               </div>
                               <div className="mt-1 truncate font-sans text-xs text-gray-500">{card.imageCode}</div>
                             </div>
-                            <div className="text-right">
-                              <div className="font-sans text-[11px] uppercase tracking-[0.16em] text-gray-500">
-                                {card.reviewStatus}
-                              </div>
-                              {card.rarity && (
-                                <div className="mt-1 font-sans text-xs font-semibold text-blue-700">{card.rarity}</div>
-                              )}
-                            </div>
+                            {card.rarity && (
+                              <div className="text-right font-sans text-xs font-semibold text-blue-700">{card.rarity}</div>
+                            )}
                           </div>
                           <div className="mt-2 truncate font-sans text-xs text-gray-500">{card.folderPath}</div>
                           {(card.attributes.length > 0 || card.seriesName) && (
                             <div className="mt-2 flex flex-wrap gap-2">
-                              {card.seriesName && (
-                                <span className="border border-[#d8d8d8] px-2 py-1 font-sans text-[11px] text-gray-700">
-                                  {card.seriesName}
+                              {splitSeriesNames(card.seriesName).map((seriesName) => (
+                                <span key={seriesName} className="border border-[#d8d8d8] px-2 py-1 font-sans text-[11px] text-gray-700">
+                                  {seriesName}
                                 </span>
-                              )}
+                              ))}
                               {card.attributes.slice(0, 4).map((attribute) => (
                                 <span
                                   key={attribute}
@@ -742,24 +1411,44 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
               </div>
             </section>
 
-            <section className="min-w-0 grid gap-6">
+            <section className="min-h-0 min-w-0 overflow-y-auto xl:order-1">
               {selectedCard ? (
                 <>
-                  <div className="grid gap-6 2xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
-                    <div className="border border-[#e5e5e5] bg-white p-4">
+                  <div className="grid gap-6">
+                    <div className="hidden">
                       <img
                         src={prefixApiUrl(apiBaseUrl, selectedCard.imageUrl)}
                         alt={selectedCard.title || selectedCard.sourceTitle || selectedCard.imageCode}
                         className="aspect-square w-full border border-[#e5e5e5] object-cover"
                       />
                       <div className="mt-4 space-y-2">
+                        <div className="flex items-center gap-2 border border-[#d8d8d8] px-3 py-2">
+                          <span className="shrink-0 font-sans text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                            Direct URL:
+                          </span>
+                          <a
+                            href={selectedDirectUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="min-w-0 flex-1 break-all font-sans text-xs font-semibold text-gray-900 hover:text-[#de8bf7]"
+                          >
+                            {selectedDirectUrl}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleDirectUrlCopy();
+                            }}
+                            className="shrink-0 font-sans text-sm font-semibold text-gray-500 hover:text-gray-900"
+                            aria-label="Copy direct URL"
+                          >
+                            {copiedDirectUrl ? '✓' : '⧉'}
+                          </button>
+                        </div>
                         <div className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">Source Path</div>
                         <div className="break-all font-sans text-sm text-gray-900">{selectedCard.imagePath}</div>
                         <div className="font-sans text-xs text-gray-500">
-                          {selectedCard.sourceTitle} | {selectedCard.imageCode}
-                        </div>
-                        <div className="font-sans text-xs text-gray-500">
-                          {selectedCard.cardUid || 'Card ID pending'}{selectedCard.editionSize ? ` | Edition ${selectedCard.editionSize}` : ''}
+                          {selectedCard.cardUid || 'Card ID pending'}
                         </div>
                       </div>
                     </div>
@@ -770,29 +1459,43 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
                       </div>
                       <div className="grid gap-4 p-4">
                         <label className="grid gap-2">
-                          <span className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">Title</span>
+                          <span className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+                            Title{savedNotice('Title')}
+                          </span>
                           <input
                             value={editor.title}
-                            onChange={(event) => setEditor((current) => ({ ...current, title: event.target.value }))}
+                            onChange={(event) => updateEditor('Title', (current) => ({ ...current, title: event.target.value }))}
                             className="w-full min-w-0 border border-[#d8d8d8] px-3 py-2 font-sans text-sm text-gray-900 outline-none focus:border-gray-900"
                           />
                         </label>
                         <label className="grid gap-2">
-                          <span className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">Description</span>
+                          <span className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+                            Description{savedNotice('Description')}
+                          </span>
                           <textarea
                             value={editor.description}
-                            onChange={(event) => setEditor((current) => ({ ...current, description: event.target.value }))}
+                            onChange={(event) => updateEditor('Description', (current) => ({ ...current, description: event.target.value }))}
                             rows={5}
                             className="w-full min-w-0 border border-[#d8d8d8] px-3 py-2 font-sans text-sm text-gray-900 outline-none focus:border-gray-900"
                           />
                         </label>
-                        <div className="grid gap-4 lg:grid-cols-2">
-                          <label className="grid gap-2">
-                            <span className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">Set / Series</span>
+                        <div className="grid gap-3 lg:grid-cols-2">
+                          <div className="grid gap-2">
+                            <span className="flex items-center justify-between gap-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+                              <span>Set / Series{savedNotice('Series')}</span>
+                            </span>
                             <input
                               list="aphelion-series-list"
-                              value={editor.seriesName}
-                              onChange={(event) => setEditor((current) => ({ ...current, seriesName: event.target.value }))}
+                              value={seriesEntry}
+                              onChange={(event) => setSeriesEntry(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key !== 'Enter') {
+                                  return;
+                                }
+                                event.preventDefault();
+                                void handleSeriesEntryAdd();
+                              }}
+                              placeholder="Type series and press Enter"
                               className="w-full min-w-0 border border-[#d8d8d8] px-3 py-2 font-sans text-sm text-gray-900 outline-none focus:border-gray-900"
                             />
                             <datalist id="aphelion-series-list">
@@ -800,86 +1503,134 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
                                 <option key={item.id} value={item.label} />
                               ))}
                             </datalist>
-                          </label>
-                          <label className="grid gap-2">
-                            <span className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">Edition Size</span>
+                            <div className="max-h-[64px] min-h-[64px] overflow-y-auto">
+                              <div className="flex flex-wrap gap-2">
+                              {series.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => updateEditor('Series', (current) => ({ ...current, seriesName: toggleSeriesName(current.seriesName, item.label) }))}
+                                  className={`inline-flex items-center gap-2 border px-2 py-1 font-sans text-xs ${
+                                    splitSeriesNames(editor.seriesName).includes(item.label)
+                                      ? 'border-blue-700 text-blue-700'
+                                      : 'border-[#d8d8d8] text-gray-700 hover:text-[#de8bf7]'
+                                  }`}
+                                >
+                                  <span>{item.label}</span>
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={`Delete ${item.label} from Series Library`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void deleteLibrary('/api/admin/series', item.id, item.label, setSeries);
+                                    }}
+                                    onKeyDown={(event) => {
+                                      if (event.key !== 'Enter' && event.key !== ' ') {
+                                        return;
+                                      }
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      void deleteLibrary('/api/admin/series', item.id, item.label, setSeries);
+                                    }}
+                                    className="text-[11px] text-gray-400 hover:text-red-600"
+                                  >
+                                    x
+                                  </span>
+                                </button>
+                              ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid gap-2">
+                            <span className="flex items-center justify-between gap-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+                              <span>Attributes{savedNotice('Attributes')}</span>
+                            </span>
                             <input
-                              value={editor.editionSize}
-                              onChange={(event) => setEditor((current) => ({ ...current, editionSize: event.target.value.replace(/[^0-9]/g, '') }))}
+                              list="aphelion-attribute-list"
+                              value={attributeEntry}
+                              onChange={(event) => setAttributeEntry(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key !== 'Enter') {
+                                  return;
+                                }
+                                event.preventDefault();
+                                void handleAttributeEntryAdd();
+                              }}
+                              placeholder="Type attribute and press Enter"
                               className="w-full min-w-0 border border-[#d8d8d8] px-3 py-2 font-sans text-sm text-gray-900 outline-none focus:border-gray-900"
                             />
-                          </label>
+                            <datalist id="aphelion-attribute-list">
+                              {attributes.map((item) => (
+                                <option key={item.id} value={item.label} />
+                              ))}
+                            </datalist>
+                            <div className="max-h-[64px] min-h-[64px] overflow-y-auto">
+                              <div className="flex flex-wrap gap-2">
+                              {attributes.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => toggleAttribute(item.label)}
+                                  className={`inline-flex items-center gap-2 border px-2 py-1 font-sans text-xs ${
+                                    editor.attributes.includes(item.label)
+                                      ? 'border-blue-700 text-blue-700'
+                                      : 'border-[#d8d8d8] text-gray-700 hover:text-[#de8bf7]'
+                                  }`}
+                                >
+                                  <span>#{item.label}</span>
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={`Delete ${item.label} from Attribute Library`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void deleteLibrary('/api/admin/attributes', item.id, item.label, setAttributes);
+                                    }}
+                                    onKeyDown={(event) => {
+                                      if (event.key !== 'Enter' && event.key !== ' ') {
+                                        return;
+                                      }
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      void deleteLibrary('/api/admin/attributes', item.id, item.label, setAttributes);
+                                    }}
+                                    className="text-[11px] text-gray-400 hover:text-red-600"
+                                  >
+                                    x
+                                  </span>
+                                </button>
+                              ))}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                         <div className="grid gap-2">
-                          <span className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">Rarity</span>
+                          <span className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+                            Rarity{savedNotice('Rarity')}
+                          </span>
                           <div className="flex flex-wrap gap-2">
                             {RARITY_OPTIONS.map((option, index) => (
                               <button
                                 key={option}
                                 type="button"
-                                onClick={() => setEditor((current) => ({ ...current, rarity: option }))}
+                                onClick={() => updateEditor('Rarity', (current) => ({ ...current, rarity: option }))}
                                 className={`border px-3 py-2 font-sans text-sm ${
                                   editor.rarity === option
                                     ? 'border-blue-700 text-blue-700'
                                     : 'border-[#d8d8d8] text-gray-700 hover:text-[#de8bf7]'
                                 }`}
                               >
-                                {index + 1}. {option}
+                                {formatRarityLabel(option, index)}
                               </button>
                             ))}
                             <button
                               type="button"
-                              onClick={() => setEditor((current) => ({ ...current, rarity: '' }))}
+                              onClick={() => updateEditor('Rarity', (current) => ({ ...current, rarity: '' }))}
                               className="border border-[#d8d8d8] px-3 py-2 font-sans text-sm text-gray-700 hover:text-[#de8bf7]"
                             >
                               Clear
                             </button>
-                          </div>
-                        </div>
-                        <div className="grid gap-2">
-                          <span className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">Review Status</span>
-                          <div className="flex flex-wrap gap-3">
-                            <button
-                              type="button"
-                              onClick={() => setEditor((current) => ({ ...current, reviewStatus: 'untagged' }))}
-                              className={`border px-3 py-2 font-sans text-sm ${
-                                editor.reviewStatus === 'untagged'
-                                  ? 'border-blue-700 text-blue-700'
-                                  : 'border-[#d8d8d8] text-gray-700 hover:text-[#de8bf7]'
-                              }`}
-                            >
-                              Untagged
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditor((current) => ({ ...current, reviewStatus: 'reviewed' }))}
-                              className={`border px-3 py-2 font-sans text-sm ${
-                                editor.reviewStatus === 'reviewed'
-                                  ? 'border-blue-700 text-blue-700'
-                                  : 'border-[#d8d8d8] text-gray-700 hover:text-[#de8bf7]'
-                              }`}
-                            >
-                              Reviewed
-                            </button>
-                          </div>
-                        </div>
-                        <div className="grid gap-2">
-                          <span className="font-sans text-xs uppercase tracking-[0.16em] text-gray-500">Quick Attributes</span>
-                          <div className="flex flex-wrap gap-2">
-                            {QUICK_ATTRIBUTES.map((label) => (
-                              <button
-                                key={label}
-                                type="button"
-                                onClick={() => toggleAttribute(label)}
-                                className={`border px-3 py-2 font-sans text-sm ${
-                                  editor.attributes.includes(label)
-                                    ? 'border-blue-700 text-blue-700'
-                                    : 'border-[#d8d8d8] text-gray-700 hover:text-[#de8bf7]'
-                                }`}
-                              >
-                                #{label}
-                              </button>
-                            ))}
                           </div>
                         </div>
                         <div className="grid gap-2">
@@ -893,137 +1644,14 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
                                   key={attribute}
                                   type="button"
                                   onClick={() => toggleAttribute(attribute)}
-                                  className="border border-blue-700 px-2 py-1 font-sans text-xs text-blue-700"
+                                  className="inline-flex items-center gap-2 border border-blue-700 px-2 py-1 font-sans text-xs text-blue-700"
                                 >
-                                  #{attribute}
+                                  <span>#{attribute}</span>
+                                  <span className="text-[10px] text-blue-500">x</span>
                                 </button>
                               ))
                             )}
                           </div>
-                        </div>
-                        <div className="flex flex-wrap gap-3 pt-2">
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => void handleSave(false)}
-                            className="border border-gray-900 px-4 py-2 font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7] disabled:opacity-50"
-                          >
-                            {saving ? 'Saving...' : 'Save'}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => void handleSave(true)}
-                            className="border border-gray-900 px-4 py-2 font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7] disabled:opacity-50"
-                          >
-                            Save + Next
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-6 xl:grid-cols-2">
-                    <div className="border border-[#e5e5e5] bg-white">
-                      <div className="border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
-                        Attribute Library
-                      </div>
-                      <div className="grid gap-4 p-4">
-                        <div className="flex gap-3">
-                          <input
-                            value={newAttribute}
-                            onChange={(event) => setNewAttribute(event.target.value)}
-                            placeholder="Add attribute"
-                            className="min-w-0 flex-1 border border-[#d8d8d8] px-3 py-2 font-sans text-sm text-gray-900 outline-none focus:border-gray-900"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => void postLibrary('/api/admin/attributes', newAttribute, setAttributes, () => setNewAttribute(''))}
-                            className="border border-gray-900 px-4 py-2 font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7]"
-                          >
-                            Add
-                          </button>
-                        </div>
-                        <div className="grid gap-2">
-                          {attributes.map((item) => (
-                            <div key={item.id} className="flex items-center gap-2 border border-[#efefef] px-3 py-2">
-                              <button
-                                type="button"
-                                onClick={() => toggleAttribute(item.label)}
-                                className={`flex-1 text-left font-sans text-sm ${
-                                  editor.attributes.includes(item.label) ? 'text-blue-700' : 'text-gray-900 hover:text-[#de8bf7]'
-                                }`}
-                              >
-                                #{item.label}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void patchLibrary('/api/admin/attributes', item.id, item.label, setAttributes)}
-                                className="font-sans text-xs font-semibold text-gray-500 hover:text-[#de8bf7]"
-                              >
-                                Rename
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void deleteLibrary('/api/admin/attributes', item.id, item.label, setAttributes)}
-                                className="font-sans text-xs font-semibold text-red-600"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="border border-[#e5e5e5] bg-white">
-                      <div className="border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
-                        Series Library
-                      </div>
-                      <div className="grid gap-4 p-4">
-                        <div className="flex gap-3">
-                          <input
-                            value={newSeries}
-                            onChange={(event) => setNewSeries(event.target.value)}
-                            placeholder="Add series"
-                            className="min-w-0 flex-1 border border-[#d8d8d8] px-3 py-2 font-sans text-sm text-gray-900 outline-none focus:border-gray-900"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => void postLibrary('/api/admin/series', newSeries, setSeries, () => setNewSeries(''))}
-                            className="border border-gray-900 px-4 py-2 font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7]"
-                          >
-                            Add
-                          </button>
-                        </div>
-                        <div className="grid gap-2">
-                          {series.map((item) => (
-                            <div key={item.id} className="flex items-center gap-2 border border-[#efefef] px-3 py-2">
-                              <button
-                                type="button"
-                                onClick={() => setEditor((current) => ({ ...current, seriesName: item.label }))}
-                                className={`flex-1 text-left font-sans text-sm ${
-                                  editor.seriesName === item.label ? 'text-blue-700' : 'text-gray-900 hover:text-[#de8bf7]'
-                                }`}
-                              >
-                                {item.label}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void patchLibrary('/api/admin/series', item.id, item.label, setSeries)}
-                                className="font-sans text-xs font-semibold text-gray-500 hover:text-[#de8bf7]"
-                              >
-                                Rename
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void deleteLibrary('/api/admin/series', item.id, item.label, setSeries)}
-                                className="font-sans text-xs font-semibold text-red-600"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          ))}
                         </div>
                       </div>
                     </div>
@@ -1038,6 +1666,26 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
           </div>
         )}
       </main>
+      )}
+      <footer className="flex h-[36px] items-center justify-end border-t border-[#e5e5e5] bg-[#FAFAFA] px-6 font-sans text-sm text-gray-700">
+        <div>
+          © 2026 Jefferson Williams. All rights reserved.
+        </div>
+      </footer>
+      {imagePreviewOpen && selectedCard && (
+        <button
+          type="button"
+          onClick={() => setImagePreviewOpen(false)}
+          className="fixed inset-0 z-[70] cursor-zoom-out bg-black/60 p-6"
+          aria-label="Close image preview"
+        >
+          <img
+            src={prefixApiUrl(apiBaseUrl, selectedCard.imageUrl)}
+            alt={selectedCard.title || selectedCard.sourceTitle || selectedCard.imageCode}
+            className="mx-auto h-full max-h-full w-full max-w-full object-contain"
+          />
+        </button>
+      )}
     </div>
   );
 }

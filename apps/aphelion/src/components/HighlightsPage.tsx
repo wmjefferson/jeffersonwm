@@ -68,17 +68,22 @@ export function HighlightsPage({ apiBaseUrl }: { apiBaseUrl: string }) {
   }, [apiBaseUrl]);
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-gray-950">
+    <div className="flex min-h-screen flex-col bg-[#FAFAFA] text-gray-950">
       <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-between border-b border-[#e5e5e5]">
         <a href="/aphelion/" className="font-sans text-sm font-semibold text-gray-900">
           Aphelion
         </a>
-        <a href="/aphelion/" className="font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7]">
-          Back
-        </a>
+        <div className="flex items-center gap-3 font-sans text-sm font-semibold text-gray-900">
+          <a href="/aphelion/" className="hover:text-[#de8bf7]">
+            Back
+          </a>
+          <a href="/aphelion/#admin" className="hover:text-[#de8bf7]">
+            Admin
+          </a>
+        </div>
       </header>
 
-      <main className="px-[36px] py-[36px]">
+      <main className="h-[calc(100vh-72px)] overflow-y-auto px-[36px] py-[36px]">
         {error && (
           <div className="mb-[36px] border border-red-200 bg-red-50 p-4 font-sans text-sm text-red-700">
             {error}
@@ -111,6 +116,11 @@ export function HighlightsPage({ apiBaseUrl }: { apiBaseUrl: string }) {
           )
         )}
       </main>
+      <footer className="flex h-[36px] items-center justify-end border-t border-[#e5e5e5] bg-[#FAFAFA] px-6 font-sans text-sm text-gray-700">
+        <div>
+          © 2026 Jefferson Williams. All rights reserved.
+        </div>
+      </footer>
     </div>
   );
 }

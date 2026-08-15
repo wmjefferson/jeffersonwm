@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>JeffersonWM Account</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <link rel="shortcut icon" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Young+Serif&family=IBM+Plex+Sans+Condensed:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --frame: 42px;
+        --ink: #111827;
+        --line: rgba(17, 24, 39, 0.18);
+        --muted: rgba(17, 24, 39, 0.62);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: var(--frame);
+        background: #fdfdfd;
+        color: var(--ink);
+        font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        position: relative;
+        isolation: isolate;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("../images/backgrounds/jeffwm-feed-lion-pattern-20260627.jpeg");
+        background-repeat: repeat;
+        background-size: 900px auto;
+        opacity: 0.05;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .layout {
+        width: 100%;
+        min-height: calc(100vh - (var(--frame) * 2));
+        display: block;
+      }
+
+      .page {
+        width: min(640px, 100%);
+      }
+
+      .logo-wrapper {
+        margin-bottom: 0.75rem;
+      }
+
+      .logo {
+        display: block;
+        width: 84px;
+        height: 84px;
+      }
+
+      h1 {
+        margin: 0 0 1.75rem 0;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: clamp(2rem, 3vw, 2.4rem);
+        font-weight: 400;
+      }
+
+      .links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .app-link,
+      .personal-link {
+        width: max-content;
+        max-width: 100%;
+        font-size: 1rem;
+        text-decoration: none;
+        color: #111827;
+        position: relative;
+      }
+
+      .app-link::after,
+      .personal-link::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.1rem;
+        width: 100%;
+        height: 1px;
+        background: #d4d4d4;
+        transform-origin: left;
+        transform: scaleX(0);
+        transition: transform 0.15s ease-out;
+      }
+
+      .app-link:hover::after,
+      .personal-link:hover::after {
+        transform: scaleX(1);
+      }
+
+      .section-label {
+        margin: 1.75rem 0 0.5rem;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .status-lines {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: var(--ink);
+        font-size: 1rem;
+        line-height: 1.65;
+      }
+
+      .status-lines span {
+        color: var(--muted);
+      }
+
+      .account-form {
+        display: grid;
+        gap: 0.75rem;
+        max-width: 32rem;
+      }
+
+      .field-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+      }
+
+      .field {
+        display: grid;
+        gap: 0.25rem;
+      }
+
+      .field label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      input,
+      select,
+      textarea,
+      button {
+        font: inherit;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.64);
+        color: inherit;
+        padding: 0.55rem 0.65rem;
+      }
+
+      textarea {
+        min-height: 4.5rem;
+        resize: vertical;
+      }
+
+      .plain-button {
+        width: max-content;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.64);
+        color: inherit;
+        padding: 0.55rem 0.8rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .plain-button:hover {
+        border-color: rgba(17, 24, 39, 0.44);
+      }
+
+      .plain-button--danger {
+        color: #9f1239;
+      }
+
+      .personal-date-list {
+        display: grid;
+        gap: 0.45rem;
+        margin-top: 0.75rem;
+      }
+
+      .personal-date-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        border-top: 1px solid var(--line);
+        padding-top: 0.45rem;
+      }
+
+      .personal-date-row p {
+        margin: 0;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .suggestion-list {
+        display: grid;
+        gap: 0.35rem;
+        margin-top: 0.35rem;
+      }
+
+      .suggestion-list[hidden] {
+        display: none;
+      }
+
+      .suggestion-button {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.72);
+        color: inherit;
+        padding: 0.45rem 0.6rem;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .suggestion-button:hover,
+      .suggestion-button:focus-visible {
+        border-color: rgba(17, 24, 39, 0.44);
+      }
+
+      .inline-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+      }
+
+      .unit-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+      }
+
+      .unit-button {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: var(--muted);
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .unit-button:hover,
+      .unit-button:focus-visible {
+        color: var(--ink);
+      }
+
+      .unit-button.is-active[data-unit="fahrenheit"] {
+        color: #a14b4b;
+      }
+
+      .unit-button.is-active[data-unit="celsius"] {
+        color: #5b7ea3;
+      }
+
+      .unit-button.is-active {
+        text-decoration: underline;
+        text-underline-offset: 0.16em;
+      }
+
+      .unit-divider {
+        color: var(--muted);
+      }
+
+      .flash-note {
+        opacity: 0;
+        color: #5b7ea3;
+        font-size: inherit;
+        font-weight: inherit;
+        letter-spacing: inherit;
+        text-transform: inherit;
+        transition: opacity 0.16s ease;
+      }
+
+      .flash-note.is-visible {
+        opacity: 1;
+      }
+
+      .bottom-links {
+        position: fixed;
+        left: var(--frame);
+        bottom: var(--frame);
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+      }
+
+      .bottom-links .personal-link {
+        font-size: 0.92rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+      }
+
+      @media (max-width: 720px) {
+        body {
+          padding: 1.5rem;
+        }
+
+        .bottom-links {
+          position: static;
+          margin-top: 4rem;
+        }
+
+        .field-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <main class="page">
+        <div class="logo-wrapper">
+          <img src="data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='3%204%2024%2023'%20width='100'%20height='100'%20fill='none'%20stroke='%232c3e50'%20stroke-width='0.8'%20stroke-linecap='round'%20stroke-linejoin='round'%3e%3cpath%20d='M4%2026h18'%20/%3e%3crect%20x='18'%20y='14'%20width='8'%20height='6'%20rx='1'%20/%3e%3cpath%20d='M22%2020v6'%20/%3e%3cpath%20d='M19.5%2026h5'%20/%3e%3cpath%20d='M16%2023h3'%20/%3e%3cpath%20d='M9.5%205.5l.7-.9%201%20.9%201.3-.3-.3%201.3%201%20.9-1%20.9.3%201.3-1.3-.3-1%20.9-.7-.9-1.3.3.3-1.3-1-.9%201-.9-.3-1.3z'%20/%3e%3ccircle%20cx='10'%20cy='7.5'%20r='1'%20/%3e%3cpath%20d='M11%207.5h.5'%20/%3e%3cpath%20d='M7%2026c0-4%201.5-8%203-8%201.2%200%202%201.5%202%203'%20/%3e%3cpath%20d='M10%2018.5c.8%201.5%201.5%203%203.5%203.3h.8'%20/%3e%3cpath%20d='M7%2023.5c-1.5%200-2.5-.8-2.5-2s1-2.2%202.5-2.2'%20/%3e%3c/svg%3e" alt="" class="logo" />
+        </div>
+
+        <h1 id="account-title">Account</h1>
+
+        <section id="widget" aria-labelledby="widget-heading">
+          <h2 class="section-label" id="widget-heading">Widget</h2>
+          <ul class="status-lines">
+            <li><span>Status:</span> JeffersonWM-owned widget API is in dev.</li>
+            <li><span>Database:</span> jeffers4_jeffwm_widget</li>
+            <li><span>Writes:</span> disabled until token/Auth admin access is enabled.</li>
+          </ul>
+        </section>
+
+        <!--
+        <section id="dates" aria-labelledby="dates-heading">
+          <h2 class="section-label" id="dates-heading">Special Dates</h2>
+          <ul class="status-lines">
+            <li><span>Public dates:</span> loading...</li>
+            <li><span>Personal dates:</span> loading...</li>
+          </ul>
+        </section>
+        -->
+
+        <section id="location" aria-labelledby="location-heading">
+          <h2 class="section-label" id="location-heading">Location</h2>
+          <form class="account-form" id="location-form">
+            <div class="field">
+              <span class="flash-note" id="city-saved-note" aria-live="polite">Saved</span>
+              <input
+                id="location-label"
+                name="location_label"
+                type="text"
+                placeholder="San Francisco"
+                autocomplete="off"
+                aria-label="City"
+              />
+              <div class="suggestion-list" id="location-suggestions" hidden></div>
+            </div>
+            <input id="latitude" name="latitude" type="hidden" />
+            <input id="longitude" name="longitude" type="hidden" />
+            <div class="field">
+              <label>
+                <!-- Scale -->
+                <span class="flash-note" id="scale-saved-note" aria-live="polite">Saved</span>
+              </label>
+              <!--
+              <div class="inline-toggle">
+                <div class="unit-toggle" aria-label="Weather unit">
+                  <button class="unit-button" id="unit-f" type="button" data-unit="fahrenheit">Fahrenheit</button>
+                  <span class="unit-divider">/</span>
+                  <button class="unit-button" id="unit-c" type="button" data-unit="celsius">Celsius</button>
+                </div>
+              </div>
+              -->
+              <input id="weather-unit-input" name="weather_unit" type="hidden" value="fahrenheit" />
+            </div>
+          </form>
+        </section>
+
+        <!--
+        <section id="personal-dates" aria-labelledby="personal-dates-heading">
+          <h2 class="section-label" id="personal-dates-heading">My Dates</h2>
+          <form class="account-form" id="personal-date-form">
+            <div class="field">
+              <label for="personal-date-name">Name</label>
+              <input id="personal-date-name" name="name" type="text" required />
+            </div>
+            <div class="field">
+              <label for="personal-date-description">Description</label>
+              <textarea id="personal-date-description" name="description"></textarea>
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label for="personal-date-date">Date</label>
+                <input id="personal-date-date" name="date" type="date" required />
+              </div>
+              <div class="field">
+                <label for="personal-date-end-date">End Date</label>
+                <input id="personal-date-end-date" name="end_date" type="date" />
+              </div>
+            </div>
+            <button class="plain-button" type="submit">Add Date</button>
+          </form>
+          <div class="personal-date-list" id="personal-date-list"></div>
+        </section>
+        -->
+
+        <!--
+        Typefaces are intentionally paused for regular accounts.
+        Restore this section when Auth-backed admin accounts can manage widget fonts and probabilities.
+
+        <section id="fonts" aria-labelledby="fonts-heading">
+          <h2 class="section-label" id="fonts-heading">Typefaces</h2>
+          <ul class="status-lines">
+            <li><span>Fonts:</span> loading...</li>
+            <li><span>Probability:</span> ready for admin controls.</li>
+          </ul>
+        </section>
+        -->
+      </main>
+
+      <div class="bottom-links" aria-label="Site links">
+        <a class="personal-link" href="/">Home</a>
+        <a class="personal-link" href="/status/">Status</a>
+        <a class="personal-link" href="#" id="auth-action-link">Login/Register</a>
+        <a
+          class="personal-link"
+          href="https://wmjefferson.com"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          William Jefferson
+        </a>
+      </div>
+    </div>
+
+    <script>
+      const JEFFERSONWM_API_ORIGIN = (() => {
+        const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
+        if (localHosts.has(window.location.hostname)) {
+          return "";
+        }
+        return "https://api-jeffersonwm.jeffersonwm.com";
+      })();
+
+      function apiUrl(url) {
+        if (typeof url === "string" && url.startsWith("/api/")) {
+          return `${JEFFERSONWM_API_ORIGIN}${url}`;
+        }
+        return url;
+      }
+
+      async function fetchJson(url, fallback, init = {}) {
+        try {
+          const response = await fetch(apiUrl(url), { credentials: "include", cache: "no-store", ...init });
+          if (!response.ok) {
+            return fallback;
+          }
+          return await response.json();
+        } catch (_error) {
+          return fallback;
+        }
+      }
+
+      async function requestJson(url, options) {
+        const response = await fetch(apiUrl(url), {
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          ...options,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Request failed: ${response.status}`);
+        }
+
+        return response.json();
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function formatDate(value) {
+        if (!value) {
+          return "";
+        }
+
+        const date = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(date.getTime())) {
+          return value;
+        }
+
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+
+      function renderPersonalDates(dates) {
+        const list = document.getElementById("personal-date-list");
+        if (!list) {
+          return;
+        }
+
+        if (!dates.length) {
+          list.innerHTML = '<p class="muted">No personal dates yet.</p>';
+          return;
+        }
+
+        list.innerHTML = dates.map(date => `
+          <div class="personal-date-row">
+            <p>
+              <strong>${escapeHtml(date.name)}</strong>
+              <span class="muted">${escapeHtml(formatDate(date.date))}</span>
+              ${date.description ? `<br><span class="muted">${escapeHtml(date.description)}</span>` : ""}
+            </p>
+            <button class="plain-button plain-button--danger" type="button" data-delete-date="${date.id}">Delete</button>
+          </div>
+        `).join("");
+
+        list.querySelectorAll("[data-delete-date]").forEach(button => {
+          button.addEventListener("click", async event => {
+            const id = event.currentTarget.getAttribute("data-delete-date");
+            await requestJson(`/api/account/widget/special-dates/${encodeURIComponent(id)}`, {
+              method: "DELETE",
+            });
+            await hydrateAccount();
+          });
+        });
+      }
+
+      function setWeatherUnit(unit) {
+        const resolvedUnit = unit === "celsius" ? "celsius" : "fahrenheit";
+        const input = document.getElementById("weather-unit-input");
+        const unitF = document.getElementById("unit-f");
+        const unitC = document.getElementById("unit-c");
+
+        if (input) {
+          input.value = resolvedUnit;
+        }
+
+        unitF?.classList.toggle("is-active", resolvedUnit === "fahrenheit");
+        unitC?.classList.toggle("is-active", resolvedUnit === "celsius");
+      }
+
+      function flashSaved(noteId) {
+        const note = document.getElementById(noteId);
+        if (!note) {
+          return;
+        }
+
+        note.classList.add("is-visible");
+        const previousTimeout = flashSaved.timeoutIds[noteId];
+        if (previousTimeout) {
+          window.clearTimeout(previousTimeout);
+        }
+        flashSaved.timeoutIds[noteId] = window.setTimeout(() => {
+          note.classList.remove("is-visible");
+        }, 1600);
+      }
+
+      flashSaved.timeoutIds = {};
+
+      async function saveLocationPreference(savedNoteId) {
+        const form = document.getElementById("location-form");
+        if (!(form instanceof HTMLFormElement)) {
+          return;
+        }
+
+        const payload = new FormData(form);
+        await requestJson("/api/account/widget/preferences", {
+          method: "PUT",
+          body: JSON.stringify({
+            location_label: payload.get("location_label"),
+            latitude: payload.get("latitude"),
+            longitude: payload.get("longitude"),
+            weather_unit: payload.get("weather_unit"),
+          }),
+        });
+        await hydrateAccount();
+        if (savedNoteId) {
+          flashSaved(savedNoteId);
+        }
+      }
+
+      function hydrateLocation(preference) {
+        document.getElementById("location-label").value = preference?.location_label || "";
+        document.getElementById("latitude").value = preference?.latitude ?? "";
+        document.getElementById("longitude").value = preference?.longitude ?? "";
+        setWeatherUnit(preference?.weather_unit || "fahrenheit");
+      }
+
+      function renderLocationSuggestions(suggestions) {
+        const list = document.getElementById("location-suggestions");
+        if (!list) {
+          return;
+        }
+
+        if (!suggestions.length) {
+          list.hidden = true;
+          list.innerHTML = "";
+          return;
+        }
+
+        list.innerHTML = suggestions.map((suggestion, index) => `
+          <button
+            class="suggestion-button"
+            type="button"
+            data-suggestion-index="${index}"
+          >
+            ${escapeHtml(suggestion.city)}
+            <span class="muted">${escapeHtml([suggestion.region, suggestion.country].filter(Boolean).join(", "))}</span>
+          </button>
+        `).join("");
+        list.hidden = false;
+
+        list.querySelectorAll("[data-suggestion-index]").forEach(button => {
+          button.addEventListener("click", event => {
+            const index = Number(event.currentTarget.getAttribute("data-suggestion-index"));
+            const suggestion = suggestions[index];
+            if (!suggestion) {
+              return;
+            }
+
+            document.getElementById("location-label").value = suggestion.city;
+            document.getElementById("latitude").value = suggestion.latitude;
+            document.getElementById("longitude").value = suggestion.longitude;
+            setWeatherUnit(suggestion.weatherUnit || "celsius");
+            list.hidden = true;
+            list.innerHTML = "";
+            void saveLocationPreference("city-saved-note");
+          });
+        });
+      }
+
+      function debounce(callback, delay) {
+        let timeoutId;
+        return (...args) => {
+          window.clearTimeout(timeoutId);
+          timeoutId = window.setTimeout(() => callback(...args), delay);
+        };
+      }
+
+      const searchLocations = debounce(async query => {
+        if (query.trim().length < 3) {
+          renderLocationSuggestions([]);
+          return;
+        }
+
+        const payload = await fetchJson(`/api/locations/search?q=${encodeURIComponent(query)}`, { suggestions: [] });
+        renderLocationSuggestions(payload?.suggestions || []);
+      }, 250);
+
+      const AUTH_ORIGIN = 'https://auth.jeffersonwm.com';
+      const AUTH_RETURN_TO = window.location.href;
+      const authActionLink = document.getElementById('auth-action-link');
+      let authSession = null;
+      let accountProfile = null;
+      let authPopup = null;
+      let authPopupPoll = null;
+
+      const normalizeAccountName = value => {
+        if (typeof value !== 'string') {
+          return '';
+        }
+
+        return value.trim().toLowerCase();
+      };
+
+      const stopAuthPopupPoll = () => {
+        if (authPopupPoll) {
+          window.clearInterval(authPopupPoll);
+          authPopupPoll = null;
+        }
+      };
+
+      const completeAuthPopupLogin = async user => {
+        if (user) {
+          applyAuthUser(user);
+        }
+        await hydrateAccount();
+        stopAuthPopupPoll();
+        if (authPopup && !authPopup.closed) {
+          authPopup.close();
+        }
+        authPopup = null;
+      };
+
+      const startAuthPopupPoll = popup => {
+        stopAuthPopupPoll();
+        authPopup = popup;
+
+        authPopupPoll = window.setInterval(async () => {
+          if (!authPopup || authPopup.closed) {
+            stopAuthPopupPoll();
+            await syncAccountState();
+            return;
+          }
+
+          const status = await refreshAuthSession();
+          if (status?.user) {
+            await completeAuthPopupLogin(status.user);
+          }
+        }, 700);
+      };
+
+      const openAuthPopup = mode => {
+        const authUrl = new URL(AUTH_ORIGIN);
+        authUrl.searchParams.set('mode', mode);
+        authUrl.searchParams.set('returnTo', AUTH_RETURN_TO);
+        authUrl.searchParams.set('popup', '1');
+
+        const width = 440;
+        const height = 620;
+        const left = Math.max(0, Math.round(window.screenX + ((window.outerWidth - width) / 2)));
+        const top = Math.max(0, Math.round(window.screenY + ((window.outerHeight - height) / 2)));
+        const popup = window.open(authUrl.toString(), 'jeffwm-auth-popup', `width=${width},height=${height},left=${left},top=${top}`);
+
+        if (!popup) {
+          window.location.assign(authUrl.toString());
+          return;
+        }
+
+        popup.focus();
+        startAuthPopupPoll(popup);
+      };
+
+      const updateAuthActionLink = () => {
+        if (!authActionLink) {
+          return;
+        }
+
+        const signedIn = Boolean(authSession?.user);
+        authActionLink.textContent = signedIn ? 'Sign Out' : 'Login/Register';
+        authActionLink.title = signedIn ? 'Sign out of Auth' : 'Open Auth';
+      };
+
+      const applyAuthUser = user => {
+        authSession = { user };
+        accountProfile = user;
+        updateAuthActionLink();
+        updateAccountTitle();
+      };
+
+      const applyGuestMode = () => {
+        authSession = { user: null };
+        accountProfile = null;
+        updateAuthActionLink();
+        updateAccountTitle();
+      };
+
+      const updateAccountTitle = () => {
+        const title = document.getElementById("account-title");
+        if (!title) {
+          return;
+        }
+
+        if (!authSession?.user) {
+          title.textContent = "guest";
+          return;
+        }
+
+        title.textContent =
+          normalizeAccountName(accountProfile?.displayName) ||
+          normalizeAccountName(accountProfile?.username) ||
+          normalizeAccountName(authSession.user?.displayName) ||
+          normalizeAccountName(authSession.user?.username) ||
+          "guest";
+      };
+
+      const refreshAuthSession = async () => {
+        authSession = await fetchJson('https://auth.jeffersonwm.com/api/auth/status', { user: null });
+        accountProfile = authSession?.user || null;
+        updateAuthActionLink();
+        updateAccountTitle();
+        return authSession;
+      };
+
+      window.addEventListener('message', event => {
+        if (event.origin !== AUTH_ORIGIN) {
+          return;
+        }
+        if (event.data?.type !== 'auth:success') {
+          return;
+        }
+
+        const returnTo = typeof event.data.returnTo === 'string' && event.data.returnTo
+          ? event.data.returnTo
+          : AUTH_RETURN_TO;
+        if (event.data.user) {
+          void completeAuthPopupLogin(event.data.user);
+        }
+        if (returnTo !== window.location.href) {
+          window.location.assign(returnTo);
+        }
+      });
+
+      async function hydrateAccount() {
+        const account = await fetchJson("/api/account/me", null);
+        if (account || !authSession?.user) {
+          accountProfile = account;
+        }
+        updateAccountTitle();
+
+        const [state, accountWidget] = await Promise.all([
+          fetchJson("/api/widget/resolved", null),
+          fetchJson("/api/account/widget", null),
+        ]);
+
+        const dateLine = document.querySelector("#dates .status-lines li:first-child");
+        if (dateLine && state?.resolved?.specialDates) {
+          dateLine.innerHTML = `<span>Public dates:</span> ${state.resolved.specialDates.length}`;
+        }
+
+        const personalDates = accountWidget?.personalDates || [];
+        const personalDateLine = document.querySelector("#dates .status-lines li:nth-child(2)");
+        if (personalDateLine) {
+          personalDateLine.innerHTML = `<span>Personal dates:</span> ${personalDates.length}`;
+        }
+
+        hydrateLocation(accountWidget?.preference || null);
+        renderPersonalDates(personalDates);
+
+        /*
+        Typefaces are paused until admin accounts exist.
+        const fonts = await fetchJson("/api/widget/fonts", []);
+        const fontLine = document.querySelector("#fonts .status-lines li:first-child");
+        if (fontLine && Array.isArray(fonts)) {
+          fontLine.innerHTML = `<span>Fonts:</span> ${fonts.length}`;
+        }
+        */
+      }
+
+      async function syncAccountState() {
+        await refreshAuthSession();
+        await hydrateAccount();
+      }
+
+      document.getElementById("location-form")?.addEventListener("submit", async event => {
+        event.preventDefault();
+        await saveLocationPreference("city-saved-note");
+      });
+
+      document.getElementById("location-label")?.addEventListener("input", event => {
+        document.getElementById("latitude").value = "";
+        document.getElementById("longitude").value = "";
+        searchLocations(event.currentTarget.value);
+      });
+
+      document.getElementById("unit-f")?.addEventListener("click", () => {
+        setWeatherUnit("fahrenheit");
+        if (document.getElementById("location-label")?.value.trim()) {
+          void saveLocationPreference("scale-saved-note");
+        }
+      });
+
+      document.getElementById("unit-c")?.addEventListener("click", () => {
+        setWeatherUnit("celsius");
+        if (document.getElementById("location-label")?.value.trim()) {
+          void saveLocationPreference("scale-saved-note");
+        }
+      });
+
+      document.getElementById("personal-date-form")?.addEventListener("submit", async event => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        await requestJson("/api/account/widget/special-dates", {
+          method: "POST",
+          body: JSON.stringify({
+            name: form.get("name"),
+            description: form.get("description"),
+            date: form.get("date"),
+            end_date: form.get("end_date"),
+          }),
+        });
+        event.currentTarget.reset();
+        await hydrateAccount();
+      });
+
+      void syncAccountState();
+
+      authActionLink?.addEventListener('click', async event => {
+        event.preventDefault();
+
+        const currentAction = authActionLink.textContent?.trim().toLowerCase();
+        if (currentAction === 'sign out') {
+          await requestJson('https://auth.jeffersonwm.com/api/auth/logout', {
+            method: 'POST',
+            body: JSON.stringify({ siteContext: AUTH_RETURN_TO }),
+          });
+          applyGuestMode();
+          return;
+        }
+
+        const status = await refreshAuthSession();
+        if (status?.user) {
+          await hydrateAccount();
+          return;
+        }
+
+        openAuthPopup('login');
+      });
+
+      window.addEventListener('pageshow', () => {
+        void syncAccountState();
+      });
+    </script>
+  </body>
+</html>

@@ -22,19 +22,57 @@ cd apps/jeffersonwm
 npm run dev
 ```
 
-For the future JeffersonWM-owned widget API:
+For the JeffersonWM-owned widget API:
 
 ```powershell
 cd apps/jeffersonwm
-npm run dev:api
+npm run server
 npm run typecheck:api
 ```
 
 The widget API reads from `.env.development` or `.env.production`. Start from `.env.example` when the new MySQL database is created.
+That template now includes the JeffersonWM widget database fields, the widget admin token, and the Vite switches used for local/prod widget control.
+
+JeffersonWM backend ports:
+
+- `8110` is the JeffersonWM API port. Point the public Cloudflare tunnel here.
+- `npm run dev` on the laptop also proxies `/api/widget`, `/api/account`, and `/api/locations` to this same server.
+- `3000` is only the code fallback if no port env var is set; do not use it for the normal JeffersonWM workflow.
+
+Normal workflow:
+
+```powershell
+# Server computer
+npm run server
+```
+
+```powershell
+# Laptop
+npm run dev
+```
+
+Local `.env.development` enables the widget and points Vite's `/api/widget`, `/api/account`, and `/api/locations` proxies to the JeffersonWM API on port `8110`. The widget now reads from JeffersonWM's own API and database rather than depending on Lionship.
+
+Widget API aliases are available at:
+
+- `GET /api/widget/state`
+- `GET /api/widget/preferences`
+- `PUT /api/widget/preferences`
+
+Additional JeffersonWM API checks:
+
+- `GET /health`
+- `GET /api/widget/resolved`
+- `GET /api/locations/search?q=San`
+
+Local page URLs:
+
+- `http://localhost:5173/`
+- `http://localhost:5173/account/`
 
 ## Widget Migration
 
-The homepage widget is moving out of Lionship and into JeffersonWM. During the migration, the public widget markup remains in `index.html`, but the widget is paused so the live homepage does not depend on Lionship widget endpoints.
+The homepage widget has moved into JeffersonWM. The public widget markup remains in `index.html`, and the live homepage now depends on JeffersonWM's widget API rather than Lionship widget endpoints.
 
 Database setup files:
 

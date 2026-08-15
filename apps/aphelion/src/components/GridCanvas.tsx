@@ -39,6 +39,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const hoverDelayRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const [settledHoverState, setSettledHoverState] = useState<HoverState | null>(null);
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 800, height: 600 });
   const [fps, setFps] = useState<number>(60);
 
@@ -61,6 +63,30 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (hoverDelayRef.current) {
+      window.clearTimeout(hoverDelayRef.current);
+      hoverDelayRef.current = null;
+    }
+
+    if (hoverState?.pinned) {
+      setSettledHoverState(hoverState);
+      return;
+    }
+
+    hoverDelayRef.current = window.setTimeout(() => {
+      setSettledHoverState(hoverState);
+      hoverDelayRef.current = null;
+    }, 250);
+
+    return () => {
+      if (hoverDelayRef.current) {
+        window.clearTimeout(hoverDelayRef.current);
+        hoverDelayRef.current = null;
+      }
+    };
+  }, [hoverState]);
 
   // Render loop
   const drawCanvas = useCallback(() => {
@@ -228,6 +254,29 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
       ctx.strokeRect(coords.x, coords.y, coords.width, coords.height);
     }
 
+    const hoverOverlay = settledHoverState || (hoverState?.pinned ? hoverState : null);
+    if (hoverOverlay) {
+      const coords = getCoordsFromIndex(hoverOverlay.index, config);
+      if (coords) {
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.18)';
+        ctx.fillRect(coords.x, coords.y, coords.width, coords.height);
+        ctx.strokeStyle = 'rgba(217, 119, 6, 0.95)';
+        ctx.lineWidth = Math.max(1, Math.min(coords.width / 5, 2));
+        ctx.strokeRect(coords.x + 0.5, coords.y + 0.5, coords.width - 1, coords.height - 1);
+      }
+    }
+
+    if (hoverState && !hoverState.pinned) {
+      const coords = getCoordsFromIndex(hoverState.index, config);
+      if (coords) {
+        ctx.strokeStyle = 'rgba(254, 240, 138, 0.95)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(coords.x + 1, coords.y + 1, coords.width - 2, coords.height - 2);
+        ctx.setLineDash([]);
+      }
+    }
+
     // Calculate FPS
     fpsFrameCount.current += 1;
     const nowTime = performance.now();
@@ -236,7 +285,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
       fpsFrameCount.current = 0;
       fpsLastTime.current = nowTime;
     }
-  }, [dimensions, config, overlayMode, searchResults, searchFilter, highlightedBlocks]);
+  }, [dimensions, config, overlayMode, searchResults, searchFilter, highlightedBlocks, hoverState, settledHoverState]);
 
   useEffect(() => {
     let animationFrameId: number;
