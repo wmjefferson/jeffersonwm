@@ -19,7 +19,6 @@ const apps = [
   monorepoApp('Bullion', 'bullion'),
   standaloneApp('Auth / Multimillion', 'auth-jeffersonwm', 'auth'),
   standaloneApp('Copy', 'copy'),
-  standaloneApp('Clionidae', 'clionidae'),
   standaloneApp('Dooky Detective', 'dookydetective'),
   standaloneApp('WMJefferson', 'wmjefferson'),
   standaloneApp('Multimillion', 'multimillion'),

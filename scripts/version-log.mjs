@@ -10,8 +10,6 @@ const appAliases = new Map([
   ['battalion', 'battalion'],
   ['bullion', 'bullion'],
   ['copy', 'copy'],
-  ['clio', 'clionidae'],
-  ['clionidae', 'clionidae'],
   ['dooky', 'dooky detective'],
   ['dookydetective', 'dooky detective'],
   ['feed', 'feed'],

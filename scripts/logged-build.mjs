@@ -31,8 +31,6 @@ const appRegistry = {
   auth: standaloneApp('Auth / Multimillion', 'auth-jeffersonwm'),
   'auth-jeffersonwm': standaloneApp('Auth / Multimillion', 'auth-jeffersonwm'),
   copy: standaloneApp('Copy', 'copy'),
-  clionidae: standaloneApp('Clionidae', 'clionidae'),
-  clio: standaloneApp('Clionidae', 'clionidae'),
   dookydetective: standaloneApp('Dooky Detective', 'dookydetective'),
   dooky: standaloneApp('Dooky Detective', 'dookydetective'),
   multimillion: standaloneApp('Auth / Multimillion', 'multimillion'),

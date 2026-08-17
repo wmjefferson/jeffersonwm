@@ -81,22 +81,8 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^perihelion(/.*)?$ /perihelion/index.html [L]
 
-# Clionidae app routing split
-# 1. Landing page paused; send clionidae root straight to /home
-# RewriteCond %{REQUEST_URI} ^/clionidae/?$
-# RewriteRule ^(.*)$ /clionidae/landing.html [L]
-RewriteCond %{REQUEST_URI} ^/clionidae/?$
-RewriteRule ^clionidae/?$ /clionidae/home [R=302,L]
-
-# 2. Rewrite /clionidae/home to index.html (the SPA)
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^clionidae/home(/.*)?$ /clionidae/index.html [L]
-
-# 3. Rewrite any other clionidae paths (deep links) to index.html
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^clionidae(/.*)?$ /clionidae/index.html [L]
+# Clionidae is decommissioned; send old public paths back to JeffersonWM Home.
+RewriteRule ^clionidae(/.*)?$ / [R=302,L]
 
 # Vermilion app routing split
 # 1. Landing page paused; send vermilion root straight to /home

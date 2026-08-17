@@ -12,8 +12,6 @@ const appRegistry = {
   aphelion: app('Aphelion', 'aphelion', 'aphelion'),
   battalion: app('Battalion', 'battalion', 'battalion'),
   bullion: app('Bullion', 'bullion', 'bullion'),
-  clionidae: standaloneApp('Clionidae', 'clionidae', 'clionidae'),
-  clio: standaloneApp('Clionidae', 'clionidae', 'clionidae'),
   feed: app('Feed', 'feed', 'feed'),
   jeffersonwm: app('JeffersonWM', 'jeffersonwm', 'jeffersonwm'),
   jeffwm: app('JeffersonWM', 'jeffersonwm', 'jeffersonwm'),
