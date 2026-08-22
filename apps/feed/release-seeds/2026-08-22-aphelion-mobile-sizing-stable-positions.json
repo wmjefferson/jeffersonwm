@@ -1,0 +1,9 @@
+﻿{
+  "secret": "the-feed-secret",
+  "title": "Aphelion — mobile sizing, stable block positions, and canvas rendering pass",
+  "content": "<p>Tonight's pass on <strong>Aphelion</strong> focused on making the grid feel solid across all screen sizes and eliminating the two most disorienting behaviors: blocks shifting positions mid-session and blocks clipping at the canvas edges.</p><p>What changed:</p><ul><li><strong>Proportional center image sizing:</strong> the large preview square now scales relative to the shorter viewport dimension instead of being fixed at 640px, so the framing block zones maintain consistent proportions on mobile, tablet, and desktop.</li><li><strong>Locked block positions:</strong> grid layout is now cached per viewport size in both memory and localStorage. Block positions no longer shift when server images load or when the page re-renders — positions stay fixed until the window physically resizes or the cache is cleared.</li><li><strong>Zone padding:</strong> a 4px inset was added to every block zone so no blocks are clipped at the container edges or the center image border.</li></ul><p>The canvas render loop was also cleaned up so highlighted-block state is read from a ref rather than a prop, which prevents the animation loop from restarting on each click. Background.png is now used as the placeholder image in the center preview while images load.</p>",
+  "url": "https://jeffersonwm.com/aphelion/",
+  "source": "manual",
+  "external_id": "aphelion-mobile-sizing-stable-positions-2026-08-22",
+  "created_at": "2026-08-22 21:35:00"
+}

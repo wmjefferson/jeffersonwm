@@ -14,7 +14,9 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.error import URLError
 from urllib.parse import parse_qs, unquote, urlparse
+from urllib.request import Request, urlopen
 
 try:
     from PIL import ExifTags, Image
@@ -51,6 +53,7 @@ SESSION_DAYS = int(os.environ.get("PERIHELION_SESSION_DAYS", "30"))
 REQUIRE_AUTH = os.environ.get("PERIHELION_REQUIRE_AUTH", "true").lower() in {"1", "true", "yes", "on"}
 AUTH_PROVIDER = os.environ.get("PERIHELION_AUTH_PROVIDER", "local").strip().lower()
 CENTRAL_AUTH_BASE_URL = os.environ.get("PERIHELION_AUTH_BASE_URL", "https://auth.jeffersonwm.com").rstrip("/")
+AUTH_INTERNAL_LOG_TOKEN = os.environ.get("PERIHELION_AUTH_INTERNAL_LOG_TOKEN", "").strip()
 CENTRAL_AUTH_DB_PATH = Path(
     os.environ.get("PERIHELION_CENTRAL_AUTH_DB_PATH", r"E:\auth-jeffersonwm\backend\data\auth-jeffersonwm.sqlite3")
 ).resolve()
@@ -100,6 +103,35 @@ def utc_now() -> datetime:
 
 def iso_utc(value: datetime | None = None) -> str:
     return (value or utc_now()).isoformat()
+
+
+def post_auth_history(action: str, target: str, user: dict | None = None, site: str | None = "perihelion") -> None:
+    if not CENTRAL_AUTH_BASE_URL or not AUTH_INTERNAL_LOG_TOKEN:
+        return
+
+    payload = {
+        "action": action,
+        "target": target,
+        "site": site or "perihelion",
+        "userId": str(user.get("id")) if user and user.get("id") is not None else "",
+        "username": str(user.get("username")) if user and user.get("username") else "",
+        "internalToken": AUTH_INTERNAL_LOG_TOKEN,
+    }
+
+    request = Request(
+        f"{CENTRAL_AUTH_BASE_URL}/api/history/log",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "x-auth-internal-token": AUTH_INTERNAL_LOG_TOKEN,
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=8) as response:
+            response.read()
+    except URLError as exc:
+        print(f"Failed to post auth history for {action}: {exc}")
 
 
 def parse_iso(value: str) -> datetime:
@@ -164,6 +196,10 @@ def visible_name(name: str) -> bool:
     return not name.startswith(".")
 
 
+def visible_rel_path(rel_path: str) -> bool:
+    return all(visible_name(part) for part in rel_path.strip("/").split("/") if part)
+
+
 def sorted_visible_files(folder: Path) -> list[Path]:
     return sorted(
         [entry for entry in folder.iterdir() if entry.is_file() and visible_name(entry.name)],
@@ -204,6 +240,11 @@ def folder_preview(folder: Path, folder_rel_path: str = "") -> dict:
         folder_detail = get_folder_detail_record(folder_rel_path)
         folder_title = folder_detail["title"]
         folder_description = folder_detail["description"]
+        visible_to_users = folder_detail["visibleToUsers"]
+        visible_to_admins = folder_detail["visibleToAdmins"]
+    else:
+        visible_to_users = True
+        visible_to_admins = True
 
     def kind_for(rel: str | None) -> str | None:
         return guess_kind(Path(rel).suffix.lower()) if rel else None
@@ -244,6 +285,8 @@ def folder_preview(folder: Path, folder_rel_path: str = "") -> dict:
         "cover2Ext": ext_for(cover2_path),
         "title": folder_title,
         "description": folder_description,
+        "visibleToUsers": visible_to_users,
+        "visibleToAdmins": visible_to_admins,
         "itemCount": item_count,
         "fileCount": file_count,
         "folderCount": folder_count,
@@ -335,7 +378,17 @@ def init_db() -> None:
                 folder_path TEXT PRIMARY KEY,
                 title TEXT NOT NULL DEFAULT '',
                 description TEXT NOT NULL DEFAULT '',
+                visible_to_users INTEGER NOT NULL DEFAULT 1,
+                visible_to_admins INTEGER NOT NULL DEFAULT 1,
                 updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS folder_account_access (
+                folder_path TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                visible INTEGER NOT NULL DEFAULT 1,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (folder_path, user_id)
             );
 
             CREATE TABLE IF NOT EXISTS folder_covers (
@@ -360,6 +413,10 @@ def init_db() -> None:
             conn.execute("ALTER TABLE folder_details ADD COLUMN title TEXT NOT NULL DEFAULT ''")
         if "description" not in folder_detail_columns:
             conn.execute("ALTER TABLE folder_details ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+        if "visible_to_users" not in folder_detail_columns:
+            conn.execute("ALTER TABLE folder_details ADD COLUMN visible_to_users INTEGER NOT NULL DEFAULT 1")
+        if "visible_to_admins" not in folder_detail_columns:
+            conn.execute("ALTER TABLE folder_details ADD COLUMN visible_to_admins INTEGER NOT NULL DEFAULT 1")
         if "updated_at" not in folder_detail_columns:
             conn.execute("ALTER TABLE folder_details ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
 
@@ -446,39 +503,266 @@ def save_image_detail_record(rel_path: str, title: str, description: str, tags: 
 def get_folder_detail_record(folder_path: str) -> dict:
     with db_connect() as conn:
         row = conn.execute(
-            "SELECT folder_path, title, description, updated_at FROM folder_details WHERE folder_path = ?",
+            """
+            SELECT folder_path, title, description, visible_to_users, visible_to_admins, updated_at
+            FROM folder_details
+            WHERE folder_path = ?
+            """,
             (folder_path,),
         ).fetchone()
     if not row:
-        return {"title": "", "description": ""}
+        return {"title": "", "description": "", "visibleToUsers": True, "visibleToAdmins": True}
     return {
         "title": row["title"] or "",
         "description": row["description"] or "",
+        "visibleToUsers": bool(row["visible_to_users"]),
+        "visibleToAdmins": bool(row["visible_to_admins"]),
     }
 
 
-def save_folder_detail_record(folder_path: str, title: str, description: str) -> dict:
+def get_folder_account_access(folder_path: str) -> dict[str, str]:
+    if not folder_path:
+        return {}
+    with db_connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT user_id, visible
+            FROM folder_account_access
+            WHERE folder_path = ?
+            """,
+            (folder_path,),
+        ).fetchall()
+    return {str(row["user_id"]): "allow" if bool(row["visible"]) else "deny" for row in rows}
+
+
+def normalize_account_access_value(value) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"allow", "allowed", "true", "1", "yes", "on"}:
+            return True
+        if normalized in {"deny", "denied", "false", "0", "no", "off"}:
+            return False
+    return None
+
+
+def save_folder_account_access(folder_path: str, account_access: dict[str, object] | None) -> dict[str, str]:
+    if account_access is None:
+        return get_folder_account_access(folder_path)
+
+    normalized: dict[str, bool] = {}
+    for user_id, value in account_access.items():
+        normalized_value = normalize_account_access_value(value)
+        if not str(user_id).strip() or normalized_value is None:
+            continue
+        normalized[str(user_id)] = normalized_value
+
+    with db_connect() as conn:
+        conn.execute("DELETE FROM folder_account_access WHERE folder_path = ?", (folder_path,))
+        for user_id, visible in normalized.items():
+            conn.execute(
+                """
+                INSERT INTO folder_account_access (folder_path, user_id, visible, updated_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (folder_path, user_id, int(visible), iso_utc()),
+            )
+        conn.commit()
+    return {user_id: "allow" if visible else "deny" for user_id, visible in normalized.items()}
+
+
+def save_folder_detail_record(
+    folder_path: str,
+    title: str,
+    description: str,
+    visible_to_users: bool | None = None,
+    visible_to_admins: bool | None = None,
+) -> dict:
+    current = get_folder_detail_record(folder_path)
     payload = {
         "title": str(title or "").strip(),
         "description": str(description or "").strip(),
+        "visibleToUsers": current["visibleToUsers"] if visible_to_users is None else bool(visible_to_users),
+        "visibleToAdmins": current["visibleToAdmins"] if visible_to_admins is None else bool(visible_to_admins),
     }
     with db_connect() as conn:
-        if payload["title"] or payload["description"]:
+        is_default_visibility = payload["visibleToUsers"] and payload["visibleToAdmins"]
+        if payload["title"] or payload["description"] or not is_default_visibility:
             conn.execute(
                 """
-                INSERT INTO folder_details (folder_path, title, description, updated_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO folder_details (folder_path, title, description, visible_to_users, visible_to_admins, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(folder_path) DO UPDATE SET
                     title = excluded.title,
                     description = excluded.description,
+                    visible_to_users = excluded.visible_to_users,
+                    visible_to_admins = excluded.visible_to_admins,
                     updated_at = excluded.updated_at
                 """,
-                (folder_path, payload["title"], payload["description"], iso_utc()),
+                (
+                    folder_path,
+                    payload["title"],
+                    payload["description"],
+                    int(payload["visibleToUsers"]),
+                    int(payload["visibleToAdmins"]),
+                    iso_utc(),
+                ),
             )
         else:
             conn.execute("DELETE FROM folder_details WHERE folder_path = ?", (folder_path,))
         conn.commit()
     return payload
+
+
+def folder_path_parts(folder_path: str) -> list[str]:
+    parts = [part for part in folder_path.strip("/").split("/") if part]
+    return ["/".join(parts[:index]) for index in range(1, len(parts) + 1)]
+
+
+def folder_parent_path(folder_path: str) -> str:
+    return posixpath.dirname(folder_path.strip("/")).strip("/")
+
+
+def folder_parent_parts(folder_path: str) -> list[str]:
+    parent = folder_parent_path(folder_path)
+    return folder_path_parts(parent) if parent else []
+
+
+def level_parent_access(folder_path: str) -> dict:
+    paths = folder_parent_parts(folder_path)
+    state = {"visibleToUsers": True, "visibleToAdmins": True}
+    if not paths:
+        return state
+
+    placeholders = ",".join("?" for _ in paths)
+    with db_connect() as conn:
+        rows = conn.execute(
+            f"SELECT folder_path, visible_to_users, visible_to_admins FROM folder_details WHERE folder_path IN ({placeholders})",
+            tuple(paths),
+        ).fetchall()
+
+    visibility_by_path = {row["folder_path"]: row for row in rows}
+    for path in paths:
+        row = visibility_by_path.get(path)
+        if not row:
+            continue
+        if not bool(row["visible_to_users"]):
+            state["visibleToUsers"] = False
+        if not bool(row["visible_to_admins"]):
+            state["visibleToAdmins"] = False
+    return state
+
+
+def can_access_folder(folder_path: str, user: dict | None) -> bool:
+    folder_path = folder_path.strip("/")
+    if not folder_path:
+        return True
+    if user and user.get("isOwner"):
+        return True
+
+    paths = folder_path_parts(folder_path)
+    if not paths:
+        return True
+
+    placeholders = ",".join("?" for _ in paths)
+    with db_connect() as conn:
+        rows = conn.execute(
+            f"SELECT folder_path, visible_to_users, visible_to_admins FROM folder_details WHERE folder_path IN ({placeholders})",
+            tuple(paths),
+        ).fetchall()
+        access_rows = []
+        if user:
+            access_rows = conn.execute(
+                f"SELECT folder_path, user_id, visible FROM folder_account_access WHERE user_id = ? AND folder_path IN ({placeholders})",
+                (str(user.get("id")), *paths),
+            ).fetchall()
+
+    visibility_by_path = {row["folder_path"]: row for row in rows}
+    account_access_by_path = {row["folder_path"]: bool(row["visible"]) for row in access_rows}
+    for path in paths:
+        if path in account_access_by_path:
+            if not account_access_by_path[path]:
+                return False
+            continue
+        row = visibility_by_path.get(path)
+        if not row:
+            continue
+        if user and user.get("isAdmin"):
+            if not bool(row["visible_to_admins"]):
+                return False
+        elif not bool(row["visible_to_users"]):
+            return False
+    return True
+
+
+def can_access_file_path(rel_path: str, user: dict | None) -> bool:
+    if not visible_rel_path(rel_path):
+        return False
+    return can_access_folder(posixpath.dirname(rel_path.strip("/")), user)
+
+
+def folder_parent_user_access(folder_path: str, users: list[dict]) -> dict[str, bool]:
+    parent = folder_parent_path(folder_path)
+    return {
+        str(user["id"]): can_access_folder(parent, user)
+        for user in users
+    }
+
+
+def approved_access_users() -> list[dict]:
+    if central_auth_enabled():
+        conn = central_auth_db_connect()
+        if not conn:
+            return []
+        with conn:
+            user_columns = {column["name"] for column in conn.execute("PRAGMA table_info(users)").fetchall()}
+            owner_select = "is_owner" if "is_owner" in user_columns else "0 AS is_owner"
+            deleted_clause = "AND is_deleted = 0" if "is_deleted" in user_columns else ""
+            membership_join = ""
+            membership_where = ""
+            if REQUIRED_APP_MEMBERSHIP:
+                membership_join = "JOIN user_app_memberships ON user_app_memberships.user_id = users.id"
+                membership_where = "AND user_app_memberships.app_key = ?"
+            params = (REQUIRED_APP_MEMBERSHIP,) if membership_where else ()
+            rows = conn.execute(
+                f"""
+                SELECT users.id, users.username, users.is_admin, {owner_select}, users.is_approved, users.is_blocked,
+                       users.request_note, users.created_at, users.approved_at, users.blocked_at
+                FROM users
+                {membership_join}
+                WHERE users.is_approved = 1
+                  AND users.is_blocked = 0
+                  {deleted_clause}
+                  {membership_where}
+                ORDER BY users.is_owner DESC, users.is_admin DESC, users.username COLLATE NOCASE
+                """,
+                params,
+            ).fetchall()
+        return [serialize_user(row) for row in rows if serialize_user(row)]
+
+    with db_connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, username, is_admin, 0 AS is_owner, is_approved, is_blocked, request_note, created_at, approved_at, blocked_at
+            FROM users
+            WHERE is_approved = 1 AND is_blocked = 0
+            ORDER BY is_admin DESC, username COLLATE NOCASE
+            """
+        ).fetchall()
+    return [serialize_user(row) for row in rows if serialize_user(row)]
+
+
+def folder_access_payload(folder_path: str) -> dict:
+    users = approved_access_users()
+    return {
+        "approvedUsers": users,
+        "accountAccess": get_folder_account_access(folder_path),
+        "parentAccess": {
+            **level_parent_access(folder_path),
+            "accounts": folder_parent_user_access(folder_path, users),
+        },
+    }
 
 
 def get_folder_cover_state(folder_path: str) -> dict[str, str | None]:
@@ -554,7 +838,7 @@ def load_image_details_map(paths: list[str]) -> dict[str, dict]:
     return {row["path"]: serialize_image_detail_row(row) for row in rows}
 
 
-def list_files_by_tag(tag_filter: str, search_filter: str = "") -> list[dict]:
+def list_files_by_tag(tag_filter: str, search_filter: str = "", user: dict | None = None) -> list[dict]:
     tag_filter = tag_filter.strip().lower()
     if not tag_filter:
         return []
@@ -572,6 +856,10 @@ def list_files_by_tag(tag_filter: str, search_filter: str = "") -> list[dict]:
 
         rel_path = str(row["path"] or "").strip().strip("/")
         if not rel_path:
+            continue
+        if not visible_rel_path(rel_path):
+            continue
+        if not can_access_file_path(rel_path, user):
             continue
 
         try:
@@ -616,7 +904,7 @@ def list_files_by_tag(tag_filter: str, search_filter: str = "") -> list[dict]:
     return files
 
 
-def list_files_globally(search_filter: str) -> list[dict]:
+def list_files_globally(search_filter: str, user: dict | None = None) -> list[dict]:
     search_filter = search_filter.strip().lower()
     if not search_filter:
         return []
@@ -633,6 +921,10 @@ def list_files_globally(search_filter: str) -> list[dict]:
         if not target.is_file():
             continue
         rel = rel_url(target)
+        if not visible_rel_path(rel):
+            continue
+        if not can_access_file_path(rel, user):
+            continue
         detail = detail_map.get(rel, {"title": "", "description": "", "tags": []})
         haystack = " ".join(
             [
@@ -667,11 +959,14 @@ def list_files_globally(search_filter: str) -> list[dict]:
     return files
 
 
-def collect_tag_stats() -> tuple[list[str], dict[str, int]]:
+def collect_tag_stats(user: dict | None = None) -> tuple[list[str], dict[str, int]]:
     counts: dict[str, int] = {}
     with db_connect() as conn:
-        rows = conn.execute("SELECT tags_json FROM image_details").fetchall()
+        rows = conn.execute("SELECT path, tags_json FROM image_details").fetchall()
     for row in rows:
+        rel_path = str(row["path"] or "").strip().strip("/")
+        if rel_path and not can_access_file_path(rel_path, user):
+            continue
         try:
             tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
         except Exception:
@@ -724,13 +1019,16 @@ def delete_tag_globally(tag_name: str) -> None:
     rewrite_tags(transform)
 
 
-def bulk_update_tags(image_paths: list[str], tag_name: str, action: str) -> None:
+def bulk_update_tags(image_paths: list[str], tag_name: str, action: str, user: dict | None = None) -> bool:
     clean_tag = tag_name.strip().lower()
     if not clean_tag or action not in {"add", "remove"}:
-        return
+        return False
     unique_paths = [path for path in dict.fromkeys(str(path or "").strip() for path in image_paths) if path]
     if not unique_paths:
-        return
+        return False
+
+    existing_tags = set(collect_tag_stats(None)[0]) if action == "add" else set()
+    changed = False
 
     with db_connect() as conn:
         now = iso_utc()
@@ -763,7 +1061,14 @@ def bulk_update_tags(image_paths: list[str], tag_name: str, action: str) -> None
                     now,
                 ),
             )
+            if next_tags != tags:
+                changed = True
         conn.commit()
+
+    if action == "add" and clean_tag not in existing_tags:
+        post_auth_history("peri.tag_created", json.dumps({"name": clean_tag, "count": len(unique_paths)}), user, "perihelion")
+
+    return changed
 
 
 def load_share_record(share_id: str) -> dict | None:
@@ -926,6 +1231,7 @@ def serialize_user(row: sqlite3.Row | None) -> dict | None:
         "id": user_id,
         "username": row["username"],
         "isAdmin": bool(row["is_admin"]),
+        "isOwner": bool(row["is_owner"]) if "is_owner" in row.keys() else False,
         "isApproved": bool(row["is_approved"]),
         "isBlocked": bool(row["is_blocked"]),
         "requestNote": row["request_note"],
@@ -1004,9 +1310,11 @@ def current_central_user_from_handler(handler: BaseHTTPRequestHandler) -> dict |
         return None
 
     with conn:
+        user_columns = {column["name"] for column in conn.execute("PRAGMA table_info(users)").fetchall()}
+        owner_select = "users.is_owner" if "is_owner" in user_columns else "0 AS is_owner"
         row = conn.execute(
-            """
-            SELECT users.id, users.username, users.is_admin, users.is_approved, users.is_blocked, users.request_note,
+            f"""
+            SELECT users.id, users.username, users.is_admin, {owner_select}, users.is_approved, users.is_blocked, users.request_note,
                    users.created_at, users.approved_at, users.blocked_at,
                    sessions.token, sessions.expires_at
             FROM sessions
@@ -1494,7 +1802,7 @@ class Handler(BaseHTTPRequestHandler):
                 limit = max(1, min(250, int(query.get("limit", ["25"])[0])))
 
                 if search_filter and len(search_filter) >= 4 and not tag_filter and not share_filter:
-                    files = list_files_globally(search_filter)
+                    files = list_files_globally(search_filter, user)
                     image_files = [f["path"] for f in files if f["kind"] == "image"]
                     total = len(files)
                     start = (page - 1) * limit
@@ -1525,7 +1833,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
 
                 if tag_filter:
-                    files = list_files_by_tag(tag_filter, search_filter)
+                    files = list_files_by_tag(tag_filter, search_filter, user)
                     image_files = [f["path"] for f in files if f["kind"] == "image"]
                     total = len(files)
                     start = (page - 1) * limit
@@ -1559,18 +1867,31 @@ class Handler(BaseHTTPRequestHandler):
                 if not current.exists() or not current.is_dir():
                     self._send_json({"error": "Folder not found"}, 404)
                     return
+                if rel and not visible_rel_path(rel):
+                    self._send_json({"error": "Folder access denied"}, 403)
+                    return
+                if rel and not can_access_folder(rel, user):
+                    self._send_json({"error": "Folder access denied"}, 403)
+                    return
 
                 folders = []
                 files = []
                 for entry in sorted(current.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
+                    entry_rel = rel_url(entry)
+                    if not visible_rel_path(entry_rel):
+                        continue
+                    if entry.is_dir() and not can_access_folder(entry_rel, user):
+                        continue
+                    if entry.is_file() and not can_access_file_path(entry_rel, user):
+                        continue
                     item = {
                         "name": entry.name,
-                        "path": rel_url(entry),
+                        "path": entry_rel,
                         "modified": int(entry.stat().st_mtime),
                     }
                     if entry.is_dir():
                         item["type"] = "directory"
-                        folder_rel = rel_url(entry)
+                        folder_rel = entry_rel
                         item.update(folder_preview(entry, folder_rel))
                         folders.append(item)
                     else:
@@ -1658,6 +1979,9 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 prefix = "/images/" if path.startswith("/images/") else "/media/"
                 rel = unquote(path[len(prefix):])
+                if not can_access_file_path(rel, user):
+                    self._send_json({"error": "File access denied"}, 403)
+                    return
                 target = safe_path(rel)
                 self._send_file(target)
                 return
@@ -1667,6 +1991,9 @@ class Handler(BaseHTTPRequestHandler):
                 if REQUIRE_AUTH and not user:
                     return
                 rel = unquote(path[len("/thumbs/"):])
+                if not can_access_file_path(rel, user):
+                    self._send_json({"error": "File access denied"}, 403)
+                    return
                 target = safe_path(rel)
                 self._send_thumbnail(target, rel, query)
                 return
@@ -1676,6 +2003,9 @@ class Handler(BaseHTTPRequestHandler):
                 if REQUIRE_AUTH and not user:
                     return
                 rel = unquote(path[len("/api/image-meta/"):])
+                if not can_access_file_path(rel, user):
+                    self._send_json({"error": "File access denied"}, 403)
+                    return
                 target = safe_path(rel)
                 if not target.is_file():
                     self._send_json({"error": "File not found"}, 404)
@@ -1688,6 +2018,9 @@ class Handler(BaseHTTPRequestHandler):
                 if REQUIRE_AUTH and not user:
                     return
                 rel = unquote(path[len("/api/image-details/"):])
+                if not can_access_file_path(rel, user):
+                    self._send_json({"error": "File access denied"}, 403)
+                    return
                 target = safe_path(rel)
                 if not target.is_file():
                     self._send_json({"error": "File not found"}, 404)
@@ -1707,7 +2040,7 @@ class Handler(BaseHTTPRequestHandler):
                 user = require_access(self)
                 if REQUIRE_AUTH and not user:
                     return
-                tags, tag_counts = collect_tag_stats()
+                tags, tag_counts = collect_tag_stats(user)
                 self._send_json({"ok": True, "tags": tags, "tagCounts": tag_counts})
                 return
 
@@ -1723,6 +2056,9 @@ class Handler(BaseHTTPRequestHandler):
                 if REQUIRE_AUTH and not user:
                     return
                 rel = unquote(path[len("/api/download/"):])
+                if not can_access_file_path(rel, user):
+                    self._send_json({"error": "File access denied"}, 403)
+                    return
                 target = safe_path(rel)
                 log_download(user, "single", rel_url(target), Path(rel).name, self)
                 self._send_file(target, Path(rel).name)
@@ -1737,6 +2073,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not share:
                     self._send_json({"error": "Shared page not found"}, 404)
                     return
+                share = dict(share)
+                share["images"] = [image for image in share.get("images", []) if can_access_file_path(str(image), user)]
                 self._send_json(share)
                 return
 
@@ -1745,8 +2083,19 @@ class Handler(BaseHTTPRequestHandler):
                 if REQUIRE_AUTH and not user:
                     return
                 folder_path = (query.get("path", [""])[0] or "").strip().strip("/")
+                if folder_path and not visible_rel_path(folder_path):
+                    self._send_json({"error": "Folder access denied"}, 403)
+                    return
+                if folder_path and not can_access_folder(folder_path, user):
+                    self._send_json({"error": "Folder access denied"}, 403)
+                    return
                 cover_state = get_folder_cover_state(folder_path) if folder_path else {"cover1Path": None, "cover2Path": None}
-                details = get_folder_detail_record(folder_path) if folder_path else {"title": "", "description": ""}
+                details = get_folder_detail_record(folder_path) if folder_path else {
+                    "title": "",
+                    "description": "",
+                    "visibleToUsers": True,
+                    "visibleToAdmins": True,
+                }
                 self._send_json({
                     "ok": True,
                     "folderPath": folder_path,
@@ -1755,6 +2104,9 @@ class Handler(BaseHTTPRequestHandler):
                     "coverImagePath": cover_state["cover1Path"],
                     "title": details["title"],
                     "description": details["description"],
+                    "visibleToUsers": details["visibleToUsers"],
+                    "visibleToAdmins": details["visibleToAdmins"],
+                    **(folder_access_payload(folder_path) if user and user.get("isAdmin") else {}),
                 })
                 return
 
@@ -1763,12 +2115,26 @@ class Handler(BaseHTTPRequestHandler):
                 if REQUIRE_AUTH and not user:
                     return
                 folder_path = (query.get("path", [""])[0] or "").strip().strip("/")
-                details = get_folder_detail_record(folder_path) if folder_path else {"title": "", "description": ""}
+                if folder_path and not visible_rel_path(folder_path):
+                    self._send_json({"error": "Folder access denied"}, 403)
+                    return
+                if folder_path and not can_access_folder(folder_path, user):
+                    self._send_json({"error": "Folder access denied"}, 403)
+                    return
+                details = get_folder_detail_record(folder_path) if folder_path else {
+                    "title": "",
+                    "description": "",
+                    "visibleToUsers": True,
+                    "visibleToAdmins": True,
+                }
                 self._send_json({
                     "ok": True,
                     "folderPath": folder_path,
                     "title": details["title"],
                     "description": details["description"],
+                    "visibleToUsers": details["visibleToUsers"],
+                    "visibleToAdmins": details["visibleToAdmins"],
+                    **(folder_access_payload(folder_path) if user and user.get("isAdmin") else {}),
                 })
                 return
 
@@ -2093,7 +2459,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(images, list) or not images:
                     self._send_json({"error": "Invalid images array"}, 400)
                     return
-                bulk_update_tags(images, tag, action)
+                bulk_update_tags(images, tag, action, user)
                 self._send_json({"ok": True})
                 return
 
@@ -2144,6 +2510,14 @@ class Handler(BaseHTTPRequestHandler):
                     share_file = SHARES_DIR / f"{share_id}.json"
 
                 data = save_share_record(share_id, title, images, datetime.now(timezone.utc).isoformat())
+                share_payload = {"code": share_id, "title": title, "count": len(images)}
+                post_auth_history("peri.share_created", json.dumps(share_payload), user, "perihelion")
+                post_auth_history(
+                    "peri.list_created",
+                    json.dumps({"name": title or share_id, "count": len(images)}),
+                    user,
+                    "perihelion",
+                )
                 self._send_json({"ok": True, "id": share_id, "share": data})
                 return
 
@@ -2189,11 +2563,17 @@ class Handler(BaseHTTPRequestHandler):
                 folder_path = (payload.get("folderPath") or "").strip().strip("/")
                 title = (payload.get("title") or "").strip()
                 description = (payload.get("description") or "").strip()
+                visible_to_users = payload.get("visibleToUsers")
+                visible_to_admins = payload.get("visibleToAdmins")
+                account_access = payload.get("accountAccess")
                 has_cover_update = "imagePath" in payload or "slot" in payload
                 image_path = (payload.get("imagePath") or "").strip() or None
                 slot = int(payload.get("slot") or 1)
                 if not folder_path:
                     self._send_json({"error": "folderPath is required"}, 400)
+                    return
+                if not visible_rel_path(folder_path) or not can_access_folder(folder_path, user):
+                    self._send_json({"error": "Folder access denied"}, 403)
                     return
                 if has_cover_update:
                     if slot not in (1, 2):
@@ -2207,8 +2587,23 @@ class Handler(BaseHTTPRequestHandler):
                             self._send_json({"error": "Invalid imagePath"}, 400)
                             return
                     set_folder_cover(folder_path, image_path, slot=slot)
-                if title or description or not has_cover_update:
-                    save_folder_detail_record(folder_path, title, description)
+                has_detail_update = (
+                    "title" in payload
+                    or "description" in payload
+                    or "visibleToUsers" in payload
+                    or "visibleToAdmins" in payload
+                    or "accountAccess" in payload
+                )
+                if has_detail_update or not has_cover_update:
+                    save_folder_detail_record(
+                        folder_path,
+                        title,
+                        description,
+                        visible_to_users if isinstance(visible_to_users, bool) else None,
+                        visible_to_admins if isinstance(visible_to_admins, bool) else None,
+                    )
+                    if isinstance(account_access, dict):
+                        save_folder_account_access(folder_path, account_access)
                 cover_state = get_folder_cover_state(folder_path)
                 details = get_folder_detail_record(folder_path)
                 self._send_json({
@@ -2219,6 +2614,9 @@ class Handler(BaseHTTPRequestHandler):
                     "coverImagePath": cover_state["cover1Path"],
                     "title": details["title"],
                     "description": details["description"],
+                    "visibleToUsers": details["visibleToUsers"],
+                    "visibleToAdmins": details["visibleToAdmins"],
+                    **folder_access_payload(folder_path),
                 })
                 return
 
@@ -2230,15 +2628,32 @@ class Handler(BaseHTTPRequestHandler):
                 folder_path = (payload.get("folderPath") or "").strip().strip("/")
                 title = (payload.get("title") or "").strip()
                 description = (payload.get("description") or "").strip()
+                visible_to_users = payload.get("visibleToUsers")
+                visible_to_admins = payload.get("visibleToAdmins")
+                account_access = payload.get("accountAccess")
                 if not folder_path:
                     self._send_json({"error": "folderPath is required"}, 400)
                     return
-                details = save_folder_detail_record(folder_path, title, description)
+                if not visible_rel_path(folder_path) or not can_access_folder(folder_path, user):
+                    self._send_json({"error": "Folder access denied"}, 403)
+                    return
+                details = save_folder_detail_record(
+                    folder_path,
+                    title,
+                    description,
+                    visible_to_users if isinstance(visible_to_users, bool) else None,
+                    visible_to_admins if isinstance(visible_to_admins, bool) else None,
+                )
+                if isinstance(account_access, dict):
+                    save_folder_account_access(folder_path, account_access)
                 self._send_json({
                     "ok": True,
                     "folderPath": folder_path,
                     "title": details["title"],
                     "description": details["description"],
+                    "visibleToUsers": details["visibleToUsers"],
+                    "visibleToAdmins": details["visibleToAdmins"],
+                    **folder_access_payload(folder_path),
                 })
                 return
 
@@ -2254,6 +2669,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
 
                 tmp = io.BytesIO()
+                exported_names: list[str] = []
                 with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zf:
                     for item in files:
                         original = item.get("original", "")
@@ -2266,6 +2682,9 @@ class Handler(BaseHTTPRequestHandler):
                         except ValueError:
                             continue
 
+                        if not can_access_file_path(rel_url(source), user):
+                            continue
+
                         if not source.is_file():
                             continue
 
@@ -2275,7 +2694,19 @@ class Handler(BaseHTTPRequestHandler):
                             data = source.read_bytes()
 
                         zf.writestr(new_name, data)
+                        exported_names.append(new_name)
                         log_download(user, "zip", rel_url(source), new_name, self)
+
+                post_auth_history(
+                    "peri.zip_exported",
+                    json.dumps({
+                        "name": "selected-images.zip",
+                        "count": len(exported_names),
+                        "contents": exported_names,
+                    }),
+                    user,
+                    "perihelion",
+                )
 
                 body = tmp.getvalue()
                 self.send_response(200)

@@ -33,6 +33,8 @@ const appRegistry = {
   copy: standaloneApp('Copy', 'copy'),
   dookydetective: standaloneApp('Dooky Detective', 'dookydetective'),
   dooky: standaloneApp('Dooky Detective', 'dookydetective'),
+  jeffershizzle: standaloneApp('Jeffershizzle', 'jeffershizzle'),
+  shizzle: standaloneApp('Jeffershizzle', 'jeffershizzle'),
   multimillion: standaloneApp('Auth / Multimillion', 'multimillion'),
   wmjefferson: standaloneApp('WM Jefferson', 'wmjefferson'),
   wmjeff: standaloneApp('WM Jefferson', 'wmjefferson'),

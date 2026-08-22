@@ -40,6 +40,8 @@ interface FolderEntry {
   fileCount: number;
   folderCount: number;
   hasCoverOverride?: boolean;
+  visibleToUsers: boolean;
+  visibleToAdmins: boolean;
 }
 
 interface FolderApiEntry {
@@ -62,12 +64,15 @@ interface FolderApiEntry {
   fileCount?: number;
   folderCount?: number;
   hasCoverOverride?: boolean;
+  visibleToUsers?: boolean;
+  visibleToAdmins?: boolean;
 }
 
 interface AuthUser {
   id: number | string;
   username: string;
   isAdmin: boolean;
+  isOwner?: boolean;
   isApproved: boolean;
   isBlocked: boolean;
   requestNote: string | null;
@@ -84,6 +89,15 @@ interface AuthStatus {
   provider?: 'local' | 'central';
   authBaseUrl?: string | null;
   requiredAppMembership?: string | null;
+}
+
+type FolderAccountAccessMode = 'allow' | 'deny';
+type FolderAccountAccess = Record<string, FolderAccountAccessMode>;
+
+interface FolderParentAccess {
+  visibleToUsers: boolean;
+  visibleToAdmins: boolean;
+  accounts: FolderAccountAccess;
 }
 
 interface DownloadHistoryEntry {
@@ -207,6 +221,8 @@ const mapFolderApiEntry = (folder: FolderApiEntry): FolderEntry => ({
   fileCount: folder.fileCount ?? folder.itemCount ?? 0,
   folderCount: folder.folderCount ?? 0,
   hasCoverOverride: folder.hasCoverOverride ?? false,
+  visibleToUsers: folder.visibleToUsers ?? true,
+  visibleToAdmins: folder.visibleToAdmins ?? true,
 });
 
 const APIBASE = 'https://api.jeffersonwm.com';
@@ -511,7 +527,138 @@ interface ImageDetail {
   exif: ImageDetailExif;
 }
 
+type PeriSourceMode = 'server' | 'local';
+
+type LocalObjectUrlMap = Record<string, string>;
+
+type LocalDirectoryPickerHandle = {
+  kind: 'directory' | 'file';
+  name: string;
+  values?: () => AsyncIterable<LocalDirectoryPickerHandle>;
+  getFile?: () => Promise<File>;
+};
+
+type DirectoryInputElement = HTMLInputElement & {
+  webkitdirectory?: boolean;
+  directory?: boolean;
+};
+
+const normalizeRelativePath = (value: string) =>
+  value
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '');
+
+const getImmediateChildFolderPath = (entryPath: string, parentPath: string) => {
+  const normalizedEntryPath = normalizeRelativePath(entryPath);
+  const normalizedParentPath = normalizeRelativePath(parentPath);
+  const relative = normalizedParentPath
+    ? normalizedEntryPath.startsWith(`${normalizedParentPath}/`)
+      ? normalizedEntryPath.slice(normalizedParentPath.length + 1)
+      : ''
+    : normalizedEntryPath;
+
+  if (!relative || !relative.includes('/')) {
+    return null;
+  }
+
+  const firstSegment = relative.split('/')[0];
+  return normalizedParentPath ? `${normalizedParentPath}/${firstSegment}` : firstSegment;
+};
+
+const buildLocalFolderEntries = (allEntries: MediaEntry[], parentPath: string): FolderEntry[] => {
+  const normalizedParentPath = normalizeRelativePath(parentPath);
+  const folderMap = new Map<string, FolderEntry>();
+  const folderDescendantSets = new Map<string, Set<string>>();
+
+  allEntries.forEach(entry => {
+    const childFolderPath = getImmediateChildFolderPath(entry.path, normalizedParentPath);
+    if (!childFolderPath) {
+      return;
+    }
+
+    const childName = basename(childFolderPath);
+    if (!folderMap.has(childFolderPath)) {
+      folderMap.set(childFolderPath, {
+        path: childFolderPath,
+        name: childName,
+        title: '',
+        description: '',
+        thumbnailPath: null,
+        thumbnailKind: null,
+        thumbnailExt: '',
+        imageThumbnailPath: null,
+        imageThumbnailKind: null,
+        imageThumbnailExt: '',
+        secondaryThumbnailPath: null,
+        secondaryThumbnailKind: null,
+        secondaryThumbnailExt: '',
+        cover1Path: null,
+        cover2Path: null,
+        itemCount: 0,
+        fileCount: 0,
+        folderCount: 0,
+        hasCoverOverride: false,
+        visibleToUsers: true,
+        visibleToAdmins: true,
+      });
+      folderDescendantSets.set(childFolderPath, new Set<string>());
+    }
+
+    const folder = folderMap.get(childFolderPath)!;
+    folder.itemCount += 1;
+    folder.fileCount += 1;
+
+    const descendantRelative = entry.path.slice(childFolderPath.length + 1);
+    if (descendantRelative.includes('/')) {
+      folderDescendantSets.get(childFolderPath)?.add(descendantRelative.split('/')[0]);
+    }
+
+    if (!folder.thumbnailPath && entry.kind === 'image' && isRenderable(entry.path)) {
+      folder.thumbnailPath = entry.path;
+      folder.thumbnailKind = entry.kind;
+      folder.thumbnailExt = entry.ext;
+      folder.imageThumbnailPath = entry.path;
+      folder.imageThumbnailKind = entry.kind;
+      folder.imageThumbnailExt = entry.ext;
+      folder.cover1Path = entry.path;
+      return;
+    }
+
+    if (!folder.secondaryThumbnailPath && entry.kind === 'image' && isRenderable(entry.path) && entry.path !== folder.thumbnailPath) {
+      folder.secondaryThumbnailPath = entry.path;
+      folder.secondaryThumbnailKind = entry.kind;
+      folder.secondaryThumbnailExt = entry.ext;
+      folder.cover2Path = entry.path;
+      return;
+    }
+
+    if (!folder.thumbnailPath) {
+      folder.thumbnailPath = entry.path;
+      folder.thumbnailKind = entry.kind;
+      folder.thumbnailExt = entry.ext;
+      folder.cover1Path = entry.path;
+      return;
+    }
+
+    if (!folder.secondaryThumbnailPath && entry.path !== folder.thumbnailPath) {
+      folder.secondaryThumbnailPath = entry.path;
+      folder.secondaryThumbnailKind = entry.kind;
+      folder.secondaryThumbnailExt = entry.ext;
+      folder.cover2Path = entry.path;
+    }
+  });
+
+  return Array.from(folderMap.values())
+    .map(folder => ({
+      ...folder,
+      folderCount: folderDescendantSets.get(folder.path)?.size || 0,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+};
+
 export default function App() {
+  const localFolderInputRef = useRef<DirectoryInputElement | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [entries, setEntries] = useState<MediaEntry[]>([]);
@@ -527,6 +674,15 @@ export default function App() {
   const [folderQuickEditPath, setFolderQuickEditPath] = useState('');
   const [folderQuickEditTitle, setFolderQuickEditTitle] = useState('');
   const [folderQuickEditDescription, setFolderQuickEditDescription] = useState('');
+  const [folderQuickVisibleToUsers, setFolderQuickVisibleToUsers] = useState(true);
+  const [folderQuickVisibleToAdmins, setFolderQuickVisibleToAdmins] = useState(true);
+  const [folderQuickApprovedUsers, setFolderQuickApprovedUsers] = useState<AuthUser[]>([]);
+  const [folderQuickAccountAccess, setFolderQuickAccountAccess] = useState<FolderAccountAccess>({});
+  const [folderQuickParentAccess, setFolderQuickParentAccess] = useState<FolderParentAccess>({
+    visibleToUsers: true,
+    visibleToAdmins: true,
+    accounts: {},
+  });
   const [folderQuickEditStatus, setFolderQuickEditStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [setCoverStatus, setSetCoverStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [allTags, setAllTags] = useState<string[]>([]);
@@ -582,6 +738,10 @@ export default function App() {
   const [sharedDescription, setSharedDescription] = useState<string>('');
   const [sharedError, setSharedError] = useState('');
   const [previewRetryTokens, setPreviewRetryTokens] = useState<Record<string, number>>({});
+  const [sourceMode, setSourceMode] = useState<PeriSourceMode>('server');
+  const [localLibraryEntries, setLocalLibraryEntries] = useState<MediaEntry[]>([]);
+  const [localObjectUrls, setLocalObjectUrls] = useState<LocalObjectUrlMap>({});
+  const [localFolderLabel, setLocalFolderLabel] = useState('');
 
   const [rowHeight, setRowHeight] = useState(250);
   const [limit, setLimit] = useState(25);
@@ -622,6 +782,188 @@ export default function App() {
   const prewarmedPageKeysRef = React.useRef<Set<string>>(new Set());
   const prewarmImagesRef = React.useRef<HTMLImageElement[]>([]);
   const isGlobalSearch = debouncedSearch.trim().length >= 4;
+  const canEditServerFolders = sourceMode === 'server' && Boolean(authStatus?.user?.isAdmin);
+
+  const replaceLocalObjectUrls = (nextMap: LocalObjectUrlMap) => {
+    Object.values(localObjectUrls).forEach(url => URL.revokeObjectURL(url));
+    setLocalObjectUrls(nextMap);
+  };
+
+  const resetToServerLibrary = () => {
+    replaceLocalObjectUrls({});
+    setSourceMode('server');
+    setLocalLibraryEntries([]);
+    setLocalFolderLabel('');
+    setAccessError('');
+    setCurrentPath('');
+    setSelectedImage(null);
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setSelectedTag('');
+    setSelectedList('');
+    setSelectionDraftId(null);
+    setSelectedImages(new Set());
+    setSelectedMetadata({});
+    setPage(1);
+    setView('gallery');
+    setShowSelectedOnly(false);
+    setFolderCoverPaths({ cover1Path: null, cover2Path: null });
+    void fetchTags();
+    void fetchShares();
+  };
+
+  const syncLocalLibrary = (nextEntries: MediaEntry[], nextObjectUrls: LocalObjectUrlMap, rootLabel: string) => {
+    replaceLocalObjectUrls(nextObjectUrls);
+    setSourceMode('local');
+    setLocalLibraryEntries(nextEntries.sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: 'base' })));
+    setLocalFolderLabel(rootLabel);
+    setAccessError('');
+    setCurrentPath('');
+    setSelectedImage(null);
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setSelectedTag('');
+    setSelectedList('');
+    setSelectionDraftId(null);
+    setSelectedImages(new Set());
+    setSelectedMetadata({});
+    setPage(1);
+    setView('gallery');
+    setShowSelectedOnly(false);
+    setFolderCoverPaths({ cover1Path: null, cover2Path: null });
+    setAllTags([]);
+    setAllShares([]);
+  };
+
+  const loadLocalFolderFromFiles = async (files: File[], rootLabel: string) => {
+    if (!files.length) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const nextObjectUrls: LocalObjectUrlMap = {};
+      const nextEntries: MediaEntry[] = files.map(file => {
+        const relativePath = normalizeRelativePath(((file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name));
+        const normalizedPath = relativePath || file.name;
+        nextObjectUrls[normalizedPath] = URL.createObjectURL(file);
+        return {
+          path: normalizedPath,
+          name: basename(normalizedPath),
+          folderPath: dirname(normalizedPath),
+          kind: getMediaKind(normalizedPath),
+          ext: extensionOf(normalizedPath),
+          title: '',
+          description: '',
+          tags: [],
+          is_large: false,
+          size: file.size || 0,
+        };
+      });
+
+      syncLocalLibrary(nextEntries, nextObjectUrls, rootLabel);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadLocalFolderFromPicker = async (directoryHandle: LocalDirectoryPickerHandle) => {
+    if (!directoryHandle.values) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const nextEntries: MediaEntry[] = [];
+      const nextObjectUrls: LocalObjectUrlMap = {};
+
+      const walkDirectory = async (handle: LocalDirectoryPickerHandle, prefix = ''): Promise<void> => {
+        if (!handle.values) {
+          return;
+        }
+
+        for await (const child of handle.values()) {
+          if (child.kind === 'directory') {
+            await walkDirectory(child, prefix ? `${prefix}/${child.name}` : child.name);
+            continue;
+          }
+
+          if (child.kind === 'file' && child.getFile) {
+            const file = await child.getFile();
+            const relativePath = normalizeRelativePath(prefix ? `${prefix}/${child.name}` : child.name);
+            nextObjectUrls[relativePath] = URL.createObjectURL(file);
+            nextEntries.push({
+              path: relativePath,
+              name: basename(relativePath),
+              folderPath: dirname(relativePath),
+              kind: getMediaKind(relativePath),
+              ext: extensionOf(relativePath),
+              title: '',
+              description: '',
+              tags: [],
+              is_large: false,
+              size: file.size || 0,
+            });
+          }
+        }
+      };
+
+      await walkDirectory(directoryHandle);
+      syncLocalLibrary(nextEntries, nextObjectUrls, directoryHandle.name || 'Local Folder');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenLocalFolder = async () => {
+    try {
+      const picker = (window as Window & {
+        showDirectoryPicker?: () => Promise<LocalDirectoryPickerHandle>;
+      }).showDirectoryPicker;
+
+      if (picker) {
+        const directoryHandle = await picker();
+        await loadLocalFolderFromPicker(directoryHandle);
+        return;
+      }
+
+      localFolderInputRef.current?.click();
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      console.error('Failed to open local folder', error);
+    }
+  };
+
+  const handleLocalFolderInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const firstRelativePath = (files[0] as File & { webkitRelativePath?: string } | undefined)?.webkitRelativePath || '';
+    const rootLabel = firstRelativePath ? firstRelativePath.split('/')[0] : 'Local Folder';
+    await loadLocalFolderFromFiles(files, rootLabel);
+    event.target.value = '';
+  };
+
+  const getResolvedImageUrl = (assetPath: string, cacheBust?: number) => {
+    if (sourceMode === 'local') {
+      return localObjectUrls[assetPath] || '';
+    }
+    return buildImageUrl(assetPath, cacheBust);
+  };
+
+  const getResolvedMediaUrl = (assetPath: string, cacheBust?: number) => {
+    if (sourceMode === 'local') {
+      return localObjectUrls[assetPath] || '';
+    }
+    return buildMediaUrl(assetPath, cacheBust);
+  };
+
+  const getResolvedThumbUrl = (assetPath: string, height: number, width = height * 2, cacheBust?: number) => {
+    if (sourceMode === 'local') {
+      return localObjectUrls[assetPath] || '';
+    }
+    return buildThumbUrl(assetPath, height, width, cacheBust);
+  };
 
   const queueHistoryUpdate = (mode: 'replace' | 'push' = 'push') => {
     historyModeRef.current = mode;
@@ -784,7 +1126,7 @@ export default function App() {
   };
 
   const saveFolderCoverSlot = async (slot: 1 | 2, imagePath: string | null) => {
-    if (!currentPath) return;
+    if (sourceMode !== 'server' || !currentPath) return;
     setSetCoverStatus('saving');
     try {
       const res = await fetch(`${API_PATH}/folder-cover`, {
@@ -816,8 +1158,15 @@ export default function App() {
     }
   };
 
-  const saveFolderDetailsFor = async (folderPath: string, title: string, description: string) => {
-    if (!folderPath) return false;
+  const saveFolderDetailsFor = async (
+    folderPath: string,
+    title: string,
+    description: string,
+    visibleToUsers?: boolean,
+    visibleToAdmins?: boolean,
+    accountAccess?: FolderAccountAccess,
+  ) => {
+    if (sourceMode !== 'server' || !folderPath) return false;
     try {
       const res = await fetch(`${API_PATH}/folder-cover`, {
         method: 'POST',
@@ -827,6 +1176,9 @@ export default function App() {
           folderPath,
           title,
           description,
+          visibleToUsers,
+          visibleToAdmins,
+          accountAccess,
         }),
       });
       if (!res.ok) {
@@ -835,13 +1187,28 @@ export default function App() {
       const data = await res.json().catch(() => null);
       const nextTitle = data?.title ?? '';
       const nextDescription = data?.description ?? '';
+      const nextVisibleToUsers = data?.visibleToUsers ?? true;
+      const nextVisibleToAdmins = data?.visibleToAdmins ?? true;
+      setFolderQuickApprovedUsers(data?.approvedUsers || []);
+      setFolderQuickAccountAccess(data?.accountAccess || {});
+      setFolderQuickParentAccess({
+        visibleToUsers: data?.parentAccess?.visibleToUsers ?? true,
+        visibleToAdmins: data?.parentAccess?.visibleToAdmins ?? true,
+        accounts: data?.parentAccess?.accounts || {},
+      });
       if (folderPath === currentPath) {
         setFolderTitleInput(nextTitle);
         setFolderDescriptionInput(nextDescription);
       }
       setFolders(prev => prev.map(folder =>
         folder.path === folderPath
-          ? { ...folder, title: nextTitle, description: nextDescription }
+          ? {
+              ...folder,
+              title: nextTitle,
+              description: nextDescription,
+              visibleToUsers: nextVisibleToUsers,
+              visibleToAdmins: nextVisibleToAdmins,
+            }
           : folder
       ));
       return true;
@@ -853,7 +1220,14 @@ export default function App() {
   const saveQuickFolderDetails = async () => {
     if (!folderQuickEditPath) return;
     setFolderQuickEditStatus('saving');
-    const saved = await saveFolderDetailsFor(folderQuickEditPath, folderQuickEditTitle, folderQuickEditDescription);
+    const saved = await saveFolderDetailsFor(
+      folderQuickEditPath,
+      folderQuickEditTitle,
+      folderQuickEditDescription,
+      folderQuickVisibleToUsers,
+      folderQuickVisibleToAdmins,
+      folderQuickAccountAccess,
+    );
     setFolderQuickEditStatus(saved ? 'saved' : 'idle');
     if (saved) {
       setTimeout(() => {
@@ -1202,13 +1576,87 @@ export default function App() {
   }, [isSharedView, sharedTitle]);
 
   useEffect(() => {
+    const input = localFolderInputRef.current;
+    if (!input) {
+      return;
+    }
+    input.webkitdirectory = true;
+    input.directory = true;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      Object.values(localObjectUrls).forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [localObjectUrls]);
+
+  useEffect(() => {
     if (!locationReady || isSharedView) {
       return;
     }
+
+    if (sourceMode === 'local') {
+      setLoading(true);
+      const nextSearch = debouncedSearch.trim().toLowerCase();
+      const selectedLocalShare = selectedList ? allShares.find(share => share.id === selectedList) : null;
+      const includePredicate = (entry: MediaEntry) => includeOtherFiles || entry.kind === 'image';
+      const filteredEntries = localLibraryEntries.filter(entry => {
+        if (!includePredicate(entry)) {
+          return false;
+        }
+
+        if (selectedTag && !(entry.tags || []).includes(selectedTag)) {
+          return false;
+        }
+
+        if (selectedLocalShare && !selectedLocalShare.images.includes(entry.path)) {
+          return false;
+        }
+
+        if (isGlobalSearch && nextSearch) {
+          const searchable = [entry.path, entry.name, entry.folderPath || ''].join(' ').toLowerCase();
+          return searchable.includes(nextSearch);
+        }
+
+        return currentPath ? entry.folderPath === currentPath : entry.folderPath === 'root';
+      });
+
+      const nextTotalItems = filteredEntries.length;
+      const nextTotalPages = Math.max(1, Math.ceil(nextTotalItems / Math.max(1, limit)));
+      const safePage = Math.min(page, nextTotalPages);
+      const startIndex = (safePage - 1) * limit;
+      const nextPageEntries = filteredEntries.slice(startIndex, startIndex + limit);
+      const nextFolders = isGlobalSearch ? [] : buildLocalFolderEntries(localLibraryEntries, currentPath);
+
+      setEntries(nextPageEntries);
+      setFolders(nextFolders);
+      setServerTotalPages(nextTotalPages);
+      setServerTotalItems(nextTotalItems);
+      setAccessError('');
+      setLoading(false);
+      return;
+    }
+
     const searchPath = isGlobalSearch ? '' : currentPath;
     const searchText = isGlobalSearch ? debouncedSearch : '';
     fetchImages(page, limit, searchPath, selectedTag, selectedList, searchText);
-  }, [locationReady, isSharedView, page, limit, currentPath, selectedTag, selectedList, debouncedSearch, isGlobalSearch, authStatus?.user?.id, authStatus?.requireAuth]);
+  }, [
+    locationReady,
+    isSharedView,
+    sourceMode,
+    page,
+    limit,
+    currentPath,
+    selectedTag,
+    selectedList,
+    allShares,
+    debouncedSearch,
+    isGlobalSearch,
+    includeOtherFiles,
+    localLibraryEntries,
+    authStatus?.user?.id,
+    authStatus?.requireAuth,
+  ]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -1314,10 +1762,12 @@ export default function App() {
 
   // Load the manual cover and metadata for the current folder whenever the path changes
   useEffect(() => {
-    if (!currentPath || !authStatus?.user?.isAdmin) {
+    if (sourceMode !== 'server' || !currentPath || !canEditServerFolders) {
       setFolderCoverPaths({ cover1Path: null, cover2Path: null });
       setFolderTitleInput('');
       setFolderDescriptionInput('');
+      setFolderQuickVisibleToUsers(true);
+      setFolderQuickVisibleToAdmins(true);
       return;
     }
 
@@ -1326,6 +1776,8 @@ export default function App() {
       .then(data => {
         setFolderTitleInput(data?.title ?? '');
         setFolderDescriptionInput(data?.description ?? '');
+        setFolderQuickVisibleToUsers(data?.visibleToUsers ?? true);
+        setFolderQuickVisibleToAdmins(data?.visibleToAdmins ?? true);
         setFolderCoverPaths({
           cover1Path: data?.cover1ImagePath ?? data?.coverImagePath ?? null,
           cover2Path: data?.cover2ImagePath ?? null,
@@ -1334,13 +1786,53 @@ export default function App() {
       .catch(() => {
         setFolderTitleInput('');
         setFolderDescriptionInput('');
+        setFolderQuickVisibleToUsers(true);
+        setFolderQuickVisibleToAdmins(true);
         setFolderCoverPaths({ cover1Path: null, cover2Path: null });
       });
-  }, [currentPath, authStatus?.user?.isAdmin]);
+  }, [sourceMode, currentPath, canEditServerFolders]);
+
+  useEffect(() => {
+    if (sourceMode !== 'server' || !folderQuickEditPath || !canEditServerFolders) {
+      setFolderQuickApprovedUsers([]);
+      setFolderQuickAccountAccess({});
+      setFolderQuickParentAccess({ visibleToUsers: true, visibleToAdmins: true, accounts: {} });
+      return;
+    }
+
+    fetch(`${API_PATH}/folder-cover?path=${encodeURIComponent(folderQuickEditPath)}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        setFolderQuickEditTitle(data.title ?? '');
+        setFolderQuickEditDescription(data.description ?? '');
+        setFolderQuickVisibleToUsers(data.visibleToUsers ?? true);
+        setFolderQuickVisibleToAdmins(data.visibleToAdmins ?? true);
+        setFolderQuickApprovedUsers(data.approvedUsers || []);
+        setFolderQuickAccountAccess(data.accountAccess || {});
+        setFolderQuickParentAccess({
+          visibleToUsers: data.parentAccess?.visibleToUsers ?? true,
+          visibleToAdmins: data.parentAccess?.visibleToAdmins ?? true,
+          accounts: data.parentAccess?.accounts || {},
+        });
+      })
+      .catch(() => {
+        setFolderQuickApprovedUsers([]);
+        setFolderQuickAccountAccess({});
+        setFolderQuickParentAccess({ visibleToUsers: true, visibleToAdmins: true, accounts: {} });
+      });
+  }, [sourceMode, folderQuickEditPath, canEditServerFolders]);
 
   useEffect(() => {
     if (!currentPath) {
       setSiblingFolders([]);
+      return;
+    }
+
+    if (sourceMode === 'local') {
+      const parentPath = dirname(currentPath);
+      const lookupPath = parentPath === 'root' ? '' : parentPath;
+      setSiblingFolders(buildLocalFolderEntries(localLibraryEntries, lookupPath));
       return;
     }
 
@@ -1369,10 +1861,10 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, [currentPath]);
+  }, [sourceMode, currentPath, localLibraryEntries]);
 
   useEffect(() => {
-    if (!locationReady || isSharedView || !locationHydratedRef.current) {
+    if (!locationReady || isSharedView || sourceMode === 'local' || !locationHydratedRef.current) {
       historyModeRef.current = 'replace';
       return;
     }
@@ -1425,16 +1917,17 @@ export default function App() {
     selectedList,
     debouncedSearch,
     selectedImage,
+    sourceMode,
   ]);
 
   useEffect(() => {
-    if (!locationReady || isSharedView || !currentPath || isGlobalSearch) {
+    if (!locationReady || isSharedView || sourceMode === 'local' || !currentPath || isGlobalSearch) {
       return;
     }
 
     lastFolderPathRef.current = currentPath;
     saveLastFolderPath(currentPath);
-  }, [locationReady, isSharedView, currentPath, isGlobalSearch]);
+  }, [locationReady, isSharedView, sourceMode, currentPath, isGlobalSearch]);
 
   useEffect(() => {
     if (page > computedTotalPages) {
@@ -1557,6 +2050,39 @@ export default function App() {
       return;
     }
 
+    if (sourceMode === 'local') {
+      const localEntry = localLibraryEntries.find(entry => entry.path === selectedImage) || entries.find(entry => entry.path === selectedImage);
+      setImageDetail({
+        title: '',
+        description: '',
+        ai_description: '',
+        tags: [],
+        exif: {
+          type: localEntry?.kind || 'image',
+          format: extensionOf(selectedImage).replace('.', '').toUpperCase() || 'FILE',
+          size: localEntry?.size || 0,
+          width: null,
+          height: null,
+          mode: null,
+          frames: null,
+          orientation: null,
+          cameraMake: null,
+          cameraModel: null,
+          capturedAt: null,
+        },
+      });
+      setImageDetailState('ready');
+      setImageMeta({
+        type: localEntry?.kind || 'image',
+        size: localEntry?.size || 0,
+        width: 0,
+        height: 0,
+      });
+      setImageMetaState('ready');
+      setShowEditBox(false);
+      return;
+    }
+
     setImageMeta(null);
     setImageMetaState('loading');
     setImageDetail(null);
@@ -1591,7 +2117,7 @@ export default function App() {
         setImageDetailState('unavailable');
         setImageMetaState('unavailable');
       });
-  }, [selectedImage]);
+  }, [selectedImage, sourceMode, localLibraryEntries, entries]);
 
   useEffect(() => {
     if (imageDetailState === 'ready' && imageDetail) {
@@ -1619,12 +2145,13 @@ export default function App() {
 
   const getTagState = (tagName: string) => {
     const selectedList = Array.from(selectedImages);
-    const visibleSelected = selectedList.filter(path => entries.some(e => e.path === path));
+    const sourceEntries = sourceMode === 'local' ? localLibraryEntries : entries;
+    const visibleSelected = selectedList.filter(path => sourceEntries.some(e => e.path === path) || selectedMetadata[path]);
     
     if (visibleSelected.length === 0) return { checked: false, indeterminate: false };
     
     const count = visibleSelected.filter(path => {
-      const entry = entries.find(e => e.path === path);
+      const entry = sourceEntries.find(e => e.path === path) || selectedMetadata[path];
       return entry?.tags?.includes(tagName) || false;
     }).length;
     
@@ -1640,18 +2167,34 @@ export default function App() {
     
     const { checked } = getTagState(tag);
     const action = checked ? 'remove' : 'add';
-    
-    setEntries(prev => prev.map(entry => {
-      if (selectedImages.has(entry.path)) {
-        const tags = entry.tags || [];
-        if (action === 'add' && !tags.includes(tag)) {
-          return { ...entry, tags: [...tags, tag] };
-        } else if (action === 'remove') {
-          return { ...entry, tags: tags.filter(t => t !== tag) };
-        }
+    const updateEntryTags = (entry: MediaEntry) => {
+      if (!selectedImages.has(entry.path)) {
+        return entry;
+      }
+
+      const tags = entry.tags || [];
+      if (action === 'add' && !tags.includes(tag)) {
+        return { ...entry, tags: [...tags, tag] };
+      }
+      if (action === 'remove') {
+        return { ...entry, tags: tags.filter(t => t !== tag) };
       }
       return entry;
-    }));
+    };
+    
+    setEntries(prev => prev.map(updateEntryTags));
+    setSelectedMetadata(prev => Object.fromEntries(
+      Object.entries(prev).map(([path, entry]) => [path, updateEntryTags(entry)])
+    ));
+
+    if (sourceMode === 'local') {
+      const nextLibraryEntries = localLibraryEntries.map(updateEntryTags);
+      const nextTagSet = new Set<string>();
+      nextLibraryEntries.forEach(entry => (entry.tags || []).forEach(entryTag => nextTagSet.add(entryTag)));
+      setLocalLibraryEntries(nextLibraryEntries);
+      setAllTags(Array.from(nextTagSet).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })));
+      return;
+    }
     
     try {
       const res = await fetch(`${API_PATH}/bulk-tags`, {
@@ -1709,6 +2252,10 @@ export default function App() {
       }
       return s;
     }));
+
+    if (sourceMode === 'local') {
+      return;
+    }
     
     try {
       const res = await fetch(`${API_PATH}/share/${shareId}`, {
@@ -1751,6 +2298,20 @@ export default function App() {
     if (!cleanTitle) return;
     
     const selectedList = Array.from(selectedImages);
+
+    if (sourceMode === 'local') {
+      const localShare = {
+        id: `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        title: cleanTitle,
+        images: selectedList,
+        itemCount: selectedList.length,
+        created_at: new Date().toISOString(),
+      };
+      setAllShares(prev => sortSharesNewestFirst([localShare, ...prev]));
+      setListSearch('');
+      setShowListsPopover(false);
+      return;
+    }
     
     try {
       const res = await fetch(`${API_PATH}/share`, {
@@ -2006,6 +2567,24 @@ export default function App() {
     if (options.files.length === 0) return;
     setIsDownloading(true);
     try {
+      if (sourceMode === 'local') {
+        for (const file of options.files) {
+          const url = localObjectUrls[file.original];
+          if (!url) {
+            continue;
+          }
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = file.newName || basename(file.original);
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          await new Promise(resolve => window.setTimeout(resolve, 60));
+        }
+        setView('gallery');
+        return;
+      }
+
       const res = await fetch(`${API_PATH}/download`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2341,6 +2920,9 @@ export default function App() {
           isDownloading={isDownloading}
           onOpenLightbox={openLightbox}
           isLargeMap={isLargeMap}
+          isLocalMode={sourceMode === 'local'}
+          getPreviewUrl={getResolvedThumbUrl}
+          getOriginalUrl={getResolvedImageUrl}
         />
       ) : (
         <>
@@ -2419,6 +3001,14 @@ export default function App() {
         <div className="shell-gutter shell-gutter--right" />
       </div>
 
+      <input
+        ref={localFolderInputRef}
+        type="file"
+        multiple
+        onChange={handleLocalFolderInputChange}
+        className="hidden"
+      />
+
       <main className="peri-shell__body text-[15px]">
         {!showPrivateGate && (
           <div className="peri-toolbar-divider mb-6 flex flex-col gap-1 pb-2">
@@ -2480,116 +3070,135 @@ export default function App() {
                   }
                   setPage(1);
                 }}
-                className={`peri-control-label ${isMaxMode ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] hover:text-black'}`}
+                className={`peri-control-label ml-3 ${isMaxMode ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] hover:text-black'}`}
               >
                 Max Mode
               </button>
-              <label className="peri-control-label flex items-center gap-2 cursor-pointer hover:text-black transition-colors whitespace-nowrap">
-                <input
-                  type="checkbox"
-                  checked={includeOtherFiles}
-                  onChange={event => {
-                    setIncludeOtherFiles(event.target.checked);
-                    setPage(1);
-                  }}
-                  className="w-4 h-4 shrink-0 accent-black border-[2px] border-[#666]"
-                />
-                <span className="whitespace-nowrap">Include Others</span>
-              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setIncludeOtherFiles(prev => !prev);
+                  setPage(1);
+                }}
+                className={`peri-control-label ml-5 ${includeOtherFiles ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] hover:text-black'}`}
+              >
+                Include Others
+              </button>
             </div>
 
-            <div className="peri-toolbar-group">
-              <span className="peri-control-label">Share Code</span>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  maxLength={4}
-                  placeholder="CODE"
-                  value={shareCodeInput}
-                  onChange={e => {
-                    setShareCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
-                    if (shareCodeError) setShareCodeError('');
-                    if (shareCodeNotice) setShareCodeNotice('');
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && shareCodeInput.length === 4 && !isValidatingCode) {
-                      handleOpenShareCode();
-                    }
-                  }}
-                  className="peri-input px-2 py-0.5 text-[13px] uppercase w-16 text-center font-sans placeholder:text-gray-300"
+            {sourceMode === 'server' && (
+              <div className="peri-toolbar-group">
+                <span className="peri-control-label">Share Code</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    maxLength={4}
+                    placeholder="CODE"
+                    value={shareCodeInput}
+                    onChange={e => {
+                      setShareCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                      if (shareCodeError) setShareCodeError('');
+                      if (shareCodeNotice) setShareCodeNotice('');
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && shareCodeInput.length === 4 && !isValidatingCode) {
+                        handleOpenShareCode();
+                      }
+                    }}
+                  className="peri-input px-2 py-0.5 text-[11px] uppercase w-16 text-center font-sans placeholder:text-gray-300"
                 />
                 <button
                   onClick={handleOpenShareCode}
                   disabled={shareCodeInput.length !== 4 || isValidatingCode}
-                  className="peri-button px-2 py-0.5 text-[13px] uppercase disabled:opacity-50 min-w-[32px] text-center"
+                  className="peri-button px-2 py-0.5 text-[11px] uppercase disabled:opacity-50 min-w-[32px] text-center"
                 >
                   {isValidatingCode ? '...' : 'Go'}
                 </button>
                 <button
                   onClick={handleLoadShareCode}
                   disabled={shareCodeInput.length !== 4 || isValidatingCode}
-                  className="peri-button--secondary px-2 py-0.5 text-[13px] uppercase disabled:opacity-50 min-w-[52px] text-center"
+                  className="peri-button--secondary px-2 py-0.5 text-[11px] uppercase disabled:opacity-50 min-w-[52px] text-center"
                 >
                   Load
                 </button>
+                </div>
+                {shareCodeError && (
+                  <span className="text-red-600 font-bold text-[11px] uppercase ml-1 animate-pulse">
+                    {shareCodeError}
+                  </span>
+                )}
               </div>
-              {shareCodeError && (
-                <span className="text-red-600 font-bold text-[11px] uppercase ml-1 animate-pulse">
-                  {shareCodeError}
-                </span>
-              )}
-            </div>
+            )}
           </div>
 
               <div className="peri-inline-actions gap-4">
               <div className="peri-toolbar-group">
-                <span className="peri-control-label">Global Tag</span>
-                <select
-                  value={selectedTag}
-                  onChange={e => {
-                    setSelectedTag(e.target.value);
-                    setSelectedList('');
-                    setSearchQuery('');
-                    setDebouncedSearch('');
-                    setPage(1);
-                  }}
-                    className="peri-select px-2 py-0.5 text-[11px] cursor-pointer"
+                <span className="peri-control-label">Library</span>
+                <button
+                  type="button"
+                  onClick={resetToServerLibrary}
+                  className={`peri-toggle px-2 py-0.5 text-[10px] uppercase ${sourceMode === 'server' ? 'is-active' : ''}`}
                 >
-                  <option value="">All Items</option>
-                  {allTags.map(tag => (
-                    <option key={tag} value={tag}>
-                      #{tag}
-                    </option>
-                  ))}
-                </select>
-                {selectedTag && (
-                  <span className="text-[10px] text-[#8A5A44]">
-                    showing matches across all folders
-                  </span>
-                )}
+                  Server Library
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleOpenLocalFolder()}
+                  className={`peri-toggle px-2 py-0.5 text-[10px] uppercase max-w-[220px] truncate ${sourceMode === 'local' ? 'is-active' : ''}`}
+                  title={sourceMode === 'local' ? 'Change local folder' : 'Open local folder'}
+                >
+                  {sourceMode === 'local' ? (localFolderLabel || 'Local Folder') : 'Open Local Folder'}
+                </button>
               </div>
 
-              <div className="peri-toolbar-group">
-                <span className="peri-control-label">Filter by List</span>
-                <select
-                  value={selectedList}
-                  onChange={e => {
-                    setSelectedList(e.target.value);
-                    setSelectedTag('');
-                    setSearchQuery('');
-                    setDebouncedSearch('');
-                    setPage(1);
-                  }}
-                    className="peri-select px-2 py-0.5 text-[11px] cursor-pointer"
-                >
-                  <option value="">All Items</option>
-                  {allShares.map(share => (
-                    <option key={share.id} value={share.id}>
-                      {share.title || share.id}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div className="peri-toolbar-group">
+                  <span className="peri-control-label">Global Tag</span>
+                  <select
+                    value={selectedTag}
+                    onChange={e => {
+                      setSelectedTag(e.target.value);
+                      setSelectedList('');
+                      setSearchQuery('');
+                      setDebouncedSearch('');
+                      setPage(1);
+                    }}
+                      className="peri-select px-2 py-0.5 text-[11px] cursor-pointer"
+                  >
+                    <option value="">All Items</option>
+                    {allTags.map(tag => (
+                      <option key={tag} value={tag}>
+                        #{tag}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedTag && (
+                    <span className="text-[10px] text-[#8A5A44]">
+                      showing matches across all folders
+                    </span>
+                  )}
+                </div>
+
+                <div className="peri-toolbar-group">
+                  <span className="peri-control-label">Filter by List</span>
+                  <select
+                    value={selectedList}
+                    onChange={e => {
+                      setSelectedList(e.target.value);
+                      setSelectedTag('');
+                      setSearchQuery('');
+                      setDebouncedSearch('');
+                      setPage(1);
+                    }}
+                      className="peri-select px-2 py-0.5 text-[11px] cursor-pointer"
+                  >
+                    <option value="">All Items</option>
+                    {allShares.map(share => (
+                      <option key={share.id} value={share.id}>
+                        {share.title || share.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
               <div className="peri-toolbar-group">
                 <span className="peri-control-label">Search</span>
@@ -2636,7 +3245,7 @@ export default function App() {
 
             </div>
 
-            <div className="peri-toolbar-group mt-0.5 flex-wrap sm:flex-nowrap">
+            <div className="peri-toolbar-group min-h-[26px] flex-wrap sm:flex-nowrap">
               <span className="peri-control-label">Selection</span>
               <button onClick={handleSelectAll} className="font-sans text-[0.82rem] font-semibold text-[#6a716b] hover:text-black">Select Page</button>
               <button onClick={handleDeselectAll} className="font-sans text-[0.82rem] font-semibold text-[#6a716b] hover:text-black">Deselect Page</button>
@@ -2976,7 +3585,7 @@ export default function App() {
                 </button>
               </div>
             )}
-            {(folderTitleInput.trim() || folderDescriptionInput.trim() || authStatus?.user?.isAdmin) && (
+            {(folderTitleInput.trim() || folderDescriptionInput.trim() || canEditServerFolders) && (
               <div className="mt-2 flex flex-wrap items-start gap-x-3 gap-y-1 text-[11px] font-sans">
                 <div className="min-w-0 max-w-full flex flex-col gap-0.5">
                   {folderTitleInput.trim() && (
@@ -2990,13 +3599,15 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                {currentPath && authStatus?.user?.isAdmin && (
+                {currentPath && canEditServerFolders && (
                   <button
                     type="button"
                     onClick={() => {
                       setFolderQuickEditPath(currentPath);
                       setFolderQuickEditTitle(folderTitleInput);
                       setFolderQuickEditDescription(folderDescriptionInput);
+                      setFolderQuickVisibleToUsers(folderQuickVisibleToUsers);
+                      setFolderQuickVisibleToAdmins(folderQuickVisibleToAdmins);
                       setFolderQuickEditStatus('idle');
                     }}
                     className="text-[10px] font-bold uppercase tracking-widest text-[#888] hover:text-black transition-colors underline"
@@ -3050,7 +3661,7 @@ export default function App() {
                   className="peri-card relative flex flex-col overflow-hidden group text-left cursor-pointer touch-manipulation flex-1 min-w-[240px] max-w-[420px]"
                   style={{ flexBasis: 'clamp(240px, 24vw, 380px)' }}
                 >
-                  {authStatus?.user?.isAdmin && (
+                  {canEditServerFolders && (
                     <button
                       type="button"
                       onClick={event => {
@@ -3058,6 +3669,8 @@ export default function App() {
                         setFolderQuickEditPath(folder.path);
                         setFolderQuickEditTitle(folder.title || '');
                         setFolderQuickEditDescription(folder.description || '');
+                        setFolderQuickVisibleToUsers(folder.visibleToUsers);
+                        setFolderQuickVisibleToAdmins(folder.visibleToAdmins);
                         setFolderQuickEditStatus('idle');
                       }}
                        className="absolute right-2 top-2 z-10 rounded-full border border-[#d4d4d8] bg-white/95 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-black opacity-0 transition-opacity group-hover:opacity-100 hover:border-[#9faab4] hover:bg-[#f8fafc]"
@@ -3091,13 +3704,13 @@ export default function App() {
                               {previewPath && previewKind === 'image' ? (
                                 <>
                                   <img
-                                    src={buildThumbUrl(previewPath, folderThumbnailHeight, folderThumbnailHeight * 2, slotRetryToken)}
+                                    src={getResolvedThumbUrl(previewPath, folderThumbnailHeight, folderThumbnailHeight * 2, slotRetryToken)}
                                     alt={`${folder.name} ${slot}`}
                                     loading="lazy"
                                     referrerPolicy="no-referrer"
                                     className="h-full w-full object-cover"
                                     onLoad={handleImageLoad}
-                                    onError={(event) => handleThumbImageError(event, buildImageUrl(previewPath, slotRetryToken))}
+                                    onError={(event) => handleThumbImageError(event, getResolvedImageUrl(previewPath, slotRetryToken))}
                                   />
                                   <div
                                     data-image-fallback
@@ -3219,7 +3832,9 @@ export default function App() {
             </div>
             <h2 className="font-sans text-2xl font-bold uppercase mb-3">{includeOtherFiles ? 'No files found' : 'No images found'}</h2>
             <p className="font-sans text-lg leading-relaxed">
-              Drop {includeOtherFiles ? 'files' : 'image files'} into the <code className="bg-white border border-[#666] px-1.5 py-0.5 text-sm font-sans">images</code> folder on the backend.
+              {sourceMode === 'local'
+                ? 'Choose a local folder to browse files from your own computer in this session.'
+                : <>Drop {includeOtherFiles ? 'files' : 'image files'} into the <code className="bg-white border border-[#666] px-1.5 py-0.5 text-sm font-sans">images</code> folder on the backend.</>}
             </p>
           </div>
         ) : (
@@ -3257,13 +3872,13 @@ export default function App() {
                   ) : entry.kind === 'image' && isRenderable(entry.path) ? (
                     <>
                       <img
-                        src={buildThumbUrl(entry.path, rowHeight, rowHeight * 2, retryToken)}
+                        src={getResolvedThumbUrl(entry.path, rowHeight, rowHeight * 2, retryToken)}
                         alt={entry.path}
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         className="h-full w-auto object-contain p-2"
                         onLoad={handleImageLoad}
-                        onError={(event) => handleThumbImageError(event, buildImageUrl(entry.path, retryToken))}
+                        onError={(event) => handleThumbImageError(event, getResolvedImageUrl(entry.path, retryToken))}
                       />
                       <div
                         data-image-fallback
@@ -3418,6 +4033,122 @@ export default function App() {
                 />
               </label>
 
+              <div className="peri-card__divider border-[1px] border-[#d4d4d8] bg-[#fafafa] px-3 py-3">
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#888]">Access</div>
+                <div className="grid gap-2 font-sans text-[12px] font-bold uppercase tracking-wider text-black sm:grid-cols-3">
+                  {folderQuickParentAccess.visibleToUsers ? (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={folderQuickVisibleToUsers}
+                        onChange={event => setFolderQuickVisibleToUsers(event.target.checked)}
+                        className="h-4 w-4 accent-black"
+                      />
+                      User
+                    </label>
+                  ) : (
+                    <div className="flex items-center gap-2 text-[#888]">
+                      <Minus size={14} strokeWidth={2.25} />
+                      User inherited off
+                    </div>
+                  )}
+                  {folderQuickParentAccess.visibleToAdmins ? (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={folderQuickVisibleToAdmins}
+                        onChange={event => setFolderQuickVisibleToAdmins(event.target.checked)}
+                        className="h-4 w-4 accent-black"
+                      />
+                      Reg Admin
+                    </label>
+                  ) : (
+                    <div className="flex items-center gap-2 text-[#888]">
+                      <Minus size={14} strokeWidth={2.25} />
+                      Reg Admin inherited off
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-[#666]">
+                    <Check size={14} strokeWidth={2.25} />
+                    Pref Admin
+                  </div>
+                </div>
+                <div className="mt-3 border-t border-[#d4d4d8] pt-3">
+                  <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#888]">Approved Accounts</div>
+                  {folderQuickApprovedUsers.length === 0 ? (
+                    <p className="font-sans text-[12px] text-[#777]">No approved accounts are available.</p>
+                  ) : (
+                    <div className="grid gap-2 font-sans text-[12px] sm:grid-cols-2">
+                      {folderQuickApprovedUsers.map(user => {
+                        const userId = String(user.id);
+                        const parentAllowsAccount = folderQuickParentAccess.accounts[userId] ?? true;
+                        const locked = Boolean(user.isOwner) || !parentAllowsAccount;
+                        const levelAllowsAccount = user.isAdmin ? folderQuickVisibleToAdmins : folderQuickVisibleToUsers;
+                        const currentMode = folderQuickAccountAccess[userId];
+                        const inheritedLabel = levelAllowsAccount ? 'Inherit: allowed' : 'Inherit: denied';
+                        const effectiveLabel = user.isOwner
+                          ? 'Always allowed'
+                          : !parentAllowsAccount
+                            ? 'Inherited deny from parent'
+                            : currentMode === 'allow'
+                              ? 'Explicit allow'
+                              : currentMode === 'deny'
+                                ? 'Explicit deny'
+                                : inheritedLabel;
+                        const role = user.isOwner ? 'Pref Admin' : user.isAdmin ? 'Reg Admin' : 'User';
+                        const setAccountMode = (mode: FolderAccountAccessMode | 'inherit') => {
+                          setFolderQuickAccountAccess(prev => {
+                            const next = { ...prev };
+                            if (mode === 'inherit') {
+                              delete next[userId];
+                            } else {
+                              next[userId] = mode;
+                            }
+                            return next;
+                          });
+                        };
+
+                        return (
+                          <div
+                            key={userId}
+                            className={`flex flex-col gap-2 border border-[#d4d4d8] bg-white px-2.5 py-2 ${locked ? 'text-[#999]' : 'text-black'}`}
+                          >
+                            <div className="min-w-0">
+                              <span className="block truncate font-bold">{user.username}</span>
+                              <span className="block text-[10px] uppercase tracking-wider text-[#888]">
+                                {role} / {effectiveLabel}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 text-[9px] font-bold uppercase tracking-widest">
+                              {(['inherit', 'allow', 'deny'] as const).map(mode => {
+                                const active = mode === 'inherit' ? currentMode == null : currentMode === mode;
+                                return (
+                                  <button
+                                    key={mode}
+                                    type="button"
+                                    disabled={locked}
+                                    onClick={() => setAccountMode(mode)}
+                                    className={`border px-2 py-1 transition-colors ${
+                                      active
+                                        ? mode === 'deny'
+                                          ? 'border-[#8A1F1F] bg-[#F6E2E2] text-[#8A1F1F]'
+                                          : 'border-black bg-black text-white'
+                                        : 'border-[#d4d4d8] bg-[#fafafa] text-[#777] hover:border-black hover:text-black'
+                                    } disabled:border-[#d4d4d8] disabled:bg-[#f2f2f2] disabled:text-[#aaa] disabled:cursor-not-allowed`}
+                                  >
+                                    {mode}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
                 <button
                   onClick={saveQuickFolderDetails}
@@ -3538,11 +4269,11 @@ export default function App() {
           {/* Top fixed bar for close and download options to ensure they always stay visible and touch-accessible */}
           <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
             <a
-              href={`${API_PATH}/download/${encodeURI(selectedImage)}`}
-              download
+              href={sourceMode === 'local' ? (localObjectUrls[selectedImage] || '#') : `${API_PATH}/download/${encodeURI(selectedImage)}`}
+              download={basename(selectedImage)}
               onClick={e => e.stopPropagation()}
               className="p-2 bg-white border-[2px] border-black hover:bg-black hover:text-white transition-colors flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-              title="Download File"
+              title={sourceMode === 'local' ? 'Download Local File' : 'Download File'}
             >
               <Download size={20} strokeWidth={2.5} />
             </a>
@@ -3573,8 +4304,8 @@ export default function App() {
                   const showFullImage = !isSelectedImageLarge || forceFullImage[selectedImage || ''];
 
                   const imageUrl = showFullImage
-                    ? buildImageUrl(selectedImage || '')
-                    : buildMediaUrl(selectedImage || '');
+                    ? getResolvedImageUrl(selectedImage || '')
+                    : getResolvedMediaUrl(selectedImage || '');
 
                   return (
                     <div className="flex flex-col items-center gap-3 max-w-full">
@@ -3633,24 +4364,24 @@ export default function App() {
             {selectedImage && (
               <div className="w-full max-w-2xl bg-white border-[2px] border-black px-3 py-1.5 font-sans text-[10px] sm:text-xs shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between gap-2">
                 <div className="truncate flex-1">
-                  <span className="text-[#888] uppercase font-bold tracking-wider mr-1">Direct URL:</span>
+                  <span className="text-[#888] uppercase font-bold tracking-wider mr-1">{sourceMode === 'local' ? 'Local File:' : 'Direct URL:'}</span>
                   <a 
-                    href={buildImageUrl(selectedImage)} 
+                    href={getResolvedImageUrl(selectedImage)} 
                     className="text-black hover:underline font-bold" 
                     target="_blank" 
                     rel="noopener noreferrer"
                   >
-                    {buildImageUrl(selectedImage)}
+                    {sourceMode === 'local' ? selectedImage : getResolvedImageUrl(selectedImage)}
                   </a>
                 </div>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(buildImageUrl(selectedImage));
+                    navigator.clipboard.writeText(sourceMode === 'local' ? selectedImage : getResolvedImageUrl(selectedImage));
                     setCopiedImageLink(true);
                     setTimeout(() => setCopiedImageLink(false), 2000);
                   }}
                   className="shrink-0 hover:bg-gray-100 p-1 border border-transparent hover:border-black active:bg-gray-200 transition-all flex items-center justify-center"
-                  title="Copy direct URL to clipboard"
+                  title={sourceMode === 'local' ? 'Copy local file path' : 'Copy direct URL to clipboard'}
                 >
                   {copiedImageLink ? (
                     <Check size={14} className="text-green-600 font-bold" strokeWidth={3} />
@@ -3661,7 +4392,7 @@ export default function App() {
               </div>
             )}
 
-            {selectedImage && isRenderable(selectedImage) && currentPath && authStatus?.user?.isAdmin && (
+            {selectedImage && isRenderable(selectedImage) && currentPath && canEditServerFolders && (
               <div className="w-full max-w-2xl border-[2px] border-black bg-[#F9F9F9] p-3 flex flex-col gap-3 font-sans text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex flex-col gap-0.5 min-w-0">

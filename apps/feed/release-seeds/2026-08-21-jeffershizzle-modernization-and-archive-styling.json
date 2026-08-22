@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Jeffershizzle archive modernization & styling tuning",
+  "content": "<p>Jeffershizzle completed a major modernization and visual refinement pass to faithfully reproduce the original photography archive aesthetic within a modern Vite-powered SPA.</p><p>Highlights:</p><ul><li><strong>Vite Integration & ES Modules:</strong> Converted the project to an npm/Vite architecture with ES module exports, unified dev/prod Cloudflare Tunnel image API routing, and lightning-fast sub-second builds.</li><li><strong>Archive Typography & Spacing:</strong> Recreated the signature legacy layout with Source Serif 4 (500 weight), tight negative tracking, zero vertical gaps against 44px fixed header/footer banners, and an exact 2px photo grid gap across all gallery formations.</li><li><strong>Browse Navigation Tuning:</strong> Added an archive header (<em>\"this is an archive, modernized with artificial intelligence, slightly imperfect.\"</em>), enlarged category typography (+4pt to 25px), anchored category titles to the right, and added a dedicated left-aligned \"back.\" link when browsing galleries with unlinked photo views.</li><li><strong>Asset & Landing Management:</strong> Safely archived landing background #78 into <code>_archived/</code>, configured dynamic active-list selection across 91 landing images, and updated the site favicon and bookmark preview from the server asset repository.</li></ul>",
+  "url": "https://jeffershizzle.com/",
+  "source": "manual",
+  "external_id": "jeffershizzle-modernization-archive-styling-2026-08-21",
+  "created_at": "2026-08-21 10:00:00"
+}

@@ -116,12 +116,13 @@ function publishDist(appConfig, deployConfig) {
 
 function isJeffersonwmRootSupportFile(relativePath) {
   return (
-    relativePath === '.htaccess' ||
-    relativePath === 'versions.json' ||
-    relativePath.startsWith('account/') ||
-    relativePath.startsWith('status/') ||
-    relativePath.startsWith('development/') ||
-    /^map\d+\.(?:png|jpe?g|webp)$/i.test(relativePath) ||
+      relativePath === '.htaccess' ||
+      relativePath === 'versions.json' ||
+      relativePath.startsWith('account/') ||
+      relativePath.startsWith('project-activity/') ||
+      relativePath.startsWith('status/') ||
+      relativePath.startsWith('development/') ||
+      /^map\d+\.(?:png|jpe?g|webp)$/i.test(relativePath) ||
     /^bookmark-preview\.(?:png|jpe?g|webp)$/i.test(relativePath)
   );
 }

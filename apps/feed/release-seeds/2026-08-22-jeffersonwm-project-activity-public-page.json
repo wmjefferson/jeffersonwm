@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "JeffersonWM Project Activity public timeline",
+  "content": "<p>JeffersonWM now has a public <strong>Project Activity</strong> page that turns the GitHub project board into a live timeline surface on the site itself. This pass focused on making project work legible to visitors without leaking private or archived repo data.</p><p>What changed:</p><ul><li><strong>Public project timeline:</strong> JeffersonWM now reads the public GitHub project through its own backend and renders issue durations directly on a dedicated public page.</li><li><strong>Real workflow colors:</strong> issue lines now inherit the project board categories directly, so <code>Backlog</code>, <code>Ready</code>, <code>In Progress</code>, <code>Blocked</code>, and <code>Done</code> read visually without inventing a second status layer.</li><li><strong>Cleaner public layout:</strong> repo/state filter controls were removed, the extra lower issues block was commented out for later, the date labels were moved to the top of the chart, and subtle row-hover highlighting now helps long lines stay connected to their issue titles.</li></ul><p>The resulting page is less like an admin dashboard and more like a public working map of JeffersonWM development. It stays current from the JeffersonWM API while filtering private and archived repositories out before the browser ever sees them.</p>",
+  "url": "https://jeffersonwm.com/project-activity/",
+  "source": "manual",
+  "external_id": "jeffersonwm-project-activity-public-page-2026-08-22",
+  "created_at": "2026-08-22 09:30:00"
+}

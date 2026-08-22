@@ -159,6 +159,9 @@ interface StagingViewProps {
   isDownloading: boolean;
   onOpenLightbox: (img: string) => void;
   isLargeMap?: Record<string, boolean>;
+  isLocalMode?: boolean;
+  getPreviewUrl?: (path: string, height: number, width?: number, cacheBust?: number) => string;
+  getOriginalUrl?: (path: string, cacheBust?: number) => string;
 }
 
 export interface DownloadOptions {
@@ -186,6 +189,9 @@ export default function StagingView({
   isDownloading,
   onOpenLightbox,
   isLargeMap,
+  isLocalMode = false,
+  getPreviewUrl,
+  getOriginalUrl,
 }: StagingViewProps) {
   const [rules, setRules] = useState<Rule[]>([{ id: '1', type: 'original', value: '' }]);
   const [enableRenaming, setEnableRenaming] = useState<boolean>(false);
@@ -334,6 +340,7 @@ export default function StagingView({
             <X size={12} strokeWidth={2.5} />
             Clear Selection
           </button>
+          {!isLocalMode && (
           <div className="relative">
             <button 
               onClick={() => setShowTitlePopup(!showTitlePopup)}
@@ -396,6 +403,7 @@ export default function StagingView({
               </div>
             )}
           </div>
+          )}
           <button 
             onClick={handleDownloadClick}
             disabled={isDownloading || selectedForDownload.size === 0}
@@ -631,13 +639,13 @@ export default function StagingView({
                   ) : isRenderable(img) ? (
                     <>
                       <img 
-                        src={buildThumbUrl(img, 240, 480, retryToken)} 
+                        src={getPreviewUrl ? getPreviewUrl(img, 240, 480, retryToken) : buildThumbUrl(img, 240, 480, retryToken)} 
                         alt={img} 
                         loading="lazy" 
                         referrerPolicy="no-referrer" 
                         className="h-full w-auto object-contain"
                         onLoad={handleImageLoad}
-                        onError={(event) => handleThumbImageError(event, `${APIBASE}/images/${encodeAssetPath(img)}?r=${retryToken}`)}
+                        onError={(event) => handleThumbImageError(event, getOriginalUrl ? getOriginalUrl(img, retryToken) : `${APIBASE}/images/${encodeAssetPath(img)}?r=${retryToken}`)}
                       />
                       <div
                         data-image-fallback

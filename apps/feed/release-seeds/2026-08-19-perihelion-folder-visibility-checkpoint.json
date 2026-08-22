@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Perihelion folder visibility checkpoint",
+  "content": "<p>Perihelion can already hide folders globally by naming them with a leading dot, but true account-aware folder visibility is not wired yet.</p><p>What worked:</p><ul><li><strong>Blunt folder hiding already exists:</strong> the backend only lists visible names, so dot-prefixed folders stay out of the normal browser view.</li><li><strong>Auth and membership checks already exist:</strong> Perihelion has the right account scaffolding in place to support more selective folder rules later.</li></ul><p>What did not exist yet:</p><ul><li><strong>No folder-level ACLs:</strong> there is no visibility flag or folder permission table yet.</li><li><strong>No account-based folder filtering:</strong> the current listing path does not hide folders by role or username.</li></ul><p>The suggested next step was to add a simple folder visibility field first, likely something like public, approved, admin, or hidden, and only move to user-specific folder permissions if the project actually needs that extra control.</p>",
+  "url": "https://jeffersonwm.com/perihelion/",
+  "source": "manual",
+  "external_id": "perihelion-folder-visibility-checkpoint-2026-08-19",
+  "created_at": "2026-08-19 21:20:00"
+}

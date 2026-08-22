@@ -112,14 +112,14 @@ function parseEnvFile(filePath) {
 
 function getEnvDefaults() {
   return {
-    ...parseEnvFile(path.join(appRoot, '.env.development')),
     ...parseEnvFile(path.join(appRoot, '.env.production')),
+    ...parseEnvFile(path.join(appRoot, '.env.development')),
     ...process.env,
   };
 }
 
 function normalizeFilePath(value) {
-  return value.replace(/^['"]|['"]$/g, '').trim().replace(/\\\\/g, '\\');
+  return value.replace(/^['"]|['"]$/g, '').trim();
 }
 
 async function pathExists(filePath) {

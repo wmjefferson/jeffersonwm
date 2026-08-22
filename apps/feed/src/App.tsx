@@ -5,6 +5,8 @@ import {
   Briefcase,
   Clock,
   Code,
+  ChevronDown,
+  ChevronUp,
   Pencil,
   ExternalLink,
   FileText,
@@ -645,6 +647,35 @@ function htmlToEditorText(html: string | null) {
   return decodeHtmlText(normalized).replace(/\n{3,}/g, '\n\n').trim();
 }
 
+function getGitHubEntryDetail(item: FeedItem) {
+  if (!item.content || typeof window === 'undefined') {
+    return null;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(item.content, 'text/html');
+  const firstParagraph = doc.querySelector('p')?.textContent?.trim();
+
+  if (!firstParagraph) {
+    return null;
+  }
+
+  if (
+    /^\d+\s+commits?\s+pushed\s+to\s+/i.test(firstParagraph) ||
+    /^created\s+/i.test(firstParagraph) ||
+    /^forked\s+to\s+/i.test(firstParagraph) ||
+    /^repository\s+forked/i.test(firstParagraph) ||
+    /^issue\s+update$/i.test(firstParagraph) ||
+    /^issue\s+comment$/i.test(firstParagraph) ||
+    /^pull\s+request\s+update$/i.test(firstParagraph) ||
+    /^pull\s+request\s+review$/i.test(firstParagraph)
+  ) {
+    return null;
+  }
+
+  return firstParagraph;
+}
+
 function releaseHtmlToHighlights(html: string | null) {
   if (!html) {
     return '';
@@ -723,6 +754,7 @@ export default function App() {
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [copiedEntryId, setCopiedEntryId] = useState<number | null>(null);
   const [highlightedEntryId, setHighlightedEntryId] = useState<number | null>(null);
+  const [expandedGitHubGroups, setExpandedGitHubGroups] = useState<string[]>([]);
   const markdownInputRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
@@ -1212,6 +1244,12 @@ export default function App() {
   const toggleSelectedSite = (siteName: string) => {
     setSelectedSites((current) =>
       current.includes(siteName) ? current.filter((item) => item !== siteName) : [...current, siteName],
+    );
+  };
+
+  const toggleExpandedGitHubGroup = (groupId: string) => {
+    setExpandedGitHubGroups((current) =>
+      current.includes(groupId) ? current.filter((item) => item !== groupId) : [...current, groupId],
     );
   };
 
@@ -2139,16 +2177,24 @@ export default function App() {
                           <div className="subfeed-item">
                             <div className="subfeed-head">
                               <h3>
-                                {group.items[0].url ? (
+                                {group.items.length > 1 ? (
+                                  <button
+                                    type="button"
+                                    className="github-group-toggle"
+                                    onClick={() => toggleExpandedGitHubGroup(group.id)}
+                                    aria-expanded={expandedGitHubGroups.includes(group.id)}
+                                  >
+                                    <span>
+                                      {cleanGitHubTitle(group.items[0].title, group.repo || '')} ({group.items.length})
+                                    </span>
+                                    {expandedGitHubGroups.includes(group.id) ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                                  </button>
+                                ) : group.items[0].url ? (
                                   <a href={group.items[0].url} target="_blank" rel="noreferrer" className="entry-title-link">
                                     {cleanGitHubTitle(group.items[0].title, group.repo || '')}
-                                    {group.items.length > 1 ? ` (${group.items.length})` : ''}
                                   </a>
                                 ) : (
-                                  <>
-                                    {cleanGitHubTitle(group.items[0].title, group.repo || '')}
-                                    {group.items.length > 1 ? ` (${group.items.length})` : ''}
-                                  </>
+                                  <>{cleanGitHubTitle(group.items[0].title, group.repo || '')}</>
                                 )}
                               </h3>
                               <div className="feed-time">
@@ -2162,10 +2208,48 @@ export default function App() {
                             </div>
 
                             {group.items.length > 1 ? (
-                              <p className="group-summary">
-                                {group.items.length} similar entries combined from{' '}
-                                {formatDate(group.items[group.items.length - 1].created_at)} to {formatDate(group.items[0].created_at)}.
-                              </p>
+                              <>
+                                <p className="group-summary">
+                                  {group.items.length} similar entries combined from{' '}
+                                  {formatDate(group.items[group.items.length - 1].created_at)} to {formatDate(group.items[0].created_at)}.
+                                </p>
+                                <AnimatePresence initial={false}>
+                                  {expandedGitHubGroups.includes(group.id) && (
+                                    <motion.div
+                                      initial={{ opacity: 0, height: 0 }}
+                                      animate={{ opacity: 1, height: 'auto' }}
+                                      exit={{ opacity: 0, height: 0 }}
+                                      transition={{ duration: 0.18 }}
+                                      className="github-group-list"
+                                    >
+                                      {group.items.map((entry) => (
+                                        <div key={entry.id} className="github-group-list-item">
+                                          <div className="github-group-list-title">
+                                            {entry.url ? (
+                                              <a href={entry.url} target="_blank" rel="noreferrer" className="entry-title-link">
+                                                {cleanGitHubTitle(entry.title, group.repo || '')}
+                                              </a>
+                                            ) : (
+                                              <span>{cleanGitHubTitle(entry.title, group.repo || '')}</span>
+                                            )}
+                                            {getGitHubEntryDetail(entry) && (
+                                              <span className="github-group-list-detail"> — {getGitHubEntryDetail(entry)}</span>
+                                            )}
+                                          </div>
+                                          <div className="feed-time github-group-list-time">
+                                            <span>{formatDate(entry.created_at)}</span>
+                                            {entry.url && (
+                                              <a href={entry.url} target="_blank" rel="noreferrer" className="icon-link">
+                                                <ExternalLink size={12} />
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </>
                             ) : (
                               group.items[0].content && (
                                 <div

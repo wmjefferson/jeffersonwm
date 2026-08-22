@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Auth notifications workflow handoff",
+  "content": "<p>Auth got a focused notifications pass today. The page now has a small set of sample triggers so it is never empty, and the owner can mute or enable notification emails one trigger at a time instead of only using one global switch.</p><p>What changed:</p><ul><li><strong>Sample triggers:</strong> added two visible example triggers so the page reads like a real notification surface before live entries arrive.</li><li><strong>Per-trigger email controls:</strong> added individual on/off toggles for each notification type, keeping the master email switch while allowing selective filtering later.</li><li><strong>Empty state cleanup:</strong> replaced the plain \"No notifications yet\" feel with guidance that the sample cards are intentionally shown first and live notifications will appear underneath them.</li></ul><p>This is now set up the way it should behave when more sites start emitting notification events: one shared auth notification surface, with fine-grained email control per event rather than a single all-or-nothing mail toggle.</p>",
+  "url": "https://auth.jeffersonwm.com/",
+  "source": "manual",
+  "external_id": "auth-notifications-workflow-handoff-2026-08-21",
+  "created_at": "2026-08-21 21:45:00"
+}

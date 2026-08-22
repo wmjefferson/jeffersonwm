@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>JeffersonWM Project Activity</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <link rel="shortcut icon" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Young+Serif&family=IBM+Plex+Sans+Condensed:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --frame: 42px;
+        --ink: #111827;
+        --line: rgba(17, 24, 39, 0.18);
+        --muted: rgba(17, 24, 39, 0.62);
+        --paper: rgba(255, 255, 255, 0.72);
+        --paper-strong: rgba(255, 255, 255, 0.92);
+        --blue: #3356d6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 102px var(--frame) var(--frame);
+        background: #fdfdfd;
+        color: var(--ink);
+        font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        position: relative;
+        isolation: isolate;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("/jeffersonwm/images/backgrounds/jeffwm-feed-lion-pattern-20260627.jpeg");
+        background-repeat: repeat;
+        background-size: 900px auto;
+        opacity: 0.05;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .topline {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: clamp(2rem, 3vw, 2.4rem);
+        font-weight: 400;
+        line-height: 1;
+      }
+
+      .filter-button {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.68);
+        color: inherit;
+        font-family: inherit;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        text-decoration: none;
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+      }
+
+      .home-link:hover,
+      .filter-button:hover {
+        border-color: rgba(17, 24, 39, 0.44);
+      }
+
+      .filter-button.is-active {
+        border-color: rgba(51, 86, 214, 0.34);
+        background: rgba(224, 232, 255, 0.75);
+        color: var(--blue);
+      }
+
+      .note,
+      .meta-line,
+      .empty-state {
+        max-width: 60rem;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+
+      .note {
+        margin: 0 0 1.25rem;
+      }
+
+      .meta-line {
+        margin: 0 0 1.5rem;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+        margin: 0 0 1.5rem;
+      }
+
+      .summary-card {
+        border: 1px solid var(--line);
+        background: var(--paper);
+        padding: 1rem;
+      }
+
+      .summary-card span {
+        display: block;
+        margin-bottom: 0.4rem;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .summary-card strong {
+        display: block;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: 2rem;
+        font-weight: 400;
+        line-height: 1;
+      }
+
+      .control-row {
+        display: flex;
+        justify-content: flex-end;
+        margin: 0 0 1.5rem;
+      }
+
+      .search-wrap {
+        min-width: min(100%, 320px);
+      }
+
+      .search-input {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.88);
+        color: inherit;
+        font: inherit;
+        padding: 0.78rem 0.9rem;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        background: var(--paper-strong);
+        margin: 0 0 1.5rem;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.95rem 1rem;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-title {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .panel-body {
+        padding: 1rem;
+      }
+
+      .timeline-wrap {
+        overflow-x: auto;
+      }
+
+      .timeline-wrap svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        min-width: 960px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 0.78rem 0.9rem;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .issue-title {
+        font-weight: 700;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.78);
+        padding: 0.18rem 0.5rem;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .status-pill.open {
+        color: #92400e;
+        background: rgba(254, 243, 199, 0.78);
+      }
+
+      .status-pill.closed {
+        color: #166534;
+        background: rgba(220, 252, 231, 0.78);
+      }
+
+      .bottom-links {
+        margin-top: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+      }
+
+      .personal-link {
+        position: relative;
+        color: #111827;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        font-family: inherit;
+        font-size: 0.92rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .personal-link::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.1rem;
+        width: 100%;
+        height: 1px;
+        background: #d4d4d4;
+        transform-origin: left;
+        transform: scaleX(0);
+        transition: transform 0.15s ease-out;
+      }
+
+      .personal-link:hover::after {
+        transform: scaleX(1);
+      }
+
+      @media (max-width: 900px) {
+        .summary-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .control-row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        body {
+          padding: 72px 24px 24px;
+        }
+
+        .topline {
+          flex-direction: column;
+        }
+
+        .bottom-links {
+          margin-top: 4rem;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .summary-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="topline">
+        <h1>Project Activity</h1>
+      </header>
+
+      <p class="note">
+        This page tracks public GitHub project issue activity across JeffersonWM repos. It updates automatically from the JeffersonWM API and excludes private and archived repositories before anything is sent to the browser.
+      </p>
+      <p class="meta-line" id="meta-line">Loading project activity...</p>
+
+      <section class="summary-grid" aria-label="Project activity summary">
+        <div class="summary-card"><span>Visible Issues</span><strong id="total-issues">--</strong></div>
+        <div class="summary-card"><span>Open</span><strong id="open-issues">--</strong></div>
+        <div class="summary-card"><span>Closed</span><strong id="closed-issues">--</strong></div>
+        <div class="summary-card"><span>Public Repos</span><strong id="repo-count">--</strong></div>
+      </section>
+
+      <section class="control-row" aria-label="Search issues">
+        <div class="search-wrap">
+          <input id="search-input" class="search-input" type="search" placeholder="Search repo, title, or issue number" />
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="timeline-title">
+        <div class="panel-header">
+          <h2 class="panel-title" id="timeline-title">Issue Durations</h2>
+        </div>
+        <div class="panel-body timeline-wrap" id="timeline-wrap">
+          <div class="empty-state">Loading timeline...</div>
+        </div>
+      </section>
+
+      <!--
+      <section class="panel" aria-labelledby="issues-title">
+        <div class="panel-header">
+          <h2 class="panel-title" id="issues-title">Issues</h2>
+          <div class="muted" id="issue-count-line">Loading issues...</div>
+        </div>
+        <div class="panel-body table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Repo</th>
+                <th>Issue</th>
+                <th>Title</th>
+                <th>State</th>
+                <th>Opened</th>
+                <th>Closed</th>
+                <th>Days</th>
+              </tr>
+            </thead>
+            <tbody id="issue-table-body">
+              <tr><td colspan="7" class="muted">Loading issues...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      -->
+    </main>
+
+    <div class="bottom-links" aria-label="Site links">
+      <a class="personal-link" href="/">Home</a>
+      <a class="personal-link" href="/status/">Status</a>
+      <a class="personal-link" href="/account/">Account</a>
+      <a class="personal-link" href="https://wmjefferson.com" target="_blank" rel="noopener noreferrer">William Jefferson</a>
+    </div>
+
+    <script>
+      const API_ORIGIN = (() => {
+        const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
+        return localHosts.has(window.location.hostname) ? "" : "https://api-jeffersonwm.jeffersonwm.com";
+      })();
+
+      const state = {
+        payload: null,
+        search: "",
+      };
+
+      const searchInput = document.getElementById("search-input");
+      const timelineWrap = document.getElementById("timeline-wrap");
+      const metaLine = document.getElementById("meta-line");
+
+      function apiUrl(path) {
+        return `${API_ORIGIN}${path}`;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function formatDate(value) {
+        if (!value) {
+          return "Open";
+        }
+
+        return new Date(value).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+
+      const CATEGORY_LINE_COLORS = {
+        backlog: "#2da44e",
+        ready: "#218bff",
+        "in progress": "#bf8700",
+        blocked: "#cf222e",
+        done: "#8250df",
+      };
+
+      function getIssueLineColor(issue) {
+        const normalizedCategory = String(issue.category || "").trim().toLowerCase();
+        if (normalizedCategory && CATEGORY_LINE_COLORS[normalizedCategory]) {
+          return CATEGORY_LINE_COLORS[normalizedCategory];
+        }
+
+        return issue.state === "OPEN" ? "#92400e" : "#166534";
+      }
+
+      function getVisibleIssues() {
+        const payload = state.payload;
+        if (!payload || !Array.isArray(payload.issues)) {
+          return [];
+        }
+
+        return payload.issues.filter((issue) => {
+          const haystack = `${issue.repo} ${issue.title} ${issue.number}`.toLowerCase();
+          const searchMatches = !state.search || haystack.includes(state.search);
+          return searchMatches;
+        });
+      }
+
+      function renderSummary() {
+        const payload = state.payload;
+        if (!payload) {
+          return;
+        }
+
+        document.getElementById("total-issues").textContent = String(payload.summary.totalIssues);
+        document.getElementById("open-issues").textContent = String(payload.summary.openIssues);
+        document.getElementById("closed-issues").textContent = String(payload.summary.closedIssues);
+        document.getElementById("repo-count").textContent = String(payload.summary.repoCount);
+        metaLine.textContent = `${payload.project.owner} / project ${payload.project.number} (${payload.project.title}) · updated ${new Date(payload.updatedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`;
+      }
+
+      function renderTimeline() {
+        const issues = getVisibleIssues();
+        if (!issues.length) {
+          timelineWrap.innerHTML = '<div class="empty-state">No issues match the current filter.</div>';
+          return;
+        }
+
+        const width = Math.max(920, timelineWrap.clientWidth - 2);
+        const leftGutter = 380;
+        const rightGutter = 32;
+        const topGutter = 34;
+        const axisHeight = 34;
+        const groupHeaderHeight = 20;
+        const rowHeight = 26;
+        const groupGap = 18;
+        const start = Math.min(...issues.map((issue) => new Date(issue.createdAt).getTime()));
+        const end = Math.max(...issues.map((issue) => new Date(issue.closedAt || Date.now()).getTime()));
+        const span = Math.max(1, end - start);
+
+        const ordered = [...issues].sort((left, right) => {
+          const repoOrder = left.repo.localeCompare(right.repo);
+          if (repoOrder !== 0) {
+            return repoOrder;
+          }
+          return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+        });
+
+        const groups = [];
+        let cursorY = topGutter;
+        ordered.forEach((issue, index) => {
+          const previousGroup = groups[groups.length - 1];
+          let group = previousGroup;
+
+          if (!group || group.name !== issue.repo) {
+            group = { name: issue.repo, labelY: cursorY + 12, items: [] };
+            groups.push(group);
+            cursorY += groupHeaderHeight;
+          }
+
+          group.items.push({ issue, y: cursorY + (rowHeight / 2) });
+          cursorY += rowHeight;
+
+          if (ordered[index + 1]?.repo !== issue.repo) {
+            cursorY += groupGap;
+          }
+        });
+
+        const plotHeight = cursorY - topGutter;
+        const svgHeight = plotHeight + topGutter + axisHeight + 18;
+
+        const xFor = (iso) => {
+          const value = new Date(iso).getTime();
+          return leftGutter + (((value - start) / span) * (width - leftGutter - rightGutter));
+        };
+
+        const dateTicks = [];
+        const tickCount = Math.min(8, Math.max(4, Math.floor((width - leftGutter) / 120)));
+        for (let index = 0; index < tickCount; index += 1) {
+          const ratio = tickCount === 1 ? 0 : index / (tickCount - 1);
+          const value = start + (span * ratio);
+          dateTicks.push(new Date(value));
+        }
+
+        const rowsMarkup = groups.map((group, groupIndex) => {
+          const itemsMarkup = group.items.map(({ issue, y }) => {
+            const openedX = xFor(issue.createdAt);
+            const closedX = xFor(issue.closedAt || new Date().toISOString());
+            const days = issue.durationDays;
+            const title = `${issue.repo}#${issue.number} ${issue.title}`;
+            const shortTitle = issue.title.length > 34 ? `${issue.title.slice(0, 34)}...` : issue.title;
+            const lineColor = getIssueLineColor(issue);
+            const lineDash = issue.state === "OPEN" ? ' stroke-dasharray="6 4"' : "";
+            const endpointFill = issue.state === "OPEN" ? "#fdfdfd" : lineColor;
+            return `
+              <a class="issue-link" href="${issue.url}" target="_blank" rel="noopener noreferrer">
+                <title>${escapeHtml(title)}${issue.category ? ` · ${escapeHtml(issue.category)}` : ""} · ${days} days · opened ${escapeHtml(formatDate(issue.createdAt))}${issue.closedAt ? ` · closed ${escapeHtml(formatDate(issue.closedAt))}` : " · still open"}</title>
+                <rect class="issue-hover-bg" x="0" y="${y - (rowHeight / 2)}" width="${width}" height="${rowHeight}" fill="${lineColor}"></rect>
+                <rect x="0" y="${y - (rowHeight / 2)}" width="${width}" height="${rowHeight}" fill="transparent"></rect>
+                <text x="0" y="${y}" fill="#111827" font-size="12" font-weight="600" dominant-baseline="middle">${escapeHtml(issue.repo)}#${issue.number} ${escapeHtml(shortTitle)}</text>
+                <text x="${leftGutter - 10}" y="${y}" fill="rgba(17, 24, 39, 0.62)" font-size="12" text-anchor="end" dominant-baseline="middle">${days}d</text>
+                <line x1="${openedX}" y1="${y}" x2="${closedX}" y2="${y}" stroke="${lineColor}" stroke-width="4" stroke-linecap="round"${lineDash}></line>
+                <circle cx="${closedX}" cy="${y}" r="4" stroke="${lineColor}" stroke-width="2" fill="${endpointFill}"></circle>
+              </a>
+            `;
+          }).join("");
+
+          return `
+            ${groupIndex > 0 ? `<line x1="0" y1="${group.labelY - 16}" x2="${width}" y2="${group.labelY - 16}" stroke="rgba(17,24,39,0.18)" stroke-width="1"></line>` : ""}
+            <text x="0" y="${group.labelY}" fill="#111827" font-size="12" font-weight="700" letter-spacing="0.05em">${escapeHtml(group.name)}</text>
+            <text x="${leftGutter - 10}" y="${group.labelY}" fill="rgba(17, 24, 39, 0.62)" font-size="12" text-anchor="end">${group.items.length} issue${group.items.length === 1 ? "" : "s"}</text>
+            ${itemsMarkup}
+          `;
+        }).join("");
+
+        const tickMarkup = dateTicks.map((tick) => {
+          const tickX = xFor(tick.toISOString());
+          const label = tick.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+          return `
+            <line x1="${tickX}" y1="${topGutter}" x2="${tickX}" y2="${topGutter + plotHeight}" stroke="rgba(17,24,39,0.08)" stroke-width="1"></line>
+            <text x="${tickX}" y="${topGutter - 10}" fill="rgba(17,24,39,0.62)" font-size="12" text-anchor="middle">${label}</text>
+          `;
+        }).join("");
+
+        timelineWrap.innerHTML = `
+          <svg viewBox="0 0 ${width} ${svgHeight}" role="img" aria-label="Issue duration timeline grouped by repository">
+            <style>
+              .issue-link .issue-hover-bg {
+                opacity: 0;
+                transition: opacity 150ms ease;
+              }
+
+              .issue-link:hover .issue-hover-bg,
+              .issue-link:focus .issue-hover-bg {
+                opacity: 0.12;
+              }
+            </style>
+            <rect x="${leftGutter}" y="${topGutter}" width="${width - leftGutter - rightGutter}" height="${plotHeight}" fill="none" stroke="rgba(17,24,39,0.18)" stroke-width="1"></rect>
+            ${tickMarkup}
+            ${rowsMarkup}
+          </svg>
+        `;
+      }
+
+      function render() {
+        renderSummary();
+        renderTimeline();
+      }
+
+      async function loadProjectActivity() {
+        try {
+          const response = await fetch(apiUrl("/api/project-activity"), { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          state.payload = await response.json();
+          render();
+        } catch (error) {
+          metaLine.textContent = "Project activity could not be loaded yet. Add the GitHub token to the JeffersonWM API environment and restart the JeffersonWM server.";
+          timelineWrap.innerHTML = '<div class="empty-state">No project activity data is available yet.</div>';
+        }
+      }
+
+      searchInput.addEventListener("input", (event) => {
+        state.search = event.currentTarget.value.trim().toLowerCase();
+        render();
+      });
+
+      loadProjectActivity();
+      window.addEventListener("resize", () => {
+        if (state.payload) {
+          renderTimeline();
+        }
+      });
+    </script>
+  </body>
+</html>

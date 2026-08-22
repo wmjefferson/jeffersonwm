@@ -110,14 +110,14 @@ function getEnvDefaults() {
   const productionEnv = parseEnvFile(path.join(appRoot, '.env.production'));
   const developmentEnv = parseEnvFile(path.join(appRoot, '.env.development'));
   return {
-    ...developmentEnv,
     ...productionEnv,
+    ...developmentEnv,
     ...process.env,
   };
 }
 
 function normalizeFilePath(value) {
-  return value.replace(/^['"]|['"]$/g, '').trim().replace(/\\\\/g, '\\');
+  return value.replace(/^['"]|['"]$/g, '').trim();
 }
 
 function getLibraryCandidates(args) {

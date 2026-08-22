@@ -72,30 +72,6 @@
         line-height: 1;
       }
 
-      .actions {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 1rem;
-      }
-
-      .home-link {
-        border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.68);
-        color: inherit;
-        font-family: inherit;
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        text-decoration: none;
-        padding: 0.75rem 1rem;
-      }
-
-      .home-link:hover {
-        border-color: rgba(17, 24, 39, 0.44);
-      }
-
       .note {
         max-width: 54rem;
         margin: 0 0 1.5rem;
@@ -238,6 +214,45 @@
         margin: 1rem 0 0;
       }
 
+      .bottom-links {
+        margin-top: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+      }
+
+      .personal-link {
+        position: relative;
+        color: #111827;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        font-family: inherit;
+        font-size: 0.92rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .personal-link::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.1rem;
+        width: 100%;
+        height: 1px;
+        background: #d4d4d4;
+        transform-origin: left;
+        transform: scaleX(0);
+        transition: transform 0.15s ease-out;
+      }
+
+      .personal-link:hover::after {
+        transform: scaleX(1);
+      }
+
       @media (max-width: 820px) {
         :root {
           --frame: 24px;
@@ -249,6 +264,10 @@
 
         .topline {
           flex-direction: column;
+        }
+
+        .bottom-links {
+          margin-top: 4rem;
         }
 
         .summary-grid {
@@ -268,10 +287,6 @@
       <div class="topline">
         <div>
           <h1>Development</h1>
-        </div>
-        <div class="actions">
-          <a class="home-link" href="/">Home</a>
-          <a class="home-link" href="/status/">Status</a>
         </div>
       </div>
 
@@ -327,6 +342,21 @@
         <span class="pill partial">Partial</span>
         <span class="pill no">No</span>
         <span class="pill tbd">TBD</span>
+      </div>
+
+      <div class="bottom-links" aria-label="Site links">
+        <a class="personal-link" href="/">Home</a>
+        <a class="personal-link" href="/status/">Status</a>
+        <a class="personal-link" href="/project-activity/">Project Activity</a>
+        <a class="personal-link" href="/account/">Account</a>
+        <a
+          class="personal-link"
+          href="https://wmjefferson.com"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          William Jefferson
+        </a>
       </div>
     </main>
 

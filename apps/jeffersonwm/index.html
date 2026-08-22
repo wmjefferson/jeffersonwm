@@ -401,17 +401,30 @@
         display: flex;
         flex-direction: column;
         align-items: flex-end;
-        gap: 0.25rem;
+        justify-content: flex-end;
+        gap: 0.22rem;
         opacity: 0.62;
+        max-width: 100%;
+        text-align: right;
       }
 
       .widget-word {
+        display: block;
         color: inherit;
         font-family: inherit;
         text-decoration: none;
         font-size: 0.92rem;
         font-weight: 600;
         letter-spacing: 0.04em;
+        max-width: 100%;
+        overflow: hidden;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .widget-word--break {
+        width: 100%;
       }
 
       .widget-word--button {
@@ -972,6 +985,7 @@
 
       <div class="bottom-links" aria-label="Site links">
         <a class="personal-link" href="/status/">Status</a>
+        <a class="personal-link" href="/project-activity/">Project Activity</a>
         <a class="personal-link" href="/account/">Account</a>
         <a
           class="personal-link"
@@ -992,7 +1006,7 @@
           <button class="widget-time" id="widget-time" type="button" title="Toggle 12/24 hour format">--:--</button>
           <div class="widget-date" id="widget-date">Loading date</div>
           <button class="widget-event" id="widget-event" type="button" hidden></button>
-            <button class="widget-weather" id="widget-weather" type="button" title="Show weather 2+ hours ahead">
+            <button class="widget-weather" id="widget-weather" type="button" title="Show weather 3+ hours ahead">
               <span class="widget-weather-icon" id="widget-weather-icon">•</span>
               <span class="widget-weather-temp" id="widget-weather-temp">--°</span>
             </button>
@@ -1098,22 +1112,136 @@
         const WEATHER_API_URL = 'https://api.open-meteo.com/v1/forecast?latitude=37.7811&longitude=-122.4883&current_weather=true&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&forecast_days=2';
         const WORD_SOURCES = [
           {
+            key: 'dictionary',
+            label: 'Dictionary.com',
+            fallbackHref: 'https://www.dictionary.com/word-of-the-day',
+            hrefForWord: word => `https://www.dictionary.com/browse/${encodeURIComponent(word)}`
+          },
+          {
             key: 'merriam',
-            fallbackLabel: 'Merriam-Webster',
+            label: 'Merriam-Webster',
             fallbackHref: 'https://www.merriam-webster.com/word-of-the-day',
             hrefForWord: word => `https://www.merriam-webster.com/dictionary/${encodeURIComponent(word)}`
           },
           {
             key: 'wiktionary',
-            fallbackLabel: 'Wiktionary',
+            label: 'Wiktionary',
             fallbackHref: 'https://en.wiktionary.org/wiki/Wiktionary:Word_of_the_day',
             hrefForWord: word => `https://en.wiktionary.org/wiki/${encodeURIComponent(word)}`
+          },
+          {
+            key: 'vocabulary',
+            label: 'Vocabulary.com',
+            fallbackHref: 'https://www.vocabulary.com/word-of-the-day/',
+            hrefForWord: word => `https://www.vocabulary.com/dictionary/${encodeURIComponent(word)}`
           }
+          // Paused extra daily-discovery sources. Keep commented for easy re-enable later.
+          /*
+          ,
+          {
+            key: 'datamuse',
+            label: 'Datamuse',
+            fallbackHref: 'https://www.datamuse.com/',
+            hrefForWord: word => `https://en.wiktionary.org/wiki/${encodeURIComponent(word)}`
+          },
+          {
+            key: 'loc',
+            label: 'Library of Congress',
+            fallbackHref: 'https://id.loc.gov/authorities/subjects.html'
+          },
+          {
+            key: 'ols4',
+            label: 'OLS4',
+            fallbackHref: 'https://www.ebi.ac.uk/ols4/',
+            hrefForWord: word => `https://www.ebi.ac.uk/ols4/api/search?q=${encodeURIComponent(word)}`
+          },
+          {
+            key: 'mesh',
+            label: 'MeSH',
+            fallbackHref: 'https://id.nlm.nih.gov/mesh/'
+          },
+          {
+            key: 'pubchem',
+            label: 'PubChem',
+            fallbackHref: 'https://pubchem.ncbi.nlm.nih.gov/',
+            hrefForWord: word => `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(word)}`
+          },
+          {
+            key: 'musicbrainz',
+            label: 'MusicBrainz',
+            fallbackHref: 'https://musicbrainz.org/genres',
+            hrefForWord: word => `https://musicbrainz.org/search?query=${encodeURIComponent(word)}&type=tag&method=indexed`
+          },
+          {
+            key: 'sportsdb',
+            label: 'TheSportsDB',
+            fallbackHref: 'https://www.thesportsdb.com/',
+            hrefForWord: word => `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(word)}`
+          },
+          {
+            key: 'mealdb',
+            label: 'TheMealDB',
+            fallbackHref: 'https://www.themealdb.com/',
+            hrefForWord: word => `https://www.themealdb.com/browse.php?c=${encodeURIComponent(word)}`
+          },
+          {
+            key: 'tvmaze',
+            label: 'TVMaze',
+            fallbackHref: 'https://www.tvmaze.com/',
+            hrefForWord: word => `https://www.tvmaze.com/search?q=${encodeURIComponent(word)}`
+          },
+          {
+            key: 'gbif',
+            label: 'GBIF',
+            fallbackHref: 'https://www.gbif.org/species/search',
+            hrefForWord: word => `https://www.gbif.org/species/search?q=${encodeURIComponent(word)}`
+          },
+          {
+            key: 'nasaApod',
+            label: 'NASA APOD',
+            fallbackHref: 'https://apod.nasa.gov/apod/astropix.html'
+          },
+          {
+            key: 'wikipediaPotd',
+            label: 'Wikipedia POTD',
+            fallbackHref: 'https://api.wikimedia.org/feed/v1/wikipedia/en/featured'
+          }
+          */
         ];
-        const FALLBACK_WORDS = WORD_SOURCES.reduce((acc, source) => {
-          acc[source.key] = source.fallbackLabel;
-          return acc;
-        }, {});
+        const getPacificDateKey = (date = new Date()) => {
+          const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Los_Angeles',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          }).formatToParts(date);
+          const year = parts.find(part => part.type === 'year')?.value || '0000';
+          const month = parts.find(part => part.type === 'month')?.value || '00';
+          const day = parts.find(part => part.type === 'day')?.value || '00';
+          return `${year}-${month}-${day}`;
+        };
+        const buildFallbackWordsPayload = () => ({
+          pacificDateKey: getPacificDateKey(),
+          generatedAt: new Date().toISOString(),
+          sources: WORD_SOURCES.map(source => ({
+            key: source.key,
+            label: source.label,
+            word: null,
+            display: source.label,
+            href: source.fallbackHref,
+            fallbackHref: source.fallbackHref,
+            ok: false,
+            fallback: true,
+            providerType: 'fallback',
+            note: 'Using fallback label until the widget API returns a live word.',
+            checkedAt: new Date().toISOString()
+          })),
+          words: WORD_SOURCES.reduce((acc, source) => {
+            acc[source.key] = source.label;
+            return acc;
+          }, {})
+        });
+        const FALLBACK_WORDS = buildFallbackWordsPayload();
         const elements = {
           greeting: document.getElementById('widget-greeting'),
           location: document.getElementById('widget-location'),
@@ -1187,6 +1315,8 @@
         let eventsLoaded = false;
         let editingEventId = null;
         let savingFontName = null;
+        let currentWordsPayload = FALLBACK_WORDS;
+        let widgetMidnightRefreshTimer = null;
         const WIDGET_FONT_WEIGHT_MIN = 1;
         const WIDGET_FONT_WEIGHT_MAX = 5;
         const getWeatherIcon = code => {
@@ -1256,26 +1386,99 @@
           elements.weather.style.setProperty('--weather-hover-color', weatherHoverColor);
           elements.weather.style.color = weatherColor;
           elements.weather.title = showNextHour && weatherState.next
-            ? 'Showing weather 2+ hours ahead. Click to return to current weather.'
-            : 'Showing current weather. Click to preview weather 2+ hours ahead.';
+            ? 'Showing weather 3+ hours ahead. Click to return to current weather.'
+            : 'Showing current weather. Click to preview weather 3+ hours ahead.';
           elements.weather.setAttribute('aria-pressed', showNextHour ? 'true' : 'false');
         };
 
         const getEventTitle = event => String(event?.title || event?.name || '').trim();
 
-        const renderWords = words => {
-          const sources = WORD_SOURCES.map(source => {
-            const label = String(words?.[source.key] || source.fallbackLabel).trim() || source.fallbackLabel;
-            const isFallback = label.localeCompare(source.fallbackLabel, undefined, { sensitivity: 'base' }) === 0;
+        const normalizeWordsPayload = payload => {
+          if (payload && Array.isArray(payload.sources)) {
+            const sourceMap = new Map(payload.sources.map(source => [source.key, source]));
             return {
-              key: source.key,
-              label,
-              href: isFallback ? source.fallbackHref : source.hrefForWord(label)
+              pacificDateKey: String(payload.pacificDateKey || getPacificDateKey()),
+              generatedAt: payload.generatedAt || new Date().toISOString(),
+              sources: WORD_SOURCES.map(source => {
+                const incoming = sourceMap.get(source.key);
+                const display = String(incoming?.display || incoming?.word || source.label).trim() || source.label;
+                const href = typeof incoming?.href === 'string' && incoming.href
+                  ? incoming.href
+                  : incoming?.word
+                    ? source.hrefForWord(incoming.word)
+                    : source.fallbackHref;
+                return {
+                  key: source.key,
+                  label: source.label,
+                  word: typeof incoming?.word === 'string' && incoming.word ? incoming.word : null,
+                  display,
+                  href,
+                  fallbackHref: source.fallbackHref,
+                  ok: Boolean(incoming?.ok),
+                  fallback: incoming ? Boolean(incoming.fallback) : true,
+                  providerType: incoming?.providerType || 'fallback',
+                  note: typeof incoming?.note === 'string' ? incoming.note : 'No source note available.',
+                  checkedAt: incoming?.checkedAt || payload.generatedAt || new Date().toISOString()
+                };
+              }),
+              words: payload.words || {}
             };
-          });
+          }
+
+          if (payload && typeof payload === 'object') {
+            return {
+              pacificDateKey: getPacificDateKey(),
+              generatedAt: new Date().toISOString(),
+              sources: WORD_SOURCES.map(source => {
+                const display = String(payload[source.key] || source.label).trim() || source.label;
+                const fallback = display.localeCompare(source.label, undefined, { sensitivity: 'base' }) === 0;
+                return {
+                  key: source.key,
+                  label: source.label,
+                  word: fallback ? null : display,
+                  display,
+                  href: fallback ? source.fallbackHref : source.hrefForWord(display),
+                  fallbackHref: source.fallbackHref,
+                  ok: !fallback,
+                  fallback,
+                  providerType: 'legacy',
+                  note: fallback
+                    ? 'Legacy widget response used the fallback label.'
+                    : 'Legacy widget response returned a live word.',
+                  checkedAt: new Date().toISOString()
+                };
+              }),
+              words: payload
+            };
+          }
+
+          return buildFallbackWordsPayload();
+        };
+
+        const scheduleWidgetMidnightRefresh = () => {
+          if (widgetMidnightRefreshTimer) {
+            window.clearInterval(widgetMidnightRefreshTimer);
+          }
+          widgetMidnightRefreshTimer = window.setInterval(async () => {
+            if (getPacificDateKey() !== currentWordsPayload.pacificDateKey) {
+              await refreshWidgetData();
+            }
+          }, 60 * 1000);
+        };
+
+        const renderWords = payload => {
+          currentWordsPayload = normalizeWordsPayload(payload);
+          scheduleWidgetMidnightRefresh();
+
+          const sources = currentWordsPayload.sources.map(source => ({
+            key: source.key,
+            label: source.display,
+            href: source.href,
+            providerType: source.providerType
+          }));
 
           const wordsMarkup = sources.map(source => `
-            <a class="widget-word" href="${source.href}" target="_blank" rel="noopener noreferrer">${source.label}</a>
+            <a class="widget-word${source.providerType === 'photo' ? ' widget-word--break' : ''}" href="${source.href}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(source.label)}">${source.label}</a>
           `).join('');
 
           const typefaceLabel = escapeHtml(currentWidgetFont?.name || 'IBM Plex Sans Condensed');
@@ -1472,7 +1675,7 @@
 
         const fetchDailyWords = async () => {
           const words = await fetchJson(`${WIDGET_API_BASE}/wotd`, FALLBACK_WORDS);
-          return words || FALLBACK_WORDS;
+          return normalizeWordsPayload(words || FALLBACK_WORDS);
         };
 
         const requestJson = async (url, options) => {
@@ -1657,7 +1860,7 @@
             const currentTimestamp = new Date(currentTime).getTime();
             const nextIndex = weather.hourly.time.findIndex(time => {
               const forecastTimestamp = new Date(time).getTime();
-              return Number.isFinite(forecastTimestamp) && forecastTimestamp >= currentTimestamp + (2 * 60 * 60 * 1000);
+              return Number.isFinite(forecastTimestamp) && forecastTimestamp >= currentTimestamp + (3 * 60 * 60 * 1000);
             });
             weatherState = {
               current: {

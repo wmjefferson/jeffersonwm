@@ -73,13 +73,6 @@
         line-height: 1;
       }
 
-      .actions {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 1rem;
-      }
-
       .button,
       .home-link {
         border: 1px solid var(--line);
@@ -113,6 +106,88 @@
         overflow-x: auto;
         border: 1px solid var(--line);
         background: rgba(255, 255, 255, 0.62);
+      }
+
+      .widget-source-accordion {
+        margin: 0 0 1.5rem;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      .widget-source-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        list-style: none;
+        cursor: pointer;
+        padding: 0.95rem 1rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .widget-source-summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .widget-source-summary::after {
+        content: "+";
+        font-size: 1rem;
+        line-height: 1;
+      }
+
+      .widget-source-accordion[open] .widget-source-summary::after {
+        content: "\2212";
+      }
+
+      .widget-source-body {
+        border-top: 1px solid var(--line);
+        padding: 0.95rem 1rem 1rem;
+      }
+
+      .widget-source-meta {
+        margin: 0 0 0.9rem;
+        color: var(--muted);
+        font-size: 0.86rem;
+        line-height: 1.45;
+      }
+
+      .widget-source-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0.8rem;
+      }
+
+      .widget-source-item {
+        display: grid;
+        gap: 0.2rem;
+      }
+
+      .widget-source-topline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.65rem;
+      }
+
+      .widget-source-label {
+        font-size: 0.92rem;
+        font-weight: 700;
+      }
+
+      .widget-source-word {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .widget-source-note {
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.45;
       }
 
       .status-table {
@@ -276,11 +351,6 @@
           flex-direction: column;
         }
 
-        .actions {
-          justify-content: flex-start;
-          flex-wrap: wrap;
-        }
-
         .bottom-links {
           position: static;
           margin-top: 4rem;
@@ -297,6 +367,16 @@
       <p class="note">
         These checks run from your browser against the public API hostnames. An online result means the public hostname, Cloudflare route, tunnel, and the server behind it are responding. A reachable result usually means the tunnel answered but the browser could not read the response because of CORS or because the endpoint is not a formal health route.
       </p>
+
+      <details class="widget-source-accordion">
+        <summary class="widget-source-summary">Widget discovery sources</summary>
+        <div class="widget-source-body">
+          <p class="widget-source-meta" id="widget-source-meta">Checking widget discovery sources...</p>
+          <ul class="widget-source-list" id="widget-source-list">
+            <li class="widget-source-note">Loading source notes...</li>
+          </ul>
+        </div>
+      </details>
 
       <div class="status-table-wrap">
         <table class="status-table" aria-label="API and tunnel statuses">
@@ -323,6 +403,8 @@
 
     <div class="bottom-links" aria-label="Site links">
       <a class="personal-link" href="/">Home</a>
+      <a class="personal-link" href="/status/">Status</a>
+      <a class="personal-link" href="/project-activity/">Project Activity</a>
       <a class="personal-link" href="/account/">Account</a>
       <a
         class="personal-link"
@@ -431,6 +513,8 @@
       const tableBody = document.getElementById('service-table-body');
       const refreshButton = document.getElementById('refresh-status');
       const checkedAt = document.getElementById('checked-at');
+      const widgetSourceMeta = document.getElementById('widget-source-meta');
+      const widgetSourceList = document.getElementById('widget-source-list');
 
       const escapeHtml = value => String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -550,6 +634,100 @@
         }
       };
 
+      const fallbackWordSources = [
+        { key: 'dictionary', label: 'Dictionary.com', fallbackHref: 'https://www.dictionary.com/word-of-the-day' },
+        { key: 'merriam', label: 'Merriam-Webster', fallbackHref: 'https://www.merriam-webster.com/word-of-the-day' },
+        { key: 'wiktionary', label: 'Wiktionary', fallbackHref: 'https://en.wiktionary.org/wiki/Wiktionary:Word_of_the_day' },
+        { key: 'vocabulary', label: 'Vocabulary.com', fallbackHref: 'https://www.vocabulary.com/word-of-the-day/' }
+        // Paused extra daily-discovery sources. Keep commented for easy re-enable later.
+        /*
+        ,
+        { key: 'datamuse', label: 'Datamuse', fallbackHref: 'https://www.datamuse.com/' },
+        { key: 'loc', label: 'Library of Congress', fallbackHref: 'https://id.loc.gov/authorities/subjects.html' },
+        { key: 'ols4', label: 'OLS4', fallbackHref: 'https://www.ebi.ac.uk/ols4/' },
+        { key: 'mesh', label: 'MeSH', fallbackHref: 'https://id.nlm.nih.gov/mesh/' },
+        { key: 'pubchem', label: 'PubChem', fallbackHref: 'https://pubchem.ncbi.nlm.nih.gov/' },
+        { key: 'musicbrainz', label: 'MusicBrainz', fallbackHref: 'https://musicbrainz.org/genres' },
+        { key: 'sportsdb', label: 'TheSportsDB', fallbackHref: 'https://www.thesportsdb.com/' },
+        { key: 'mealdb', label: 'TheMealDB', fallbackHref: 'https://www.themealdb.com/' },
+        { key: 'tvmaze', label: 'TVMaze', fallbackHref: 'https://www.tvmaze.com/' },
+        { key: 'gbif', label: 'GBIF', fallbackHref: 'https://www.gbif.org/species/search' },
+        { key: 'nasaApod', label: 'NASA APOD', fallbackHref: 'https://apod.nasa.gov/apod/astropix.html' },
+        { key: 'wikipediaPotd', label: 'Wikipedia POTD', fallbackHref: 'https://api.wikimedia.org/feed/v1/wikipedia/en/featured' }
+        */
+      ];
+
+      const normalizeWordPayload = payload => {
+        if (payload && Array.isArray(payload.sources)) {
+          return payload;
+        }
+
+        if (payload && typeof payload === 'object') {
+          return {
+            pacificDateKey: 'legacy',
+            generatedAt: new Date().toISOString(),
+            sources: fallbackWordSources.map(source => {
+              const display = String(payload[source.key] || source.label).trim() || source.label;
+              const fallback = display.localeCompare(source.label, undefined, { sensitivity: 'base' }) === 0;
+              return {
+                key: source.key,
+                label: source.label,
+                display,
+                href: fallback ? source.fallbackHref : source.fallbackHref,
+                ok: !fallback,
+                fallback,
+                note: fallback ? 'Legacy widget response used the fallback label.' : 'Legacy widget response returned a live word.'
+              };
+            })
+          };
+        }
+
+        return {
+          pacificDateKey: 'unknown',
+          generatedAt: new Date().toISOString(),
+          sources: fallbackWordSources.map(source => ({
+            key: source.key,
+            label: source.label,
+            display: source.label,
+            href: source.fallbackHref,
+            ok: false,
+            fallback: true,
+            note: 'No widget word data available.'
+          }))
+        };
+      };
+
+      const renderWidgetWordSources = payload => {
+        const normalized = normalizeWordPayload(payload);
+        widgetSourceMeta.textContent = `Pacific day ${normalized.pacificDateKey}. Updated ${new Date(normalized.generatedAt || Date.now()).toLocaleString('en-US', {
+          dateStyle: 'medium',
+          timeStyle: 'short'
+        })}.`;
+        widgetSourceList.innerHTML = normalized.sources.map(source => `
+          <li class="widget-source-item">
+            <div class="widget-source-topline">
+              <a class="widget-source-label" href="${escapeHtml(source.href || '#')}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label)}</a>
+              <span class="status-pill status-${source.ok ? 'online' : 'reachable'}">${source.ok ? 'Live' : 'Fallback'}</span>
+              <span class="widget-source-word">${escapeHtml(source.display || source.label)}</span>
+            </div>
+            <div class="widget-source-note">${escapeHtml(source.note || 'No source note available.')}</div>
+          </li>
+        `).join('');
+      };
+
+      const loadWidgetWordSources = async () => {
+        try {
+          const response = await fetchWithTimeout('https://api-jeffersonwm.jeffersonwm.com/api/widget/wotd');
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          renderWidgetWordSources(await response.json());
+        } catch (_error) {
+          renderWidgetWordSources(null);
+          widgetSourceMeta.textContent = 'Widget discovery sources could not be loaded from the public JeffersonWM API.';
+        }
+      };
+
       const runChecks = async () => {
         refreshButton.disabled = true;
         checkedAt.textContent = 'Checking services...';
@@ -575,8 +753,10 @@
       };
 
       renderCards();
-      refreshButton.addEventListener('click', runChecks);
-      runChecks();
+      refreshButton.addEventListener('click', async () => {
+        await Promise.all([runChecks(), loadWidgetWordSources()]);
+      });
+      Promise.all([runChecks(), loadWidgetWordSources()]);
     </script>
   </body>
 </html>

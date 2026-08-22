@@ -73,10 +73,74 @@
       }
 
       h1 {
-        margin: 0 0 1.75rem 0;
+        margin: 0;
         font-family: "Young Serif", "Times New Roman", serif;
         font-size: clamp(2rem, 3vw, 2.4rem);
         font-weight: 400;
+      }
+
+      .account-heading {
+        margin: 0 0 1.75rem 0;
+      }
+
+      .account-heading-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .account-title-button {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        line-height: 1;
+      }
+
+      .account-title-button[hidden] {
+        display: none;
+      }
+
+      .account-title-input {
+        min-width: 14rem;
+        max-width: 100%;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.72);
+        color: inherit;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: clamp(2rem, 3vw, 2.4rem);
+        font-weight: 400;
+        line-height: 1.1;
+        padding: 0.1rem 0.35rem;
+      }
+
+      .account-title-input[hidden] {
+        display: none;
+      }
+
+      .account-username {
+        margin-top: 0.3rem;
+        color: var(--muted);
+        font-size: 0.92rem;
+        letter-spacing: 0.04em;
+      }
+
+      .account-username[hidden] {
+        display: none;
+      }
+
+      .account-role {
+        margin-top: 0.2rem;
+        color: var(--muted);
+        font-size: 0.82rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .account-role[hidden] {
+        display: none;
       }
 
       .links {
@@ -134,6 +198,45 @@
 
       .status-lines span {
         color: var(--muted);
+      }
+
+      .app-membership-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0.22rem;
+        color: var(--ink);
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+
+      .app-membership-list[hidden] {
+        display: none;
+      }
+
+      .app-membership-link {
+        color: inherit;
+        text-decoration: none;
+        position: relative;
+      }
+
+      .app-membership-link::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.08rem;
+        width: 100%;
+        height: 1px;
+        background: #d4d4d4;
+        transform-origin: left;
+        transform: scaleX(0);
+        transition: transform 0.15s ease-out;
+      }
+
+      .app-membership-link:hover::after,
+      .app-membership-link:focus-visible::after {
+        transform: scaleX(1);
       }
 
       .account-form {
@@ -354,7 +457,31 @@
           <img src="data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='3%204%2024%2023'%20width='100'%20height='100'%20fill='none'%20stroke='%232c3e50'%20stroke-width='0.8'%20stroke-linecap='round'%20stroke-linejoin='round'%3e%3cpath%20d='M4%2026h18'%20/%3e%3crect%20x='18'%20y='14'%20width='8'%20height='6'%20rx='1'%20/%3e%3cpath%20d='M22%2020v6'%20/%3e%3cpath%20d='M19.5%2026h5'%20/%3e%3cpath%20d='M16%2023h3'%20/%3e%3cpath%20d='M9.5%205.5l.7-.9%201%20.9%201.3-.3-.3%201.3%201%20.9-1%20.9.3%201.3-1.3-.3-1%20.9-.7-.9-1.3.3.3-1.3-1-.9%201-.9-.3-1.3z'%20/%3e%3ccircle%20cx='10'%20cy='7.5'%20r='1'%20/%3e%3cpath%20d='M11%207.5h.5'%20/%3e%3cpath%20d='M7%2026c0-4%201.5-8%203-8%201.2%200%202%201.5%202%203'%20/%3e%3cpath%20d='M10%2018.5c.8%201.5%201.5%203%203.5%203.3h.8'%20/%3e%3cpath%20d='M7%2023.5c-1.5%200-2.5-.8-2.5-2s1-2.2%202.5-2.2'%20/%3e%3c/svg%3e" alt="" class="logo" />
         </div>
 
-        <h1 id="account-title">Account</h1>
+        <div class="account-heading">
+          <div class="account-heading-row">
+            <h1 id="account-title">Account</h1>
+            <input
+              id="account-title-input"
+              class="account-title-input"
+              type="text"
+              maxlength="120"
+              hidden
+              aria-label="Display name"
+            />
+            <button
+              id="account-title-edit"
+              class="account-title-button"
+              type="button"
+              title="Edit display name"
+              aria-label="Edit display name"
+              hidden
+            >
+              &#9998;
+            </button>
+          </div>
+          <div class="account-username" id="account-username" hidden>@guest</div>
+          <div class="account-role" id="account-role">Visitor</div>
+        </div>
 
         <section id="widget" aria-labelledby="widget-heading">
           <h2 class="section-label" id="widget-heading">Widget</h2>
@@ -411,6 +538,13 @@
           </form>
         </section>
 
+        <section id="apps" aria-labelledby="apps-heading">
+          <h2 class="section-label" id="apps-heading">Apps</h2>
+          <ul class="app-membership-list" id="app-membership-list">
+            <li class="muted">Sign in to see app access.</li>
+          </ul>
+        </section>
+
         <!--
         <section id="personal-dates" aria-labelledby="personal-dates-heading">
           <h2 class="section-label" id="personal-dates-heading">My Dates</h2>
@@ -454,8 +588,19 @@
       </main>
 
       <div class="bottom-links" aria-label="Site links">
+        <a
+          class="personal-link"
+          href="https://auth.jeffersonwm.com/"
+          id="admin-auth-link"
+          target="_blank"
+          rel="noopener noreferrer"
+          hidden
+        >
+          Auth
+        </a>
         <a class="personal-link" href="/">Home</a>
         <a class="personal-link" href="/status/">Status</a>
+        <a class="personal-link" href="/project-activity/">Project Activity</a>
         <a class="personal-link" href="#" id="auth-action-link">Login/Register</a>
         <a
           class="personal-link"
@@ -695,10 +840,67 @@
       const AUTH_ORIGIN = 'https://auth.jeffersonwm.com';
       const AUTH_RETURN_TO = window.location.href;
       const authActionLink = document.getElementById('auth-action-link');
+      const adminAuthLink = document.getElementById('admin-auth-link');
+      const APP_LABELS = {
+        aphelion: 'Aphelion',
+        auth: 'Auth',
+        battalion: 'Battalion',
+        bullion: 'Bullion',
+        copy: 'Copy',
+        dookydetective: 'Dooky Detective',
+        feed: 'Feed',
+        jeffersonwm: 'JeffersonWM',
+        jeffershizzle: 'Jeffershizzle',
+        lionship: 'Lionship',
+        millionfold: 'Millionfold',
+        perihelion: 'Perihelion',
+        stallioneer: 'Stallioneer',
+        tourbillion: 'Tourbillion',
+        vermilion: 'Vermilion'
+      };
+      const APP_URLS = {
+        aphelion: '/aphelion/',
+        auth: 'https://auth.jeffersonwm.com/',
+        battalion: '/battalion/',
+        bullion: '/bullion/',
+        dookydetective: 'https://dookydetective.com/',
+        feed: '/feed/',
+        jeffersonwm: '/',
+        jeffershizzle: 'https://jeffershizzle.com/',
+        lionship: '/lionship/',
+        millionfold: '/millionfold/',
+        perihelion: '/perihelion/',
+        tourbillion: '/tourbillion/',
+        vermilion: '/vermilion/'
+      };
       let authSession = null;
       let accountProfile = null;
       let authPopup = null;
       let authPopupPoll = null;
+      let accountTitleEditing = false;
+      let accountTitleSaveInFlight = false;
+
+      const getAccountType = user => {
+        if (!user) {
+          return { key: 'visitor', label: 'Visitor' };
+        }
+        if (user.isDeleted) {
+          return { key: 'archived', label: 'Archived Account' };
+        }
+        if (user.isBlocked) {
+          return { key: 'blocked', label: 'Blocked Account' };
+        }
+        if (user.isApproved === false) {
+          return { key: 'pending', label: 'Pending Approval' };
+        }
+        if (user.isOwner) {
+          return { key: 'owner', label: 'Preferred Admin' };
+        }
+        if (user.isAdmin) {
+          return { key: 'admin', label: 'Admin' };
+        }
+        return { key: 'member', label: 'Signed-In User' };
+      };
 
       const normalizeAccountName = value => {
         if (typeof value !== 'string') {
@@ -776,10 +978,70 @@
         authActionLink.title = signedIn ? 'Sign out of Auth' : 'Open Auth';
       };
 
+      const updateAdminAuthLink = () => {
+        if (!adminAuthLink) {
+          return;
+        }
+
+        const accountType = getAccountType(authSession?.user);
+        adminAuthLink.hidden = !Boolean(authSession?.user?.isAdmin);
+        adminAuthLink.textContent = accountType.key === 'owner' ? 'Auth Owner' : 'Auth Admin';
+      };
+
+      const getResolvedUsername = () => {
+        const username =
+          accountProfile?.username ||
+          authSession?.user?.username ||
+          '';
+
+        return typeof username === 'string' ? username.trim().toLowerCase() : '';
+      };
+
+      const getResolvedDisplayName = () => {
+        if (!authSession?.user) {
+          return 'guest';
+        }
+
+        return (
+          normalizeAccountName(accountProfile?.displayName) ||
+          normalizeAccountName(accountProfile?.username) ||
+          normalizeAccountName(authSession.user?.displayName) ||
+          normalizeAccountName(authSession.user?.username) ||
+          'guest'
+        );
+      };
+
+      const setAccountTitleEditMode = editing => {
+        accountTitleEditing = Boolean(editing && authSession?.user);
+        const title = document.getElementById('account-title');
+        const titleInput = document.getElementById('account-title-input');
+        const editButton = document.getElementById('account-title-edit');
+        const displayName = getResolvedDisplayName();
+
+        if (!title || !titleInput || !editButton) {
+          return;
+        }
+
+        title.hidden = accountTitleEditing;
+        titleInput.hidden = !accountTitleEditing;
+        editButton.textContent = accountTitleEditing ? 'Save' : '\u270e';
+        editButton.title = accountTitleEditing ? 'Save display name' : 'Edit display name';
+        editButton.setAttribute('aria-label', editButton.title);
+
+        if (accountTitleEditing) {
+          titleInput.value = displayName;
+          window.requestAnimationFrame(() => {
+            titleInput.focus();
+            titleInput.select();
+          });
+        }
+      };
+
       const applyAuthUser = user => {
         authSession = { user };
         accountProfile = user;
         updateAuthActionLink();
+        updateAdminAuthLink();
         updateAccountTitle();
       };
 
@@ -787,33 +1049,110 @@
         authSession = { user: null };
         accountProfile = null;
         updateAuthActionLink();
+        updateAdminAuthLink();
         updateAccountTitle();
       };
 
       const updateAccountTitle = () => {
         const title = document.getElementById("account-title");
+        const usernameLine = document.getElementById("account-username");
+        const roleLine = document.getElementById("account-role");
+        const editButton = document.getElementById("account-title-edit");
+        const titleInput = document.getElementById("account-title-input");
         if (!title) {
           return;
         }
 
-        if (!authSession?.user) {
-          title.textContent = "guest";
+        const displayName = getResolvedDisplayName();
+        const username = getResolvedUsername();
+        const accountType = getAccountType(authSession?.user);
+
+        title.textContent = displayName;
+        if (titleInput && !accountTitleEditing) {
+          titleInput.value = displayName;
+        }
+
+        if (usernameLine) {
+          if (authSession?.user && username) {
+            usernameLine.textContent = `@${username}`;
+            usernameLine.hidden = false;
+          } else {
+            usernameLine.hidden = true;
+          }
+        }
+
+        if (roleLine) {
+          roleLine.textContent = accountType.label;
+          roleLine.hidden = false;
+        }
+
+        if (editButton) {
+          editButton.hidden = !Boolean(authSession?.user);
+        }
+      };
+
+      const formatMembershipLabel = appKey => {
+        const normalizedKey = String(appKey || "").trim().toLowerCase();
+        return APP_LABELS[normalizedKey] || String(appKey || "").trim() || "Unknown app";
+      };
+
+      const formatMembershipUrl = appKey => {
+        const normalizedKey = String(appKey || "").trim().toLowerCase();
+        return APP_URLS[normalizedKey] || "";
+      };
+
+      const renderAppMemberships = memberships => {
+        const list = document.getElementById("app-membership-list");
+        if (!list) {
           return;
         }
 
-        title.textContent =
-          normalizeAccountName(accountProfile?.displayName) ||
-          normalizeAccountName(accountProfile?.username) ||
-          normalizeAccountName(authSession.user?.displayName) ||
-          normalizeAccountName(authSession.user?.username) ||
-          "guest";
+        if (!authSession?.user) {
+          list.innerHTML = '<li class="muted">Visitor access only. Sign in to see app access.</li>';
+          return;
+        }
+
+        const normalizedMemberships = Array.isArray(memberships)
+          ? [...new Set(memberships.map(value => String(value || "").trim()).filter(Boolean))]
+          : [];
+
+        if (!normalizedMemberships.length) {
+          list.innerHTML = '<li class="muted">No app access has been granted yet.</li>';
+          return;
+        }
+
+        const sortedMemberships = normalizedMemberships
+          .map(appKey => ({
+            key: appKey,
+            label: formatMembershipLabel(appKey),
+            url: formatMembershipUrl(appKey),
+          }))
+          .sort((first, second) => first.label.localeCompare(second.label));
+
+        list.innerHTML = sortedMemberships
+          .map(app => {
+            if (app.url) {
+              return `
+                <li>
+                  <a class="app-membership-link" href="${escapeHtml(app.url)}" target="_blank" rel="noopener noreferrer">
+                    ${escapeHtml(app.label)}
+                  </a>
+                </li>
+              `;
+            }
+
+            return `<li>${escapeHtml(app.label)}</li>`;
+          })
+          .join("");
       };
 
       const refreshAuthSession = async () => {
         authSession = await fetchJson('https://auth.jeffersonwm.com/api/auth/status', { user: null });
         accountProfile = authSession?.user || null;
         updateAuthActionLink();
+        updateAdminAuthLink();
         updateAccountTitle();
+        renderAppMemberships(authSession?.user?.memberships || []);
         return authSession;
       };
 
@@ -842,6 +1181,7 @@
           accountProfile = account;
         }
         updateAccountTitle();
+        renderAppMemberships(authSession?.user?.memberships || []);
 
         const [state, accountWidget] = await Promise.all([
           fetchJson("/api/widget/resolved", null),
@@ -875,6 +1215,67 @@
       async function syncAccountState() {
         await refreshAuthSession();
         await hydrateAccount();
+      }
+
+      async function saveDisplayName() {
+        if (!authSession?.user) {
+          setAccountTitleEditMode(false);
+          updateAccountTitle();
+          return;
+        }
+
+        if (accountTitleSaveInFlight) {
+          return;
+        }
+
+        const titleInput = document.getElementById('account-title-input');
+        if (!(titleInput instanceof HTMLInputElement)) {
+          return;
+        }
+
+        const nextValue = titleInput.value.trim();
+        const previousProfile = accountProfile ? { ...accountProfile } : null;
+        const previousAuthDisplayName = authSession?.user?.displayName || null;
+
+        accountTitleSaveInFlight = true;
+        setAccountTitleEditMode(false);
+
+        accountProfile = {
+          ...(accountProfile || {}),
+          username: accountProfile?.username || authSession?.user?.username,
+          displayName: nextValue || accountProfile?.username || authSession?.user?.username || 'guest',
+        };
+        updateAccountTitle();
+
+        try {
+          const saved = await requestJson('/api/account/me', {
+            method: 'PUT',
+            body: JSON.stringify({
+              displayName: nextValue,
+            }),
+          });
+
+          accountProfile = {
+            ...(accountProfile || {}),
+            username: saved?.username || accountProfile?.username || authSession?.user?.username,
+            displayName: saved?.displayName || nextValue || saved?.username || accountProfile?.username,
+          };
+
+          if (authSession?.user) {
+            authSession.user.displayName = saved?.displayName || nextValue || authSession.user.displayName;
+          }
+        } catch (error) {
+          accountProfile = previousProfile;
+          if (authSession?.user) {
+            authSession.user.displayName = previousAuthDisplayName;
+          }
+          updateAccountTitle();
+          throw error;
+        } finally {
+          accountTitleSaveInFlight = false;
+        }
+
+        updateAccountTitle();
       }
 
       document.getElementById("location-form")?.addEventListener("submit", async event => {
@@ -944,6 +1345,41 @@
 
       window.addEventListener('pageshow', () => {
         void syncAccountState();
+      });
+
+      document.getElementById('account-title-edit')?.addEventListener('click', async () => {
+        if (accountTitleSaveInFlight) {
+          return;
+        }
+
+        if (!accountTitleEditing) {
+          setAccountTitleEditMode(true);
+          return;
+        }
+
+        await saveDisplayName();
+      });
+
+      document.getElementById('account-title-input')?.addEventListener('keydown', async event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          await saveDisplayName();
+          return;
+        }
+
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setAccountTitleEditMode(false);
+          updateAccountTitle();
+        }
+      });
+
+      document.getElementById('account-title-input')?.addEventListener('blur', () => {
+        if (!accountTitleEditing) {
+          return;
+        }
+
+        void saveDisplayName();
       });
     </script>
   </body>

@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "JeffersonWM widget source pause and daily discovery checkpoint",
+  "content": "<p>This pass explored a richer JeffersonWM homepage widget: more editorial and no-auth discovery sources, better source-health thinking, Pacific-day timing, and a wider surface for future terminology and image-title feeds.</p><p>What worked:</p><ul><li><strong>The richer architecture held up:</strong> mixed outside sources could be normalized into the same homepage widget without breaking the existing direction.</li><li><strong>Pacific-day cadence is the right model:</strong> the widget should change on the JeffersonWM schedule at midnight Pacific instead of drifting with provider release timing.</li><li><strong>The work was left reversible:</strong> the broader source system was paused by commenting it out cleanly, not by deleting it.</li></ul><p>What did not hold up as the default homepage experience:</p><ul><li><strong>The extended list felt too busy:</strong> the longer discovery surface added more visual density than the home page currently wants.</li><li><strong>Some outside sources are better treated as optional:</strong> they make sense as future enrichments, but not as the always-on default row right now.</li></ul><p>The final rollback was a preference decision, not a failure. The end state keeps only Merriam-Webster, Wiktionary, Dictionary.com, Vocabulary.com, and the typeface line active, while the larger discovery/photo/terminology groundwork stays commented and ready for a later return.</p>",
+  "url": "https://jeffersonwm.com/",
+  "source": "manual",
+  "external_id": "jeffersonwm-widget-source-pause-and-daily-discovery-checkpoint-2026-08-18",
+  "created_at": "2026-08-18 21:10:00"
+}

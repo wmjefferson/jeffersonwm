@@ -50,6 +50,8 @@ function prettyRootPagesInDev() {
   const pageRoutes = new Map([
     ['/account', '/account/index.html'],
     ['/account/', '/account/index.html'],
+    ['/project-activity', '/project-activity/index.html'],
+    ['/project-activity/', '/project-activity/index.html'],
     ['/status', '/status/index.html'],
     ['/status/', '/status/index.html'],
     ['/development', '/development/index.html'],
@@ -93,6 +95,10 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
         '/api/locations': {
+          target: widgetApiTarget,
+          changeOrigin: true,
+        },
+        '/api/project-activity': {
           target: widgetApiTarget,
           changeOrigin: true,
         },

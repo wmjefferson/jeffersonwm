@@ -4,6 +4,7 @@ import express from 'express';
 import mysql from 'mysql2/promise';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createProjectActivityService } from './projectActivity.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,7 @@ const allowedOrigins = (process.env.JEFFERSONWM_ALLOWED_ORIGIN || 'http://localh
 const adminToken = process.env.JEFFERSONWM_WIDGET_ADMIN_TOKEN || '';
 const geoapifyApiKey = process.env.GEOAPIFY_API_KEY || '';
 const authBaseUrl = (process.env.JEFFERSONWM_AUTH_BASE_URL || 'https://auth.jeffersonwm.com').replace(/\/$/, '');
+const projectActivityService = createProjectActivityService(process.env);
 
 type WidgetFont = {
   id?: number;
@@ -40,6 +42,7 @@ type WidgetEvent = {
 
 type UserWidgetPreference = {
   auth_user_id: string;
+  display_name?: string | null;
   location_label?: string | null;
   latitude?: number | string | null;
   longitude?: number | string | null;
@@ -57,18 +60,56 @@ type LocationSuggestion = {
   weatherUnit: 'fahrenheit' | 'celsius';
 };
 
-type WidgetWords = {
-  dictionary: string;
-  merriam: string;
-  oxford: string;
-  wiktionary: string;
+type WidgetProviderType = 'scrape' | 'rss' | 'api' | 'photo';
+
+type WidgetWordSourceKey =
+  | 'dictionary'
+  | 'merriam'
+  | 'wiktionary'
+  | 'vocabulary'
+  | 'datamuse'
+  | 'loc'
+  | 'ols4'
+  | 'mesh'
+  | 'pubchem'
+  | 'musicbrainz'
+  | 'sportsdb'
+  | 'mealdb'
+  | 'tvmaze'
+  | 'gbif'
+  | 'nasaApod'
+  | 'wikipediaPotd';
+
+type WidgetWords = Record<WidgetWordSourceKey, string>;
+
+type WidgetWordSource = {
+  key: WidgetWordSourceKey;
+  label: string;
+  word: string | null;
+  display: string;
+  href: string;
+  fallbackHref: string;
+  providerType: WidgetProviderType;
+  ok: boolean;
+  fallback: boolean;
+  note: string;
+  checkedAt: string;
+};
+
+type WidgetWordsPayload = {
+  pacificDateKey: string;
+  generatedAt: string;
+  sources: WidgetWordSource[];
+  words: WidgetWords;
 };
 
 type AuthStatusUser = {
   id?: string;
   username?: string;
   displayName?: string | null;
+  memberships?: string[];
   isAdmin?: boolean;
+  isOwner?: boolean;
   isApproved?: boolean;
   isBlocked?: boolean;
   isDeleted?: boolean;
@@ -83,8 +124,974 @@ const fallbackFonts: WidgetFont[] = [
 const fallbackWords: WidgetWords = {
   dictionary: 'Dictionary.com',
   merriam: 'Merriam-Webster',
-  oxford: 'Oxford',
   wiktionary: 'Wiktionary',
+  vocabulary: 'Vocabulary.com',
+  datamuse: 'Datamuse',
+  loc: 'Library of Congress',
+  ols4: 'OLS4',
+  mesh: 'MeSH',
+  pubchem: 'PubChem',
+  musicbrainz: 'MusicBrainz',
+  sportsdb: 'TheSportsDB',
+  mealdb: 'TheMealDB',
+  tvmaze: 'TVMaze',
+  gbif: 'GBIF',
+  nasaApod: 'NASA APOD',
+  wikipediaPotd: 'Wikipedia POTD',
+};
+
+const widgetWordSourceDefinitions = {
+  dictionary: {
+    label: 'Dictionary.com',
+    fallbackHref: 'https://www.dictionary.com/word-of-the-day',
+    providerType: 'scrape',
+    hrefForWord: (word: string) => `https://www.dictionary.com/browse/${encodeURIComponent(word)}`,
+  },
+  merriam: {
+    label: 'Merriam-Webster',
+    fallbackHref: 'https://www.merriam-webster.com/word-of-the-day',
+    providerType: 'rss',
+    hrefForWord: (word: string) => `https://www.merriam-webster.com/dictionary/${encodeURIComponent(word)}`,
+  },
+  wiktionary: {
+    label: 'Wiktionary',
+    fallbackHref: 'https://en.wiktionary.org/wiki/Wiktionary:Word_of_the_day',
+    providerType: 'rss',
+    hrefForWord: (word: string) => `https://en.wiktionary.org/wiki/${encodeURIComponent(word)}`,
+  },
+  vocabulary: {
+    label: 'Vocabulary.com',
+    fallbackHref: 'https://www.vocabulary.com/word-of-the-day/',
+    providerType: 'scrape',
+    hrefForWord: (word: string) => `https://www.vocabulary.com/dictionary/${encodeURIComponent(word)}`,
+  },
+  // Paused extra daily-discovery sources. Keep commented for easy re-enable later.
+  /*
+  label: string;
+  fallbackHref: string;
+  providerType: WidgetProviderType;
+  hrefForWord?: (word: string) => string;
+  datamuse: {
+    label: 'Datamuse',
+    fallbackHref: 'https://www.datamuse.com/',
+    providerType: 'api',
+    hrefForWord: word => `https://en.wiktionary.org/wiki/${encodeURIComponent(word)}`,
+  },
+  loc: {
+    label: 'Library of Congress',
+    fallbackHref: 'https://id.loc.gov/authorities/subjects.html',
+    providerType: 'api',
+  },
+  ols4: {
+    label: 'OLS4',
+    fallbackHref: 'https://www.ebi.ac.uk/ols4/',
+    providerType: 'api',
+    hrefForWord: word => `https://www.ebi.ac.uk/ols4/api/search?q=${encodeURIComponent(word)}`,
+  },
+  mesh: {
+    label: 'MeSH',
+    fallbackHref: 'https://id.nlm.nih.gov/mesh/',
+    providerType: 'api',
+  },
+  pubchem: {
+    label: 'PubChem',
+    fallbackHref: 'https://pubchem.ncbi.nlm.nih.gov/',
+    providerType: 'api',
+    hrefForWord: word => `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(word)}`,
+  },
+  musicbrainz: {
+    label: 'MusicBrainz',
+    fallbackHref: 'https://musicbrainz.org/genres',
+    providerType: 'api',
+    hrefForWord: word => `https://musicbrainz.org/search?query=${encodeURIComponent(word)}&type=tag&method=indexed`,
+  },
+  sportsdb: {
+    label: 'TheSportsDB',
+    fallbackHref: 'https://www.thesportsdb.com/',
+    providerType: 'api',
+    hrefForWord: word => `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(word)}`,
+  },
+  mealdb: {
+    label: 'TheMealDB',
+    fallbackHref: 'https://www.themealdb.com/',
+    providerType: 'api',
+    hrefForWord: word => `https://www.themealdb.com/browse.php?c=${encodeURIComponent(word)}`,
+  },
+  tvmaze: {
+    label: 'TVMaze',
+    fallbackHref: 'https://www.tvmaze.com/',
+    providerType: 'api',
+    hrefForWord: word => `https://www.tvmaze.com/search?q=${encodeURIComponent(word)}`,
+  },
+  gbif: {
+    label: 'GBIF',
+    fallbackHref: 'https://www.gbif.org/species/search',
+    providerType: 'api',
+    hrefForWord: word => `https://www.gbif.org/species/search?q=${encodeURIComponent(word)}`,
+  },
+  nasaApod: {
+    label: 'NASA APOD',
+    fallbackHref: 'https://apod.nasa.gov/apod/astropix.html',
+    providerType: 'photo',
+  },
+  wikipediaPotd: {
+    label: 'Wikipedia POTD',
+    fallbackHref: 'https://api.wikimedia.org/feed/v1/wikipedia/en/featured',
+    providerType: 'photo',
+  },
+  */
+} satisfies Partial<Record<WidgetWordSourceKey, {
+  label: string;
+  fallbackHref: string;
+  providerType: WidgetProviderType;
+  hrefForWord?: (word: string) => string;
+}>>;
+
+type ActiveWidgetWordSourceKey = keyof typeof widgetWordSourceDefinitions;
+
+type WidgetSourceHealth = {
+  ok: boolean;
+  note: string;
+  word: string | null;
+  href?: string | null;
+};
+
+type WidgetSourceFetchContext = {
+  pacificDateKey: string;
+  checkedAt: string;
+  fetchOptions: RequestInit;
+};
+
+const widgetWordSourceKeys = Object.keys(widgetWordSourceDefinitions) as ActiveWidgetWordSourceKey[];
+
+const generalThemeSeeds = [
+  'astronomy',
+  'botany',
+  'cinema',
+  'design',
+  'ecology',
+  'geometry',
+  'history',
+  'language',
+  'music',
+  'ocean',
+  'poetry',
+  'weather',
+  'architecture',
+  'biology',
+  'mythology',
+  'photography',
+  'physics',
+  'chemistry',
+  'cartography',
+  'typography',
+  'zoology',
+  'folklore',
+  'jazz',
+  'mineralogy',
+  'rivers',
+  'fungi',
+  'ritual',
+  'theater',
+  'memory',
+  'dance',
+  'orchid',
+  'beetle',
+  'cedar',
+  'coral',
+  'tide',
+  'desert',
+];
+
+const mediaThemeSeeds = [
+  'comedy',
+  'crime',
+  'documentary',
+  'fantasy',
+  'history',
+  'horror',
+  'music',
+  'mystery',
+  'nature',
+  'romance',
+  'science',
+  'sports',
+  'travel',
+  'western',
+  'anime',
+  'architecture',
+  'cooking',
+  'myth',
+];
+
+const biologyThemeSeeds = [
+  'oak',
+  'fern',
+  'moss',
+  'iris',
+  'orchid',
+  'cedar',
+  'maple',
+  'lichen',
+  'coral',
+  'beetle',
+  'heron',
+  'sparrow',
+  'willow',
+  'kelp',
+  'cactus',
+  'fox',
+  'whale',
+  'gull',
+];
+
+const scienceThemeSeeds = [
+  'biology',
+  'ecology',
+  'genetics',
+  'immunology',
+  'metabolism',
+  'microbiology',
+  'neurology',
+  'pharmacology',
+  'toxicology',
+  'zoology',
+  'botany',
+  'evolution',
+  'anatomy',
+  'pathology',
+];
+
+const chemistryThemeSeeds = [
+  'water',
+  'glucose',
+  'caffeine',
+  'ethanol',
+  'citric',
+  'sodium',
+  'calcium',
+  'nitrogen',
+  'oxygen',
+  'sulfur',
+  'carbon',
+  'acetone',
+  'lactate',
+  'iodine',
+];
+
+function hashString(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function normaliseSourceText(value: unknown) {
+  return String(value ?? '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, '\'')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isSingleWordCandidate(value: string) {
+  return /^[A-Za-z0-9][A-Za-z0-9'’.-]*$/.test(value);
+}
+
+function pickDeterministicItem<T>(items: T[], pacificDateKey: string, key: string) {
+  if (!items.length) {
+    return null;
+  }
+  return items[hashString(`${pacificDateKey}:${key}`) % items.length];
+}
+
+function pickDailySeed(seeds: string[], pacificDateKey: string, key: string) {
+  return seeds[hashString(`${pacificDateKey}:${key}:seed`) % seeds.length];
+}
+
+function buildDefaultSourceHealth(note = 'Using fallback label until today\'s item is resolved.') {
+  return Object.fromEntries(widgetWordSourceKeys.map((key) => [
+    key,
+    {
+      ok: false,
+      note,
+      word: null,
+      href: null,
+    } satisfies WidgetSourceHealth,
+  ])) as Record<ActiveWidgetWordSourceKey, WidgetSourceHealth>;
+}
+
+function buildSourcePayload(
+  key: ActiveWidgetWordSourceKey,
+  health: WidgetSourceHealth,
+  checkedAt: string,
+) {
+  const source = widgetWordSourceDefinitions[key];
+  return {
+    key,
+    label: source.label,
+    word: health.word,
+    display: health.word || source.label,
+    href: health.href || (health.word && source.hrefForWord ? source.hrefForWord(health.word) : source.fallbackHref),
+    fallbackHref: source.fallbackHref,
+    providerType: source.providerType,
+    ok: health.ok,
+    fallback: !health.ok,
+    note: health.note,
+    checkedAt,
+  };
+}
+
+async function fetchDictionarySource({ fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  try {
+    const response = await fetch('https://www.dictionary.com/e/word-of-the-day/', fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const html = await response.text();
+    const match =
+      html.match(/"headword":"(.*?)"/i) ||
+      html.match(/<a class="wotd-entry-headword"[^>]*>(.*?)<\/a>/i) ||
+      html.match(/<div class="otd-item-headword__word">[\s\S]*?<h1>(.*?)<\/h1>/i) ||
+      html.match(/<title>Word of the Day: (.*?) \| Dictionary\.com<\/title>/i);
+
+    if (!match?.[1]) {
+      return {
+        ok: false,
+        note: 'Dictionary.com responded, but no daily headword matched the current parser.',
+        word: null,
+      };
+    }
+
+    const word = normaliseSourceText(match[1]);
+    return {
+      ok: true,
+      note: 'Live word loaded from the public Dictionary.com word-of-the-day page.',
+      word,
+    };
+  } catch (error) {
+    console.error('Dictionary WOTD fetch failed:', error);
+    return {
+      ok: false,
+      note: 'Dictionary.com request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchMerriamSource({ fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  try {
+    const response = await fetch('https://www.merriam-webster.com/wotd/feed/rss2', fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const xml = await response.text();
+    const match = xml.match(/<item>[\s\S]*?<title>(?:Word of the Day: )?(.*?)<\/title>/i);
+
+    if (!match?.[1]) {
+      return {
+        ok: false,
+        note: 'Merriam-Webster responded, but no RSS title matched the current parser.',
+        word: null,
+      };
+    }
+
+    const word = normaliseSourceText(match[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1'));
+    return {
+      ok: true,
+      note: 'Live word loaded from Merriam-Webster RSS.',
+      word,
+    };
+  } catch (error) {
+    console.error('Merriam WOTD fetch failed:', error);
+    return {
+      ok: false,
+      note: 'Merriam-Webster request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchWiktionarySource({ fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  try {
+    const response = await fetch('https://en.wiktionary.org/w/api.php?action=featuredfeed&feed=wotd&format=xml', fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const xml = await response.text();
+    const items = xml.split('<item>');
+    const lastItem = items[items.length - 1] || xml;
+    const match =
+      lastItem.match(/id=&quot;WOTD-rss-title&quot;&gt;(.*?)&lt;\/span&gt;/i) ||
+      lastItem.match(/id="WOTD-rss-title">(.*?)<\/span>/i) ||
+      lastItem.match(/<title>(?:Word of the day for .*: )?(.*?)<\/title>/i);
+
+    if (!match?.[1]) {
+      return {
+        ok: false,
+        note: 'Wiktionary responded, but no featured-feed title matched the current parser.',
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: 'Live word loaded from the Wiktionary featured feed.',
+      word: normaliseSourceText(match[1]),
+    };
+  } catch (error) {
+    console.error('Wiktionary WOTD fetch failed:', error);
+    return {
+      ok: false,
+      note: 'Wiktionary request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchVocabularySource({ fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  try {
+    const response = await fetch('https://www.vocabulary.com/word-of-the-day/', fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const html = await response.text();
+    const match =
+      html.match(/<title>Word of the day:\s*(.*?)\s*\|\s*Vocabulary\.com<\/title>/i) ||
+      html.match(/aria-label="dictionary page for today's word of the day - (.*?)"/i) ||
+      html.match(/class="word-of-the-day"[^>]*>\s*(.*?)\s*</i);
+
+    if (!match?.[1]) {
+      return {
+        ok: false,
+        note: 'Vocabulary.com responded, but no daily headword matched the current parser.',
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: 'Live word loaded from the public Vocabulary.com word-of-the-day page.',
+      word: normaliseSourceText(match[1]),
+    };
+  } catch (error) {
+    console.error('Vocabulary WOTD fetch failed:', error);
+    return {
+      ok: false,
+      note: 'Vocabulary.com request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchDatamuseSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  const seed = pickDailySeed(generalThemeSeeds, pacificDateKey, 'datamuse');
+  try {
+    const response = await fetch(`https://api.datamuse.com/words?rel_trg=${encodeURIComponent(seed)}&max=40`, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as Array<{ word?: string }>;
+    const candidates = payload
+      .map((entry) => normaliseSourceText(entry.word))
+      .filter((word) => isSingleWordCandidate(word) && word.toLowerCase() !== seed.toLowerCase());
+    const word = pickDeterministicItem(candidates, pacificDateKey, 'datamuse');
+
+    if (!word) {
+      return {
+        ok: false,
+        note: `Datamuse responded for seed "${seed}", but no clean single-word term was available.`,
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: `Daily related term selected from Datamuse using the Pacific-day theme "${seed}".`,
+      word,
+    };
+  } catch (error) {
+    console.error('Datamuse term fetch failed:', error);
+    return {
+      ok: false,
+      note: 'Datamuse request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchLocSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  const seed = pickDailySeed(generalThemeSeeds, pacificDateKey, 'loc');
+  try {
+    const response = await fetch(`https://id.loc.gov/authorities/subjects/suggest/?q=${encodeURIComponent(seed)}`, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as [string, string[], string[], string[]];
+    const labels = Array.isArray(payload?.[1]) ? payload[1] : [];
+    const hrefs = Array.isArray(payload?.[3]) ? payload[3] : [];
+    const candidates = labels
+      .map((label, index) => ({
+        word: normaliseSourceText(label),
+        href: normaliseSourceText(hrefs[index]),
+      }))
+      .filter((entry) => isSingleWordCandidate(entry.word) && entry.href);
+    const choice = pickDeterministicItem(candidates, pacificDateKey, 'loc');
+
+    if (!choice) {
+      return {
+        ok: false,
+        note: `Library of Congress responded for seed "${seed}", but no single-word subject heading fit the widget.`,
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: `Library of Congress subject heading selected from the Pacific-day theme "${seed}".`,
+      word: choice.word,
+      href: choice.href,
+    };
+  } catch (error) {
+    console.error('Library of Congress term fetch failed:', error);
+    return {
+      ok: false,
+      note: 'Library of Congress request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchOls4Source({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  const seed = pickDailySeed(scienceThemeSeeds, pacificDateKey, 'ols4');
+  try {
+    const response = await fetch(`https://www.ebi.ac.uk/ols4/api/search?q=${encodeURIComponent(seed)}&rows=25`, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as {
+      response?: {
+        docs?: Array<{ label?: string; iri?: string; ontology_prefix?: string; ontology_name?: string }>;
+      };
+    };
+    const candidates = (payload.response?.docs || [])
+      .map((entry) => ({
+        word: normaliseSourceText(entry.label),
+        href: normaliseSourceText(entry.iri),
+        source: normaliseSourceText(entry.ontology_prefix || entry.ontology_name),
+      }))
+      .filter((entry) => isSingleWordCandidate(entry.word) && entry.href);
+    const choice = pickDeterministicItem(candidates, pacificDateKey, 'ols4');
+
+    if (!choice) {
+      return {
+        ok: false,
+        note: `OLS4 responded for seed "${seed}", but no clean single-word ontology term was available.`,
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: `Ontology term selected from OLS4 using the Pacific-day science theme "${seed}"${choice.source ? ` (${choice.source})` : ''}.`,
+      word: choice.word,
+      href: choice.href,
+    };
+  } catch (error) {
+    console.error('OLS4 term fetch failed:', error);
+    return {
+      ok: false,
+      note: 'OLS4 request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchMeshSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  const seed = pickDailySeed(scienceThemeSeeds, pacificDateKey, 'mesh');
+  try {
+    const response = await fetch(`https://id.nlm.nih.gov/mesh/lookup/term?label=${encodeURIComponent(seed)}&match=contains&limit=25`, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as Array<{ label?: string; resource?: string }>;
+    const directCandidates = payload
+      .map((entry) => ({
+        word: normaliseSourceText(entry.label),
+        href: normaliseSourceText(entry.resource),
+      }))
+      .filter((entry) => isSingleWordCandidate(entry.word) && entry.href);
+    const derivedCandidates = payload
+      .flatMap((entry) => {
+        const href = normaliseSourceText(entry.resource);
+        const label = normaliseSourceText(entry.label);
+        if (!href || !label) {
+          return [];
+        }
+        return label
+          .split(/[;,()/]+/)
+          .map((part) => normaliseSourceText(part))
+          .filter(isSingleWordCandidate)
+          .map((word) => ({ word, href }));
+      });
+    const candidates = Array.from(new Map([...directCandidates, ...derivedCandidates].map((entry) => [`${entry.word}|${entry.href}`, entry])).values());
+    const choice = pickDeterministicItem(candidates, pacificDateKey, 'mesh');
+
+    if (!choice) {
+      return {
+        ok: false,
+        note: `MeSH responded for seed "${seed}", but no single-word descriptor fit the widget.`,
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: `Medical subject term selected from MeSH using the Pacific-day science theme "${seed}".`,
+      word: choice.word,
+      href: choice.href,
+    };
+  } catch (error) {
+    console.error('MeSH term fetch failed:', error);
+    return {
+      ok: false,
+      note: 'MeSH request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchPubChemSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  const seed = pickDailySeed(chemistryThemeSeeds, pacificDateKey, 'pubchem');
+  try {
+    const response = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(seed)}/json?limit=25`, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as {
+      dictionary_terms?: {
+        compound?: string[];
+      };
+    };
+    const candidates = (payload.dictionary_terms?.compound || [])
+      .map((entry) => normaliseSourceText(entry))
+      .filter((entry) => isSingleWordCandidate(entry) && entry.toLowerCase() !== seed.toLowerCase());
+    const word = pickDeterministicItem(candidates, pacificDateKey, 'pubchem');
+
+    if (!word) {
+      return {
+        ok: false,
+        note: `PubChem responded for seed "${seed}", but no single-word compound name was available.`,
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: `Chemistry term selected from PubChem autocomplete using the Pacific-day chemistry seed "${seed}".`,
+      word,
+    };
+  } catch (error) {
+    console.error('PubChem term fetch failed:', error);
+    return {
+      ok: false,
+      note: 'PubChem request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchMusicBrainzSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  try {
+    const response = await fetch('https://musicbrainz.org/ws/2/genre/all?fmt=json&limit=200', {
+      ...fetchOptions,
+      headers: {
+        ...(fetchOptions.headers || {}),
+        'User-Agent': 'JeffersonWM/1.0 (wm@wmjefferson.com)',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as { genres?: Array<{ id?: string; name?: string }> };
+    const candidates = (payload.genres || [])
+      .map((entry) => ({
+        word: normaliseSourceText(entry.name),
+        href: entry.id ? `https://musicbrainz.org/genre/${entry.id}` : '',
+      }))
+      .filter((entry) => isSingleWordCandidate(entry.word) && entry.href);
+    const choice = pickDeterministicItem(candidates, pacificDateKey, 'musicbrainz');
+
+    if (!choice) {
+      return {
+        ok: false,
+        note: 'MusicBrainz responded, but no single-word genre was available from the public genre list.',
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: 'Music genre selected from the public MusicBrainz genre catalog.',
+      word: choice.word,
+      href: choice.href,
+    };
+  } catch (error) {
+    console.error('MusicBrainz term fetch failed:', error);
+    return {
+      ok: false,
+      note: 'MusicBrainz request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchSportsDbSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  try {
+    const response = await fetch('https://www.thesportsdb.com/api/v1/json/3/all_sports.php', fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as { sports?: Array<{ strSport?: string }> };
+    const candidates = (payload.sports || [])
+      .map((entry) => normaliseSourceText(entry.strSport))
+      .filter(isSingleWordCandidate);
+    const word = pickDeterministicItem(candidates, pacificDateKey, 'sportsdb');
+
+    if (!word) {
+      return {
+        ok: false,
+        note: 'TheSportsDB responded, but no single-word sport label was available.',
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: 'Sport term selected from the public TheSportsDB catalog.',
+      word,
+    };
+  } catch (error) {
+    console.error('TheSportsDB term fetch failed:', error);
+    return {
+      ok: false,
+      note: 'TheSportsDB request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchMealDbSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  try {
+    const response = await fetch('https://www.themealdb.com/api/json/v1/1/list.php?c=list', fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as { meals?: Array<{ strCategory?: string }> };
+    const candidates = (payload.meals || [])
+      .map((entry) => normaliseSourceText(entry.strCategory))
+      .filter(isSingleWordCandidate);
+    const word = pickDeterministicItem(candidates, pacificDateKey, 'mealdb');
+
+    if (!word) {
+      return {
+        ok: false,
+        note: 'TheMealDB responded, but no single-word category was available.',
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: 'Culinary term selected from TheMealDB category list.',
+      word,
+    };
+  } catch (error) {
+    console.error('TheMealDB term fetch failed:', error);
+    return {
+      ok: false,
+      note: 'TheMealDB request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchTvMazeSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  const seed = pickDailySeed(mediaThemeSeeds, pacificDateKey, 'tvmaze');
+  try {
+    const response = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(seed)}`, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as Array<{ show?: { genres?: string[]; type?: string | null } }>;
+    const candidates = payload
+      .flatMap((entry) => [
+        ...(Array.isArray(entry.show?.genres) ? entry.show.genres : []),
+        normaliseSourceText(entry.show?.type),
+      ])
+      .map((value) => normaliseSourceText(value))
+      .filter((value) => isSingleWordCandidate(value) && value.toLowerCase() !== seed.toLowerCase());
+    const word = pickDeterministicItem(Array.from(new Set(candidates)), pacificDateKey, 'tvmaze');
+
+    if (!word) {
+      return {
+        ok: false,
+        note: `TVMaze responded for seed "${seed}", but no clean single-word genre or type was available.`,
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: `Entertainment term selected from TVMaze results using the Pacific-day theme "${seed}".`,
+      word,
+    };
+  } catch (error) {
+    console.error('TVMaze term fetch failed:', error);
+    return {
+      ok: false,
+      note: 'TVMaze request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchGbifSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  const seed = pickDailySeed(biologyThemeSeeds, pacificDateKey, 'gbif');
+  try {
+    const response = await fetch(`https://api.gbif.org/v1/species/suggest?q=${encodeURIComponent(seed)}&limit=30`, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as Array<{ key?: number; canonicalName?: string; rank?: string }>;
+    const candidates = payload
+      .map((entry) => ({
+        word: normaliseSourceText(entry.canonicalName),
+        href: typeof entry.key === 'number' ? `https://www.gbif.org/species/${entry.key}` : '',
+        rank: normaliseSourceText(entry.rank),
+      }))
+      .filter((entry) => entry.href && isSingleWordCandidate(entry.word) && ['GENUS', 'FAMILY', 'ORDER'].includes(entry.rank));
+    const choice = pickDeterministicItem(candidates, pacificDateKey, 'gbif');
+
+    if (!choice) {
+      return {
+        ok: false,
+        note: `GBIF responded for seed "${seed}", but no single-word higher-taxon match was available.`,
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: `Biology term selected from GBIF using the Pacific-day theme "${seed}".`,
+      word: choice.word,
+      href: choice.href,
+    };
+  } catch (error) {
+    console.error('GBIF term fetch failed:', error);
+    return {
+      ok: false,
+      note: 'GBIF request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchNasaApodSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  try {
+    const response = await fetch(`https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&date=${encodeURIComponent(pacificDateKey)}`, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as { title?: string; url?: string; hdurl?: string };
+    const href = normaliseSourceText(payload.hdurl || payload.url);
+    const title = normaliseSourceText(payload.title) || 'APOD';
+
+    if (!href) {
+      return {
+        ok: false,
+        note: `NASA APOD responded for ${pacificDateKey}, but did not include a usable media URL.`,
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: `NASA Astronomy Picture of the Day loaded for Pacific day ${pacificDateKey}: ${title}.`,
+      word: title,
+      href,
+    };
+  } catch (error) {
+    console.error('NASA APOD fetch failed:', error);
+    return {
+      ok: false,
+      note: 'NASA APOD request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+async function fetchWikipediaPotdSource({ pacificDateKey, fetchOptions }: WidgetSourceFetchContext): Promise<WidgetSourceHealth> {
+  const [year, month, day] = pacificDateKey.split('-');
+  try {
+    const response = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/featured/${year}/${month}/${day}`, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json() as { image?: { file_page?: string; title?: string } };
+    const href = normaliseSourceText(payload.image?.file_page);
+    const title = normaliseSourceText(payload.image?.title)
+      .replace(/^File:/i, '')
+      .replace(/\.[A-Za-z0-9]{2,5}$/i, '')
+      || 'POTD';
+
+    if (!href) {
+      return {
+        ok: false,
+        note: `Wikipedia featured feed responded for ${pacificDateKey}, but no picture-of-the-day page was present.`,
+        word: null,
+      };
+    }
+
+    return {
+      ok: true,
+      note: `Wikipedia featured image loaded for Pacific day ${pacificDateKey}: ${title}.`,
+      word: title,
+      href,
+    };
+  } catch (error) {
+    console.error('Wikipedia featured image fetch failed:', error);
+    return {
+      ok: false,
+      note: 'Wikipedia featured image request failed; using fallback label.',
+      word: null,
+    };
+  }
+}
+
+const widgetWordSourceFetchers: Record<WidgetWordSourceKey, (context: WidgetSourceFetchContext) => Promise<WidgetSourceHealth>> = {
+  dictionary: fetchDictionarySource,
+  merriam: fetchMerriamSource,
+  wiktionary: fetchWiktionarySource,
+  vocabulary: fetchVocabularySource,
+  datamuse: fetchDatamuseSource,
+  loc: fetchLocSource,
+  ols4: fetchOls4Source,
+  mesh: fetchMeshSource,
+  pubchem: fetchPubChemSource,
+  musicbrainz: fetchMusicBrainzSource,
+  sportsdb: fetchSportsDbSource,
+  mealdb: fetchMealDbSource,
+  tvmaze: fetchTvMazeSource,
+  gbif: fetchGbifSource,
+  nasaApod: fetchNasaApodSource,
+  wikipediaPotd: fetchWikipediaPotdSource,
 };
 
 const defaultWidgetPreference = {
@@ -94,7 +1101,21 @@ const defaultWidgetPreference = {
   weather_unit: 'fahrenheit',
 };
 
-let wotdCache: { data: WidgetWords; timestamp: number } | null = null;
+let wotdCache: { data: WidgetWordsPayload; pacificDateKey: string } | null = null;
+
+function getPacificDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const year = parts.find(part => part.type === 'year')?.value ?? '0000';
+  const month = parts.find(part => part.type === 'month')?.value ?? '00';
+  const day = parts.find(part => part.type === 'day')?.value ?? '00';
+  return `${year}-${month}-${day}`;
+}
 
 const dbConfig = {
   host: process.env.JEFFERSONWM_WIDGET_DB_HOST || process.env.MYSQL_HOST,
@@ -342,7 +1363,7 @@ async function getUserPreference(authUserId: string) {
   }
 
   const [rows] = await pool.query(
-    `SELECT auth_user_id, location_label, latitude, longitude, weather_unit
+    `SELECT auth_user_id, display_name, location_label, latitude, longitude, weather_unit
      FROM user_widget_preferences
      WHERE auth_user_id = ?
      LIMIT 1`,
@@ -367,68 +1388,50 @@ async function getFonts() {
 }
 
 async function getWidgetWords() {
-  if (wotdCache && Date.now() - wotdCache.timestamp < 60 * 60 * 1000) {
+  const pacificDateKey = getPacificDateKey();
+  if (wotdCache && wotdCache.pacificDateKey === pacificDateKey) {
     return wotdCache.data;
   }
 
   const fetchOptions = {
     headers: {
       'User-Agent': 'Mozilla/5.0',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
     },
   };
 
   const result: WidgetWords = { ...fallbackWords };
+  const sourceHealth = buildDefaultSourceHealth();
+  const checkedAt = new Date().toISOString();
+  const healthResults = await Promise.all(widgetWordSourceKeys.map(async (key) => {
+    const health = await widgetWordSourceFetchers[key]({
+      pacificDateKey,
+      checkedAt,
+      fetchOptions,
+    });
+    return [key, health] as const;
+  }));
 
-  try {
-    const dictionaryResponse = await fetch('https://www.dictionary.com/e/word-of-the-day/', fetchOptions);
-    const dictionaryHtml = await dictionaryResponse.text();
-    const dictionaryMatch =
-      dictionaryHtml.match(/<div class="otd-item-headword__word">[\s\S]*?<h1>(.*?)<\/h1>/i) ||
-      dictionaryHtml.match(/<title>Word of the Day: (.*?) \| Dictionary\.com<\/title>/i);
-
-    if (dictionaryMatch?.[1]) {
-      result.dictionary = dictionaryMatch[1].replace(/<[^>]*>/g, '').trim();
+  for (const [key, health] of healthResults) {
+    sourceHealth[key] = health;
+    if (health.word) {
+      result[key] = health.word;
     }
-  } catch (error) {
-    console.error('Dictionary WOTD fetch failed:', error);
   }
 
-  try {
-    const merriamResponse = await fetch('https://www.merriam-webster.com/wotd/feed/rss2', fetchOptions);
-    const merriamXml = await merriamResponse.text();
-    const merriamMatch = merriamXml.match(/<item>[\s\S]*?<title>(?:Word of the Day: )?(.*?)<\/title>/i);
-
-    if (merriamMatch?.[1]) {
-      result.merriam = merriamMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
-    }
-  } catch (error) {
-    console.error('Merriam WOTD fetch failed:', error);
-  }
-
-  try {
-    const wiktionaryResponse = await fetch('https://en.wiktionary.org/w/api.php?action=featuredfeed&feed=wotd&format=xml', fetchOptions);
-    const wiktionaryXml = await wiktionaryResponse.text();
-    const items = wiktionaryXml.split('<item>');
-    const lastItem = items[items.length - 1] || wiktionaryXml;
-    const wiktionaryMatch =
-      lastItem.match(/id=&quot;WOTD-rss-title&quot;&gt;(.*?)&lt;\/span&gt;/i) ||
-      lastItem.match(/id="WOTD-rss-title">(.*?)<\/span>/i) ||
-      lastItem.match(/<title>(?:Word of the day for .*: )?(.*?)<\/title>/i);
-
-    if (wiktionaryMatch?.[1]) {
-      result.wiktionary = wiktionaryMatch[1].replace(/<[^>]*>/g, '').trim();
-    }
-  } catch (error) {
-    console.error('Wiktionary WOTD fetch failed:', error);
-  }
-
-  wotdCache = {
-    data: result,
-    timestamp: Date.now(),
+  const payload: WidgetWordsPayload = {
+    pacificDateKey,
+    generatedAt: checkedAt,
+    sources: widgetWordSourceKeys.map((key) => buildSourcePayload(key, sourceHealth[key], checkedAt)),
+    words: result,
   };
 
-  return result;
+  wotdCache = {
+    data: payload,
+    pacificDateKey,
+  };
+
+  return payload;
 }
 
 async function buildWidgetAccountPayload(authUserId: string, useStoredPreference = true) {
@@ -530,7 +1533,22 @@ app.get('/health', async (_req, res) => {
     dbOk,
     dbError,
     writeAccess: adminToken ? 'token-required' : 'disabled',
+    projectActivity: projectActivityService.getStatus(),
   });
+});
+
+app.get('/api/project-activity', async (_req, res) => {
+  try {
+    const snapshot = await projectActivityService.getSnapshot();
+    res.json(snapshot);
+  } catch (error) {
+    const status = projectActivityService.getStatus();
+    res.status(503).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Project activity could not be loaded.',
+      status,
+    });
+  }
 });
 
 app.get('/api/widget/schema', (_req, res) => {
@@ -547,15 +1565,64 @@ app.get('/api/widget/schema', (_req, res) => {
   });
 });
 
-app.get('/api/account/me', (_req, res) => {
-  const username = getCurrentUserId();
+app.get('/api/account/me', async (req, res) => {
+  const authUser = await getAuthUser(req);
+  const username = getWidgetUserId(authUser);
+  const preference = authUser ? await getUserPreference(username) : null;
 
   res.json({
     ok: true,
-    authenticated: false,
+    authenticated: Boolean(authUser),
     username,
-    displayName: process.env.JEFFERSONWM_DEV_DISPLAY_NAME || username,
-    authProvider: 'pending',
+    displayName:
+      preference?.display_name ||
+      authUser?.displayName ||
+      process.env.JEFFERSONWM_DEV_DISPLAY_NAME ||
+      username,
+    authProvider: authUser ? 'central' : 'pending',
+    isAdmin: Boolean(authUser?.isAdmin),
+    isOwner: Boolean(authUser?.isOwner),
+    isApproved: Boolean(authUser?.isApproved),
+    isBlocked: Boolean(authUser?.isBlocked),
+    isDeleted: Boolean(authUser?.isDeleted),
+    memberships: Array.isArray(authUser?.memberships) ? authUser.memberships : [],
+  });
+});
+
+app.put('/api/account/me', async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  const authUser = await getAuthUser(req);
+  if (!authUser) {
+    res.status(401).json({ ok: false, error: 'Sign in before editing your account name.' });
+    return;
+  }
+
+  const authUserId = getWidgetUserId(authUser);
+  const displayNameRaw = typeof req.body?.displayName === 'string' ? req.body.displayName : '';
+  const displayName = displayNameRaw.trim() || null;
+
+  await db.execute(
+    `INSERT INTO user_widget_preferences (auth_user_id, display_name)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE
+       display_name = VALUES(display_name)`,
+    [authUserId, displayName],
+  );
+
+  res.json({
+    ok: true,
+    authenticated: true,
+    username: authUserId,
+    displayName: displayName || authUser.displayName || authUser.username || authUserId,
+    isAdmin: Boolean(authUser.isAdmin),
+    isOwner: Boolean(authUser.isOwner),
+    isApproved: Boolean(authUser.isApproved),
+    isBlocked: Boolean(authUser.isBlocked),
+    isDeleted: Boolean(authUser.isDeleted),
   });
 });
 
@@ -898,11 +1965,34 @@ app.get('/api/widget/wotd', async (_req, res) => {
   try {
     res.json(await getWidgetWords());
   } catch (error) {
-    console.error('Widget WOTD could not be loaded:', error);
-    res.json(fallbackWords);
+    console.error('Widget discovery sources could not be loaded:', error);
+    const checkedAt = new Date().toISOString();
+    res.json({
+      pacificDateKey: getPacificDateKey(),
+      generatedAt: checkedAt,
+      sources: widgetWordSourceKeys.map((key) => {
+        const source = widgetWordSourceDefinitions[key];
+        return {
+          key,
+          label: source.label,
+          word: null,
+          display: source.label,
+          href: source.fallbackHref,
+          fallbackHref: source.fallbackHref,
+          providerType: source.providerType,
+          ok: false,
+          fallback: true,
+          note: 'The widget API could not load this source and returned the fallback label.',
+          checkedAt,
+        };
+      }),
+      words: fallbackWords,
+    } satisfies WidgetWordsPayload);
   }
 });
 
 app.listen(port, () => {
   console.log(`JeffersonWM API listening on http://localhost:${port}`);
 });
+
+projectActivityService.start();

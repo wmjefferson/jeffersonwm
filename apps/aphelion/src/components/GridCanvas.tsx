@@ -42,15 +42,22 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
   const hoverDelayRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [settledHoverState, setSettledHoverState] = useState<HoverState | null>(null);
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 800, height: 600 });
-  const [fps, setFps] = useState<number>(60);
 
   const fpsFrameCount = useRef(0);
   const fpsLastTime = useRef(performance.now());
 
-  // Observe container size
+  const highlightedBlocksRef = useRef(highlightedBlocks);
+  highlightedBlocksRef.current = highlightedBlocks;
+
+  const hoverStateRef = useRef(hoverState);
+  hoverStateRef.current = hoverState;
+
+  const settledHoverStateRef = useRef(settledHoverState);
+  settledHoverStateRef.current = settledHoverState;
+
+  // Observe container size changes
   useEffect(() => {
     if (!containerRef.current) return;
-
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
@@ -59,27 +66,24 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
         }
       }
     });
-
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
 
+  // Settled hover state — instant on click/pin, debounced on hover move
   useEffect(() => {
     if (hoverDelayRef.current) {
       window.clearTimeout(hoverDelayRef.current);
       hoverDelayRef.current = null;
     }
-
     if (hoverState?.pinned) {
       setSettledHoverState(hoverState);
       return;
     }
-
     hoverDelayRef.current = window.setTimeout(() => {
       setSettledHoverState(hoverState);
       hoverDelayRef.current = null;
     }, 250);
-
     return () => {
       if (hoverDelayRef.current) {
         window.clearTimeout(hoverDelayRef.current);
@@ -88,7 +92,20 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
     };
   }, [hoverState]);
 
-  // Render loop
+  // Resize canvas bitmap only when container dimensions physically change
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const { width, height } = dimensions;
+    if (width <= 0 || height <= 0) return;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+  }, [dimensions]);
+
+  // Render loop — all mutable values read via refs so the loop never restarts on state changes
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -99,12 +116,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
     const width = dimensions.width;
     const height = dimensions.height;
 
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-
-    ctx.scale(dpr, dpr);
+    // Reset transform matrix for HiDPI scaling without clearing or reallocating the canvas GPU buffer
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const { cols, rows, cellWidth, cellHeight, totalBlocks } = config;
     const zones = config.zones;
@@ -241,7 +254,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
       }
     }
 
-    for (const index of highlightedBlocks) {
+    // Read highlighted blocks from ref — never stale, never causes loop restart
+    for (const index of highlightedBlocksRef.current) {
       const coords = getCoordsFromIndex(index, config);
       if (!coords) {
         continue;
@@ -254,7 +268,9 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
       ctx.strokeRect(coords.x, coords.y, coords.width, coords.height);
     }
 
-    const hoverOverlay = settledHoverState || (hoverState?.pinned ? hoverState : null);
+    const currentHoverState = hoverStateRef.current;
+    const currentSettledHoverState = settledHoverStateRef.current;
+    const hoverOverlay = currentSettledHoverState || (currentHoverState?.pinned ? currentHoverState : null);
     if (hoverOverlay) {
       const coords = getCoordsFromIndex(hoverOverlay.index, config);
       if (coords) {
@@ -266,8 +282,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
       }
     }
 
-    if (hoverState && !hoverState.pinned) {
-      const coords = getCoordsFromIndex(hoverState.index, config);
+    if (currentHoverState && !currentHoverState.pinned) {
+      const coords = getCoordsFromIndex(currentHoverState.index, config);
       if (coords) {
         ctx.strokeStyle = 'rgba(254, 240, 138, 0.95)';
         ctx.lineWidth = 1;
@@ -277,27 +293,29 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
       }
     }
 
-    // Calculate FPS
+    // FPS tracking via refs — no setState, no re-render
     fpsFrameCount.current += 1;
     const nowTime = performance.now();
     if (nowTime - fpsLastTime.current >= 1000) {
-      setFps(Math.round((fpsFrameCount.current * 1000) / (nowTime - fpsLastTime.current)));
-      fpsFrameCount.current = 0;
       fpsLastTime.current = nowTime;
+      fpsFrameCount.current = 0;
     }
-  }, [dimensions, config, overlayMode, searchResults, searchFilter, highlightedBlocks, hoverState, settledHoverState]);
+  }, [dimensions, config, overlayMode, searchResults, searchFilter]);
+
+  const drawCanvasRef = useRef(drawCanvas);
+  drawCanvasRef.current = drawCanvas;
 
   useEffect(() => {
     let animationFrameId: number;
     const render = () => {
-      drawCanvas();
+      drawCanvasRef.current();
       animationFrameId = requestAnimationFrame(render);
     };
-    render();
+    animationFrameId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [drawCanvas]);
+  }, []);
 
-  // Mouse event handling
+  // Mouse & touch event handling
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (hoverState?.pinned) return;
 
@@ -326,6 +344,58 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
     }
   };
 
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (hoverState?.pinned) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas || e.touches.length === 0) return;
+
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    const cellInfo = getIndexFromCoords(x, y, config);
+
+    if (cellInfo && cellInfo.index >= 0 && cellInfo.index < config.totalBlocks) {
+      const image = getImageByIndex(cellInfo.index);
+      onHover({
+        index: cellInfo.index,
+        x: touch.clientX,
+        y: touch.clientY,
+        col: cellInfo.col,
+        row: cellInfo.row,
+        image,
+        pinned: false,
+      });
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || e.touches.length === 0) return;
+
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    const cellInfo = getIndexFromCoords(x, y, config);
+
+    if (cellInfo && cellInfo.index >= 0 && cellInfo.index < config.totalBlocks) {
+      const image = getImageByIndex(cellInfo.index);
+      onHover({
+        index: cellInfo.index,
+        x: touch.clientX,
+        y: touch.clientY,
+        col: cellInfo.col,
+        row: cellInfo.row,
+        image,
+        pinned: false,
+      });
+    }
+  };
+
   const handleMouseLeave = () => {
     if (!hoverState?.pinned) {
       onHover(null);
@@ -343,6 +413,15 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
     const cellInfo = getIndexFromCoords(x, y, config);
     if (cellInfo && cellInfo.index >= 0 && cellInfo.index < config.totalBlocks) {
       const image = getImageByIndex(cellInfo.index);
+      onHover({
+        index: cellInfo.index,
+        x: e.clientX,
+        y: e.clientY,
+        col: cellInfo.col,
+        row: cellInfo.row,
+        image,
+        pinned: true,
+      });
       onClickBlock(image, cellInfo.index);
     }
   };
@@ -356,6 +435,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         className="block cursor-crosshair touch-none"
       />
 

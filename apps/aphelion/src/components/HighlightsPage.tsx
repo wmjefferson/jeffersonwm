@@ -77,9 +77,6 @@ export function HighlightsPage({ apiBaseUrl }: { apiBaseUrl: string }) {
           <a href="/aphelion/" className="hover:text-[#de8bf7]">
             Back
           </a>
-          <a href="/aphelion/#admin" className="hover:text-[#de8bf7]">
-            Admin
-          </a>
         </div>
       </header>
 

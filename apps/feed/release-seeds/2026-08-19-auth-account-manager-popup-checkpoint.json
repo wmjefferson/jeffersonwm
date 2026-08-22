@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Auth account manager popup checkpoint",
+  "content": "<p>Auth JeffersonWM got a cleaner account-management flow today. The owner can now create new accounts and edit existing ones from a shared popup, which keeps the Accounts page readable while still exposing the controls needed for username, display name, password resets, account type, account state, request notes, owner notes, and app memberships.</p><p>What worked:</p><ul><li><strong>One shared modal:</strong> the same popup pattern now handles both create and edit, so the page does not have to carry two inline editor blocks.</li><li><strong>Cleaner Accounts page:</strong> the account list stays focused on review and action buttons, while the heavier form fields only appear when needed.</li><li><strong>Owner-only control stays intact:</strong> regular admins still review accounts, but preferred admin can open the modal and manage the account records directly.</li></ul><p>What changed:</p><ul><li>Added a Create Account button that opens the shared modal instead of expanding a large form inside the page.</li><li>Moved Edit into the same popup flow so save closes the modal automatically after updates.</li><li>Kept app membership toggles, account state, notes, and password reset fields inside the modal so the record can be adjusted in one pass.</li></ul><p>This keeps Auth feeling more like a proper admin console and less like a long form tucked into the middle of a list.</p>",
+  "url": "https://auth.jeffersonwm.com/",
+  "source": "manual",
+  "external_id": "auth-account-manager-popup-checkpoint-2026-08-19",
+  "created_at": "2026-08-19 20:43:00"
+}

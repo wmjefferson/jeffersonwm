@@ -699,7 +699,24 @@ a {
   text-decoration: none;
 }
 
+.github-group-toggle {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .entry-title-link:hover {
+  color: #1f4fd6;
+}
+
+.github-group-toggle:hover {
   color: #1f4fd6;
 }
 
@@ -727,6 +744,36 @@ a {
   color: rgba(17, 24, 39, 0.68);
   font-size: 0.98rem;
   line-height: 1.6;
+}
+
+.github-group-list {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(17, 24, 39, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  overflow: hidden;
+}
+
+.github-group-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.github-group-list-title {
+  min-width: 0;
+  line-height: 1.5;
+}
+
+.github-group-list-detail {
+  color: rgba(17, 24, 39, 0.68);
+}
+
+.github-group-list-time {
+  flex-shrink: 0;
 }
 
 .feed-html a,

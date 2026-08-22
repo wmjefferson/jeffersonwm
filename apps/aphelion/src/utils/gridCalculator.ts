@@ -74,14 +74,24 @@ function countFrameBlocks(width: number, height: number, centerSize: number, cel
   }, 0);
 }
 
+/** Minimum gap (px) between block edges and container/center-square borders */
+const ZONE_PADDING = 4;
+
 function buildFrameZones(width: number, height: number, centerSize: number, cellSize: number) {
   const { centerSquare, rects } = getFrameZoneRects(width, height, centerSize);
   let startIndex = 0;
   const zones: GridZone[] = [];
 
   for (const rect of rects) {
-    const cols = Math.max(0, Math.floor(rect.width / cellSize));
-    const rows = Math.max(0, Math.floor(rect.height / cellSize));
+    // Shrink each rect inward by ZONE_PADDING on every side so blocks never
+    // touch the container edges or the center-square border.
+    const px = rect.x + ZONE_PADDING;
+    const py = rect.y + ZONE_PADDING;
+    const pw = rect.width - ZONE_PADDING * 2;
+    const ph = rect.height - ZONE_PADDING * 2;
+
+    const cols = Math.max(0, Math.floor(pw / cellSize));
+    const rows = Math.max(0, Math.floor(ph / cellSize));
     const totalBlocks = cols * rows;
 
     if (totalBlocks === 0) {
@@ -89,11 +99,15 @@ function buildFrameZones(width: number, height: number, centerSize: number, cell
     }
 
     zones.push({
-      ...rect,
+      name: rect.name,
+      x: px,
+      y: py,
+      width: pw,
+      height: ph,
       cols,
       rows,
-      cellWidth: rect.width / cols,
-      cellHeight: rect.height / rows,
+      cellWidth: pw / cols,
+      cellHeight: ph / rows,
       startIndex,
       totalBlocks,
     });
@@ -103,19 +117,104 @@ function buildFrameZones(width: number, height: number, centerSize: number, cell
   return { centerSquare, zones, totalBlocks: startIndex };
 }
 
+const LAYOUT_CACHE_KEY = 'aphelion_grid_layout_v2';
+
+/**
+ * In-memory layout cache keyed by "width|height".
+ * Once a layout is computed for a viewport size, positions are locked until the
+ * window resizes or the cache is explicitly cleared.
+ */
+const layoutMemoryCache = new Map<string, GridConfig>();
+
+/**
+ * Persist the layout cache to localStorage so positions survive page reloads.
+ * Only stores the config for the current viewport dimensions.
+ */
+function saveLayoutToStorage(key: string, config: GridConfig): void {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LAYOUT_CACHE_KEY) || '{}');
+    stored[key] = config;
+    localStorage.setItem(LAYOUT_CACHE_KEY, JSON.stringify(stored));
+  } catch {
+    // localStorage unavailable — silent fail, memory cache still works
+  }
+}
+
+/**
+ * Load a previously saved layout from localStorage.
+ */
+function loadLayoutFromStorage(key: string): GridConfig | null {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LAYOUT_CACHE_KEY) || '{}');
+    return stored[key] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Evict old viewport entries from both caches so only the current viewport is retained.
+ * Call this when the viewport changes.
+ */
+export function evictLayoutCache(currentWidth: number, currentHeight: number): void {
+  const currentKey = `${Math.round(currentWidth)}|${Math.round(currentHeight)}`;
+  for (const key of layoutMemoryCache.keys()) {
+    if (key !== currentKey) {
+      layoutMemoryCache.delete(key);
+    }
+  }
+  try {
+    const stored = JSON.parse(localStorage.getItem(LAYOUT_CACHE_KEY) || '{}');
+    const evicted: Record<string, GridConfig> = {};
+    if (stored[currentKey]) evicted[currentKey] = stored[currentKey];
+    localStorage.setItem(LAYOUT_CACHE_KEY, JSON.stringify(evicted));
+  } catch {
+    // silent fail
+  }
+}
+
 /**
  * Calculates a four-zone grid that reserves a centered square for image preview.
  * Blocks are placed only in the top, bottom, left, and right regions.
+ *
+ * Layout positions are **locked** per viewport size once first computed — they will
+ * not shift when targetCount changes (e.g., when server images load), when the page
+ * flashes, or on subsequent renders. Positions only update when the window resizes.
  */
 export function calculateFrameGrid(
   viewportWidth: number,
   viewportHeight: number,
   targetCount: number = 9170,
-  centerSize: number = 640
+  centerSize?: number
 ): GridConfig {
   const width = Math.max(100, viewportWidth);
   const height = Math.max(100, viewportHeight);
-  const safeCenterSize = Math.max(120, Math.min(centerSize, width, height));
+  const layoutKey = `${Math.round(width)}|${Math.round(height)}`;
+
+  // Return the locked layout if we already have one for these dimensions.
+  // targetCount changes (e.g., server images loading) will NOT shift block positions.
+  const memoryCached = layoutMemoryCache.get(layoutKey);
+  if (memoryCached) {
+    return memoryCached;
+  }
+
+  const storedLayout = loadLayoutFromStorage(layoutKey);
+  if (storedLayout) {
+    layoutMemoryCache.set(layoutKey, storedLayout);
+    return storedLayout;
+  }
+
+  const minDimension = Math.min(width, height);
+
+  // Proportional sizing: on regular 1440x900 desktop, center square is 640px for an 828px viewport height (~77.3%).
+  const proportionalSize = Math.min(640, Math.round(minDimension * (640 / 828)));
+  const targetCenterSize = typeof centerSize === 'number' && centerSize > 0
+    ? Math.min(centerSize, proportionalSize)
+    : proportionalSize;
+
+  // Leave room for frame borders and surrounding blocks on all sides
+  const maxSafeSize = Math.max(60, minDimension - 24);
+  const safeCenterSize = Math.max(60, Math.min(targetCenterSize, maxSafeSize));
 
   let low = 1;
   let high = Math.max(width, height);
@@ -137,7 +236,7 @@ export function calculateFrameGrid(
     null
   );
 
-  return {
+  const config: GridConfig = {
     targetCount,
     cols: largestZone?.cols || 1,
     rows: largestZone?.rows || 1,
@@ -148,6 +247,12 @@ export function calculateFrameGrid(
     centerSquare,
     zones,
   };
+
+  // Lock these positions in memory and localStorage
+  layoutMemoryCache.set(layoutKey, config);
+  saveLayoutToStorage(layoutKey, config);
+
+  return config;
 }
 
 /**

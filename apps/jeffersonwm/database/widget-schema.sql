@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS widget_special_dates (
 CREATE TABLE IF NOT EXISTS user_widget_preferences (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   auth_user_id VARCHAR(255) NOT NULL,
+  display_name VARCHAR(255) NULL,
   location_label VARCHAR(255) NULL,
   latitude DECIMAL(10, 7) NULL,
   longitude DECIMAL(10, 7) NULL,

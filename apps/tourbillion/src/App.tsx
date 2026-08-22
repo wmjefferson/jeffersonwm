@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { AnimatePresence } from 'motion/react';
 
 import { DEFAULT_SETTINGS, TRAIN_QUALITY_PROFILES } from './constants';
@@ -360,18 +360,29 @@ export default function App() {
   };
 
   const toggleFullscreen = async () => {
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      // Ignore errors if fullscreen request or exit is rejected
+    }
+  };
+
+  const handleDoubleClick = (e: MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('#settings-panel, #settings-trigger, #fullscreen-trigger')) {
       return;
     }
-
-    await document.documentElement.requestFullscreen();
+    toggleFullscreen().catch(() => undefined);
   };
 
   return (
     <div 
       className={`fixed inset-0 bg-black transition-all duration-700 ${isMouseIdle ? 'cursor-none' : 'cursor-default'}`}
       id="screensaver-container"
+      onDoubleClick={handleDoubleClick}
     >
       <div 
         className={`fixed inset-0 bg-black pointer-events-none transition-opacity duration-1000 z-[40] ${

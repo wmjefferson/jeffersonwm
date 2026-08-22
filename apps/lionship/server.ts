@@ -5,11 +5,36 @@ import mysql from 'mysql2/promise';
 import cors from 'cors';
 import path from 'path';
 
+type AuthStatusUser = {
+  id: string;
+  username: string;
+  displayName?: string | null;
+  isAdmin: boolean;
+  isOwner: boolean;
+  isApproved: boolean;
+  isBlocked: boolean;
+  isDeleted: boolean;
+  memberships?: string[];
+};
+
+type LinkRecord = {
+  id: string;
+  title: string;
+  url: string;
+  acronym: string;
+  category: string;
+  tags?: string | null;
+  scope?: string | null;
+  owner_user_id?: string | null;
+};
+
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || '8040');
   const HOST = process.env.HOST || '0.0.0.0';
   const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+  const AUTH_BASE_URL = (process.env.AUTH_BASE_URL || 'https://auth.jeffersonwm.com').replace(/\/$/, '');
+  const AUTH_INTERNAL_LOG_TOKEN = (process.env.AUTH_INTERNAL_LOG_TOKEN || '').trim();
   const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
     .map(origin => origin.trim())
@@ -35,6 +60,7 @@ async function startServer() {
   let pool: mysql.Pool | null = null;
   let widgetEventsSchemaReady: Promise<void> | null = null;
   let widgetFontsSchemaReady: Promise<void> | null = null;
+  let authStatusCache: { token: string; user: AuthStatusUser | null; timestamp: number } | null = null;
   const FALLBACK_FONTS = ['Inter', 'Roboto', 'Open Sans', 'Playfair Display', 'Outfit'];
   const WIDGET_FONT_WEIGHT_MIN = 1;
   const WIDGET_FONT_WEIGHT_MAX = 5;
@@ -85,23 +111,34 @@ async function startServer() {
           title VARCHAR(255) NOT NULL,
           url TEXT NOT NULL,
           acronym VARCHAR(50),
-          category VARCHAR(100)
+          category VARCHAR(100),
+          tags TEXT NULL,
+          scope VARCHAR(20) NOT NULL DEFAULT 'global',
+          owner_user_id VARCHAR(255) NULL
         )
       `).then(async () => {
         console.log('Links table ready.');
         try {
-          const [columns] = await pool!.query(
-            `SELECT COUNT(*) AS count
-             FROM information_schema.COLUMNS
-             WHERE TABLE_SCHEMA = ?
-               AND TABLE_NAME = 'links'
-               AND COLUMN_NAME = 'tags'`,
-             [process.env.MYSQL_DATABASE]
-          );
-          const count = Number((columns as Array<{ count?: number }>)[0]?.count || 0);
-          if (count === 0) {
-            await pool!.execute('ALTER TABLE links ADD COLUMN tags TEXT NULL');
-            console.log('Added tags column to links table.');
+          const columnsToCheck = [
+            { column: 'tags', sql: 'ALTER TABLE links ADD COLUMN tags TEXT NULL' },
+            { column: 'scope', sql: "ALTER TABLE links ADD COLUMN scope VARCHAR(20) NOT NULL DEFAULT 'global'" },
+            { column: 'owner_user_id', sql: 'ALTER TABLE links ADD COLUMN owner_user_id VARCHAR(255) NULL' },
+          ] as const;
+
+          for (const entry of columnsToCheck) {
+            const [columns] = await pool!.query(
+              `SELECT COUNT(*) AS count
+               FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = ?
+                 AND TABLE_NAME = 'links'
+                 AND COLUMN_NAME = ?`,
+              [process.env.MYSQL_DATABASE, entry.column]
+            );
+            const count = Number((columns as Array<{ count?: number }>)[0]?.count || 0);
+            if (count === 0) {
+              await pool!.execute(entry.sql);
+              console.log(`Added ${entry.column} column to links table.`);
+            }
           }
         } catch (colErr) {
           console.error('Error checking or adding tags column:', colErr);
@@ -117,6 +154,115 @@ async function startServer() {
   };
 
   initDb();
+
+  const authCookieFromRequest = (req: express.Request) => req.get('cookie') || '';
+
+  const getAuthUser = async (req: express.Request) => {
+    const cookie = authCookieFromRequest(req);
+    const cacheKey = cookie || 'anonymous';
+    if (authStatusCache && authStatusCache.token === cacheKey && (Date.now() - authStatusCache.timestamp) < 15_000) {
+      return authStatusCache.user;
+    }
+
+    try {
+      const response = await fetch(`${AUTH_BASE_URL}/api/auth/status`, {
+        headers: cookie ? { cookie } : {},
+      });
+
+      if (!response.ok) {
+        authStatusCache = { token: cacheKey, user: null, timestamp: Date.now() };
+        return null;
+      }
+
+      const payload = await response.json() as { user?: AuthStatusUser | null };
+      const user = payload.user ?? null;
+      const isAllowed = Boolean(user && user.isApproved && !user.isBlocked && !user.isDeleted);
+      const resolvedUser = isAllowed ? user : null;
+
+      authStatusCache = { token: cacheKey, user: resolvedUser, timestamp: Date.now() };
+      return resolvedUser;
+    } catch (error) {
+      console.error('Auth status lookup failed:', error);
+      authStatusCache = { token: cacheKey, user: null, timestamp: Date.now() };
+      return null;
+    }
+  };
+
+  const requireAuthenticatedUser = async (req: express.Request, res: express.Response) => {
+    const user = await getAuthUser(req);
+    if (!user) {
+      res.status(401).json({ error: 'Sign in with an approved Lionship account to access this site.' });
+      return null;
+    }
+    return user;
+  };
+
+  const requireAdminUser = async (req: express.Request, res: express.Response) => {
+    const user = await requireAuthenticatedUser(req, res);
+    if (!user) {
+      return null;
+    }
+
+    if (!user.isAdmin && !user.isOwner) {
+      res.status(403).json({ error: 'Admin or owner access is required to change links.' });
+      return null;
+    }
+
+    return user;
+  };
+
+  const canManageGlobalLinks = (user: AuthStatusUser | null) => Boolean(user?.isOwner);
+
+  const canManagePersonalLinks = (user: AuthStatusUser | null) => Boolean(user);
+
+  const normalizeLinkRecord = (row: Record<string, unknown>): LinkRecord => ({
+    id: String(row.id),
+    title: String(row.title),
+    url: String(row.url),
+    acronym: String(row.acronym || ''),
+    category: String(row.category || ''),
+    tags: row.tags == null ? null : String(row.tags),
+    scope: row.scope == null ? 'global' : String(row.scope),
+    owner_user_id: row.owner_user_id == null ? null : String(row.owner_user_id),
+  });
+
+  const isPersonalLinkOwnedByUser = (link: LinkRecord, user: AuthStatusUser | null) =>
+    Boolean(user && link.scope === 'personal' && link.owner_user_id === user.id);
+
+  const canAccessLinkRecord = (link: LinkRecord, user: AuthStatusUser | null) =>
+    link.scope !== 'personal' || Boolean(user && (user.isOwner || isPersonalLinkOwnedByUser(link, user)));
+
+  const canEditLinkRecord = (link: LinkRecord, user: AuthStatusUser | null) => {
+    if (!user) return false;
+    if (user.isOwner) return true;
+    return user.isAdmin && isPersonalLinkOwnedByUser(link, user);
+  };
+
+  const logAuthHistory = async (payload: {
+    action: string;
+    target: string;
+    site?: string | null;
+    userId?: string | null;
+    username?: string | null;
+  }) => {
+    if (!AUTH_INTERNAL_LOG_TOKEN) return;
+
+    try {
+      await fetch(`${AUTH_BASE_URL}/api/history/log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-internal-token': AUTH_INTERNAL_LOG_TOKEN,
+        },
+        body: JSON.stringify({
+          ...payload,
+          internalToken: AUTH_INTERNAL_LOG_TOKEN,
+        }),
+      });
+    } catch (error) {
+      console.warn('Failed to notify Auth history stream:', error);
+    }
+  };
 
   const isMissingDescriptionColumnError = (error: unknown) =>
     error instanceof Error && /Unknown column 'description'|description.*doesn't exist/i.test(error.message);
@@ -487,9 +633,14 @@ async function startServer() {
   // GET all links
   app.get('/api/links', async (req, res) => {
     try {
+      const user = await getAuthUser(req);
+
       const db = initDb()!;
       const [rows] = await db.query('SELECT * FROM links');
-      res.json(rows);
+      const visibleLinks = (rows as Array<Record<string, unknown>>)
+        .map(normalizeLinkRecord)
+        .filter(link => canAccessLinkRecord(link, user));
+      res.json(visibleLinks);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -644,15 +795,28 @@ async function startServer() {
   // SYNC existing initial links (one-off sync helper for the frontend)
   app.post('/api/links/batch', async (req, res) => {
     try {
+      const user = await requireAuthenticatedUser(req, res);
+      if (!user) return;
+
       const links = req.body.links;
       const db = initDb()!;
       if (!Array.isArray(links)) return res.status(400).json({ error: 'Expected an array of links' });
+      if (!canManageGlobalLinks(user)) {
+        return res.status(403).json({ error: 'Only the owner can sync the global master list.' });
+      }
       for (const link of links) {
         await db.execute(
-          'INSERT IGNORE INTO links (id, title, url, acronym, category, tags) VALUES (?, ?, ?, ?, ?, ?)',
-          [link.id, link.title, link.url, link.acronym, link.category, link.tags || '']
+          'INSERT IGNORE INTO links (id, title, url, acronym, category, tags, scope, owner_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [link.id, link.title, link.url, link.acronym, link.category, link.tags || '', 'global', null]
         );
       }
+      void logAuthHistory({
+        action: 'lionship.master_synced',
+        target: `Synced ${links.length} global link${links.length === 1 ? '' : 's'}`,
+        site: 'lionship',
+        userId: user.id,
+        username: user.username,
+      });
       res.status(201).json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -662,12 +826,25 @@ async function startServer() {
   // CREATE a new link
   app.post('/api/links', async (req, res) => {
     try {
+      const user = await requireAuthenticatedUser(req, res);
+      if (!user) return;
+
       const { id, title, url, acronym, category, tags } = req.body;
+      const requestedScope = String(req.body?.scope || '').toLowerCase();
+      const scope = canManageGlobalLinks(user) && requestedScope === 'global' ? 'global' : 'personal';
+      const ownerUserId = scope === 'personal' ? user.id : null;
       const db = initDb()!;
       await db.execute(
-        'INSERT INTO links (id, title, url, acronym, category, tags) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title=VALUES(title), url=VALUES(url), acronym=VALUES(acronym), category=VALUES(category), tags=VALUES(tags)',
-        [id, title, url, acronym, category, tags || '']
+        'INSERT INTO links (id, title, url, acronym, category, tags, scope, owner_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title=VALUES(title), url=VALUES(url), acronym=VALUES(acronym), category=VALUES(category), tags=VALUES(tags), scope=VALUES(scope), owner_user_id=VALUES(owner_user_id)',
+        [id, title, url, acronym, category, tags || '', scope, ownerUserId]
       );
+      void logAuthHistory({
+        action: scope === 'global' ? 'lionship.master_created' : 'lionship.personal_created',
+        target: `${title} (${id})`,
+        site: 'lionship',
+        userId: user.id,
+        username: user.username,
+      });
       res.status(201).json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -677,13 +854,35 @@ async function startServer() {
   // UPDATE a link
   app.put('/api/links/:id', async (req, res) => {
     try {
+      const user = await requireAuthenticatedUser(req, res);
+      if (!user) return;
+
       const { id } = req.params;
       const { title, url, acronym, category, tags } = req.body;
       const db = initDb()!;
+      const [rows] = await db.query('SELECT * FROM links WHERE id = ?', [id]);
+      const existing = (rows as Array<Record<string, unknown>>)[0] ? normalizeLinkRecord((rows as Array<Record<string, unknown>>)[0]) : null;
+      if (!existing) {
+        return res.status(404).json({ error: 'Link not found.' });
+      }
+      if (!canEditLinkRecord(existing, user)) {
+        return res.status(403).json({ error: 'You can only edit your own personal links.' });
+      }
+
+      const requestedScope = String(req.body?.scope || existing.scope || 'global').toLowerCase();
+      const nextScope = user.isOwner && requestedScope === 'global' ? 'global' : 'personal';
+      const nextOwnerUserId = nextScope === 'personal' ? (existing.owner_user_id || user.id) : null;
       await db.execute(
-        'UPDATE links SET title = ?, url = ?, acronym = ?, category = ?, tags = ? WHERE id = ?',
-        [title, url, acronym, category, tags || '', id]
+        'UPDATE links SET title = ?, url = ?, acronym = ?, category = ?, tags = ?, scope = ?, owner_user_id = ? WHERE id = ?',
+        [title, url, acronym, category, tags || '', nextScope, nextOwnerUserId, id]
       );
+      void logAuthHistory({
+        action: nextScope === 'global' ? 'lionship.master_updated' : 'lionship.personal_updated',
+        target: `${title} (${id})`,
+        site: 'lionship',
+        userId: user.id,
+        username: user.username,
+      });
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -693,9 +892,27 @@ async function startServer() {
   // DELETE a link
   app.delete('/api/links/:id', async (req, res) => {
     try {
+      const user = await requireAuthenticatedUser(req, res);
+      if (!user) return;
+
       const { id } = req.params;
       const db = initDb()!;
+      const [rows] = await db.query('SELECT * FROM links WHERE id = ?', [id]);
+      const existing = (rows as Array<Record<string, unknown>>)[0] ? normalizeLinkRecord((rows as Array<Record<string, unknown>>)[0]) : null;
+      if (!existing) {
+        return res.status(404).json({ error: 'Link not found.' });
+      }
+      if (!canEditLinkRecord(existing, user)) {
+        return res.status(403).json({ error: 'You can only delete your own personal links.' });
+      }
       await db.execute('DELETE FROM links WHERE id = ?', [id]);
+      void logAuthHistory({
+        action: existing.scope === 'global' ? 'lionship.master_deleted' : 'lionship.personal_deleted',
+        target: `${existing.title} (${id})`,
+        site: 'lionship',
+        userId: user.id,
+        username: user.username,
+      });
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

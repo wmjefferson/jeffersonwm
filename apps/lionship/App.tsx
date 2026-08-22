@@ -8,6 +8,28 @@ interface LinkItem {
   acronym: string;
   category: string;
   tags?: string;
+  scope?: 'global' | 'personal';
+  owner_user_id?: string | null;
+}
+
+interface AuthUser {
+  id: string;
+  username: string;
+  displayName?: string | null;
+  isAdmin: boolean;
+  isOwner: boolean;
+  isApproved: boolean;
+  isBlocked: boolean;
+  isDeleted: boolean;
+  memberships?: string[];
+}
+
+interface AuthStatusResponse {
+  ok: boolean;
+  user: AuthUser | null;
+  requireAuth: boolean;
+  hasUsers: boolean;
+  apps: Array<{ key: string; label: string; description?: string | null }>;
 }
 
 const INITIAL_LINKS: LinkItem[] = [];
@@ -16,24 +38,34 @@ type SortKey = 'acronym' | 'title';
 type SortOrder = 'asc' | 'desc';
 type SearchEngine = 'GOOGLE' | 'BING';
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const AUTH_BASE_URL = (import.meta.env.VITE_AUTH_BASE_URL || 'https://auth.jeffersonwm.com').replace(/\/$/, '');
 const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
+const authUrl = (path: string) => `${AUTH_BASE_URL}${path}`;
 
 const App: React.FC = () => {
   const [links, setLinks] = useState<LinkItem[]>(INITIAL_LINKS);
   const [dbStatus, setDbStatus] = useState<'LOADING' | 'CONNECTED' | 'DISCONNECTED'>('LOADING');
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authNotice, setAuthNotice] = useState('');
 
   useEffect(() => {
-    // Try to load from database first
-    fetch(apiUrl('/api/links'))
-      .then(res => {
-        if (!res.ok) throw new Error('DB not available');
-        return res.json();
-      })
-      .then(async (data) => {
+    let cancelled = false;
+
+    const loadLinks = async () => {
+      try {
+        const response = await fetch(apiUrl('/api/links'), {
+          credentials: 'include',
+        });
+
+        if (!response.ok) throw new Error('DB not available');
+        const data = await response.json();
+        if (cancelled) return;
+
         setDbStatus('CONNECTED');
         if (data.length === 0) {
           const savedStr = localStorage.getItem('linkstream_links');
-          if (savedStr) {
+          const shouldSeedMasterList = Boolean(authUser?.isOwner);
+          if (savedStr && shouldSeedMasterList) {
             const linksToSync = JSON.parse(savedStr);
             setLinks(linksToSync);
 
@@ -41,6 +73,7 @@ const App: React.FC = () => {
               await fetch(apiUrl('/api/links/batch'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ links: linksToSync })
               });
             }
@@ -50,9 +83,9 @@ const App: React.FC = () => {
         } else {
           setLinks(data);
         }
-      })
-      .catch((err) => {
-        console.warn('Falling back to local storage:', err);
+      } catch (err) {
+        if (cancelled) return;
+        console.warn('Lionship auth/link load failed:', err);
         setDbStatus('DISCONNECTED');
         const saved = localStorage.getItem('linkstream_links');
         if (saved) {
@@ -64,7 +97,53 @@ const App: React.FC = () => {
         } else {
           setLinks([]);
         }
-      });
+      }
+    };
+
+    void loadLinks();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.isOwner]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAuthStatus = async () => {
+      try {
+        const authResponse = await fetch(authUrl('/api/auth/status'), {
+          credentials: 'include',
+        });
+        if (!authResponse.ok) {
+          if (!cancelled) {
+            setAuthUser(null);
+            setAuthNotice('Public view active. Sign in to add or edit your own links.');
+          }
+          return;
+        }
+
+        const authData = await authResponse.json() as AuthStatusResponse;
+        const user = authData.user;
+        if (cancelled) return;
+
+        if (user && user.isApproved && !user.isBlocked && !user.isDeleted) {
+          setAuthUser(user);
+          setAuthNotice(`Signed in as ${user.displayName || user.username}.`);
+        } else {
+          setAuthUser(null);
+          setAuthNotice('Public view active. Sign in to add or edit your own links.');
+        }
+      } catch {
+        if (!cancelled) {
+          setAuthUser(null);
+          setAuthNotice('Public view active. Sign in to add or edit your own links.');
+        }
+      }
+    };
+
+    void loadAuthStatus();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -76,7 +155,7 @@ const App: React.FC = () => {
 
   const [currentView, setCurrentView] = useState<'MAIN' | 'EDIT' | 'ABOUT'>('MAIN');
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState({ title: '', url: '', acronym: '', category: '', tags: '' });
+  const [editFormData, setEditFormData] = useState({ title: '', url: '', acronym: '', category: '', tags: '', scope: 'global' as 'global' | 'personal' });
   const [newCategoryName, setNewCategoryName] = useState('');
   const [columnCount, setColumnCount] = useState(4);
 
@@ -95,7 +174,14 @@ const App: React.FC = () => {
 
   const handleEditClick = (link: LinkItem) => {
     setEditingLinkId(link.id);
-    setEditFormData({ title: link.title, url: link.url, acronym: link.acronym, category: link.category, tags: link.tags || '' });
+    setEditFormData({
+      title: link.title,
+      url: link.url,
+      acronym: link.acronym,
+      category: link.category,
+      tags: link.tags || '',
+      scope: link.scope || 'global',
+    });
     setNewCategoryName('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -117,7 +203,8 @@ const App: React.FC = () => {
       url: editFormData.url,
       acronym: editFormData.acronym,
       category: finalCategory,
-      tags: editFormData.tags || ''
+      tags: editFormData.tags || '',
+      scope: editFormData.scope
     };
 
     if (editingLinkId) {
@@ -128,6 +215,7 @@ const App: React.FC = () => {
         await fetch(apiUrl(`/api/links/${editingLinkId}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(newOrUpdatedLink)
         }).catch(err => console.error(err));
       }
@@ -140,6 +228,7 @@ const App: React.FC = () => {
         await fetch(apiUrl('/api/links'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(newOrUpdatedLink)
         }).catch(err => console.error(err));
       }
@@ -147,7 +236,7 @@ const App: React.FC = () => {
     
     setLinks(updatedLinks);
     setEditingLinkId(null);
-    setEditFormData({ title: '', url: '', acronym: '', category: '', tags: '' });
+    setEditFormData({ title: '', url: '', acronym: '', category: '', tags: '', scope: 'global' });
     setNewCategoryName('');
   };
 
@@ -155,14 +244,15 @@ const App: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this link?')) {
       if (dbStatus === 'CONNECTED') {
         await fetch(apiUrl(`/api/links/${id}`), {
-          method: 'DELETE'
+          method: 'DELETE',
+          credentials: 'include'
         }).catch(err => console.error(err));
       }
 
       setLinks(links.filter(l => l.id !== id));
       if (editingLinkId === id) {
         setEditingLinkId(null);
-        setEditFormData({ title: '', url: '', acronym: '', category: '', tags: '' });
+        setEditFormData({ title: '', url: '', acronym: '', category: '', tags: '', scope: 'global' });
         setNewCategoryName('');
       }
     }
@@ -170,7 +260,7 @@ const App: React.FC = () => {
 
   const handleCancelEdit = () => {
     setEditingLinkId(null);
-    setEditFormData({ title: '', url: '', acronym: '', category: '', tags: '' });
+    setEditFormData({ title: '', url: '', acronym: '', category: '', tags: '', scope: 'global' });
     setNewCategoryName('');
   };
 
@@ -189,6 +279,28 @@ const App: React.FC = () => {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const canEditLinks = Boolean(authUser);
+  const canCreateGlobal = Boolean(authUser?.isOwner);
+  const canManageLink = (link: LinkItem) => {
+    if (!authUser) return false;
+    if (authUser.isOwner) return true;
+    return Boolean(link.scope === 'personal' && link.owner_user_id === authUser.id);
+  };
+  const isPersonalDraft = editFormData.scope === 'personal';
+
+  useEffect(() => {
+    if (currentView !== 'EDIT' || editingLinkId) {
+      return;
+    }
+
+    setEditFormData(current => {
+      const nextScope = authUser?.isOwner ? 'global' : 'personal';
+      if (current.scope === nextScope) {
+        return current;
+      }
+      return { ...current, scope: nextScope };
+    });
+  }, [currentView, editingLinkId, authUser?.isOwner]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -504,6 +616,14 @@ const App: React.FC = () => {
       window.open(truncatedUrl, '_blank');
     }
   };
+  const returnTo = `${window.location.origin}${window.location.pathname}${window.location.hash}`;
+  const authSigninLink = `${AUTH_BASE_URL}/home?returnTo=${encodeURIComponent(returnTo)}`;
+
+  useEffect(() => {
+    if (!canEditLinks && currentView === 'EDIT') {
+      setCurrentView('MAIN');
+    }
+  }, [canEditLinks, currentView]);
 
   return (
     <div className="min-h-screen pb-[72px] bg-[#F0F0F0]">
@@ -512,6 +632,11 @@ const App: React.FC = () => {
           Running in offline mode. The live API could not be reached, so this device is using local storage.
         </div>
       )}
+      {authNotice ? (
+        <div className="bg-white/80 text-zinc-600 text-[10px] px-4 py-2 border-b border-zinc-200 font-heading tracking-widest uppercase text-center font-bold">
+          {authNotice}
+        </div>
+      ) : null}
       <header className="top-banner">
         <div className="px-[36px] w-full flex items-center justify-between">
           <button 
@@ -521,23 +646,37 @@ const App: React.FC = () => {
             LIONSHIP
           </button>
           <div className="flex gap-4 items-center">
+            {authUser ? (
+              <span className="text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-500">
+                {authUser.displayName || authUser.username} • {authUser.isOwner ? 'Owner' : authUser.isAdmin ? 'Admin' : 'User'}
+              </span>
+            ) : (
+              <a
+                href={authSigninLink}
+                className="text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-500 hover:text-black hover:underline"
+              >
+                Sign in to manage links
+              </a>
+            )}
             <button 
               onClick={() => setCurrentView(currentView === 'ABOUT' ? 'MAIN' : 'ABOUT')}
               className={`text-[10px] font-bold font-heading uppercase tracking-widest hover:underline text-black ${currentView === 'ABOUT' ? 'underline' : ''}`}
             >
               ABOUT
             </button>
-            <button 
-              onClick={() => setCurrentView(currentView === 'EDIT' ? 'MAIN' : 'EDIT')}
-              className={`text-[10px] font-bold font-heading uppercase tracking-widest hover:underline text-black ${currentView === 'EDIT' ? 'underline' : ''}`}
-            >
-              {currentView === 'EDIT' ? 'DONE EDITING' : 'EDIT LINKS'}
-            </button>
+            {canEditLinks ? (
+              <button 
+                onClick={() => setCurrentView(currentView === 'EDIT' ? 'MAIN' : 'EDIT')}
+                className={`text-[10px] font-bold font-heading uppercase tracking-widest hover:underline text-black ${currentView === 'EDIT' ? 'underline' : ''}`}
+              >
+                {currentView === 'EDIT' ? 'DONE EDITING' : 'EDIT LINKS'}
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
 
-      {currentView === 'EDIT' ? (
+      {currentView === 'EDIT' && canEditLinks ? (
         <main className="mt-[20px] px-[36px] max-w-4xl pb-20">
           <div className="bg-white p-4 border border-black mb-6 shadow-sm">
             <h2 className="text-[12px] font-bold font-heading uppercase tracking-widest mb-4">
@@ -595,6 +734,26 @@ const App: React.FC = () => {
                 placeholder="e.g. WORK, REFERENCE, TOOLS" 
               />
             </div>
+            <div className="mb-4">
+              <label className="block text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-500 mb-1">Scope</label>
+              {canCreateGlobal ? (
+                <select
+                  value={editFormData.scope}
+                  onChange={e => setEditFormData({...editFormData, scope: e.target.value as 'global' | 'personal'})}
+                  className="w-full border border-black px-2 py-1.5 text-[14px] font-heading focus:outline-none focus:border-blue-500 bg-white"
+                >
+                  <option value="global">Global master list</option>
+                  <option value="personal">Personal admin links</option>
+                </select>
+              ) : (
+                <div className="w-full border border-black px-2 py-1.5 text-[14px] font-heading bg-zinc-50 text-zinc-500">
+                  Personal admin links only
+                </div>
+              )}
+              <p className="mt-1 text-[10px] font-heading uppercase tracking-widest text-zinc-400">
+                Global links stay owner-managed. Admin links stay tied to your account.
+              </p>
+            </div>
             <div className="flex gap-2">
               <button onClick={handleSaveEdit} className="bg-black text-white px-4 py-1 font-heading text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors">
                 {editingLinkId ? 'Save Changes' : 'Add Link'}
@@ -633,6 +792,9 @@ const App: React.FC = () => {
                       <span className="font-bold text-[14px]">{link.title}</span>
                       <span className="text-[10px] font-heading uppercase tracking-widest text-zinc-500 bg-zinc-100 px-1">{link.acronym}</span>
                       <span className="text-[10px] font-heading uppercase tracking-widest text-zinc-500">{link.category}</span>
+                      <span className={`text-[10px] font-heading uppercase tracking-widest px-1 ${link.scope === 'personal' ? 'bg-blue-50 text-blue-700' : 'bg-zinc-100 text-zinc-500'}`}>
+                        {link.scope === 'personal' ? 'Personal' : 'Global'}
+                      </span>
                       {link.tags && link.tags.split(',').map(t => t.trim()).filter(Boolean).map((t, idx) => (
                         <span key={idx} className="text-[9px] font-heading uppercase tracking-wider bg-blue-50 text-blue-800 px-1.5 py-0.5 border border-blue-200">
                           {t}
@@ -642,8 +804,14 @@ const App: React.FC = () => {
                     <span className="text-[11px] text-zinc-400 truncate mt-0.5">{link.url}</span>
                   </div>
                   <div className="flex gap-2 ml-4 shrink-0">
-                    <button onClick={() => handleEditClick(link)} className="text-[10px] font-bold font-heading uppercase tracking-widest text-blue-600 hover:underline">Edit</button>
-                    <button onClick={() => handleDeleteLink(link.id)} className="text-[10px] font-bold font-heading uppercase tracking-widest text-red-600 hover:underline">Delete</button>
+                    {canManageLink(link) ? (
+                      <>
+                        <button onClick={() => handleEditClick(link)} className="text-[10px] font-bold font-heading uppercase tracking-widest text-blue-600 hover:underline">Edit</button>
+                        <button onClick={() => handleDeleteLink(link.id)} className="text-[10px] font-bold font-heading uppercase tracking-widest text-red-600 hover:underline">Delete</button>
+                      </>
+                    ) : (
+                      <span className="text-[10px] font-heading uppercase tracking-widest text-zinc-400">View only</span>
+                    )}
                   </div>
                 </div>
               ))}

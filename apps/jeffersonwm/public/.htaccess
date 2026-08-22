@@ -18,6 +18,11 @@ RewriteCond %{THE_REQUEST} \s/+account/index(\.html)?[\s?]
 RewriteRule ^account/index(\.html)?$ /account/ [R=301,L]
 RewriteRule ^account/?$ /account/index.html [L]
 
+# JeffersonWM project activity page
+RewriteCond %{THE_REQUEST} \s/+project-activity/index(\.html)?[\s?]
+RewriteRule ^project-activity/index(\.html)?$ /project-activity/ [R=301,L]
+RewriteRule ^project-activity/?$ /project-activity/index.html [L]
+
 # JeffersonWM status page
 RewriteCond %{THE_REQUEST} \s/+status/index(\.html)?[\s?]
 RewriteRule ^status/index(\.html)?$ /status/ [R=301,L]

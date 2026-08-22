@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { GridConfig, GridOverlayMode, HoverState, ImageItem } from './types';
-import { calculateFrameGrid } from './utils/gridCalculator';
+import { calculateFrameGrid, evictLayoutCache } from './utils/gridCalculator';
 import {
   clearCustomImages,
   clearServerImages,
@@ -23,7 +23,6 @@ const BOTTOM_BANNER_HEIGHT = 36;
 const TOTAL_BANNER_HEIGHT = TOP_BANNER_HEIGHT + BOTTOM_BANNER_HEIGHT;
 const SIDE_GUTTER = BOTTOM_BANNER_HEIGHT;
 const TOTAL_SIDE_GUTTER = SIDE_GUTTER * 2;
-const PREVIEW_SQUARE_SIZE = 640;
 
 export default function App() {
   const apiBaseUrl = import.meta.env.VITE_APHELION_API_BASE_URL || '';
@@ -77,10 +76,11 @@ export default function App() {
   // Resize Listener for dynamic grid recalculation
   useEffect(() => {
     const handleResize = () => {
-      setViewport({
-        width: Math.max(100, window.innerWidth - TOTAL_SIDE_GUTTER),
-        height: Math.max(100, window.innerHeight - TOTAL_BANNER_HEIGHT),
-      });
+      const nextWidth = Math.max(100, window.innerWidth - TOTAL_SIDE_GUTTER);
+      const nextHeight = Math.max(100, window.innerHeight - TOTAL_BANNER_HEIGHT);
+      // Evict cached layout for old dimensions so new window size computes fresh positions
+      evictLayoutCache(nextWidth, nextHeight);
+      setViewport({ width: nextWidth, height: nextHeight });
     };
 
     window.addEventListener('resize', handleResize);
@@ -113,10 +113,12 @@ export default function App() {
     };
   }, [apiBaseUrl]);
 
-  // Compute Grid Config to guarantee totalBlocks >= targetCount (9,170)
+  // Compute Grid Config — positions are locked per viewport size via the layout cache.
+  // targetCount is intentionally omitted from deps: server image loading will not shift block positions.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const config: GridConfig = useMemo(() => {
-    return calculateFrameGrid(viewport.width, viewport.height, targetCount, PREVIEW_SQUARE_SIZE);
-  }, [viewport.width, viewport.height, targetCount]);
+    return calculateFrameGrid(viewport.width, viewport.height, targetCount);
+  }, [viewport.width, viewport.height]);
 
   // Search Filter matching engine across the current image catalog
   const searchResults = useMemo(() => {
@@ -242,25 +244,28 @@ export default function App() {
   }, [highlightedBlocks]);
 
   const handleBlockClick = useCallback((image: ImageItem, blockIndex: number) => {
-    const action = highlightedBlocks.has(blockIndex) ? 'cleared' : 'selected';
     setHighlightedBlocks((current) => {
       const next = new Set(current);
+      const action = next.has(blockIndex) ? 'cleared' : 'selected';
       if (next.has(blockIndex)) {
         next.delete(blockIndex);
       } else {
         next.add(blockIndex);
       }
+      logHighlightEvent({ action, blockIndex, image });
       return next;
     });
-    logHighlightEvent({ action, blockIndex, image });
     setSelectedImage(image);
-  }, [highlightedBlocks, logHighlightEvent]);
+  }, [logHighlightEvent]);
 
   const selectedImages = useMemo(() => {
+    if (page !== 'selected') {
+      return [];
+    }
     return [...highlightedBlocks]
       .sort((left, right) => left - right)
       .map((blockIndex) => ({ blockIndex, image: getImageByIndex(blockIndex) }));
-  }, [highlightedBlocks]);
+  }, [highlightedBlocks, page]);
 
   const handleClearHighlights = () => {
     logHighlightEvent({ action: 'cleared-all', clearedCount: highlightedBlocks.size });
@@ -308,9 +313,11 @@ export default function App() {
     );
   }
 
+  const centerSquareSize = config.centerSquare?.size || 640;
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#FAFAFA] text-slate-800">
-      <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-between shrink-0 relative z-20">
+      <header className="h-[36px] px-4 sm:px-6 bg-[#FAFAFA] flex items-center justify-between shrink-0 relative z-20">
         <div className="flex items-center">
           <a
             href="/aphelion/"
@@ -318,7 +325,7 @@ export default function App() {
           >
             Aphelion
           </a>
-          <div className="ml-5 flex items-center gap-3 font-sans text-[11px] leading-none text-gray-500">
+          <div className="ml-3 sm:ml-5 flex items-center gap-3 font-sans text-[11px] leading-none text-gray-500">
           {highlightedBlocks.size > 0 ? (
             <>
               <button
@@ -353,7 +360,13 @@ export default function App() {
         <div className="pointer-events-none absolute right-[36px] top-0 bottom-0 z-[55] border-r border-[#e5e5e5]" />
         <div className="pointer-events-none absolute left-0 right-0 top-0 z-[55] border-t border-[#e5e5e5]" />
         <div className="pointer-events-none absolute left-0 right-0 bottom-0 z-[55] border-b border-[#e5e5e5]" />
-        <div className="pointer-events-none fixed left-1/2 top-1/2 z-[60] h-[640px] w-[640px] -translate-x-1/2 -translate-y-1/2 border border-[#e5e5e5]" />
+        <div
+          className="pointer-events-none fixed left-1/2 top-1/2 z-[60] -translate-x-1/2 -translate-y-1/2 border border-[#e5e5e5]"
+          style={{
+            width: `${centerSquareSize}px`,
+            height: `${centerSquareSize}px`,
+          }}
+        />
 
         {/* Aphelion Grid Canvas */}
         <GridCanvas
@@ -368,8 +381,8 @@ export default function App() {
         />
       </main>
 
-      <footer className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-end shrink-0 relative z-20">
-        <p className="m-0 leading-none text-gray-500 text-sm font-sans">
+      <footer className="h-[36px] px-4 sm:px-6 bg-[#FAFAFA] flex items-center justify-end shrink-0 relative z-20">
+        <p className="m-0 leading-none text-gray-500 text-xs sm:text-sm font-sans truncate">
           &copy; {new Date().getFullYear()}{' '}
           <a
             href="https://jeffersonwm.com"
@@ -393,7 +406,7 @@ export default function App() {
       </footer>
 
       {/* Pure Hover Image Popup */}
-      <HoverPreviewCard hover={hoverState} />
+      <HoverPreviewCard hover={hoverState} size={centerSquareSize} />
     </div>
   );
 }
