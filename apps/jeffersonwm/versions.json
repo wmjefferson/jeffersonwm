@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-08-22T04:41:29.034Z",
+  "updatedAt": "2026-08-22T04:46:28.647Z",
   "apps": {
     "jeffersonwm": {
       "label": "JeffersonWM",
-      "version": "0.1.0",
-      "updatedAt": "2026-08-21 19:18 PDT"
+      "version": "0.2.0",
+      "updatedAt": "2026-08-21 21:46 PDT"
     },
     "feed": {
       "label": "Feed",
