@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Auth notifications and activity alignment",
+  "content": "Auth got a small but important UX pass that pulled Notifications closer to Activity so both pages now feel like parts of the same dashboard.\n\nWhat changed:\n- Notifications now starts directly with the page title and summary, then username/site/trigger filters in the same general rhythm as Activity.\n- Per-trigger email settings were reduced into a compact `On | Off` column instead of heavier boxed controls.\n- Stable scrollbar spacing was added, and a blank-page regression from a missing React `Fragment` import was fixed.\n\nThis matters because Auth is increasingly acting as the shared operational surface for the platform, so consistency and scanability matter more than separate one-off styling.",
+  "url": "https://auth.jeffersonwm.com/",
+  "source": "manual",
+  "external_id": "auth-notifications-activity-alignment-2026-08-28",
+  "created_at": "2026-08-28 22:40:00"
+}

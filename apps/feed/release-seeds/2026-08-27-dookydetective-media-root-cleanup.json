@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Dooky Detective media root cleanup",
+  "content": "<p>This was a small but useful Dooky Detective maintenance pass to bring the image library layout fully in line with the shared server model before the new video work continues.</p><p>What changed:</p><ul><li><strong>Shared media split:</strong> the existing Dooky image groups now live under <code>photos</code>, and a sibling <code>video</code> folder is ready for the next pass.</li><li><strong>Old local leftovers removed:</strong> the stale repo-local files in <code>dookydetective\\images</code> were deleted so the project no longer pretends that folder is still the active runtime library.</li><li><strong>Backend path cleanup:</strong> the Dooky API now prefers <code>E:\\images\\dookydetective</code> and falls back to the shared UNC path on the laptop, matching the current multi-machine setup more honestly.</li></ul><p>The point of this pass was clarity: photo and video work are now separated cleanly, and future restarts or handoffs should no longer drift back toward the older local-image assumption.</p>",
+  "url": "https://dookydetective.com",
+  "source": "manual",
+  "external_id": "dookydetective-media-root-cleanup-2026-08-27"
+}

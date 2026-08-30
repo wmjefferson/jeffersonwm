@@ -42,6 +42,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
   const hoverDelayRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [settledHoverState, setSettledHoverState] = useState<HoverState | null>(null);
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 800, height: 600 });
+  const [fps, setFps] = useState(0);
 
   const fpsFrameCount = useRef(0);
   const fpsLastTime = useRef(performance.now());
@@ -293,10 +294,11 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
       }
     }
 
-    // FPS tracking via refs — no setState, no re-render
+    // FPS updates at most once per second so the badge stays cheap.
     fpsFrameCount.current += 1;
     const nowTime = performance.now();
     if (nowTime - fpsLastTime.current >= 1000) {
+      setFps(fpsFrameCount.current);
       fpsLastTime.current = nowTime;
       fpsFrameCount.current = 0;
     }
@@ -420,7 +422,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
         col: cellInfo.col,
         row: cellInfo.row,
         image,
-        pinned: true,
+        pinned: false,
       });
       onClickBlock(image, cellInfo.index);
     }

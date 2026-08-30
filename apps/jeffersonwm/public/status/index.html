@@ -29,7 +29,7 @@
       body {
         margin: 0;
         min-height: 100vh;
-        padding: 102px var(--frame) var(--frame);
+        padding: var(--frame);
         background: #fdfdfd;
         color: var(--ink);
         font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -58,11 +58,22 @@
       }
 
       .topline {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 1.5rem;
+        display: block;
         margin-bottom: 2rem;
+      }
+
+      .logo-wrapper {
+        margin-bottom: 0.75rem;
+      }
+
+      .logo-link {
+        display: inline-block;
+      }
+
+      .logo {
+        display: block;
+        width: 84px;
+        height: 84px;
       }
 
       h1 {
@@ -347,10 +358,6 @@
           padding: 24px;
         }
 
-        .topline {
-          flex-direction: column;
-        }
-
         .bottom-links {
           position: static;
           margin-top: 4rem;
@@ -361,6 +368,11 @@
   <body>
     <main class="shell">
       <header class="topline">
+        <a class="logo-link" href="/" aria-label="Return to JeffersonWM home">
+          <div class="logo-wrapper">
+            <img src="/jeffersonwm/assets/favicon-DxRHekBS.svg" alt="" class="logo" />
+          </div>
+        </a>
         <h1>Status</h1>
       </header>
 
@@ -403,7 +415,6 @@
 
     <div class="bottom-links" aria-label="Site links">
       <a class="personal-link" href="/">Home</a>
-      <a class="personal-link" href="/status/">Status</a>
       <a class="personal-link" href="/project-activity/">Project Activity</a>
       <a class="personal-link" href="/account/">Account</a>
       <a

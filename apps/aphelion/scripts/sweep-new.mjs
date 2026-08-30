@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { createReadStream, readFileSync } from 'node:fs';
 import { access, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -489,6 +490,17 @@ function printSummary({ libraryRoot, newFolderPath, currentFiles, newFiles, matc
   }
 }
 
+function syncTargetCount(libraryRoot) {
+  const syncScriptPath = path.join(appRoot, 'scripts', 'sync-target-count.mjs');
+  const result = spawnSync(process.execPath, [syncScriptPath, '--library', libraryRoot], {
+    stdio: 'inherit',
+  });
+
+  if (result.status !== 0) {
+    console.warn('Target count sync did not complete cleanly.');
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
@@ -542,10 +554,12 @@ async function main() {
 
   if (args.rename) {
     await applyRenamePlan(plan, libraryRoot, history, historyPath, args);
+    syncTargetCount(libraryRoot);
     return;
   }
 
   await deleteDuplicateMatches(matches, args);
+  syncTargetCount(libraryRoot);
 }
 
 main().catch((error) => {

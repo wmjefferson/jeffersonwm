@@ -1,8 +1,9 @@
 import express from "express";
+import { existsSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "fs/promises";
 import mysql from "mysql2/promise";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -24,6 +25,13 @@ const CHANGELOG_SOURCE_URLS = (process.env.CHANGELOG_SOURCE_URLS || "")
   .map((url) => url.trim())
   .filter(Boolean);
 const CHANGELOG_POLL_MINUTES = Number(process.env.CHANGELOG_POLL_MINUTES || "15");
+const DOWNLOAD_BY_DEFAULT_EXTENSIONS = new Set([
+  ".md",
+  ".txt",
+  ".csv",
+  ".json",
+  ".zip",
+]);
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",")
@@ -42,6 +50,36 @@ app.use(
     },
   }),
 );
+app.get("/uploads/feed/:fileName", (req, res, next) => {
+  const requestedName = path.basename(String(req.params.fileName || ""));
+  const extension = path.extname(requestedName).toLowerCase();
+  const forceDownload = req.query.download === "1" || DOWNLOAD_BY_DEFAULT_EXTENSIONS.has(extension);
+
+  if (!forceDownload) {
+    return next();
+  }
+
+  const filePath = path.join(UPLOAD_DIR, requestedName);
+  const downloadName = requestedName.replace(/^\d{4}-\d{2}-\d{2}-[0-9a-f-]{36}-/i, "") || "attachment";
+
+  res.download(filePath, downloadName, (error) => {
+    if (!error) {
+      return;
+    }
+
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      if (!res.headersSent) {
+        res.status(404).json({ error: "File not found" });
+      }
+      return;
+    }
+
+    console.error("Failed to download feed upload:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to download upload" });
+    }
+  });
+});
 app.use("/uploads/feed", express.static(UPLOAD_DIR));
 app.post("/api/uploads/feed", express.raw({ type: "*/*", limit: "25mb" }), async (req, res) => {
   const secret = String(req.headers["x-feed-secret"] || "");
@@ -109,7 +147,43 @@ interface FeedItemRow extends FeedDbRow {
   external_id?: string | null;
   created_at: string | Date;
   pinned_at?: string | Date | null;
+  tint_color?: string | null;
 }
+
+interface FeedWeekSummaryRow {
+  week_key: string;
+  week_year: number;
+  week_number: number;
+  start_date: string;
+  end_date: string;
+  content: string;
+  updated_at: string;
+}
+
+interface FeedWeekSummaryStyleRow {
+  id: string;
+  label: string;
+  mode: string;
+  purpose: string;
+}
+
+const ALLOWED_TINT_COLORS = new Set([
+  "#f4d7d7",
+  "#f3dfcf",
+  "#f0e1b8",
+  "#dbe6b8",
+  "#d1ead4",
+  "#cde9de",
+  "#cfecea",
+  "#d5edf7",
+  "#dce7fb",
+  "#deddf8",
+  "#eadcf8",
+  "#f0d8f0",
+  "#f6dce8",
+  "#e7dfd6",
+  "#ece9e3",
+]);
 
 interface NormalizedGitHubFeedItem {
   title: string;
@@ -163,6 +237,164 @@ function normalizeManualCreatedAt(value: unknown) {
   }
 
   return parsed.toISOString().slice(0, 19).replace("T", " ");
+}
+
+function normalizeTintColor(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+
+  return ALLOWED_TINT_COLORS.has(trimmed) ? trimmed : null;
+}
+
+function normalizeWeekKey(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim().toUpperCase();
+  return /^\d{4}-W\d{2}$/.test(trimmed) ? trimmed : null;
+}
+
+function normalizeIsoDateOnly(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
+}
+
+function resolveWeekSummariesDir() {
+  if (process.env.FEED_WEEK_SUMMARIES_DIR) {
+    return process.env.FEED_WEEK_SUMMARIES_DIR;
+  }
+
+  const candidates = [
+    "\\\\JEFFERSHIZZLE-D\\Dotcoms E\\copy\\text\\feed\\weekly-summaries",
+    path.resolve(__dirname, "..", "..", "copy", "text", "feed", "weekly-summaries"),
+    path.resolve(__dirname, "..", "..", "..", "copy", "text", "feed", "weekly-summaries"),
+  ];
+
+  const existingCandidate = candidates.find((candidate) => existsSync(candidate));
+  return existingCandidate || "\\\\JEFFERSHIZZLE-D\\Dotcoms E\\copy\\text\\feed\\weekly-summaries";
+}
+
+function resolveWeekSummaryStylesPath() {
+  return path.join(resolveWeekSummariesDir(), "styles.json");
+}
+
+function getIsoWeekRange(weekYear: number, weekNumber: number) {
+  const isoAnchor = new Date(Date.UTC(weekYear, 0, 4));
+  const firstWeekday = (isoAnchor.getUTCDay() + 6) % 7;
+  const firstWeekStart = new Date(isoAnchor);
+  firstWeekStart.setUTCDate(isoAnchor.getUTCDate() - firstWeekday);
+  firstWeekStart.setUTCHours(0, 0, 0, 0);
+
+  const start = new Date(firstWeekStart);
+  start.setUTCDate(firstWeekStart.getUTCDate() + (weekNumber - 1) * 7);
+
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+
+  return {
+    start_date: start.toISOString().slice(0, 10),
+    end_date: end.toISOString().slice(0, 10),
+  };
+}
+
+function parseWeekKeyParts(weekKey: string) {
+  const match = /^(\d{4})-W(\d{2})$/.exec(weekKey);
+  if (!match) {
+    return null;
+  }
+
+  const weekYear = Number(match[1]);
+  const weekNumber = Number(match[2]);
+  if (!Number.isInteger(weekYear) || !Number.isInteger(weekNumber) || weekNumber < 1 || weekNumber > 53) {
+    return null;
+  }
+
+  return { weekYear, weekNumber };
+}
+
+async function loadWeekSummariesFromFiles() {
+  const summariesDir = resolveWeekSummariesDir();
+  await mkdir(summariesDir, { recursive: true });
+
+  const files = await readdir(summariesDir, { withFileTypes: true });
+  const summaries: FeedWeekSummaryRow[] = [];
+
+  for (const entry of files) {
+    if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== ".md") {
+      continue;
+    }
+
+    const weekKey = normalizeWeekKey(path.basename(entry.name, ".md"));
+    if (!weekKey) {
+      continue;
+    }
+
+    const weekParts = parseWeekKeyParts(weekKey);
+    if (!weekParts) {
+      continue;
+    }
+
+    const filePath = path.join(summariesDir, entry.name);
+    const content = (await readFile(filePath, "utf8")).trim();
+    if (!content) {
+      continue;
+    }
+    const { start_date, end_date } = getIsoWeekRange(weekParts.weekYear, weekParts.weekNumber);
+    const fileStats = await stat(filePath);
+    const updatedAt = fileStats.mtime.toISOString();
+
+    summaries.push({
+      week_key: weekKey,
+      week_year: weekParts.weekYear,
+      week_number: weekParts.weekNumber,
+      start_date,
+      end_date,
+      content,
+      updated_at: updatedAt,
+    });
+  }
+
+  summaries.sort((a, b) => b.week_key.localeCompare(a.week_key));
+  return summaries;
+}
+
+async function loadWeekSummaryStyles() {
+  const stylesPath = resolveWeekSummaryStylesPath();
+  if (!existsSync(stylesPath)) {
+    return [] as FeedWeekSummaryStyleRow[];
+  }
+
+  const raw = await readFile(stylesPath, "utf8");
+  const payload = JSON.parse(raw);
+  if (!Array.isArray(payload)) {
+    return [] as FeedWeekSummaryStyleRow[];
+  }
+
+  return payload
+    .map((entry) => {
+      const id = typeof entry?.id === "string" ? entry.id.trim() : "";
+      const label = typeof entry?.label === "string" ? entry.label.trim() : "";
+      const mode = typeof entry?.mode === "string" ? entry.mode.trim() : "";
+      const purpose = typeof entry?.purpose === "string" ? entry.purpose.trim() : "";
+
+      if (!id || !label) {
+        return null;
+      }
+
+      return { id, label, mode, purpose } satisfies FeedWeekSummaryStyleRow;
+    })
+    .filter((entry): entry is FeedWeekSummaryStyleRow => Boolean(entry));
 }
 
 function escapeHtml(value: string) {
@@ -661,7 +893,8 @@ async function initDb() {
         source VARCHAR(50),
         external_id VARCHAR(255) UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        pinned_at TIMESTAMP NULL DEFAULT NULL
+        pinned_at TIMESTAMP NULL DEFAULT NULL,
+        tint_color VARCHAR(16) NULL DEFAULT NULL
       )
     `);
     const [columns] = await pool.query(
@@ -670,12 +903,17 @@ async function initDb() {
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = 'feed_items'
-          AND COLUMN_NAME = 'pinned_at'
-        LIMIT 1
+          AND COLUMN_NAME IN ('pinned_at', 'tint_color')
       `,
     );
-    if (!Array.isArray(columns) || columns.length === 0) {
+    const columnSet = new Set(
+      (Array.isArray(columns) ? columns : []).map((column: any) => String(column.COLUMN_NAME || "")),
+    );
+    if (!columnSet.has("pinned_at")) {
       await pool.query(`ALTER TABLE feed_items ADD COLUMN pinned_at TIMESTAMP NULL DEFAULT NULL`);
+    }
+    if (!columnSet.has("tint_color")) {
+      await pool.query(`ALTER TABLE feed_items ADD COLUMN tint_color VARCHAR(16) NULL DEFAULT NULL`);
     }
     console.log("MySQL Database initialized");
     // Initial fetch
@@ -848,6 +1086,26 @@ app.get("/api/feed", async (req, res) => {
   }
 });
 
+app.get("/api/feed/week-summaries", async (_req, res) => {
+  try {
+    const summaries = await loadWeekSummariesFromFiles();
+    res.json(summaries);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch weekly summaries" });
+  }
+});
+
+app.get("/api/feed/week-summary-styles", async (_req, res) => {
+  try {
+    const styles = await loadWeekSummaryStyles();
+    res.json(styles);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch weekly summary styles" });
+  }
+});
+
 app.get("/atom.xml", async (_req, res) => {
   try {
     const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY pinned_at IS NULL, pinned_at DESC, created_at DESC LIMIT 200");
@@ -898,7 +1156,7 @@ app.post("/api/auth/verify", (req, res) => {
 });
 
 app.post("/api/feed", async (req, res) => {
-  const { secret, title, content, url, source, external_id, created_at } = req.body;
+  const { secret, title, content, url, source, external_id, created_at, tint_color } = req.body;
 
   if (secret !== process.env.FEED_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -912,17 +1170,22 @@ app.post("/api/feed", async (req, res) => {
   if (created_at && !normalizedCreatedAt) {
     return res.status(400).json({ error: "Invalid created_at value" });
   }
+  if (tint_color && !normalizeTintColor(tint_color)) {
+    return res.status(400).json({ error: "Invalid tint_color value" });
+  }
 
   try {
     const createdAt = normalizedCreatedAt || new Date().toISOString().slice(0, 19).replace("T", " ");
+    const tintColor = normalizeTintColor(tint_color);
     const sql = `
-      INSERT INTO feed_items (title, content, url, source, external_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO feed_items (title, content, url, source, external_id, created_at, tint_color)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         title=VALUES(title),
         content=VALUES(content),
         url=VALUES(url),
-        source=VALUES(source)
+        source=VALUES(source),
+        tint_color=VALUES(tint_color)
     `;
     
     await pool.execute(sql, [
@@ -931,7 +1194,8 @@ app.post("/api/feed", async (req, res) => {
       url || null, 
       source || "manual", 
       external_id || null,
-      createdAt
+      createdAt,
+      tintColor,
     ]);
     
     res.json({ success: true });
@@ -943,7 +1207,7 @@ app.post("/api/feed", async (req, res) => {
 
 app.put("/api/feed/:id", async (req, res) => {
   const { id } = req.params;
-  const { secret, title, content, url, source, created_at } = req.body || {};
+  const { secret, title, content, url, source, created_at, tint_color } = req.body || {};
 
   if (secret !== process.env.FEED_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -956,6 +1220,9 @@ app.put("/api/feed/:id", async (req, res) => {
   const normalizedCreatedAt = normalizeManualCreatedAt(created_at);
   if (created_at && !normalizedCreatedAt) {
     return res.status(400).json({ error: "Invalid created_at value" });
+  }
+  if (tint_color && !normalizeTintColor(tint_color)) {
+    return res.status(400).json({ error: "Invalid tint_color value" });
   }
 
   try {
@@ -970,19 +1237,49 @@ app.put("/api/feed/:id", async (req, res) => {
       return res.status(403).json({ error: "GitHub feed items cannot be edited here" });
     }
 
+    const tintColor = normalizeTintColor(tint_color);
     await pool.execute(
       `
         UPDATE feed_items
-        SET title = ?, content = ?, url = ?, source = ?, created_at = COALESCE(?, created_at)
+        SET title = ?, content = ?, url = ?, source = ?, created_at = COALESCE(?, created_at), tint_color = ?
         WHERE id = ?
       `,
-      [title, content || null, url || null, source || entry.source || "manual", normalizedCreatedAt, id],
+      [title, content || null, url || null, source || entry.source || "manual", normalizedCreatedAt, tintColor, id],
     );
 
     res.json({ success: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update feed item" });
+  }
+});
+
+app.put("/api/feed/week-summaries/:weekKey", async (req, res) => {
+  const normalizedWeekKey = normalizeWeekKey(req.params.weekKey);
+  const { secret, content } = req.body || {};
+
+  if (secret !== process.env.FEED_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!normalizedWeekKey) {
+    return res.status(400).json({ error: "Invalid week key" });
+  }
+
+  const summaryContent = typeof content === "string" ? content.trim() : "";
+  if (!summaryContent) {
+    return res.status(400).json({ error: "Summary content is required" });
+  }
+
+  try {
+    const summariesDir = resolveWeekSummariesDir();
+    await mkdir(summariesDir, { recursive: true });
+    const filePath = path.join(summariesDir, `${normalizedWeekKey}.md`);
+    await writeFile(filePath, `${summaryContent.trim()}\n`, "utf8");
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to save weekly summary" });
   }
 });
 

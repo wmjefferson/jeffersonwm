@@ -349,6 +349,10 @@ export async function getBrowserThumbnailUrl(sourceUrl: string, size = 768): Pro
       throw new Error('Browser thumbnail canvas context is unavailable.');
     }
 
+    // Transparent PNGs turn black when exported to JPEG unless we paint a base first.
+    ctx.fillStyle = '#FAFAFA';
+    ctx.fillRect(0, 0, normalizedSize, normalizedSize);
+
     const crop = fitSquareCropDimensions(width, height, normalizedSize);
     ctx.drawImage(
       drawable,

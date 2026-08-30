@@ -77,9 +77,9 @@ The homepage widget has moved into JeffersonWM. The public widget markup remains
 Database setup files:
 
 - `database/widget-schema.sql` creates the future JeffersonWM widget tables.
-- `database/widget-migration-from-legacy.sql` documents how to copy old `jeffers4_dates` and `jeffers4_fonts` data into the new widget database.
+- `database/widget-migration-from-legacy.sql` records that the legacy widget migration is complete and that fresh rebuilds should restore from backups rather than recreating standalone source databases.
 
-Do not delete the legacy databases until the new JeffersonWM API is verified live and cPanel/env references have been checked.
+The legacy standalone widget databases have been retired. JeffersonWM's widget API is now the live source of truth.
 
 ## Deployment
 

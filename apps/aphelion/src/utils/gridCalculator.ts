@@ -1,4 +1,5 @@
 import { GridConfig, GridZone } from '../types';
+import { DEFAULT_TARGET_COUNT } from '../config';
 
 /**
  * Calculates optimal grid columns and rows for a given viewport and target cell count.
@@ -7,7 +8,7 @@ import { GridConfig, GridZone } from '../types';
 export function calculateGrid(
   viewportWidth: number,
   viewportHeight: number,
-  targetCount: number = 9170,
+  targetCount: number = DEFAULT_TARGET_COUNT,
   mode: 'auto-aspect' | 'exact-target' | 'fixed-cols' = 'auto-aspect',
   userCols?: number
 ): GridConfig {
@@ -157,16 +158,20 @@ function loadLayoutFromStorage(key: string): GridConfig | null {
  * Call this when the viewport changes.
  */
 export function evictLayoutCache(currentWidth: number, currentHeight: number): void {
-  const currentKey = `${Math.round(currentWidth)}|${Math.round(currentHeight)}`;
+  const currentPrefix = `${Math.round(currentWidth)}|${Math.round(currentHeight)}|`;
   for (const key of layoutMemoryCache.keys()) {
-    if (key !== currentKey) {
+    if (!key.startsWith(currentPrefix)) {
       layoutMemoryCache.delete(key);
     }
   }
   try {
     const stored = JSON.parse(localStorage.getItem(LAYOUT_CACHE_KEY) || '{}');
     const evicted: Record<string, GridConfig> = {};
-    if (stored[currentKey]) evicted[currentKey] = stored[currentKey];
+    for (const [key, value] of Object.entries(stored)) {
+      if (key.startsWith(currentPrefix)) {
+        evicted[key] = value as GridConfig;
+      }
+    }
     localStorage.setItem(LAYOUT_CACHE_KEY, JSON.stringify(evicted));
   } catch {
     // silent fail
@@ -177,22 +182,20 @@ export function evictLayoutCache(currentWidth: number, currentHeight: number): v
  * Calculates a four-zone grid that reserves a centered square for image preview.
  * Blocks are placed only in the top, bottom, left, and right regions.
  *
- * Layout positions are **locked** per viewport size once first computed — they will
- * not shift when targetCount changes (e.g., when server images load), when the page
- * flashes, or on subsequent renders. Positions only update when the window resizes.
+ * Layout positions are cached per viewport size and loaded target count so the grid
+ * tracks the real library size while staying stable between ordinary re-renders.
  */
 export function calculateFrameGrid(
   viewportWidth: number,
   viewportHeight: number,
-  targetCount: number = 9170,
+  targetCount: number = DEFAULT_TARGET_COUNT,
   centerSize?: number
 ): GridConfig {
   const width = Math.max(100, viewportWidth);
   const height = Math.max(100, viewportHeight);
-  const layoutKey = `${Math.round(width)}|${Math.round(height)}`;
+  const layoutKey = `${Math.round(width)}|${Math.round(height)}|${targetCount}`;
 
-  // Return the locked layout if we already have one for these dimensions.
-  // targetCount changes (e.g., server images loading) will NOT shift block positions.
+  // Return the cached layout if we already have one for these dimensions and item count.
   const memoryCached = layoutMemoryCache.get(layoutKey);
   if (memoryCached) {
     return memoryCached;

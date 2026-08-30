@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Auth notification chooser and shell polish",
+  "content": "<p>Auth received a small but worthwhile polish pass on August 29, 2026. The goal was not to add another major feature, but to make the shared admin surface easier to read, easier to route into, and easier to resume after pauses.</p><p>What changed:</p><ul><li><strong>Chooser and filter wording:</strong> <code>Send Notifications</code> became <code>Choose Notifications</code>, and the matching filter controls were tightened so Activity and Notifications now share the same collapsible rhythm.</li><li><strong>Notification naming cleanup:</strong> popup labels and live entries now use <code>Perihelion</code> instead of <code>Peri</code>, and Lionship actions now begin with <code>Lionship</code> so the mixed-site list scans faster.</li><li><strong>Route and shell polish:</strong> the first-load Notifications-link issue was fixed, sample notification filler cards were removed, chooser copy now clarifies where email notifications are sent, and Auth now carries the shared repeating JeffersonWM background pattern at 7 percent opacity.</li></ul><p>This matters because Auth is increasingly acting as the operational surface for the rest of the platform. Small clarity improvements here reduce friction everywhere else.</p>",
+  "url": "https://auth.jeffersonwm.com/",
+  "source": "manual",
+  "external_id": "auth-notification-chooser-and-background-2026-08-29",
+  "created_at": "2026-08-29 18:49:26"
+}

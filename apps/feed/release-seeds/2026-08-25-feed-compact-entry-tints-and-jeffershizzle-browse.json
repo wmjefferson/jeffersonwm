@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Feed compact entry tints + Jeffershizzle browse return",
+  "content": "<p>Tonight's pass stayed intentionally small and practical. Feed's manual-entry editor was tightened into a more compact authoring surface, while Jeffershizzle's browse-view image flow was corrected so archive browsing and spiderweb wandering stay meaningfully separate.</p><p>What changed:</p><ul><li><strong>Feed composer compacted:</strong> manual entries now keep <code>Title</code> and <code>Publish Date</code> on the same row instead of stacking the date above everything else.</li><li><strong>Compact tint popup:</strong> the earlier full-width tint section was replaced by a small popup color chooser beside <code>Publish Date</code>, with 16 preset colors and hover labels.</li><li><strong>Tint persistence:</strong> Feed now stores tint choices in MySQL through a new <code>tint_color</code> field, so create/edit/reload/live display all stay in sync.</li><li><strong>Jeffershizzle browse correction:</strong> when a viewer comes from <code>#/browse</code>, clicking an image enlarges it as expected, and clicking the enlarged image now returns them cleanly to browse instead of pushing them into the original spiderweb link path.</li></ul><p>The important design decision here was restraint. The tint feature is useful, but it should feel like a small editorial choice rather than a control panel. And on Jeffershizzle, browse mode needed to stay browse mode: enlargement is good, but the archive path should not quietly become the spiderweb path unless the viewer actually chose that experience.</p>",
+  "url": "https://jeffersonwm.com/feed/",
+  "source": "manual",
+  "external_id": "feed-compact-entry-tints-and-jeffershizzle-browse-2026-08-25",
+  "created_at": "2026-08-24 21:16:00"
+}

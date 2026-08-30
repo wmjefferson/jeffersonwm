@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
 import type { ViteDevServer } from 'vite'
@@ -12,11 +12,19 @@ function copyStaticRuntimeFilesToDist() {
     name: 'copy-static-runtime-files-to-dist',
     closeBundle() {
       const rootDummyPath = resolve(__dirname, dummyFileName)
+      const faviconPath = resolve(__dirname, 'favicon.svg')
       const versionsPath = resolve(__dirname, 'versions.json')
       const distDir = resolve(__dirname, 'dist')
       const distDummyPath = resolve(distDir, dummyFileName)
+      const distFaviconPath = resolve(distDir, 'favicon.svg')
       const distVersionsPath = resolve(distDir, 'versions.json')
       const legacyDistDummyPath = resolve(distDir, 'dummyjeffersonwm')
+      const utilityPages = [
+        resolve(distDir, 'account', 'index.html'),
+        resolve(distDir, 'development', 'index.html'),
+        resolve(distDir, 'project-activity', 'index.html'),
+        resolve(distDir, 'status', 'index.html'),
+      ]
 
       try {
         if (!existsSync(distDir)) {
@@ -32,12 +40,36 @@ function copyStaticRuntimeFilesToDist() {
           copyFileSync(rootDummyPath, distDummyPath)
         }
 
+        if (existsSync(faviconPath)) {
+          copyFileSync(faviconPath, distFaviconPath)
+        }
+
         if (existsSync(versionsPath)) {
           copyFileSync(versionsPath, distVersionsPath)
         }
 
         if (existsSync(legacyDistDummyPath)) {
           rmSync(legacyDistDummyPath)
+        }
+
+        const assetsDir = resolve(distDir, 'assets')
+        if (existsSync(assetsDir)) {
+          const builtFaviconName = readdirSync(assetsDir).find((name) => /^favicon-.*\.svg$/i.test(name))
+
+          if (builtFaviconName) {
+            const utilityFaviconPath = `/jeffersonwm/assets/${builtFaviconName}`
+            for (const pagePath of utilityPages) {
+              if (!existsSync(pagePath)) {
+                continue
+              }
+
+              const html = readFileSync(pagePath, 'utf8')
+              const updated = html.replaceAll('/favicon.svg', utilityFaviconPath)
+              if (updated !== html) {
+                writeFileSync(pagePath, updated, 'utf8')
+              }
+            }
+          }
         }
       } catch (error) {
         console.warn('[vite] Dist runtime file sync was skipped.', error)

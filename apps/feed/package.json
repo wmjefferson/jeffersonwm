@@ -1,13 +1,13 @@
 {
   "name": "feed",
   "private": true,
-  "version": "0.2.7",
+  "version": "0.2.9",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
     "server": "tsx server.ts",
     "build": "vite build",
-    "publish": "node ..\\..\\scripts\\publish-aso.mjs --app feed",
+    "publish": "node ..\\..\\scripts\\publish-feed.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",

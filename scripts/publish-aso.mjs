@@ -10,7 +10,7 @@ const deployConfigPath = path.join(repoRoot, '.vscode', 'sftp.json');
 
 const appRegistry = {
   aphelion: app('Aphelion', 'aphelion', 'aphelion'),
-  battalion: app('Battalion', 'battalion', 'battalion'),
+  battalion: app('Battalion', 'battalion', 'battalion', 'client/dist'),
   bullion: app('Bullion', 'bullion', 'bullion'),
   feed: app('Feed', 'feed', 'feed'),
   jeffersonwm: app('JeffersonWM', 'jeffersonwm', 'jeffersonwm'),
@@ -26,9 +26,9 @@ const appRegistry = {
   verm: app('Vermilion', 'vermilion', 'vermilion'),
 };
 
-function app(label, slug, remotePath) {
+function app(label, slug, remotePath, distSubdir = 'dist') {
   const cwd = path.join(repoRoot, 'apps', slug);
-  return createAppConfig(label, slug, remotePath, cwd);
+  return createAppConfig(label, slug, remotePath, cwd, distSubdir);
 }
 
 function standaloneApp(label, folderName, remotePath) {
@@ -36,14 +36,14 @@ function standaloneApp(label, folderName, remotePath) {
   return createAppConfig(label, folderName, remotePath, cwd);
 }
 
-function createAppConfig(label, slug, remotePath, cwd) {
+function createAppConfig(label, slug, remotePath, cwd, distSubdir = 'dist') {
   return {
     label,
     slug,
     cwd,
     remotePath,
     packagePath: path.join(cwd, 'package.json'),
-    distDir: path.join(cwd, 'dist'),
+    distDir: path.join(cwd, distSubdir),
   };
 }
 

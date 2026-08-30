@@ -1,15 +1,15 @@
 {
-  "updatedAt": "2026-08-22T04:46:28.647Z",
+  "updatedAt": "2026-08-29T20:04:36.641Z",
   "apps": {
     "jeffersonwm": {
       "label": "JeffersonWM",
-      "version": "0.2.0",
-      "updatedAt": "2026-08-21 21:46 PDT"
+      "version": "0.2.1",
+      "updatedAt": "2026-08-22 21:22 PDT"
     },
     "feed": {
       "label": "Feed",
-      "version": "0.2.7",
-      "updatedAt": "2026-08-18 17:56 PDT"
+      "version": "0.2.9",
+      "updatedAt": "2026-08-27 19:27 PDT"
     },
     "vermilion": {
       "label": "Vermilion",
@@ -38,8 +38,8 @@
     },
     "perihelion": {
       "label": "Perihelion",
-      "version": "1.8.0",
-      "updatedAt": "2026-08-21 21:41 PDT"
+      "version": "1.8.4",
+      "updatedAt": "2026-08-26 21:25 PDT"
     },
     "bullion": {
       "label": "Bullion",
@@ -63,13 +63,13 @@
     },
     "dookydetective": {
       "label": "Dooky Detective",
-      "version": "0.0.6",
-      "updatedAt": "reconciled registry"
+      "version": "0.1.1",
+      "updatedAt": "2026-08-29 13:04 PDT"
     },
     "jeffershizzle": {
       "label": "Jeffershizzle",
-      "version": "0.2.0",
-      "updatedAt": "2026-08-21 10:23 PDT"
+      "version": "0.2.1",
+      "updatedAt": "2026-08-24 20:49 PDT"
     },
     "wmjefferson": {
       "label": "WM Jefferson",
@@ -78,13 +78,13 @@
     },
     "aphelion": {
       "label": "Aphelion",
-      "version": "0.3.2",
-      "updatedAt": "2026-08-21 21:36 PDT"
+      "version": "0.5.1",
+      "updatedAt": "2026-08-26 21:24 PDT"
     },
     "auth-jeffersonwm": {
       "label": "Auth / Multimillion",
-      "version": "0.3.2",
-      "updatedAt": "2026-08-18 18:15 PDT"
+      "version": "0.5.0",
+      "updatedAt": "2026-08-26 21:24 PDT"
     }
   }
 }

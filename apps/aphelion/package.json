@@ -1,7 +1,7 @@
 {
   "name": "aphelion",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.5.1",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -21,6 +21,8 @@
     "rename:apply": "node scripts/rename-library.mjs --apply",
     "rename:check": "node scripts/rename-library.mjs --preview",
     "rename:sweep": "node scripts/sweep-new.mjs",
+    "count:sync": "node scripts/sync-target-count.mjs",
+    "count:preview": "node scripts/sync-target-count.mjs --preview",
     "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",
     "version:patch": "node ..\\..\\scripts\\version-and-log.mjs --app aphelion --type patch",
     "version:patch:aphelion": "node ..\\..\\scripts\\version-and-log.mjs --app aphelion --type patch",
@@ -42,6 +44,7 @@
   "dependencies": {
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "mysql2": "^3.23.3",

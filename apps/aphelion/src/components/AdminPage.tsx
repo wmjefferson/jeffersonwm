@@ -37,11 +37,53 @@ type EditorState = {
   attributes: string[];
 };
 
+type AuthStatus = {
+  user: null | {
+    username: string;
+    displayName: string | null;
+    isAdmin: boolean;
+    isOwner: boolean;
+  };
+};
+
 type FolderTreeNode = {
   name: string;
   path: string;
   count: number;
   children: FolderTreeNode[];
+};
+
+type HighlightAdminImageSummary = {
+  key: string;
+  count: number;
+  lastSelectedAt: string;
+  blockIndex: number | null;
+  image: {
+    id: number | null;
+    code: string;
+    title: string;
+    path: string;
+    folder: string;
+    thumbUrl: string;
+  };
+};
+
+type HighlightAdminSummary = {
+  ok: boolean;
+  generatedAt: string;
+  totalEvents: number;
+  selectedCount: number;
+  clearedCount: number;
+  allImages: HighlightAdminImageSummary[];
+  topImages: HighlightAdminImageSummary[];
+  topFolders: Array<{ folder: string; count: number }>;
+  daily: Array<{ date: string; selected: number; cleared: number }>;
+};
+
+type HighlightImageViewerState = {
+  title: string;
+  imageUrl: string;
+  directUrl: string;
 };
 
 const EMPTY_EDITOR: EditorState = {
@@ -68,6 +110,23 @@ function prefixApiUrl(apiBaseUrl: string, url: string) {
 
   const base = apiBaseUrl.trim().replace(/\/$/, '');
   return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+function withImageSize(url: string, size: number) {
+  if (!url) {
+    return '';
+  }
+
+  try {
+    const resolved = new URL(url, window.location.origin);
+    resolved.searchParams.set('size', String(size));
+    if (/^https?:\/\//i.test(url)) {
+      return resolved.toString();
+    }
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  } catch {
+    return url;
+  }
 }
 
 function titleCase(value: string) {
@@ -218,7 +277,15 @@ function formatActionTimestamp(timestamp: string) {
   });
 }
 
-export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
+export function AdminPage({
+  apiBaseUrl,
+  authStatus,
+  onSignOut,
+}: {
+  apiBaseUrl: string;
+  authStatus: AuthStatus | null;
+  onSignOut: () => void;
+}) {
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const [cards, setCards] = useState<CardCatalogItem[]>([]);
   const [attributes, setAttributes] = useState<ControlledLibraryItem[]>([]);
@@ -244,6 +311,11 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
   const [pendingSaveField, setPendingSaveField] = useState('');
   const [savedField, setSavedField] = useState('');
   const [actionHistory, setActionHistory] = useState<AdminActionRecord[]>(() => loadActionHistory());
+  const [resetStatus, setResetStatus] = useState('');
+  const [highlightSummary, setHighlightSummary] = useState<HighlightAdminSummary | null>(null);
+  const [highlightLoading, setHighlightLoading] = useState(false);
+  const [highlightError, setHighlightError] = useState('');
+  const [highlightViewer, setHighlightViewer] = useState<HighlightImageViewerState | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedEditorPathRef = useRef('');
@@ -260,7 +332,9 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
     async function loadCatalog() {
       setLoading(true);
       try {
-        const response = await fetch(`${apiBaseUrl}/api/admin/catalog`);
+        const response = await fetch(`${apiBaseUrl}/api/admin/catalog`, {
+          credentials: 'include',
+        });
         if (!response.ok) {
           throw new Error(`Admin catalog returned ${response.status}`);
         }
@@ -414,6 +488,87 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
   const selectedSeriesHeader = selectedSeriesFilters.length > 0 ? selectedSeriesFilters.join(', ') : 'With Series';
   const selectedAttributeHeader = selectedAttributeFilters.length > 0 ? selectedAttributeFilters.map((item) => `#${item}`).join(', ') : 'With Attributes';
   const isOptionsPage = currentHash === '#options';
+  const isAdminHighlightsPage = currentHash === '#admin-highlights';
+
+  useEffect(() => {
+    if (!isAdminHighlightsPage) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadHighlightSummary() {
+      setHighlightLoading(true);
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/highlight-events/summary`, {
+          credentials: 'include',
+        });
+        if (!response.ok) {
+          throw new Error(`Highlight summary returned ${response.status}`);
+        }
+
+        const payload = (await response.json()) as HighlightAdminSummary;
+        if (cancelled) {
+          return;
+        }
+
+        setHighlightSummary(payload);
+        setHighlightError('');
+      } catch (loadError) {
+        if (!cancelled) {
+          setHighlightError(loadError instanceof Error ? loadError.message : 'Highlight details could not be loaded.');
+        }
+      } finally {
+        if (!cancelled) {
+          setHighlightLoading(false);
+        }
+      }
+    }
+
+    void loadHighlightSummary();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, isAdminHighlightsPage]);
+
+  useEffect(() => {
+    if (!highlightViewer) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setHighlightViewer(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [highlightViewer]);
+
+  const highlightedCards = useMemo(() => {
+    if (!highlightSummary) {
+      return [];
+    }
+
+    return highlightSummary.allImages.map((item) => {
+      const matchedCard = cards.find((card) => card.imageCode === item.image.code) || null;
+      const directUrl = matchedCard
+        ? prefixApiUrl(apiBaseUrl, withImageSize(matchedCard.imageUrl, 2048))
+        : prefixApiUrl(apiBaseUrl, withImageSize(item.image.thumbUrl, 2048));
+      const thumbUrl = matchedCard
+        ? prefixApiUrl(apiBaseUrl, withImageSize(matchedCard.thumbUrl || matchedCard.imageUrl, 2048))
+        : prefixApiUrl(apiBaseUrl, withImageSize(item.image.thumbUrl, 2048));
+
+      return {
+        summary: item,
+        card: matchedCard,
+        directUrl,
+        thumbUrl,
+        displayTitle: matchedCard?.title || matchedCard?.sourceTitle || item.image.title || item.image.code,
+      };
+    });
+  }, [apiBaseUrl, cards, highlightSummary]);
 
   useEffect(() => {
     if (!selectedCard) {
@@ -542,6 +697,7 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
 
       const response = await fetch(`${apiBaseUrl}/api/admin/cards`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -633,6 +789,7 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
 
     const response = await fetch(`${apiBaseUrl}${endpoint}`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label: cleaned }),
     });
@@ -659,6 +816,7 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
 
     const response = await fetch(`${apiBaseUrl}${endpoint}/${id}`, {
       method: 'PATCH',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label: nextLabel.trim(), previousLabel: currentLabel }),
     });
@@ -711,6 +869,7 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
 
     const response = await fetch(`${apiBaseUrl}${endpoint}/${id}`, {
       method: 'DELETE',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label }),
     });
@@ -971,6 +1130,262 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
     );
   }
 
+  async function handleHighlightReset(mode: 'all' | 'least-popular-50' | 'least-popular-90') {
+    setResetStatus('Checking current highlights...');
+    try {
+      const previewResponse = await fetch(`${apiBaseUrl}/api/admin/highlight-resets/preview?mode=${encodeURIComponent(mode)}`, {
+        credentials: 'include',
+      });
+      const preview = await previewResponse.json();
+      if (!previewResponse.ok) {
+        throw new Error(preview?.error || 'Reset preview failed.');
+      }
+
+      const modeLabel = mode === 'all'
+        ? 'all active highlights'
+        : mode === 'least-popular-50'
+          ? 'the least popular 50% of active highlights'
+          : 'the least popular 90% of active highlights';
+      const confirmed = window.confirm(
+        `Soft reset ${modeLabel}?\n\nThis will remove ${preview.resetCount} of ${preview.totalActive} active highlighted image${preview.totalActive === 1 ? '' : 's'} from the master Highlights view. The raw history stays intact.`
+      );
+      if (!confirmed) {
+        setResetStatus('Reset cancelled.');
+        return;
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/admin/highlight-resets`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Reset failed.');
+      }
+
+      setResetStatus(`Reset complete: ${payload.resetCount} active highlight${payload.resetCount === 1 ? '' : 's'} removed from the public summary.`);
+      recordAction('Soft reset', `${payload.resetCount} highlights reset with mode ${mode}`);
+    } catch (error) {
+      setResetStatus(error instanceof Error ? error.message : 'Reset failed.');
+    }
+  }
+
+  async function handleJsonExport(kind: 'all-images' | 'highlighted-images') {
+    setResetStatus(`Preparing ${kind === 'all-images' ? 'all images' : 'highlighted images'} JSON...`);
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/admin/exports/${kind}`, {
+        credentials: 'include',
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || 'Export failed.');
+      }
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `aphelion-${kind}-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setResetStatus(`Export complete: ${payload.total || 0} ${kind === 'all-images' ? 'image' : 'highlight'} record${payload.total === 1 ? '' : 's'} downloaded.`);
+      recordAction('Export', `${kind} JSON exported with ${payload.total || 0} records`);
+    } catch (error) {
+      setResetStatus(error instanceof Error ? error.message : 'Export failed.');
+    }
+  }
+
+  function renderHighlightMaintenance() {
+    return (
+      <section className="border border-[#e5e5e5] bg-white xl:col-span-2">
+        <div className="flex items-center justify-between border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+          <span>Highlight Maintenance</span>
+          <span className="text-[10px] normal-case tracking-normal text-gray-400">
+            Preferred admin only
+          </span>
+        </div>
+        <div className="grid gap-3 p-4 font-sans text-sm text-gray-800">
+          <p className="m-0">
+            These controls soft reset the master Highlights view without deleting the raw event log. Use them to clear stale public trends while keeping the history available for later reporting and visualizations.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={() => void handleHighlightReset('all')} className="border border-gray-900 px-3 py-2 font-semibold text-gray-900 hover:text-[#de8bf7]">
+              Reset All Highlights
+            </button>
+            <button type="button" onClick={() => void handleHighlightReset('least-popular-50')} className="border border-gray-900 px-3 py-2 font-semibold text-gray-900 hover:text-[#de8bf7]">
+              Reset Least Popular 50%
+            </button>
+            <button type="button" onClick={() => void handleHighlightReset('least-popular-90')} className="border border-gray-900 px-3 py-2 font-semibold text-gray-900 hover:text-[#de8bf7]">
+              Reset Least Popular 90%
+            </button>
+            <a href={`${apiBaseUrl}/api/highlight-events/summary`} target="_blank" rel="noopener noreferrer" className="border border-gray-900 px-3 py-2 font-semibold text-gray-900 hover:text-[#de8bf7]">
+              Open Highlight Summary JSON
+            </a>
+            <button type="button" onClick={() => void handleJsonExport('all-images')} className="border border-gray-900 px-3 py-2 font-semibold text-gray-900 hover:text-[#de8bf7]">
+              Download All Images JSON
+            </button>
+            <button type="button" onClick={() => void handleJsonExport('highlighted-images')} className="border border-gray-900 px-3 py-2 font-semibold text-gray-900 hover:text-[#de8bf7]">
+              Download Highlighted Images JSON
+            </button>
+          </div>
+          {resetStatus && (
+            <div className="text-gray-600">{resetStatus}</div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  function renderAdminHighlightsPage() {
+    return (
+      <>
+        <main className="h-[calc(100vh-72px)] overflow-y-auto px-[36px] py-[16px]">
+          <div className="mb-4 border-b border-[#e5e5e5] pb-2 font-sans text-sm text-gray-900">
+            <span className="font-semibold">Highlights</span> - review the current master highlight list with card identity details and direct image links.
+            {highlightSummary && (
+              <span className="ml-2 text-gray-500">
+                {highlightedCards.length} highlighted image{highlightedCards.length === 1 ? '' : 's'} in the current public summary.
+              </span>
+            )}
+          </div>
+
+          {highlightError && (
+            <div className="mb-4 border border-red-200 bg-red-50 px-4 py-3 font-sans text-sm text-red-700">
+              {highlightError}
+            </div>
+          )}
+
+          {highlightLoading && !highlightSummary ? (
+            <div className="font-sans text-sm text-gray-500">Loading highlight details...</div>
+          ) : highlightSummary && highlightedCards.length === 0 ? (
+            <div className="border border-[#e5e5e5] bg-white px-4 py-6 font-sans text-sm text-gray-500">
+              No active highlighted images are currently recorded.
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {highlightedCards.map(({ summary, card, directUrl, thumbUrl, displayTitle }) => (
+                <article key={summary.key} className="grid gap-4 border border-[#e5e5e5] bg-white p-4 xl:grid-cols-[140px_minmax(0,1fr)] xl:items-start">
+                  <div className="grid max-w-[140px] gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setHighlightViewer({ title: displayTitle, imageUrl: directUrl, directUrl })}
+                      className="block aspect-square border border-[#e5e5e5] bg-[#fafafa] text-left"
+                    >
+                      <img
+                        src={thumbUrl}
+                        alt={displayTitle}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHighlightViewer({ title: displayTitle, imageUrl: directUrl, directUrl })}
+                      className="text-left font-sans text-xs font-semibold uppercase tracking-[0.12em] text-gray-900 hover:text-[#de8bf7]"
+                    >
+                      View image
+                    </button>
+                  </div>
+
+                  <div className="grid min-w-0 gap-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="break-words font-sans text-sm font-semibold text-gray-900">
+                          {displayTitle}
+                        </div>
+                        <div className="mt-1 break-all font-sans text-xs text-gray-500">
+                          {summary.image.code}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right font-sans text-xs text-gray-500">
+                        <div>{summary.count} selected</div>
+                        <div>{new Date(summary.lastSelectedAt).toLocaleString()}</div>
+                      </div>
+                    </div>
+
+                    <div className="grid min-w-0 gap-2 font-sans text-sm text-gray-800 xl:grid-cols-2">
+                      <div className="min-w-0">
+                        <span className="font-semibold text-gray-900">Card ID:</span>{' '}
+                        {card?.cardUid || 'Card ID pending'}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-semibold text-gray-900">Rarity:</span>{' '}
+                        {card?.rarity ? titleCase(card.rarity) : 'Not set'}
+                      </div>
+                      <div className="min-w-0 xl:col-span-2">
+                        <span className="font-semibold text-gray-900">Title:</span>{' '}
+                        <span className="break-words">{card?.title || 'Not set'}</span>
+                      </div>
+                      <div className="min-w-0 xl:col-span-2">
+                        <span className="font-semibold text-gray-900">Description:</span>{' '}
+                        <span className="break-words">{card?.description || 'Not set'}</span>
+                      </div>
+                      <div className="min-w-0 xl:col-span-2">
+                        <span className="font-semibold text-gray-900">Set / Series:</span>{' '}
+                        <span className="break-words">{card?.seriesName || 'Not set'}</span>
+                      </div>
+                      <div className="min-w-0 xl:col-span-2">
+                        <span className="font-semibold text-gray-900">Attributes:</span>{' '}
+                        <span className="break-words">
+                          {card && card.attributes.length > 0 ? card.attributes.map((attribute) => `#${attribute}`).join(', ') : 'None'}
+                        </span>
+                      </div>
+                      <div className="min-w-0 xl:col-span-2">
+                        <span className="font-semibold text-gray-900">Source Path:</span>
+                        <span className="mt-1 block break-all">{card?.imagePath || summary.image.path}</span>
+                      </div>
+                      <div className="min-w-0 xl:col-span-2">
+                        <span className="font-semibold text-gray-900">Direct URL:</span>
+                        <a href={directUrl} target="_blank" rel="noreferrer" className="mt-1 block break-all hover:text-[#de8bf7]">
+                          {directUrl}
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </main>
+
+        {highlightViewer && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 p-6 backdrop-blur-sm"
+            onClick={() => setHighlightViewer(null)}
+          >
+            <div
+              className="max-h-[90vh] max-w-[90vw] overflow-hidden border border-[#e5e5e5] bg-[#fafafa] shadow-xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-4 border-b border-[#e5e5e5] px-4 py-3 font-sans text-sm text-gray-900">
+                <div className="min-w-0 flex-1 truncate font-semibold">{highlightViewer.title}</div>
+                <div className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.12em]">
+                  <a href={highlightViewer.directUrl} target="_blank" rel="noreferrer" className="hover:text-[#de8bf7]">
+                    Open direct
+                  </a>
+                  <button type="button" onClick={() => setHighlightViewer(null)} className="hover:text-[#de8bf7]">
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div className="flex max-h-[calc(90vh-49px)] items-center justify-center bg-white">
+                <img
+                  src={highlightViewer.imageUrl}
+                  alt={highlightViewer.title}
+                  className="max-h-[calc(90vh-49px)] max-w-[90vw] object-contain"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <div
       className="min-h-screen overflow-x-hidden bg-[#FAFAFA] text-gray-950"
@@ -986,10 +1401,22 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
           </a>
         </div>
         <div className="flex items-center gap-4 font-sans text-sm font-semibold text-gray-900">
-          <a href="/aphelion/#highlights" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
+          <a
+            href="/aphelion/#admin-highlights"
+            className={`transition-colors duration-1000 hover:duration-150 hover:text-[#de8bf7] ${isAdminHighlightsPage ? 'text-blue-700' : ''}`}
+          >
             Highlights
           </a>
-          {isOptionsPage ? (
+          {isAdminHighlightsPage ? (
+            <>
+              <a href="/aphelion/#admin" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
+                Admin
+              </a>
+              <a href="/aphelion/#options" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
+                Options
+              </a>
+            </>
+          ) : isOptionsPage ? (
             <a href="/aphelion/#admin" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
               Admin
             </a>
@@ -1001,15 +1428,28 @@ export function AdminPage({ apiBaseUrl }: { apiBaseUrl: string }) {
           <a href="/aphelion/" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
             Public
           </a>
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+          >
+            Sign Out
+          </button>
         </div>
       </header>
 
-      {isOptionsPage ? (
+      {isAdminHighlightsPage ? (
+        renderAdminHighlightsPage()
+      ) : isOptionsPage ? (
         <main className="h-[calc(100vh-72px)] overflow-y-auto px-[36px] py-[16px]">
           <div className="mb-4 border-b border-[#e5e5e5] pb-2 font-sans text-sm text-gray-900">
             <span className="font-semibold">Admin</span> - edit card libraries, set labels, and the property standards used by curation.
+            {authStatus?.user && (
+              <span className="ml-2 text-gray-500">Signed in as {authStatus.user.displayName || authStatus.user.username}.</span>
+            )}
           </div>
           <div className="grid gap-6 xl:grid-cols-2">
+            {renderHighlightMaintenance()}
             {renderLibraryOptions('Attribute Library', attributes, '/api/admin/attributes', setAttributes)}
             {renderLibraryOptions('Series Library', series, '/api/admin/series', setSeries)}
             <section className="border border-[#e5e5e5] bg-white">

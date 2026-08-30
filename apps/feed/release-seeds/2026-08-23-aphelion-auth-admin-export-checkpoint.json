@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Aphelion + Auth — preferred-admin exports and notification bridge",
+  "content": "<p>Tonight's Aphelion/Auth pass clarified where public selection ends and owner-level curation begins. The selected-image JSON manifest for regular users was removed; Aphelion now keeps public selection as a local viewing interaction, while export power moves to the preferred-admin Options page.</p><p>What changed:</p><ul><li><strong>Public/user boundary:</strong> visitors can still view Aphelion and Highlights and click/select images locally, but they do not see Selected, Clear, the selected page, or download/export controls.</li><li><strong>Preferred-admin controls:</strong> the Options page now has owner-only JSON exports for the full image catalog and the active highlighted-image set.</li><li><strong>Highlights maintenance:</strong> the soft reset controls remain preferred-admin-only, with preview counts and confirmation before changing the public Highlights summary.</li><li><strong>Auth notification bridge:</strong> Aphelion export/reset actions now log into Auth history/notifications through the shared internal log channel, giving us one place to decide which cross-app events deserve attention.</li></ul><p>The important design decision is that Aphelion's public surface can stay playful and visible, while master viewership, exports, resets, and future audit-worthy actions live behind Auth's preferred-admin model. This should make tomorrow's testing much cleaner: public visitor, regular user, regular admin, and preferred admin each have a distinct role to verify.</p>",
+  "url": "https://jeffersonwm.com/aphelion/",
+  "source": "manual",
+  "external_id": "aphelion-auth-admin-export-checkpoint-2026-08-23",
+  "created_at": "2026-08-23 21:10:00"
+}

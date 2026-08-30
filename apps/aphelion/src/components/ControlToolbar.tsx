@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { GridConfig, GridOverlayMode } from '../types';
+import { DEFAULT_TARGET_COUNT, TARGET_COUNT_PRESETS } from '../config';
 import {
   Search,
   Shuffle,
@@ -41,7 +42,8 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
 }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [collapsed, setCollapsed] = useState(true); // Default collapsed for pure white look
-  const [customCount, setCustomCount] = useState<string>('9170');
+  const [customCount, setCustomCount] = useState<string>(String(DEFAULT_TARGET_COUNT));
+  const defaultTargetCountLabel = DEFAULT_TARGET_COUNT.toLocaleString();
 
   const handleCustomCountSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +62,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           className="px-3 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-900 text-slate-300 hover:text-white border border-slate-700/60 backdrop-blur-md shadow-lg text-xs font-mono flex items-center gap-2 transition-all opacity-40 hover:opacity-100"
         >
           <Grid className="w-3.5 h-3.5 text-sky-400" />
-          <span>9,170 Blocks Toolbar</span>
+          <span>{defaultTargetCountLabel} Blocks Toolbar</span>
         </button>
       </div>
     );
@@ -76,7 +78,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h1 className="font-bold text-sm text-slate-100 tracking-tight">9,170 Block Grid</h1>
+              <h1 className="font-bold text-sm text-slate-100 tracking-tight">{defaultTargetCountLabel} Block Grid</h1>
               <span className="px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 text-[10px] font-mono border border-sky-500/30">
                 LIVE
               </span>
@@ -202,7 +204,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
             <div>
               <label className="block text-slate-300 mb-1.5 font-medium">Target Block Count</label>
               <div className="grid grid-cols-3 gap-1.5">
-                {[9170, 25000, 50000].map((count) => (
+                {TARGET_COUNT_PRESETS.map((count) => (
                   <button
                     key={count}
                     onClick={() => {

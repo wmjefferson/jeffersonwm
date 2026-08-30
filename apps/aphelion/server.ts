@@ -1,9 +1,11 @@
 import express from 'express';
 import { access, appendFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
 import dotenv from 'dotenv';
 import sharp from 'sharp';
+import { DatabaseSync } from 'node:sqlite';
 import type { ImageItem } from './src/types';
 import { createCurationDb } from './curationDb';
 import type {
@@ -42,7 +44,25 @@ const IMAGE_EXTENSIONS = new Set([
   '.tiff',
 ]);
 
-const SERVED_IMAGE_SIZE = 1024;
+const DEFAULT_SERVED_IMAGE_SIZE = 1024;
+const MIN_SERVED_IMAGE_SIZE = 84;
+const MAX_PUBLIC_IMAGE_SIZE = 1024;
+const MAX_OWNER_IMAGE_SIZE = 2048;
+const DEFAULT_IMAGE_URL_TTL_SECONDS = 60 * 60 * 6;
+
+type AuthUser = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  isAdmin: boolean;
+  isOwner: boolean;
+  memberships: string[];
+};
+
+type CatalogImageRecord = Omit<ImageItem, 'imageUrl' | 'thumbUrl'> & {
+  imageKey: string;
+  relativePath: string;
+};
 
 function normalizeConfiguredPath(value: string) {
   const trimmed = value.trim().replace(/^"+|"+$/g, '');
@@ -108,6 +128,15 @@ function shuffleBySeed<T>(items: T[], seed: number): T[] {
   return shuffled;
 }
 
+function parseServedImageSize(value: unknown) {
+  const requested = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(requested)) {
+    return DEFAULT_SERVED_IMAGE_SIZE;
+  }
+
+  return Math.max(MIN_SERVED_IMAGE_SIZE, requested);
+}
+
 async function startServer() {
   const app = express();
   const curationDb = createCurationDb();
@@ -121,13 +150,32 @@ async function startServer() {
     )
   );
   let resolvedImageRoot: string | null = null;
-  const corsOrigin = process.env.APHELION_CORS_ORIGIN || '*';
+  const configuredCorsOrigin = process.env.APHELION_CORS_ORIGIN || '*';
+  const requireAuth = ['1', 'true', 'yes', 'on'].includes(String(process.env.APHELION_REQUIRE_AUTH || '').toLowerCase());
+  const authBaseUrl = String(process.env.APHELION_AUTH_BASE_URL || 'https://auth.jeffersonwm.com').replace(/\/$/, '');
+  const authDbPath = normalizeConfiguredPath(
+    process.env.APHELION_CENTRAL_AUTH_DB_PATH || 'E:\\auth-jeffersonwm\\backend\\data\\auth-jeffersonwm.sqlite3'
+  );
+  const authSessionCookieName = process.env.APHELION_CENTRAL_SESSION_COOKIE_NAME || 'auth_jeffersonwm_session';
+  const requiredAppMembership = process.env.APHELION_REQUIRED_APP_MEMBERSHIP || 'aphelion';
+  const authInternalLogToken = process.env.APHELION_AUTH_INTERNAL_LOG_TOKEN || process.env.AUTH_INTERNAL_LOG_TOKEN || '';
+  const imageUrlSecret = process.env.APHELION_IMAGE_URL_SECRET
+    || authInternalLogToken
+    || `${authDbPath}|${requiredAppMembership}|${imageRootCandidates.join('|')}`;
+  const imageUrlTtlSeconds = Math.max(
+    300,
+    Number.parseInt(String(process.env.APHELION_IMAGE_URL_TTL_SECONDS || DEFAULT_IMAGE_URL_TTL_SECONDS), 10) || DEFAULT_IMAGE_URL_TTL_SECONDS,
+  );
 
   app.use(express.json({ limit: '10mb' }));
   app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+    const requestOrigin = String(req.headers.origin || '');
+    const safeOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestOrigin)
+      || /^https?:\/\/([a-z0-9-]+\.)*jeffersonwm\.com$/i.test(requestOrigin);
+    res.setHeader('Access-Control-Allow-Origin', configuredCorsOrigin === '*' && safeOrigin ? requestOrigin : configuredCorsOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Auth-Internal-Token');
     if (req.method === 'OPTIONS') {
       res.sendStatus(204);
       return;
@@ -135,20 +183,264 @@ async function startServer() {
     next();
   });
 
-  let cachedCatalog: ImageItem[] | null = null;
+  let cachedCatalog: CatalogImageRecord[] | null = null;
   let cachedCatalogAt = 0;
   const weeklogDir = process.env.APHELION_WEEKLOG_DIR || path.join(process.cwd(), 'data', 'weeklog');
   const highlightLogDir = process.env.APHELION_HIGHLIGHT_LOG_DIR || path.join(process.cwd(), 'data', 'logs');
+  const downloadLogDir = process.env.APHELION_DOWNLOAD_LOG_DIR || path.join(process.cwd(), 'data', 'downloads');
 
-  async function mergeCatalogWithMetadata(items: ImageItem[]): Promise<AdminCatalogPayload> {
+  function cookieMap(cookieHeader = '') {
+    const cookies: Record<string, string> = {};
+    for (const part of cookieHeader.split(';')) {
+      if (!part.includes('=')) continue;
+      const [key, value] = part.split('=', 2);
+      cookies[key.trim()] = decodeURIComponent(value.trim());
+    }
+    return cookies;
+  }
+
+  function readCurrentAuthUser(req: express.Request): AuthUser | null {
+    const token = cookieMap(req.headers.cookie || '')[authSessionCookieName];
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const authDb = new DatabaseSync(authDbPath, { readOnly: true });
+      try {
+        const sessionRow = authDb.prepare(`
+          SELECT
+            users.id,
+            users.username,
+            users.display_name,
+            users.is_admin,
+            users.is_owner,
+            users.is_approved,
+            users.is_blocked,
+            users.is_deleted,
+            sessions.expires_at
+          FROM sessions
+          INNER JOIN users ON users.id = sessions.user_id
+          WHERE sessions.token = ?
+          LIMIT 1
+        `).get(token) as Record<string, unknown> | undefined;
+
+        if (!sessionRow || new Date(String(sessionRow.expires_at)).getTime() <= Date.now()) {
+          return null;
+        }
+
+        if (
+          Boolean(sessionRow.is_blocked)
+          || Boolean(sessionRow.is_deleted)
+          || !Boolean(sessionRow.is_approved)
+        ) {
+          return null;
+        }
+
+        const membershipRows = authDb.prepare(`
+          SELECT app_key
+          FROM user_app_memberships
+          WHERE user_id = ?
+          ORDER BY app_key COLLATE NOCASE
+        `).all(String(sessionRow.id)) as Array<{ app_key: string }>;
+        const memberships = membershipRows.map((row) => String(row.app_key));
+        const isOwner = Boolean(sessionRow.is_owner);
+
+        // Auth admins can use the signed-in public tools even before they are granted the
+        // app-specific membership; only owner unlocks the admin surface later in the UI.
+        if (
+          requireAuth
+          && requiredAppMembership
+          && !isOwner
+          && !Boolean(sessionRow.is_admin)
+          && !memberships.includes(requiredAppMembership)
+        ) {
+          return null;
+        }
+
+        return {
+          id: String(sessionRow.id),
+          username: String(sessionRow.username),
+          displayName: sessionRow.display_name == null ? null : String(sessionRow.display_name),
+          isAdmin: Boolean(sessionRow.is_admin),
+          isOwner,
+          memberships,
+        };
+      } finally {
+        authDb.close();
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  function requireSignedIn(req: express.Request, res: express.Response) {
+    if (!requireAuth) {
+      return {
+        id: 'development',
+        username: 'development',
+        displayName: 'Development',
+        isAdmin: true,
+        isOwner: true,
+        memberships: [requiredAppMembership],
+      } satisfies AuthUser;
+    }
+
+    const user = readCurrentAuthUser(req);
+    if (!user) {
+      res.status(401).json({ ok: false, error: 'Authentication required.' });
+      return null;
+    }
+    return user;
+  }
+
+  function requireOwner(req: express.Request, res: express.Response) {
+    const user = requireSignedIn(req, res);
+    if (!user) {
+      return null;
+    }
+    if (!user.isOwner) {
+      res.status(403).json({ ok: false, error: 'Preferred admin access required.' });
+      return null;
+    }
+    return user;
+  }
+
+  async function logAuthHistory(user: AuthUser | null, action: string, target: string) {
+    if (!authInternalLogToken) {
+      return;
+    }
+
+    try {
+      await fetch(`${authBaseUrl}/api/history/log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth-Internal-Token': authInternalLogToken,
+        },
+        body: JSON.stringify({
+          action,
+          site: 'aphelion',
+          target,
+          userId: user?.id || '',
+          username: user?.username || 'aphelion',
+        }),
+      });
+    } catch (error) {
+      console.warn('Aphelion could not log to Auth history.', error);
+    }
+  }
+
+  function buildImageKey(relativePath: string) {
+    return createHash('sha256')
+      .update(sanitizeRelativePath(relativePath))
+      .digest('base64url')
+      .slice(0, 24);
+  }
+
+  function buildImageSignature(imageKey: string, expiresAt: number) {
+    return createHmac('sha256', imageUrlSecret)
+      .update(`${imageKey}|${expiresAt}`)
+      .digest('base64url');
+  }
+
+  function buildSignedImageUrl(imageKey: string, expiresAt = Math.floor(Date.now() / 1000) + imageUrlTtlSeconds) {
+    const signature = buildImageSignature(imageKey, expiresAt);
+    return `/api/image?key=${encodeURIComponent(imageKey)}&exp=${expiresAt}&sig=${encodeURIComponent(signature)}`;
+  }
+
+  function safeCompareSignature(left: string, right: string) {
+    const leftBuffer = Buffer.from(left);
+    const rightBuffer = Buffer.from(right);
+    if (leftBuffer.length !== rightBuffer.length) {
+      return false;
+    }
+    return timingSafeEqual(leftBuffer, rightBuffer);
+  }
+
+  function verifySignedImageRequest(imageKey: string, expiresAt: number, signature: string) {
+    if (!imageKey || !Number.isFinite(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000) || !signature) {
+      return false;
+    }
+    const expected = buildImageSignature(imageKey, expiresAt);
+    return safeCompareSignature(signature, expected);
+  }
+
+  function getMaxAllowedImageSizeForRequest(req: express.Request) {
+    if (!requireAuth) {
+      return MAX_OWNER_IMAGE_SIZE;
+    }
+
+    const user = readCurrentAuthUser(req);
+    return user?.isOwner ? MAX_OWNER_IMAGE_SIZE : MAX_PUBLIC_IMAGE_SIZE;
+  }
+
+  function toPublicImageItem(item: CatalogImageRecord): ImageItem {
+    const imageUrl = buildSignedImageUrl(item.imageKey);
+    return {
+      id: item.id,
+      code: item.code,
+      title: item.title,
+      category: item.category,
+      colorHex: item.colorHex,
+      hue: item.hue,
+      brightness: item.brightness,
+      imageUrl,
+      thumbUrl: imageUrl,
+      resolution: item.resolution,
+      dateAdded: item.dateAdded,
+      tags: item.tags,
+      cameraInfo: item.cameraInfo,
+      customUploaded: item.customUploaded,
+    };
+  }
+
+  async function findCatalogImageById(id: number) {
+    const items = await getCatalog();
+    return items.find((item) => item.id === id) || null;
+  }
+
+  async function findCatalogImageByCode(code: string) {
+    const cleanCode = cleanLogText(code, 120);
+    if (!cleanCode) {
+      return null;
+    }
+    const items = await getCatalog();
+    return items.find((item) => item.code === cleanCode) || null;
+  }
+
+  async function findCatalogImageByKey(imageKey: string) {
+    const items = await getCatalog();
+    return items.find((item) => item.imageKey === imageKey) || null;
+  }
+
+  async function resolveCatalogImagePath(candidate: { id?: unknown; code?: unknown; imageUrl?: unknown }) {
+    const numericId = Number(candidate.id);
+    if (Number.isFinite(numericId)) {
+      const byId = await findCatalogImageById(numericId);
+      if (byId) {
+        return byId.relativePath;
+      }
+    }
+
+    const byCode = await findCatalogImageByCode(String(candidate.code || ''));
+    if (byCode) {
+      return byCode.relativePath;
+    }
+
+    return extractImagePath(String(candidate.imageUrl || ''));
+  }
+
+  async function mergeCatalogWithMetadata(items: CatalogImageRecord[]): Promise<AdminCatalogPayload> {
     const metadataByPath = new Map<string, CardMetadataRecord>();
     for (const record of await curationDb.listCardMetadata()) {
       metadataByPath.set(record.imagePath, record);
     }
 
     const cards: CardCatalogItem[] = items.map((item) => {
-      const imagePath = decodeURIComponent(item.imageUrl.split('path=').slice(1).join('path=') || '');
+      const imagePath = item.relativePath;
       const metadata = metadataByPath.get(imagePath);
+      const imageUrl = buildSignedImageUrl(item.imageKey);
 
       return {
         id: metadata?.id ?? item.id,
@@ -158,8 +450,8 @@ async function startServer() {
         folderPath: item.cameraInfo || '',
         sourceTitle: item.title,
         sourceTags: item.tags,
-        imageUrl: item.imageUrl,
-        thumbUrl: item.thumbUrl,
+        imageUrl,
+        thumbUrl: imageUrl,
         title: metadata?.title || '',
         description: metadata?.description || '',
         rarity: metadata?.rarity || null,
@@ -263,7 +555,7 @@ async function startServer() {
     return fullPath;
   }
 
-  function buildImageItem(relativePath: string, mtimeMs: number, index: number): ImageItem {
+  function buildImageItem(relativePath: string, mtimeMs: number, index: number): CatalogImageRecord {
     const safeRelativePath = sanitizeRelativePath(relativePath);
     const parsed = path.posix.parse(safeRelativePath);
     const fileStem = parsed.name || `image-${index + 1}`;
@@ -288,7 +580,6 @@ async function startServer() {
       .map((part) => part.toLowerCase());
     const folderTags = folderPath === '.' ? ['keep'] : folderPath.split('/').filter(Boolean).map((part) => part.toLowerCase());
     const tags = Array.from(new Set([category.toLowerCase(), ...folderTags, ...keywords])).slice(0, 8);
-    const imageUrl = `/api/image?path=${encodeURIComponent(safeRelativePath)}`;
 
     return {
       id: index,
@@ -298,8 +589,8 @@ async function startServer() {
       colorHex,
       hue,
       brightness,
-      imageUrl,
-      thumbUrl: imageUrl,
+      imageKey: buildImageKey(safeRelativePath),
+      relativePath: safeRelativePath,
       resolution: 'Server image',
       dateAdded: new Date(mtimeMs).toISOString().split('T')[0],
       tags,
@@ -308,7 +599,7 @@ async function startServer() {
   }
 
   async function buildCatalog() {
-    const items: ImageItem[] = [];
+    const items: CatalogImageRecord[] = [];
     const imageRoot = await getImageRoot();
 
     async function walk(currentDir: string, relativeDir = '') {
@@ -338,7 +629,7 @@ async function startServer() {
     return items;
   }
 
-  async function ensureWeeklyPositionLog(items: ImageItem[]) {
+  async function ensureWeeklyPositionLog(items: CatalogImageRecord[]) {
     const weekInfo = getIsoWeekInfo();
     const logPath = path.join(weeklogDir, `${weekInfo.label}.json`);
 
@@ -364,7 +655,7 @@ async function startServer() {
         originalId: image.id,
         code: image.code,
         title: image.title,
-        imageUrl: image.imageUrl,
+        imageKey: image.imageKey,
         folder: image.cameraInfo || '',
         tags: image.tags,
       })),
@@ -375,7 +666,7 @@ async function startServer() {
     console.log(`Weekly Aphelion position log written: ${logPath}`);
   }
 
-  async function getCatalog(forceRefresh = false) {
+  async function getCatalog(forceRefresh = false): Promise<CatalogImageRecord[]> {
     if (!forceRefresh && cachedCatalog) {
       await ensureWeeklyPositionLog(cachedCatalog);
       return cachedCatalog;
@@ -458,16 +749,39 @@ async function startServer() {
     const imageMap = new Map<string, any>();
     const folderMap = new Map<string, { folder: string; count: number }>();
     const dailyMap = new Map<string, { date: string; selected: number; cleared: number }>();
+    const chronologicalEvents = events
+      .slice()
+      .sort((a, b) => String(a.timestamp || '').localeCompare(String(b.timestamp || '')));
 
-    for (const event of events) {
+    for (const event of chronologicalEvents) {
       const date = String(event.timestamp || '').slice(0, 10) || 'unknown';
       const day = dailyMap.get(date) || { date, selected: 0, cleared: 0 };
       if (event.action === 'selected') {
         day.selected += 1;
-      } else if (event.action === 'cleared' || event.action === 'cleared-all') {
+      } else if (event.action === 'cleared' || event.action === 'cleared-all' || event.action === 'soft-reset') {
         day.cleared += 1;
       }
       dailyMap.set(date, day);
+
+      if (event.action === 'soft-reset' && Array.isArray(event.resetKeys)) {
+        for (const key of event.resetKeys) {
+          const resetKey = cleanLogText(key, 1000);
+          const existing = imageMap.get(resetKey);
+          if (existing?.image?.folder) {
+            const folderSummary = folderMap.get(existing.image.folder);
+            if (folderSummary) {
+              folderSummary.count = Math.max(0, folderSummary.count - existing.count);
+              if (folderSummary.count === 0) {
+                folderMap.delete(existing.image.folder);
+              } else {
+                folderMap.set(existing.image.folder, folderSummary);
+              }
+            }
+          }
+          imageMap.delete(resetKey);
+        }
+        continue;
+      }
 
       if (event.action !== 'selected' || !event.image) {
         continue;
@@ -486,7 +800,7 @@ async function startServer() {
           title: cleanLogText(event.image.title, 200),
           path: imagePath,
           folder: cleanLogText(event.image.folder, 200),
-          thumbUrl: imagePath ? `/api/image?path=${encodeURIComponent(imagePath)}` : '',
+          thumbUrl: imagePath ? buildSignedImageUrl(buildImageKey(imagePath)) : '',
         },
       };
 
@@ -503,9 +817,9 @@ async function startServer() {
       folderMap.set(folder, folderSummary);
     }
 
-    const topImages = Array.from(imageMap.values())
-      .sort((a, b) => b.count - a.count || String(b.lastSelectedAt).localeCompare(String(a.lastSelectedAt)))
-      .slice(0, 60);
+    const allImages = Array.from(imageMap.values())
+      .sort((a, b) => b.count - a.count || String(b.lastSelectedAt).localeCompare(String(a.lastSelectedAt)));
+    const topImages = allImages.slice(0, 60);
     const topFolders = Array.from(folderMap.values())
       .sort((a, b) => b.count - a.count || a.folder.localeCompare(b.folder))
       .slice(0, 20);
@@ -519,11 +833,50 @@ async function startServer() {
       totalEvents: events.length,
       selectedCount: selectedEvents.length,
       clearedCount: events.filter((event) => event.action === 'cleared' || event.action === 'cleared-all').length,
+      allImages,
       topImages,
       topFolders,
       daily,
       recentEvents: events.slice(0, 200),
+      resetCount: events.filter((event) => event.action === 'soft-reset').length,
     };
+  }
+
+  function getResetCandidates(mode: string, summary: ReturnType<typeof summarizeHighlightEvents>) {
+    const activeImages = summary.allImages.slice();
+    if (mode === 'all') {
+      return activeImages;
+    }
+
+    const percentage = mode === 'least-popular-90' ? 0.9 : mode === 'least-popular-50' ? 0.5 : 0;
+    if (!percentage) {
+      return [];
+    }
+
+    return activeImages
+      .slice()
+      .sort((a, b) => a.count - b.count || String(a.lastSelectedAt).localeCompare(String(b.lastSelectedAt)))
+      .slice(0, Math.ceil(activeImages.length * percentage));
+  }
+
+  async function appendHighlightEvent(event: Record<string, unknown>) {
+    const timestamp = new Date(String(event.timestamp || new Date().toISOString()));
+    await mkdir(highlightLogDir, { recursive: true });
+    await appendFile(
+      path.join(highlightLogDir, `highlight-events-${getMonthLogName(timestamp)}.jsonl`),
+      `${JSON.stringify(event)}\n`,
+      'utf8'
+    );
+  }
+
+  async function appendDownloadEvent(event: Record<string, unknown>) {
+    const timestamp = new Date(String(event.createdAt || new Date().toISOString()));
+    await mkdir(downloadLogDir, { recursive: true });
+    await appendFile(
+      path.join(downloadLogDir, `selected-downloads-${getMonthLogName(timestamp)}.jsonl`),
+      `${JSON.stringify(event)}\n`,
+      'utf8'
+    );
   }
 
   app.post('/api/highlight-events', async (req, res) => {
@@ -539,6 +892,9 @@ async function startServer() {
       }
 
       const image = body.image && typeof body.image === 'object' ? body.image : {};
+      const resolvedImagePath = action === 'cleared-all'
+        ? ''
+        : await resolveCatalogImagePath(image as Record<string, unknown>);
       const event = {
         timestamp: timestamp.toISOString(),
         app: 'aphelion',
@@ -551,18 +907,13 @@ async function startServer() {
               id: Number.isFinite(Number(image.id)) ? Number(image.id) : null,
               code: cleanLogText(image.code, 80),
               title: cleanLogText(image.title, 200),
-              path: extractImagePath(cleanLogText(image.imageUrl, 1000)),
+              path: resolvedImagePath,
               folder: cleanLogText(image.cameraInfo, 200),
             },
         isoWeek: getIsoWeekInfo(timestamp).label,
       };
 
-      await mkdir(highlightLogDir, { recursive: true });
-      await appendFile(
-        path.join(highlightLogDir, `highlight-events-${getMonthLogName(timestamp)}.jsonl`),
-        `${JSON.stringify(event)}\n`,
-        'utf8'
-      );
+      await appendHighlightEvent(event);
 
       res.json({ ok: true });
     } catch (error) {
@@ -575,7 +926,33 @@ async function startServer() {
     try {
       const limit = Math.min(20000, Math.max(100, Number(req.query.limit || 5000)));
       const events = await readHighlightEvents(limit);
-      res.json(summarizeHighlightEvents(events));
+      const summary = summarizeHighlightEvents(events);
+      res.json({
+        ...summary,
+        allImages: summary.allImages.map((item) => ({
+          ...item,
+          image: {
+            ...item.image,
+            path: '',
+          },
+        })),
+        topImages: summary.topImages.map((item) => ({
+          ...item,
+          image: {
+            ...item.image,
+            path: '',
+          },
+        })),
+        recentEvents: summary.recentEvents.map((event) => ({
+          ...event,
+          image: event.image
+            ? {
+                ...event.image,
+                path: '',
+              }
+            : null,
+        })),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown highlight summary error';
       res.status(500).json({ ok: false, error: message });
@@ -604,11 +981,231 @@ async function startServer() {
     try {
       const forceRefresh = String(req.query.refresh || '').toLowerCase() === 'true' || req.query.refresh === '1';
       const items = await getCatalog(forceRefresh);
-      res.json(items);
+      res.json(items.map((item) => toPublicImageItem(item)));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown catalog error';
       res.status(500).json({ error: message });
     }
+  });
+
+  app.get('/api/auth/status', (req, res) => {
+    const user = readCurrentAuthUser(req);
+    res.json({
+      ok: true,
+      requireAuth,
+      provider: 'central',
+      authBaseUrl,
+      requiredAppMembership,
+      user,
+    });
+  });
+
+  app.post('/api/downloads/selected-log', async (req, res) => {
+    try {
+      const user = requireSignedIn(req, res);
+      if (!user) return;
+
+      const source = Array.isArray(req.body?.items) ? req.body.items : [];
+      const items = source
+        .filter((item) => item && typeof item === 'object')
+        .map(async (item) => {
+          const record = item as Record<string, unknown>;
+          const resolvedPath = await resolveCatalogImagePath(record);
+          return {
+            id: cleanLogText(record.id, 120),
+            code: cleanLogText(record.code, 120),
+            title: cleanLogText(record.title, 240),
+            path: cleanLogText(record.path, 1200) || resolvedPath,
+            fileName: cleanLogText(record.fileName, 240),
+          };
+        })
+      const itemsResolved = (await Promise.all(items))
+        .filter((item) => item.path || item.code || item.id);
+
+      if (itemsResolved.length === 0) {
+        res.status(400).json({ ok: false, error: 'At least one downloaded item is required.' });
+        return;
+      }
+
+      const timestamp = new Date();
+      const event = {
+        createdAt: timestamp.toISOString(),
+        app: 'aphelion',
+        action: 'selected-zip-downloaded',
+        isoWeek: getIsoWeekInfo(timestamp).label,
+        actor: {
+          accountName: user.username,
+          displayName: user.displayName,
+          isOwner: user.isOwner,
+          isAdmin: user.isAdmin,
+        },
+        count: itemsResolved.length,
+        items: itemsResolved,
+      };
+
+      await appendDownloadEvent(event);
+      await logAuthHistory(user, 'aphelion.selected_zip_downloaded', JSON.stringify({
+        accountName: user.username,
+        count: itemsResolved.length,
+      }));
+
+      res.json({ ok: true, count: itemsResolved.length });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown download logging error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.get('/api/admin/highlight-resets/preview', async (req, res) => {
+    try {
+      const user = requireOwner(req, res);
+      if (!user) return;
+
+      const mode = cleanLogText(req.query.mode, 40);
+      const events = await readHighlightEvents(20000);
+      const summary = summarizeHighlightEvents(events);
+      const candidates = getResetCandidates(mode, summary);
+      res.json({
+        ok: true,
+        mode,
+        totalActive: summary.allImages.length,
+        resetCount: candidates.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown reset preview error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.post('/api/admin/highlight-resets', async (req, res) => {
+    try {
+      const user = requireOwner(req, res);
+      if (!user) return;
+
+      const mode = cleanLogText(req.body?.mode, 40);
+      const allowedModes = new Set(['all', 'least-popular-50', 'least-popular-90']);
+      if (!allowedModes.has(mode)) {
+        res.status(400).json({ ok: false, error: 'Unsupported reset mode.' });
+        return;
+      }
+
+      const timestamp = new Date();
+      const events = await readHighlightEvents(20000);
+      const summary = summarizeHighlightEvents(events);
+      const candidates = getResetCandidates(mode, summary);
+      const event = {
+        timestamp: timestamp.toISOString(),
+        app: 'aphelion',
+        action: 'soft-reset',
+        resetMode: mode,
+        resetCount: candidates.length,
+        resetKeys: candidates.map((candidate) => candidate.key),
+        resetImages: candidates.map((candidate) => ({
+          key: candidate.key,
+          count: candidate.count,
+          code: candidate.image.code,
+          title: candidate.image.title,
+          path: candidate.image.path,
+        })),
+        actor: {
+          accountName: user.username,
+        },
+        isoWeek: getIsoWeekInfo(timestamp).label,
+      };
+
+      await appendHighlightEvent(event);
+      await logAuthHistory(user, 'aphelion.highlight_reset', JSON.stringify({
+        mode,
+        accountName: user.username,
+        resetCount: candidates.length,
+      }));
+
+      res.json({
+        ok: true,
+        mode,
+        resetCount: candidates.length,
+        totalActiveBeforeReset: summary.allImages.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown highlight reset error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.get('/api/admin/exports/all-images', async (req, res) => {
+    try {
+      const user = requireOwner(req, res);
+      if (!user) return;
+
+      const timestamp = new Date();
+      const forceRefresh = String(req.query.refresh || '').toLowerCase() === 'true' || req.query.refresh === '1';
+      const items = await getCatalog(forceRefresh);
+      const catalog = await mergeCatalogWithMetadata(items);
+      const record = {
+        ok: true,
+        app: 'aphelion',
+        exportType: 'all-images',
+        createdAt: timestamp.toISOString(),
+        accountName: user.username,
+        total: catalog.cards.length,
+        stats: catalog.stats,
+        attributes: catalog.attributes,
+        series: catalog.series,
+        images: catalog.cards,
+      };
+      const fileName = `aphelion-all-images-${timestamp.toISOString().slice(0, 10)}.json`;
+
+      await logAuthHistory(user, 'aphelion.export_all_images', JSON.stringify({
+        accountName: user.username,
+        count: catalog.cards.length,
+      }));
+
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.json(record);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown all-images export error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.get('/api/admin/exports/highlighted-images', async (req, res) => {
+    try {
+      const user = requireOwner(req, res);
+      if (!user) return;
+
+      const timestamp = new Date();
+      const events = await readHighlightEvents(20000);
+      const summary = summarizeHighlightEvents(events);
+      const record = {
+        ok: true,
+        app: 'aphelion',
+        exportType: 'highlighted-images',
+        createdAt: timestamp.toISOString(),
+        accountName: user.username,
+        total: summary.allImages.length,
+        images: summary.allImages,
+        topFolders: summary.topFolders,
+        daily: summary.daily,
+      };
+      const fileName = `aphelion-highlighted-images-${timestamp.toISOString().slice(0, 10)}.json`;
+
+      await logAuthHistory(user, 'aphelion.export_highlighted_images', JSON.stringify({
+        accountName: user.username,
+        count: summary.allImages.length,
+      }));
+
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.json(record);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown highlighted-images export error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.use('/api/admin', (req, res, next) => {
+    const user = requireOwner(req, res);
+    if (!user) return;
+    next();
   });
 
   app.get('/api/admin/catalog', async (req, res) => {
@@ -730,18 +1327,39 @@ async function startServer() {
 
   app.get('/api/image', async (req, res) => {
     try {
-      const requestedPath = String(req.query.path || '').trim();
-      if (!requestedPath) {
-        res.status(400).json({ error: 'Missing path query parameter.' });
+      const imageKey = cleanLogText(req.query.key, 120);
+      const expiresAt = Number.parseInt(String(req.query.exp || ''), 10);
+      const signature = cleanLogText(req.query.sig, 200);
+
+      if (String(req.query.path || '').trim()) {
+        res.status(403).json({ error: 'Direct path requests are not allowed.' });
         return;
       }
 
-      const filePath = await resolveSafePath(requestedPath);
+      if (!verifySignedImageRequest(imageKey, expiresAt, signature)) {
+        res.status(403).json({ error: 'Invalid or expired image request.' });
+        return;
+      }
+
+      const record = await findCatalogImageByKey(imageKey);
+      if (!record) {
+        res.status(404).json({ error: 'Image not found.' });
+        return;
+      }
+
+      const servedImageSize = parseServedImageSize(req.query.size);
+      const maxAllowedImageSize = getMaxAllowedImageSizeForRequest(req);
+      if (servedImageSize > maxAllowedImageSize) {
+        res.status(403).json({ error: 'Requested image size is not permitted.' });
+        return;
+      }
+
+      const filePath = await resolveSafePath(record.relativePath);
       await access(filePath);
 
       const imageBuffer = await sharp(filePath, { animated: false })
         .rotate()
-        .resize(SERVED_IMAGE_SIZE, SERVED_IMAGE_SIZE, {
+        .resize(servedImageSize, servedImageSize, {
           fit: 'cover',
           position: 'center',
           withoutEnlargement: false,
@@ -750,7 +1368,7 @@ async function startServer() {
         .toBuffer();
 
       res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Cache-Control', 'private, max-age=3600');
       res.send(imageBuffer);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown image error';

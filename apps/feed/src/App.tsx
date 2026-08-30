@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
@@ -20,6 +20,7 @@ import {
   Share2,
   Trash2,
   Trophy,
+  SwatchBook,
 } from 'lucide-react';
 
 type FeedView = 'all' | 'releases' | 'manual';
@@ -33,6 +34,7 @@ interface FeedItem {
   source: string;
   created_at: string;
   pinned_at?: string | null;
+  tint_color?: string | null;
 }
 
 interface ConsolidatedFeedItem {
@@ -50,6 +52,29 @@ interface FeedWeekGroup {
   start: Date;
   end: Date;
   items: FeedItem[];
+}
+
+interface FeedWeekSummary {
+  week_key: string;
+  week_year: number;
+  week_number: number;
+  start_date: string;
+  end_date: string;
+  content: string;
+  updated_at: string;
+}
+
+interface FeedWeekSummaryStyle {
+  id: string;
+  label: string;
+  mode: string;
+  purpose: string;
+}
+
+interface WeekSiteSummary {
+  siteKey: string;
+  siteLabel: string;
+  tasks: string[];
 }
 
 interface FeedLegendEntry {
@@ -72,6 +97,7 @@ interface PostFormState {
   appName: string;
   version: string;
   highlights: string;
+  tintColor: string;
 }
 
 interface FeedUploadResponse {
@@ -109,6 +135,27 @@ const FEED_LEGEND_LINKS: Record<string, string> = {
   trillions: 'https://github.com/wmjefferson',
   vermilion: 'https://jeffersonwm.com/vermilion/',
   wmjefferson: 'https://github.com/wmjefferson',
+};
+const FEED_SITE_LABELS: Record<string, string> = {
+  'auth/multimillion': 'Auth/Multimillion',
+  battalion: 'Battalion',
+  bullion: 'Bullion',
+  'clionidae-legacy': 'Clionidae Legacy',
+  dookydetective: 'Dookydetective',
+  endellionite: 'Endellionite',
+  feed: 'Feed',
+  jeffershizzle: 'Jeffershizzle',
+  jeffersonwm: 'JeffersonWM',
+  'jeffersonwm-legacy': 'JeffersonWM Legacy',
+  lionship: 'Lionship',
+  medallion: 'Medallion',
+  perihelion: 'Perihelion',
+  rebellion: 'Rebellion',
+  stallioneer: 'Stallioneer',
+  tourbillion: 'Tourbillion',
+  trillions: 'Trillions',
+  vermilion: 'Vermilion',
+  wmjefferson: 'WMJefferson',
 };
 const FEED_LEGEND: FeedLegendEntry[] = [
   { name: 'auth/multimillion', description: 'auth' },
@@ -181,7 +228,29 @@ const defaultPostState = (): PostFormState => ({
   appName: '',
   version: '',
   highlights: '',
+  tintColor: '',
 });
+
+const ENTRY_TINT_OPTIONS = [
+  { value: '', label: 'Default' },
+  { value: '#f4d7d7', label: 'Rose' },
+  { value: '#f3dfcf', label: 'Peach' },
+  { value: '#f0e1b8', label: 'Gold' },
+  { value: '#dbe6b8', label: 'Lime' },
+  { value: '#d1ead4', label: 'Mint' },
+  { value: '#cde9de', label: 'Sage' },
+  { value: '#cfecea', label: 'Seafoam' },
+  { value: '#d5edf7', label: 'Sky' },
+  { value: '#dce7fb', label: 'Blue' },
+  { value: '#deddf8', label: 'Indigo' },
+  { value: '#eadcf8', label: 'Violet' },
+  { value: '#f0d8f0', label: 'Orchid' },
+  { value: '#f6dce8', label: 'Pink' },
+  { value: '#e7dfd6', label: 'Stone' },
+  { value: '#ece9e3', label: 'Mist' },
+] as const;
+
+const ENTRY_TINT_VALUES = new Set<string>(ENTRY_TINT_OPTIONS.map((option) => option.value));
 
 function apiUrl(path: string) {
   return `${FEED_API_BASE}${path}`;
@@ -252,8 +321,16 @@ function getWeekMetadata(value: string) {
   };
 }
 
+function formatIsoDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
 function formatWeekRange(start: Date, end: Date) {
   return `${feedWeekRangeFormatter.format(start)} – ${feedWeekRangeFormatter.format(end)}`;
+}
+
+function getFeedSiteLabel(siteName: string) {
+  return FEED_SITE_LABELS[siteName] || siteName;
 }
 
 function escapeHtml(value: string) {
@@ -263,6 +340,29 @@ function escapeHtml(value: string) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function stripMarkupToText(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (typeof window !== 'undefined') {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${trimmed}</div>`, 'text/html');
+    return doc.body.textContent?.replace(/\s+/g, ' ').trim() || '';
+  }
+
+  return trimmed.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeSummaryTask(value: string) {
+  return value
+    .replace(/\s+/g, ' ')
+    .replace(/^[\-\*\d.\s]+/, '')
+    .replace(/[.:;,\s]+$/, '')
+    .trim();
 }
 
 function isSafeRichUrl(value: string) {
@@ -457,32 +557,36 @@ function formatParagraphHtml(value: string) {
 function formatInlineMarkdown(value: string) {
   let html = escapeHtml(value);
 
-  const codeSegments: string[] = [];
-  html = html.replace(/`([^`]+)`/g, (_match, code) => {
-    const token = `@@CODE${codeSegments.length}@@`;
-    codeSegments.push(`<code>${code}</code>`);
+  const protectedSegments: string[] = [];
+  const protectSegment = (segment: string) => {
+    const token = `@@PROTECTED${protectedSegments.length}@@`;
+    protectedSegments.push(segment);
     return token;
+  };
+
+  html = html.replace(/`([^`]+)`/g, (_match, code) => {
+    return protectSegment(`<code>${code}</code>`);
   });
 
   html = html.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, alt, url) => {
     if (!isSafeRichUrl(url)) {
       return '';
     }
-    return `<figure><img src="${url}" alt="${alt}" loading="lazy" /><figcaption>${alt}</figcaption></figure>`;
+    return protectSegment(`<figure><img src="${url}" alt="${alt}" loading="lazy" /><figcaption>${alt}</figcaption></figure>`);
   });
   html = html.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_match, label, url) => {
     if (!isSafeRichUrl(url)) {
       return label;
     }
-    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    return protectSegment(`<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`);
   });
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
   html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
   html = html.replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
 
-  codeSegments.forEach((segment, index) => {
-    html = html.replace(`@@CODE${index}@@`, segment);
+  protectedSegments.forEach((segment, index) => {
+    html = html.replace(`@@PROTECTED${index}@@`, segment);
   });
 
   return html;
@@ -716,6 +820,7 @@ function buildPostStateFromItem(item: FeedItem): PostFormState {
       appName: parsedTitle.appName,
       version: parsedTitle.version,
       highlights: releaseHtmlToHighlights(item.content),
+      tintColor: item.tint_color || '',
     };
   }
 
@@ -728,11 +833,37 @@ function buildPostStateFromItem(item: FeedItem): PostFormState {
     appName: '',
     version: '',
     highlights: '',
+    tintColor: item.tint_color || '',
+  };
+}
+
+function hexToRgba(hex: string, alpha: number) {
+  const normalized = hex.replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) {
+    return `rgba(17, 24, 39, ${alpha})`;
+  }
+
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function getEntryTintStyle(item?: FeedItem | null): CSSProperties | undefined {
+  if (!item?.tint_color || !ENTRY_TINT_VALUES.has(item.tint_color)) {
+    return undefined;
+  }
+
+  return {
+    backgroundColor: hexToRgba(item.tint_color, 0.42),
+    borderColor: hexToRgba(item.tint_color, 0.88),
   };
 }
 
 export default function App() {
   const [items, setItems] = useState<FeedItem[]>([]);
+  const [weekSummaries, setWeekSummaries] = useState<Record<string, FeedWeekSummary>>({});
+  const [weekSummaryStyles, setWeekSummaryStyles] = useState<FeedWeekSummaryStyle[]>([]);
   const [view, setView] = useState<FeedView>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -751,6 +882,10 @@ export default function App() {
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [richEditorTab, setRichEditorTab] = useState<RichEditorTab>('write');
   const [activeWeekKey, setActiveWeekKey] = useState<string | null>(null);
+  const [expandedWeekSummaryKey, setExpandedWeekSummaryKey] = useState<string | null>(null);
+  const [editingWeekSummaryKey, setEditingWeekSummaryKey] = useState<string | null>(null);
+  const [weekSummaryDraft, setWeekSummaryDraft] = useState('');
+  const [selectedWeekSummaryStyleId, setSelectedWeekSummaryStyleId] = useState('');
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [copiedEntryId, setCopiedEntryId] = useState<number | null>(null);
   const [highlightedEntryId, setHighlightedEntryId] = useState<number | null>(null);
@@ -758,6 +893,8 @@ export default function App() {
   const markdownInputRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const tintPickerRef = useRef<HTMLDivElement | null>(null);
+  const [showTintPicker, setShowTintPicker] = useState(false);
 
   const resetComposer = () => {
     setNewPost(defaultPostState());
@@ -765,7 +902,23 @@ export default function App() {
     setUploadingAttachment(false);
     setRichEditorTab('write');
     setShowCompose(false);
+    setShowTintPicker(false);
   };
+
+  useEffect(() => {
+    if (!showTintPicker) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!tintPickerRef.current?.contains(event.target as Node)) {
+        setShowTintPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [showTintPicker]);
 
   const handleResetPage = () => {
     setView('all');
@@ -778,6 +931,9 @@ export default function App() {
     setError(null);
     setPasswordInput('');
     setHighlightedEntryId(null);
+    setExpandedWeekSummaryKey(null);
+    setEditingWeekSummaryKey(null);
+    setWeekSummaryDraft('');
     setActiveWeekKey(weeks[0]?.key || null);
     resetComposer();
     if (window.location.hash) {
@@ -801,6 +957,36 @@ export default function App() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWeekSummaries = async () => {
+    try {
+      const response = await fetch(apiUrl('/api/feed/week-summaries'));
+      if (!response.ok) {
+        throw new Error('Failed to fetch weekly summaries');
+      }
+
+      const data = (await response.json()) as FeedWeekSummary[];
+      const summaryMap = Object.fromEntries(data.map((summary) => [summary.week_key, summary]));
+      setWeekSummaries(summaryMap);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchWeekSummaryStyles = async () => {
+    try {
+      const response = await fetch(apiUrl('/api/feed/week-summary-styles'));
+      if (!response.ok) {
+        throw new Error('Failed to fetch weekly summary styles');
+      }
+
+      const data = (await response.json()) as FeedWeekSummaryStyle[];
+      setWeekSummaryStyles(data);
+      setSelectedWeekSummaryStyleId((current) => current || data[0]?.id || '');
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -884,6 +1070,10 @@ export default function App() {
     return (await response.json()) as FeedUploadResponse;
   };
 
+  const buildAttachmentDownloadUrl = (url: string) => {
+    return `${url}${url.includes('?') ? '&' : '?'}download=1`;
+  };
+
   const insertMarkdownLine = (line: string) => {
     const input = markdownInputRef.current;
     const value = newPost.content;
@@ -913,7 +1103,7 @@ export default function App() {
         if (mode === 'image') {
           insertMarkdownLine(`![${upload.name}](${upload.url})`);
         } else {
-          insertMarkdownLine(`[Attachment: ${upload.name}](${upload.url})`);
+          insertMarkdownLine(`[Attachment: ${upload.name}](${buildAttachmentDownloadUrl(upload.url)})`);
         }
       }
     } catch (err: any) {
@@ -979,6 +1169,83 @@ export default function App() {
     setEditingItemId(null);
     setUploadingAttachment(false);
     setRichEditorTab('write');
+    setEditingWeekSummaryKey(null);
+    setWeekSummaryDraft('');
+  };
+
+  const handleEditWeekSummary = () => {
+    if (!activeWeek) {
+      return;
+    }
+
+    setExpandedWeekSummaryKey(activeWeek.key);
+    setEditingWeekSummaryKey(activeWeek.key);
+    setWeekSummaryDraft(activeWeekSummary?.content || '');
+    setError(null);
+  };
+
+  const handleCancelWeekSummaryEdit = () => {
+    setEditingWeekSummaryKey(null);
+    setWeekSummaryDraft('');
+  };
+
+  const handleWeekSummaryStyleChange = (styleId: string) => {
+    setSelectedWeekSummaryStyleId(styleId);
+
+    const selectedStyle = generatedWeekSummaryVariants.find((style) => style.id === styleId);
+    if (!selectedStyle?.content.trim()) {
+      return;
+    }
+
+    setWeekSummaryDraft(selectedStyle.content);
+  };
+
+  const handleSaveWeekSummary = async () => {
+    if (!activeWeek) {
+      return;
+    }
+
+    const content = weekSummaryDraft.trim();
+    if (!content) {
+      setError('Weekly summary cannot be empty.');
+      return;
+    }
+
+    setPosting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(apiUrl(`/api/feed/week-summaries/${activeWeek.key}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: secretInput,
+          content,
+          week_year: activeWeek.weekYear,
+          week_number: activeWeek.weekNumber,
+          start_date: formatIsoDate(activeWeek.start),
+          end_date: formatIsoDate(activeWeek.end),
+        }),
+      });
+
+      if (response.status === 401) {
+        throw new Error('Invalid secret');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save weekly summary');
+      }
+
+      await fetchWeekSummaries();
+      setEditingWeekSummaryKey(null);
+      setExpandedWeekSummaryKey(activeWeek.key);
+      setWeekSummaryDraft('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to save weekly summary');
+    } finally {
+      setPosting(false);
+    }
   };
 
   const handlePost = async (event: FormEvent) => {
@@ -992,6 +1259,7 @@ export default function App() {
       ? formatReleaseHtml(newPost.highlights)
       : newPost.content.trim();
     const createdAt = normalizeEditorDate(newPost.publishAt);
+    const tintColor = ENTRY_TINT_VALUES.has(newPost.tintColor) ? newPost.tintColor || null : null;
 
     if (!resolvedTitle) {
       setError(isRelease ? 'App name and version are required for release notes.' : 'Title is required.');
@@ -1016,6 +1284,7 @@ export default function App() {
           content: resolvedContent || null,
           url: newPost.url || null,
           source: newPost.source,
+          tint_color: tintColor,
           created_at: createdAt,
           secret: secretInput,
           ...(isEditing ? {} : { external_id: `${newPost.source}-${Date.now()}` }),
@@ -1115,6 +1384,8 @@ export default function App() {
 
   useEffect(() => {
     fetchFeed();
+    fetchWeekSummaries();
+    fetchWeekSummaryStyles();
     const interval = setInterval(fetchFeed, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -1239,6 +1510,94 @@ export default function App() {
         const normalizedName = name.toLowerCase();
         return haystacks.some((value) => value.includes(normalizedName));
       });
+  };
+
+  const extractReleaseSummaryTasks = (content: string) => {
+    const htmlListMatches = [...content.matchAll(/<li>([\s\S]*?)<\/li>/gi)]
+      .map((match) => normalizeSummaryTask(stripMarkupToText(match[1] || '')))
+      .filter(Boolean);
+    if (htmlListMatches.length > 0) {
+      return htmlListMatches;
+    }
+
+    const markdownListMatches = content
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => /^[-*]\s+/.test(line) || /^\d+\.\s+/.test(line))
+      .map((line) => normalizeSummaryTask(stripMarkupToText(line.replace(/^([-*]|\d+\.)\s+/, ''))))
+      .filter(Boolean);
+    if (markdownListMatches.length > 0) {
+      return markdownListMatches;
+    }
+
+    const paragraphText = normalizeSummaryTask(stripMarkupToText(content));
+    return paragraphText ? [paragraphText] : [];
+  };
+
+  const cleanSummaryTaskForSite = (value: string, siteName: string) => {
+    const variants = [siteName, getFeedSiteLabel(siteName)]
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    let cleaned = value;
+    for (const variant of variants) {
+      const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      cleaned = cleaned.replace(new RegExp(escaped, 'ig'), '').replace(/\s{2,}/g, ' ').trim();
+    }
+
+    cleaned = cleaned.replace(/^[:\-–|,.\s]+/, '').replace(/\s{2,}/g, ' ').trim();
+    return normalizeSummaryTask(cleaned);
+  };
+
+  const summarizeItemForSite = (item: FeedItem, siteName: string) => {
+    if (isReleaseItem(item)) {
+      const tasks = extractReleaseSummaryTasks(item.content || '')
+        .map((task) => cleanSummaryTaskForSite(task, siteName))
+        .filter(Boolean);
+      if (tasks.length > 0) {
+        return tasks;
+      }
+    }
+
+    if ((item.source || '').toLowerCase() === 'github') {
+      const repo = getGitHubRepo(item);
+      const githubTask = normalizeSummaryTask(cleanGitHubTitle(item.title, repo || ''));
+      const cleanedGitHubTask = cleanSummaryTaskForSite(githubTask, siteName);
+      return cleanedGitHubTask ? [cleanedGitHubTask] : [];
+    }
+
+    const fallbackTask = cleanSummaryTaskForSite(stripMarkupToText(item.title), siteName);
+    return fallbackTask ? [fallbackTask] : [];
+  };
+
+  const renderWeekSummaryVariant = (styleId: string, siteSummaries: WeekSiteSummary[]) => {
+    if (siteSummaries.length === 0) {
+      return '';
+    }
+
+    const lines = siteSummaries.map((summary) => {
+      const tasks = summary.tasks;
+      const lead = tasks[0] || 'updated work';
+      const rest = tasks.slice(1);
+
+      switch (styleId) {
+        case 'compact-built-fixed-decided':
+          return `- ${summary.siteLabel}: ${tasks.join('; ')}.`;
+        case 'compact-outcome-first':
+          return `- ${summary.siteLabel}: ${lead}; ${rest.length > 0 ? rest.join('; ') : 'improved the overall experience'}.`;
+        case 'expanded-focus-work-result':
+          return `- ${summary.siteLabel}: focus was ${lead.toLowerCase()}; work included ${tasks.join('; ')}; result was a clearer weekly step forward.`;
+        case 'expanded-editorial-recap':
+          return `- ${summary.siteLabel}: the week centered on ${lead.toLowerCase()}, with work spanning ${tasks.join('; ')}.`;
+        case 'expanded-technical-why':
+          return `- ${summary.siteLabel}: ${tasks.join('; ')}; this matters because the week left the project easier to use and easier to understand.`;
+        case 'compact-plain-bullets':
+        default:
+          return `- ${summary.siteLabel}: ${tasks.join('; ')}.`;
+      }
+    });
+
+    return lines.join('\n');
   };
 
   const toggleSelectedSite = (siteName: string) => {
@@ -1393,9 +1752,70 @@ export default function App() {
     setActiveWeekKey((current) => (current && weeks.some((week) => week.key === current) ? current : weeks[0].key));
   }, [weeks]);
 
+  useEffect(() => {
+    if (expandedWeekSummaryKey && !weeks.some((week) => week.key === expandedWeekSummaryKey)) {
+      setExpandedWeekSummaryKey(null);
+    }
+    if (editingWeekSummaryKey && !weeks.some((week) => week.key === editingWeekSummaryKey)) {
+      setEditingWeekSummaryKey(null);
+      setWeekSummaryDraft('');
+    }
+  }, [editingWeekSummaryKey, expandedWeekSummaryKey, weeks]);
+
   const activeWeekIndex = weeks.findIndex((week) => week.key === activeWeekKey);
   const activeWeek = activeWeekIndex >= 0 ? weeks[activeWeekIndex] : weeks[0] || null;
+  const activeWeekSummary = activeWeek ? weekSummaries[activeWeek.key] || null : null;
   const groupedItems = groupFeedItems(activeWeek?.items || []);
+  const activeWeekSiteSummaries = useMemo<WeekSiteSummary[]>(() => {
+    if (!activeWeek) {
+      return [];
+    }
+
+    const taskMap = new Map<string, string[]>();
+    const seenMap = new Map<string, Set<string>>();
+
+    for (const item of activeWeek.items) {
+      const matchedSites = getItemSiteMatches(item);
+      for (const siteName of matchedSites) {
+        const currentTasks = taskMap.get(siteName) || [];
+        const seen = seenMap.get(siteName) || new Set<string>();
+        const nextTasks = summarizeItemForSite(item, siteName);
+
+        for (const task of nextTasks) {
+          const normalized = task.toLowerCase();
+          if (seen.has(normalized) || currentTasks.length >= 4) {
+            continue;
+          }
+          seen.add(normalized);
+          currentTasks.push(task);
+        }
+
+        taskMap.set(siteName, currentTasks);
+        seenMap.set(siteName, seen);
+      }
+    }
+
+    return FEED_LEGEND
+      .map((entry) => entry.name)
+      .filter((siteKey) => (taskMap.get(siteKey) || []).length > 0)
+      .map((siteKey) => ({
+        siteKey,
+        siteLabel: getFeedSiteLabel(siteKey),
+        tasks: taskMap.get(siteKey) || [],
+      }));
+  }, [activeWeek, items]);
+  const generatedWeekSummaryVariants = useMemo(
+    () =>
+      weekSummaryStyles
+        .map((style) => ({
+          ...style,
+          content: renderWeekSummaryVariant(style.id, activeWeekSiteSummaries),
+        }))
+        .filter((style) => style.content.trim().length > 0),
+    [activeWeekSiteSummaries, weekSummaryStyles],
+  );
+  const selectedWeekSummaryStyle =
+    generatedWeekSummaryVariants.find((style) => style.id === selectedWeekSummaryStyleId) || null;
   const renderFeedEntry = (item: FeedItem) => (
     <div
       key={item.id}
@@ -1459,6 +1879,57 @@ export default function App() {
           className="feed-html"
           dangerouslySetInnerHTML={{ __html: formatFeedContentHtml(item) }}
         />
+      )}
+    </div>
+  );
+
+  const renderCompactTintPicker = () => (
+    <div className="compact-tint-picker" ref={tintPickerRef}>
+      <label className="field-label" htmlFor="feed-tint-trigger">
+        Color
+      </label>
+      <button
+        id="feed-tint-trigger"
+        type="button"
+        className={`compact-tint-trigger ${newPost.tintColor ? 'compact-tint-trigger--active' : ''}`}
+        onClick={() => setShowTintPicker((current) => !current)}
+        aria-expanded={showTintPicker}
+        aria-haspopup="dialog"
+        title={newPost.tintColor ? `Selected tint: ${ENTRY_TINT_OPTIONS.find((option) => option.value === newPost.tintColor)?.label || 'Custom'}` : 'Choose entry tint'}
+      >
+        <span
+          className="compact-tint-trigger-chip"
+          style={{ backgroundColor: newPost.tintColor || 'rgba(255, 255, 255, 0.92)' }}
+        />
+        <SwatchBook size={14} />
+      </button>
+
+      {showTintPicker && (
+        <div className="compact-tint-popover" role="dialog" aria-label="Entry tint colors">
+          <div className="compact-tint-grid">
+            {ENTRY_TINT_OPTIONS.map((option) => {
+              const isSelected = newPost.tintColor === option.value;
+              return (
+                <button
+                  key={option.label}
+                  type="button"
+                  className={`compact-tint-swatch ${isSelected ? 'compact-tint-swatch--active' : ''}`}
+                  onClick={() => {
+                    setNewPost({ ...newPost, tintColor: option.value });
+                    setShowTintPicker(false);
+                  }}
+                  aria-pressed={isSelected}
+                  title={option.label}
+                >
+                  <span
+                    className="compact-tint-swatch-chip"
+                    style={{ backgroundColor: option.value || 'rgba(255, 255, 255, 0.92)' }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1607,9 +2078,7 @@ export default function App() {
                           >
                             {entry.name}
                           </a>
-                          <span className="legend-count">({count})</span>
                         </span>
-                        <span className="legend-line">{entry.description}</span>
                       </span>
                     </label>
                   );
@@ -1768,7 +2237,8 @@ export default function App() {
                   key={`pinned-${item.id}`}
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="feed-card feed-card--pinned"
+                  className={`feed-card feed-card--pinned ${item.tint_color ? 'feed-card--tinted' : ''}`}
+                  style={getEntryTintStyle(item)}
                 >
                   {renderFeedEntry(item)}
                 </motion.article>
@@ -1778,49 +2248,168 @@ export default function App() {
         )}
 
         <section className="feed-weekbar feed-card">
-          <div className="feed-weekbar-copy">
-            <span className="eyebrow">Calendar Week</span>
-            {activeWeek ? (
-              <>
-                <h2 className="feed-week-title">Week {activeWeek.weekNumber}, {activeWeek.weekYear}</h2>
-                <p className="feed-week-range">
-                  {formatWeekRange(activeWeek.start, activeWeek.end)} · {activeWeek.items.length} entr{activeWeek.items.length === 1 ? 'y' : 'ies'}
-                </p>
-              </>
-            ) : (
-              <>
-                <h2 className="feed-week-title">No entries yet</h2>
-                <p className="feed-week-range">Once the stream has posts, they will be grouped here by calendar week.</p>
-              </>
-            )}
+          <div className="feed-weekbar-head">
+            <div className="feed-weekbar-copy">
+              <span className="eyebrow">Calendar Week</span>
+              {activeWeek ? (
+                <>
+                  <h2 className="feed-week-title">Week {activeWeek.weekNumber}, {activeWeek.weekYear}</h2>
+                  <p className="feed-week-range">
+                    {formatWeekRange(activeWeek.start, activeWeek.end)} · {activeWeek.items.length} entr{activeWeek.items.length === 1 ? 'y' : 'ies'}
+                  </p>
+                  <button
+                    type="button"
+                    className="feed-link-button feed-week-summary-link"
+                    onClick={() => {
+                      const isExpanded = expandedWeekSummaryKey === activeWeek.key;
+                      setExpandedWeekSummaryKey(isExpanded ? null : activeWeek.key);
+                      if (isExpanded) {
+                        setEditingWeekSummaryKey(null);
+                        setWeekSummaryDraft('');
+                      }
+                    }}
+                  >
+                    {expandedWeekSummaryKey === activeWeek.key
+                      ? 'Hide Summary'
+                      : activeWeekSummary
+                        ? 'View Summary'
+                        : isLoggedIn
+                          ? 'Add Summary'
+                          : 'Summary'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h2 className="feed-week-title">No entries yet</h2>
+                  <p className="feed-week-range">Once the stream has posts, they will be grouped here by calendar week.</p>
+                </>
+              )}
+            </div>
+
+            <div className="feed-weekbar-actions">
+              <button
+                type="button"
+                className="feed-button"
+                onClick={() => {
+                  if (activeWeekIndex >= 0 && activeWeekIndex < weeks.length - 1) {
+                    setExpandedWeekSummaryKey(null);
+                    setEditingWeekSummaryKey(null);
+                    setWeekSummaryDraft('');
+                    setActiveWeekKey(weeks[activeWeekIndex + 1].key);
+                  }
+                }}
+                disabled={activeWeekIndex === -1 || activeWeekIndex >= weeks.length - 1}
+              >
+                Prev Week
+              </button>
+              <button
+                type="button"
+                className="feed-button"
+                onClick={() => {
+                  if (activeWeekIndex > 0) {
+                    setExpandedWeekSummaryKey(null);
+                    setEditingWeekSummaryKey(null);
+                    setWeekSummaryDraft('');
+                    setActiveWeekKey(weeks[activeWeekIndex - 1].key);
+                  }
+                }}
+                disabled={activeWeekIndex <= 0}
+              >
+                Next Week
+              </button>
+            </div>
           </div>
 
-          <div className="feed-weekbar-actions">
-            <button
-              type="button"
-              className="feed-button"
-              onClick={() => {
-                if (activeWeekIndex >= 0 && activeWeekIndex < weeks.length - 1) {
-                  setActiveWeekKey(weeks[activeWeekIndex + 1].key);
-                }
-              }}
-              disabled={activeWeekIndex === -1 || activeWeekIndex >= weeks.length - 1}
-            >
-              Prev Week
-            </button>
-            <button
-              type="button"
-              className="feed-button"
-              onClick={() => {
-                if (activeWeekIndex > 0) {
-                  setActiveWeekKey(weeks[activeWeekIndex - 1].key);
-                }
-              }}
-              disabled={activeWeekIndex <= 0}
-            >
-              Next Week
-            </button>
-          </div>
+          <AnimatePresence initial={false}>
+            {activeWeek && expandedWeekSummaryKey === activeWeek.key && (
+              <motion.div
+                key={activeWeek.key}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="feed-week-summary-panel"
+              >
+                <div className="feed-week-summary-copy">
+                  <span className="eyebrow">Weekly TL;DR</span>
+                  {editingWeekSummaryKey === activeWeek.key ? (
+                    <>
+                      <p className="helper-copy">Keep this short and readable. A few sentences is enough.</p>
+                      <div className="feed-week-summary-generator">
+                        {weekSummaryStyles.length > 0 && (
+                          <div className="feed-week-summary-generator-head">
+                            <label className="field-label" htmlFor="feed-week-summary-style">
+                              Generated Style
+                            </label>
+                            <p className="helper-copy feed-week-summary-generator-copy">
+                              Choose a summary style and it will load into the editor below for rewriting.
+                            </p>
+                          </div>
+                        )}
+                        {weekSummaryStyles.length > 0 ? (
+                          generatedWeekSummaryVariants.length > 0 ? (
+                            <>
+                              <select
+                                id="feed-week-summary-style"
+                                className="feed-input"
+                                value={selectedWeekSummaryStyleId}
+                                onChange={(event) => handleWeekSummaryStyleChange(event.target.value)}
+                              >
+                                <option value="">Select a generated style</option>
+                                {generatedWeekSummaryVariants.map((style) => (
+                                  <option key={style.id} value={style.id}>
+                                    {style.label}
+                                  </option>
+                                ))}
+                              </select>
+                              {selectedWeekSummaryStyle?.purpose && (
+                                <p className="helper-copy feed-week-summary-generator-copy">
+                                  {selectedWeekSummaryStyle.purpose}
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="helper-copy">No generated weekly summary is available for this week yet.</p>
+                          )
+                        ) : null}
+                        <textarea
+                          className="feed-textarea feed-week-summary-input"
+                          value={weekSummaryDraft}
+                          onChange={(event) => setWeekSummaryDraft(event.target.value)}
+                          placeholder="Briefly summarize what changed this week, what mattered, and where the work is heading."
+                        />
+                      </div>
+                    </>
+                  ) : activeWeekSummary ? (
+                    <div
+                      className="feed-html feed-week-summary-body"
+                      dangerouslySetInnerHTML={{ __html: formatMarkdownHtml(activeWeekSummary.content) }}
+                    />
+                  ) : (
+                    <p className="helper-copy">No weekly summary.</p>
+                  )}
+                </div>
+
+                {isLoggedIn && (
+                  <div className="feed-week-summary-actions">
+                    {editingWeekSummaryKey === activeWeek.key ? (
+                      <>
+                        <button type="button" className="feed-link-button" onClick={handleSaveWeekSummary} disabled={posting}>
+                          {posting ? 'Saving' : 'Save Summary'}
+                        </button>
+                        <button type="button" className="feed-link-button" onClick={handleCancelWeekSummaryEdit} disabled={posting}>
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" className="feed-link-button" onClick={handleEditWeekSummary}>
+                        {activeWeekSummary ? 'Edit Summary' : 'Write Summary'}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
 
         <AnimatePresence>
@@ -1846,56 +2435,24 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="form-row">
-                  <div>
-                    <label className="field-label" htmlFor="feed-source">
-                      Type
-                    </label>
-                    <select
-                      id="feed-source"
-                      className="feed-input"
-                      value={newPost.source}
-                      onChange={(event) => setNewPost({ ...newPost, source: event.target.value })}
-                    >
-                      <option value="log">Log</option>
-                      <option value="thought">Thought</option>
-                      <option value="milestone">Milestone</option>
-                      <option value="release">Release</option>
-                      <option value="handshake">Handshake</option>
-                      <option value="linkedin">LinkedIn</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="field-label" htmlFor="feed-publish-at">
-                      Publish Date
-                    </label>
-                    <input
-                      id="feed-publish-at"
-                      type="date"
-                      className="feed-input"
-                      value={newPost.publishAt}
-                      onChange={(event) => setNewPost({ ...newPost, publishAt: event.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="field-label" htmlFor="feed-url">
-                      Link
-                    </label>
-                    <input
-                      id="feed-url"
-                      className="feed-input"
-                      value={newPost.url}
-                      onChange={(event) => setNewPost({ ...newPost, url: event.target.value })}
-                      placeholder="Optional source URL"
-                    />
-                  </div>
-                </div>
-
                 {newPost.source === 'release' ? (
                   <>
                     <div className="form-row">
+                      <div>
+                        <label className="field-label" htmlFor="feed-publish-at">
+                          Publish Date
+                        </label>
+                        <input
+                          id="feed-publish-at"
+                          type="date"
+                          className="feed-input"
+                          value={newPost.publishAt}
+                          onChange={(event) => setNewPost({ ...newPost, publishAt: event.target.value })}
+                        />
+                      </div>
+
+                      {renderCompactTintPicker()}
+
                       <div>
                         <label className="field-label" htmlFor="feed-release-app">
                           App / Site
@@ -1941,18 +2498,35 @@ export default function App() {
                   </>
                 ) : (
                   <>
-                    <div>
-                      <label className="field-label" htmlFor="feed-title-input">
-                        Title
-                      </label>
-                      <input
-                        id="feed-title-input"
-                        className="feed-input"
-                        value={newPost.title}
-                        onChange={(event) => setNewPost({ ...newPost, title: event.target.value })}
-                        placeholder="What changed?"
-                        required
-                      />
+                    <div className="form-row form-row--title-date">
+                      <div>
+                        <label className="field-label" htmlFor="feed-title-input">
+                          Title
+                        </label>
+                        <input
+                          id="feed-title-input"
+                          className="feed-input"
+                          value={newPost.title}
+                          onChange={(event) => setNewPost({ ...newPost, title: event.target.value })}
+                          placeholder="What changed?"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="field-label" htmlFor="feed-publish-at">
+                          Publish Date
+                        </label>
+                        <input
+                          id="feed-publish-at"
+                          type="date"
+                          className="feed-input"
+                          value={newPost.publishAt}
+                          onChange={(event) => setNewPost({ ...newPost, publishAt: event.target.value })}
+                        />
+                      </div>
+
+                      {renderCompactTintPicker()}
                     </div>
 
                     <div>
@@ -2115,7 +2689,7 @@ export default function App() {
                 )}
 
                 <div className="composer-actions">
-                  <button type="submit" className="feed-button feed-button--primary" disabled={posting}>
+                  <button type="submit" className="feed-link-button" disabled={posting}>
                     {posting ? (editingItemId !== null ? 'Saving' : 'Posting') : editingItemId !== null ? 'Save Changes' : 'Post to Feed'}
                   </button>
                 </div>
@@ -2159,7 +2733,10 @@ export default function App() {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 16 }}
-                    className={`feed-card ${group.repo ? 'feed-card--github' : ''}`}
+                    className={`feed-card ${group.repo ? 'feed-card--github' : ''} ${
+                      !group.repo && group.items[0]?.tint_color ? 'feed-card--tinted' : ''
+                    }`}
+                    style={!group.repo ? getEntryTintStyle(group.items[0]) : undefined}
                   >
                     {group.repo ? (
                       <div>

@@ -85,6 +85,7 @@ interface AuthStatus {
   ok: boolean;
   user: AuthUser | null;
   requireAuth: boolean;
+  serverLibraryRequireAuth?: boolean;
   hasUsers: boolean;
   provider?: 'local' | 'central';
   authBaseUrl?: string | null;
@@ -742,9 +743,10 @@ export default function App() {
   const [localLibraryEntries, setLocalLibraryEntries] = useState<MediaEntry[]>([]);
   const [localObjectUrls, setLocalObjectUrls] = useState<LocalObjectUrlMap>({});
   const [localFolderLabel, setLocalFolderLabel] = useState('');
+  const [localFolderConsentOpen, setLocalFolderConsentOpen] = useState(false);
 
   const [rowHeight, setRowHeight] = useState(250);
-  const [limit, setLimit] = useState(25);
+  const [limit, setLimit] = useState(10);
   const isMaxMode = rowHeight === MAX_MODE_ROW_HEIGHT && limit === MAX_MODE_LIMIT;
   const [includeOtherFiles, setIncludeOtherFiles] = useState(false);
   const [showFolderThumbnails, setShowFolderThumbnails] = useState(true);
@@ -782,7 +784,18 @@ export default function App() {
   const prewarmedPageKeysRef = React.useRef<Set<string>>(new Set());
   const prewarmImagesRef = React.useRef<HTMLImageElement[]>([]);
   const isGlobalSearch = debouncedSearch.trim().length >= 4;
+  const serverLibraryRequiresAuth = authStatus?.serverLibraryRequireAuth ?? authStatus?.requireAuth ?? false;
+  const canUseLocalLibrary = authStatus?.requireAuth ? Boolean(authStatus?.user) : true;
+  const canUseServerLibrary = serverLibraryRequiresAuth ? Boolean(authStatus?.user?.isAdmin) : true;
   const canEditServerFolders = sourceMode === 'server' && Boolean(authStatus?.user?.isAdmin);
+  const canEditServerFolderPermissions = sourceMode === 'server' && Boolean(authStatus?.user?.isOwner);
+  const showForcedAuthGate = Boolean(
+    (authStatus?.requireAuth || serverLibraryRequiresAuth) &&
+    !authLoading &&
+    !authStatus?.user &&
+    !isSharedView,
+  );
+  const holdInitialShellForAuth = Boolean(!isSharedView && authStatus === null && authLoading);
 
   const replaceLocalObjectUrls = (nextMap: LocalObjectUrlMap) => {
     Object.values(localObjectUrls).forEach(url => URL.revokeObjectURL(url));
@@ -790,6 +803,9 @@ export default function App() {
   };
 
   const resetToServerLibrary = () => {
+    if (!canUseServerLibrary) {
+      return;
+    }
     replaceLocalObjectUrls({});
     setSourceMode('server');
     setLocalLibraryEntries([]);
@@ -810,6 +826,27 @@ export default function App() {
     setFolderCoverPaths({ cover1Path: null, cover2Path: null });
     void fetchTags();
     void fetchShares();
+  };
+
+  const resetToLocalLibrary = () => {
+    setSourceMode('local');
+    setAccessError('');
+    setCurrentPath('');
+    setSelectedImage(null);
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setSelectedTag('');
+    setSelectedList('');
+    setSelectionDraftId(null);
+    setSelectedImages(new Set());
+    setSelectedMetadata({});
+    setPage(1);
+    setView('gallery');
+    setShowSelectedOnly(false);
+    setFolderCoverPaths({ cover1Path: null, cover2Path: null });
+    setAllTags([]);
+    setAllShares([]);
+    setTagCounts({});
   };
 
   const syncLocalLibrary = (nextEntries: MediaEntry[], nextObjectUrls: LocalObjectUrlMap, rootLabel: string) => {
@@ -862,6 +899,9 @@ export default function App() {
       });
 
       syncLocalLibrary(nextEntries, nextObjectUrls, rootLabel);
+      void fetch(`${API_PATH}/local-folder-opened`, { method: 'POST' }).catch(error => {
+        console.warn('Failed to log local folder open event', error);
+      });
     } finally {
       setLoading(false);
     }
@@ -910,12 +950,15 @@ export default function App() {
 
       await walkDirectory(directoryHandle);
       syncLocalLibrary(nextEntries, nextObjectUrls, directoryHandle.name || 'Local Folder');
+      void fetch(`${API_PATH}/local-folder-opened`, { method: 'POST' }).catch(error => {
+        console.warn('Failed to log local folder open event', error);
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOpenLocalFolder = async () => {
+  const handleOpenLocalFolderPicker = async () => {
     try {
       const picker = (window as Window & {
         showDirectoryPicker?: () => Promise<LocalDirectoryPickerHandle>;
@@ -934,6 +977,15 @@ export default function App() {
       }
       console.error('Failed to open local folder', error);
     }
+  };
+
+  const handleRequestOpenLocalFolder = () => {
+    setLocalFolderConsentOpen(true);
+  };
+
+  const handleConfirmOpenLocalFolder = async () => {
+    setLocalFolderConsentOpen(false);
+    await handleOpenLocalFolderPicker();
   };
 
   const handleLocalFolderInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1168,18 +1220,28 @@ export default function App() {
   ) => {
     if (sourceMode !== 'server' || !folderPath) return false;
     try {
+      const payload: {
+        folderPath: string;
+        title: string;
+        description: string;
+        visibleToUsers?: boolean;
+        visibleToAdmins?: boolean;
+        accountAccess?: FolderAccountAccess;
+      } = {
+        folderPath,
+        title,
+        description,
+      };
+      if (canEditServerFolderPermissions) {
+        payload.visibleToUsers = visibleToUsers;
+        payload.visibleToAdmins = visibleToAdmins;
+        payload.accountAccess = accountAccess;
+      }
       const res = await fetch(`${API_PATH}/folder-cover`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          folderPath,
-          title,
-          description,
-          visibleToUsers,
-          visibleToAdmins,
-          accountAccess,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         return false;
@@ -1312,6 +1374,7 @@ export default function App() {
   };
 
   const totalVisibleItems = showSelectedOnly ? visibleEntries.length : serverTotalItems;
+  const visibleFolderCount = folders.length;
   const selectedFileTone = selectedImage ? getFileTypeTone(selectedImage) : null;
 
   const resetAuthForm = () => {
@@ -1337,6 +1400,7 @@ export default function App() {
     try {
       const response = await fetch(`${API_PATH}/auth/status`, {
         credentials: 'include',
+        cache: 'no-store',
       });
       const data = await response.json();
       if (!response.ok) {
@@ -1349,6 +1413,7 @@ export default function App() {
         ok: false,
         user: null,
         requireAuth: false,
+        serverLibraryRequireAuth: false,
         hasUsers: false,
       });
     } finally {
@@ -1453,6 +1518,12 @@ export default function App() {
 
   useEffect(() => {
     loadAuthStatus();
+    const refreshAuthStatus = () => {
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
+      void loadAuthStatus();
+    };
     const handleClickOutside = (event: MouseEvent) => {
       if (tagsRef.current && !tagsRef.current.contains(event.target as Node)) {
         setShowTagsPopover(false);
@@ -1467,9 +1538,23 @@ export default function App() {
         setShowLimitMenu(false);
       }
     };
+    window.addEventListener('focus', refreshAuthStatus);
+    window.addEventListener('pageshow', refreshAuthStatus);
+    document.addEventListener('visibilitychange', refreshAuthStatus);
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('focus', refreshAuthStatus);
+      window.removeEventListener('pageshow', refreshAuthStatus);
+      document.removeEventListener('visibilitychange', refreshAuthStatus);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!isMaxMode) return;
+    setShowRowHeightMenu(false);
+    setShowLimitMenu(false);
+  }, [isMaxMode]);
 
   useEffect(() => {
     const shareId = getShareIdFromLocation();
@@ -1547,8 +1632,6 @@ export default function App() {
     };
 
     applyLocationState();
-    fetchTags();
-    fetchShares();
     setLocationReady(true);
     locationHydratedRef.current = true;
 
@@ -1591,7 +1674,49 @@ export default function App() {
   }, [localObjectUrls]);
 
   useEffect(() => {
+    if (!locationReady || isSharedView || authLoading) {
+      return;
+    }
+
+    if (!canUseLocalLibrary) {
+      if (sourceMode === 'local') {
+        setSourceMode('server');
+        setLocalFolderLabel('');
+      }
+      return;
+    }
+
+    if (!canUseServerLibrary) {
+      if (sourceMode === 'server') {
+        resetToLocalLibrary();
+      }
+      return;
+    }
+
+    if (sourceMode === 'server') {
+      void fetchTags();
+      void fetchShares();
+    }
+  }, [locationReady, isSharedView, authLoading, canUseLocalLibrary, canUseServerLibrary, sourceMode]);
+
+  useEffect(() => {
     if (!locationReady || isSharedView) {
+      return;
+    }
+
+    if (showForcedAuthGate) {
+      setLoading(false);
+      return;
+    }
+
+    if (sourceMode === 'server' && authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (sourceMode === 'server' && !canUseServerLibrary) {
+      resetToLocalLibrary();
+      setLoading(false);
       return;
     }
 
@@ -1643,6 +1768,7 @@ export default function App() {
   }, [
     locationReady,
     isSharedView,
+    showForcedAuthGate,
     sourceMode,
     page,
     limit,
@@ -1654,6 +1780,9 @@ export default function App() {
     isGlobalSearch,
     includeOtherFiles,
     localLibraryEntries,
+    authLoading,
+    canUseServerLibrary,
+    canUseLocalLibrary,
     authStatus?.user?.id,
     authStatus?.requireAuth,
   ]);
@@ -2718,6 +2847,7 @@ export default function App() {
     setAuthError('');
     setAuthMessage('');
     try {
+      const requireAuthAfterLogout = Boolean(authStatus?.requireAuth);
       const response = await fetch(usesCentralAuth ? `${authBaseUrl}/api/auth/logout` : `${API_PATH}/auth/logout`, {
         method: 'POST',
         headers: usesCentralAuth ? { 'Content-Type': 'application/json' } : undefined,
@@ -2734,7 +2864,21 @@ export default function App() {
       resetAuthForm();
       resetPasswordForm();
       resetUsernameForm();
+      setEntries([]);
+      setFolders([]);
+      setServerTotalPages(1);
+      setServerTotalItems(0);
+      setSelectedImage(null);
+      setSelectedImages(new Set());
+      setSelectedMetadata({});
+      setSourceMode('server');
+      setLocalFolderLabel('');
+      setAuthStatus(prev => (prev ? { ...prev, user: null } : prev));
+      setAccessError('');
       setAuthMessage(usesCentralAuth ? 'Signed out of Multimillion.' : '');
+      if (requireAuthAfterLogout) {
+        setLoading(false);
+      }
       await loadAuthStatus();
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Failed to sign out');
@@ -2778,18 +2922,123 @@ export default function App() {
   const pendingUsers = adminUsers.filter(user => !user.isApproved && !user.isBlocked);
   const approvedUsers = adminUsers.filter(user => user.isApproved && !user.isBlocked);
   const blockedUsers = adminUsers.filter(user => user.isBlocked);
-  const showPrivateGate = !loading && Boolean(accessError);
+  const showPrivateGate = showForcedAuthGate || (!loading && Boolean(accessError));
   const usesCentralAuth = authStatus?.provider === 'central';
   const authBaseUrl = authStatus?.authBaseUrl || 'https://auth.jeffersonwm.com';
+  const authOrigin = useMemo(() => {
+    try {
+      return new URL(authBaseUrl).origin;
+    } catch {
+      return 'https://auth.jeffersonwm.com';
+    }
+  }, [authBaseUrl]);
+  const authPopupPollRef = useRef<number | null>(null);
 
-  const openCentralAuth = (mode: 'login' | 'register' = 'login') => {
+  const stopAuthPopupPoll = () => {
+    if (authPopupPollRef.current !== null) {
+      window.clearInterval(authPopupPollRef.current);
+      authPopupPollRef.current = null;
+    }
+  };
+
+  const startAuthPopupPoll = (popup: Window | null) => {
+    stopAuthPopupPoll();
+    authPopupPollRef.current = window.setInterval(() => {
+      if (!popup || popup.closed) {
+        stopAuthPopupPoll();
+        void loadAuthStatus();
+      }
+    }, 700);
+  };
+
+  const buildCentralAuthUrl = (mode: 'login' | 'register' = 'login') => {
     const url = new URL(authBaseUrl);
     url.searchParams.set('returnTo', window.location.href);
     if (mode === 'register') {
       url.searchParams.set('mode', 'register');
     }
-    window.location.assign(url.toString());
+    return url;
   };
+
+  const openCentralAuth = (mode: 'login' | 'register' = 'login', options?: { popup?: boolean }) => {
+    const url = buildCentralAuthUrl(mode);
+    const shouldUsePopup = options?.popup ?? false;
+    if (!shouldUsePopup) {
+      window.location.assign(url.toString());
+      return;
+    }
+
+    url.searchParams.set('popup', '1');
+    const width = 440;
+    const height = 620;
+    const left = Math.max(0, Math.round(window.screenX + ((window.outerWidth - width) / 2)));
+    const top = Math.max(0, Math.round(window.screenY + ((window.outerHeight - height) / 2)));
+    const popup = window.open(
+      url.toString(),
+      'perihelion-auth-popup',
+      `width=${width},height=${height},left=${left},top=${top}`,
+    );
+
+    if (!popup) {
+      window.location.assign(url.toString());
+      return;
+    }
+
+    popup.focus();
+    startAuthPopupPoll(popup);
+  };
+
+  const openRoleDashboard = () => {
+    if (usesCentralAuth) {
+      if (authStatus?.user?.isAdmin) {
+        window.location.assign(buildCentralAuthUrl().toString());
+        return;
+      }
+      window.location.assign('https://jeffersonwm.com/account/');
+      return;
+    }
+
+    if (authStatus?.user?.isAdmin) {
+      setAccountPanel('admin');
+      setAuthError('');
+      setAuthMessage('');
+      return;
+    }
+
+    setAccountPanel('user');
+    setAuthError('');
+    setAuthMessage('');
+  };
+
+  useEffect(() => {
+    const handleAuthSuccess = (event: MessageEvent) => {
+      if (event.origin !== authOrigin) {
+        return;
+      }
+      if (event.data?.type !== 'auth:success') {
+        return;
+      }
+
+      stopAuthPopupPoll();
+      setAccountPanel(null);
+      setAuthError('');
+      setAuthMessage('');
+      void loadAuthStatus();
+
+      const returnTo = typeof event.data.returnTo === 'string' && event.data.returnTo
+        ? event.data.returnTo
+        : window.location.href;
+      if (returnTo !== window.location.href) {
+        window.location.assign(returnTo);
+      }
+    };
+
+    window.addEventListener('message', handleAuthSuccess);
+    return () => {
+      stopAuthPopupPoll();
+      window.removeEventListener('message', handleAuthSuccess);
+    };
+  }, [authOrigin]);
 
   const accountPanelTitle = accountPanel === 'user'
     ? 'Your Account'
@@ -2910,6 +3159,9 @@ export default function App() {
 
 
   return (
+    holdInitialShellForAuth ? (
+      <div className="min-h-screen bg-[#fafafa]" aria-label="Loading account access" />
+    ) : (
     <div className={`min-h-screen text-black flex flex-col selection:bg-black selection:text-white bg-[#fafafa] ${view === 'staging' ? '' : 'peri-shell'}`}>
       {view === 'staging' ? (
         <StagingView
@@ -2935,7 +3187,7 @@ export default function App() {
         </h1>
         <div className="flex items-center gap-3 font-sans text-[11px] font-bold">
           {authLoading ? (
-            <span className="text-[#888]">Checking AccountÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦</span>
+            <span className="text-[#888]">Checking Account...</span>
           ) : authStatus?.user ? (
             <>
               {authStatus.user.isAdmin && (
@@ -2950,22 +3202,14 @@ export default function App() {
                     Manage
                   </button>
                   <span className="text-[#DDD]">|</span>
-                  <button
-                    onClick={() => {
-                      if (usesCentralAuth) {
-                        openCentralAuth();
-                      } else {
-                        setAccountPanel('admin');
-                        setAuthError('');
-                        setAuthMessage('');
-                      }
-                    }}
-                    className="text-[#888] hover:text-black transition-colors"
-                  >
-                    Dashboard
-                  </button>
                 </>
               )}
+              <button
+                onClick={openRoleDashboard}
+                className="text-[#888] hover:text-black transition-colors"
+              >
+                Dashboard
+              </button>
               <button
                 onClick={() => {
                   setAccountPanel('user');
@@ -2983,23 +3227,29 @@ export default function App() {
           ) : (
             <button
               onClick={() => {
+                if (usesCentralAuth) {
+                  openCentralAuth(authStatus?.hasUsers ? 'login' : 'register', { popup: true });
+                  return;
+                }
                 setAccountPanel('auth');
                 setAuthError('');
                 setAuthMessage('');
               }}
               className="text-[#888] hover:text-black transition-colors"
             >
-              {authStatus?.hasUsers ? 'Sign In' : 'Create Admin'}
+              Sign In
             </button>
           )}
         </div>
         </div>
       </header>
 
-      <div className="shell-gutters" aria-hidden="true">
-        <div className="shell-gutter shell-gutter--left" />
-        <div className="shell-gutter shell-gutter--right" />
-      </div>
+      {!showForcedAuthGate && (
+        <div className="shell-gutters" aria-hidden="true">
+          <div className="shell-gutter shell-gutter--left" />
+          <div className="shell-gutter shell-gutter--right" />
+        </div>
+      )}
 
       <input
         ref={localFolderInputRef}
@@ -3010,140 +3260,148 @@ export default function App() {
       />
 
       <main className="peri-shell__body text-[15px]">
+        {!showForcedAuthGate && <h2 className="peri-section-title mb-4">{includeOtherFiles ? 'Files' : 'Images'}</h2>}
         {!showPrivateGate && (
           <div className="peri-toolbar-divider mb-6 flex flex-col gap-1 pb-2">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <div className="peri-toolbar-group">
-              <span className={`peri-control-label ${isMaxMode ? 'text-[#c8c8c8]' : 'text-[#6a716b]'}`}>Image Height</span>
-              {ROW_HEIGHT_OPTIONS.map(num => (
-                <button
-                  key={num}
-                  onClick={() => {
-                    setRowHeight(num);
-                    if (isMaxMode) setLimit(25);
-                  }}
-                  className={
-                    isMaxMode
-                      ? 'text-[#c8c8c8] hover:text-[#888]'
-                      : rowHeight === num
-                        ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
-                        : 'text-[#888] hover:text-black'
-                  }
-                >
-                  {num}px
-                </button>
-              ))}
-            </div>
+            <div className="flex w-full items-center gap-x-5 overflow-x-auto pb-1">
+              <div className="peri-toolbar-group shrink-0">
+                <span className={`peri-control-label ${isMaxMode ? 'text-[#c8c8c8]' : 'text-[#6a716b]'}`}>Image Height</span>
+                {ROW_HEIGHT_OPTIONS.map(num => (
+                  <button
+                    onClick={() => {
+                      setRowHeight(num);
+                      if (isMaxMode) setLimit(10);
+                    }}
+                    className={
+                      isMaxMode
+                        ? 'text-[#c8c8c8] hover:text-[#888]'
+                        : rowHeight === num
+                          ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
+                          : 'text-[#888] hover:text-black'
+                    }
+                    key={num}
+                  >
+                    {num}px
+                  </button>
+                ))}
+              </div>
 
-            <div className="peri-toolbar-group">
-              <span className={`peri-control-label ${isMaxMode ? 'text-[#c8c8c8]' : 'text-[#6a716b]'}`}>Items per page</span>
-              {Array.from(new Set([...LIMIT_OPTIONS, ...(isMaxMode ? [MAX_MODE_LIMIT] : []), limit])).sort((a, b) => a - b).map(num => (
+              <div className="peri-toolbar-group shrink-0">
+                <span className={`peri-control-label ${isMaxMode ? 'text-[#c8c8c8]' : 'text-[#6a716b]'}`}>Items per page</span>
+                {Array.from(new Set([...LIMIT_OPTIONS, ...(isMaxMode ? [MAX_MODE_LIMIT] : []), limit]))
+                  .sort((a, b) => a - b)
+                  .map(num => (
+                  <button
+                    onClick={() => {
+                      if (isMaxMode && num !== MAX_MODE_LIMIT) setRowHeight(250);
+                      setLimit(num);
+                      setPage(1);
+                    }}
+                    className={
+                      isMaxMode
+                        ? num === MAX_MODE_LIMIT
+                          ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
+                          : 'text-[#c8c8c8] hover:text-[#888]'
+                        : limit === num
+                            ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
+                          : 'text-[#888] hover:text-black'
+                    }
+                    key={num}
+                  >
+                    {num}
+                  </button>
+                ))}
                 <button
-                  key={num}
+                  type="button"
                   onClick={() => {
-                    if (isMaxMode && num !== MAX_MODE_LIMIT) setRowHeight(250);
-                    setLimit(num);
+                    if (isMaxMode) {
+                      setRowHeight(250);
+                      setLimit(10);
+                    } else {
+                      setRowHeight(MAX_MODE_ROW_HEIGHT);
+                      setLimit(MAX_MODE_LIMIT);
+                    }
                     setPage(1);
                   }}
-                  className={
-                    isMaxMode
-                      ? num === MAX_MODE_LIMIT
-                        ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
-                        : 'text-[#C8C8C8] hover:text-[#888]'
-                      : limit === num
-                        ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
-                        : 'text-[#888] hover:text-black'
-                  }
+                  className={`peri-control-label ml-3 ${isMaxMode ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] hover:text-black'}`}
                 >
-                  {num}
+                  MAX MODE
                 </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  if (isMaxMode) {
-                    setRowHeight(250);
-                    setLimit(25);
-                  } else {
-                    setRowHeight(MAX_MODE_ROW_HEIGHT);
-                    setLimit(MAX_MODE_LIMIT);
-                  }
-                  setPage(1);
-                }}
-                className={`peri-control-label ml-3 ${isMaxMode ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] hover:text-black'}`}
-              >
-                Max Mode
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIncludeOtherFiles(prev => !prev);
-                  setPage(1);
-                }}
-                className={`peri-control-label ml-5 ${includeOtherFiles ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] hover:text-black'}`}
-              >
-                Include Others
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIncludeOtherFiles(prev => !prev);
+                    setPage(1);
+                  }}
+                  className={`peri-control-label ml-5 ${includeOtherFiles ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] hover:text-black'}`}
+                >
+                  INCLUDE OTHER FILES
+                </button>
+              </div>
 
-            {sourceMode === 'server' && (
-              <div className="peri-toolbar-group">
-                <span className="peri-control-label">Share Code</span>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    maxLength={4}
-                    placeholder="CODE"
-                    value={shareCodeInput}
-                    onChange={e => {
-                      setShareCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
-                      if (shareCodeError) setShareCodeError('');
-                      if (shareCodeNotice) setShareCodeNotice('');
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && shareCodeInput.length === 4 && !isValidatingCode) {
-                        handleOpenShareCode();
-                      }
-                    }}
-                  className="peri-input px-2 py-0.5 text-[11px] uppercase w-16 text-center font-sans placeholder:text-gray-300"
-                />
-                <button
-                  onClick={handleOpenShareCode}
-                  disabled={shareCodeInput.length !== 4 || isValidatingCode}
-                  className="peri-button px-2 py-0.5 text-[11px] uppercase disabled:opacity-50 min-w-[32px] text-center"
-                >
-                  {isValidatingCode ? '...' : 'Go'}
-                </button>
-                <button
-                  onClick={handleLoadShareCode}
-                  disabled={shareCodeInput.length !== 4 || isValidatingCode}
-                  className="peri-button--secondary px-2 py-0.5 text-[11px] uppercase disabled:opacity-50 min-w-[52px] text-center"
-                >
-                  Load
-                </button>
-                </div>
-                {shareCodeError && (
-                  <span className="text-red-600 font-bold text-[11px] uppercase ml-1 animate-pulse">
-                    {shareCodeError}
-                  </span>
+              <div className="peri-toolbar-group shrink-0">
+                {sourceMode === 'server' ? (
+                  <>
+                    <span className="peri-control-label">Share Code</span>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        maxLength={4}
+                        placeholder="CODE"
+                        value={shareCodeInput}
+                        onChange={e => {
+                          setShareCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                          if (shareCodeError) setShareCodeError('');
+                          if (shareCodeNotice) setShareCodeNotice('');
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && shareCodeInput.length === 4 && !isValidatingCode) {
+                            handleOpenShareCode();
+                          }
+                        }}
+                        className="peri-input px-2 py-0.5 text-[11px] uppercase w-16 text-center font-sans placeholder:text-gray-300"
+                      />
+                      <button
+                        onClick={handleOpenShareCode}
+                        disabled={shareCodeInput.length !== 4 || isValidatingCode}
+                        className="peri-button px-2 py-0.5 text-[11px] uppercase disabled:opacity-50 min-w-[32px] text-center"
+                      >
+                        {isValidatingCode ? '...' : 'Go'}
+                      </button>
+                      <button
+                        onClick={handleLoadShareCode}
+                        disabled={shareCodeInput.length !== 4 || isValidatingCode}
+                        className="peri-button--secondary px-2 py-0.5 text-[11px] uppercase disabled:opacity-50 min-w-[52px] text-center"
+                      >
+                        Load
+                      </button>
+                    </div>
+                    {shareCodeError && (
+                      <span className="text-red-600 font-bold text-[11px] uppercase ml-1 animate-pulse">
+                        {shareCodeError}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="peri-control-label text-transparent select-none">Share Code</span>
                 )}
               </div>
-            )}
-          </div>
-
+            </div>
               <div className="peri-inline-actions gap-4">
               <div className="peri-toolbar-group">
                 <span className="peri-control-label">Library</span>
+                {canUseServerLibrary && (
+                  <button
+                    type="button"
+                    onClick={resetToServerLibrary}
+                    className={`peri-toggle px-2 py-0.5 text-[10px] uppercase ${sourceMode === 'server' ? 'is-active' : ''}`}
+                  >
+                    Server Library
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={resetToServerLibrary}
-                  className={`peri-toggle px-2 py-0.5 text-[10px] uppercase ${sourceMode === 'server' ? 'is-active' : ''}`}
-                >
-                  Server Library
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleOpenLocalFolder()}
+                  onClick={handleRequestOpenLocalFolder}
                   className={`peri-toggle px-2 py-0.5 text-[10px] uppercase max-w-[220px] truncate ${sourceMode === 'local' ? 'is-active' : ''}`}
                   title={sourceMode === 'local' ? 'Change local folder' : 'Open local folder'}
                 >
@@ -3273,6 +3531,7 @@ export default function App() {
                       onClick={() => {
                         setShowTagsPopover(!showTagsPopover);
                         setShowListsPopover(false);
+                        setTagSearch('');
                       }}
                       className={`peri-toggle flex items-center gap-1.5 px-2.5 py-1 text-[11px] uppercase ${showTagsPopover ? 'is-active' : ''}`}
                     >
@@ -3281,50 +3540,10 @@ export default function App() {
                     </button>
                     {showTagsPopover && (
                       <div className="peri-popover absolute left-0 mt-1.5 z-50 w-64 text-black normal-case font-sans">
-                        <div className="peri-popover__header p-2 flex items-center gap-1.5">
-                          <Search size={12} className="text-[#888]" />
-                          <input
-                            type="text"
-                            value={tagSearch}
-                            onChange={e => setTagSearch(e.target.value)}
-                            placeholder="Filter tags..."
-                            onKeyDown={e => {
-                              if (!showTagsPopover) return;
-                              const count = filteredTagOptions.length + (canCreateTagCandidate ? 1 : 0);
-                              if (!count) return;
-
-                              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                                e.preventDefault();
-                                setActiveTagIndex(prev => {
-                                  const direction = e.key === 'ArrowDown' ? 1 : -1;
-                                  const next = (prev + direction + count) % count;
-                                  return next;
-                                });
-                              }
-
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                if (filteredTagOptions.length > 0 && activeTagIndex < filteredTagOptions.length) {
-                                  void handleCommitTagPopoverChoice(filteredTagOptions[activeTagIndex]);
-                                  return;
-                                }
-                                if (canCreateTagCandidate) {
-                                  void handleCommitTagPopoverChoice(createTagCandidate);
-                                }
-                              }
-
-                              if (e.key === 'Escape') {
-                                setShowTagsPopover(false);
-                              }
-                            }}
-                            className="w-full bg-transparent text-[11px] font-sans focus:outline-none placeholder-gray-400 font-bold uppercase"
-                            onClick={e => e.stopPropagation()}
-                          />
-                          {tagSearch && (
-                            <button onClick={() => setTagSearch('')} className="hover:text-red-500 font-bold text-[13px]">
-                              <X size={13} />
-                            </button>
-                          )}
+                        <div className="peri-popover__header p-2">
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-[#6a716b]">
+                            Choose Tags
+                          </span>
                         </div>
                         <div className="max-h-48 overflow-y-auto divide-y divide-[#DDD] font-sans text-[10px] lowercase">
                           {filteredTagOptions.map((tagName, index) => {
@@ -3368,6 +3587,7 @@ export default function App() {
                       onClick={() => {
                         setShowListsPopover(!showListsPopover);
                         setShowTagsPopover(false);
+                        setListSearch('');
                       }}
                       className={`peri-toggle flex items-center gap-1.5 px-2.5 py-1 text-[11px] uppercase ${showListsPopover ? 'is-active' : ''}`}
                     >
@@ -3376,53 +3596,10 @@ export default function App() {
                     </button>
                     {showListsPopover && (
                       <div className="peri-popover absolute left-0 mt-1.5 z-50 w-64 text-black normal-case font-sans">
-                        <div className="peri-popover__header p-2 flex items-center gap-1.5">
-                          <Search size={12} className="text-[#888]" />
-                          <input
-                            type="text"
-                            value={listSearch}
-                            onChange={e => setListSearch(e.target.value)}
-                            placeholder="Filter lists..."
-                            onKeyDown={e => {
-                              if (!showListsPopover) return;
-                              const count = filteredListOptions.length + (canCreateListCandidate ? 1 : 0);
-                              if (!count) return;
-
-                              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                                e.preventDefault();
-                                setActiveListIndex(prev => {
-                                  const direction = e.key === 'ArrowDown' ? 1 : -1;
-                                  const next = (prev + direction + count) % count;
-                                  return next;
-                                });
-                              }
-
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                if (filteredListOptions.length > 0 && activeListIndex < filteredListOptions.length) {
-                                  void handleCommitListPopoverChoice(filteredListOptions[activeListIndex].id);
-                                  return;
-                                }
-                                if (canCreateListCandidate) {
-                                  void handleCreateListBulk(createListCandidate);
-                                  setShowListsPopover(false);
-                                  setListSearch('');
-                                  setActiveListIndex(0);
-                                }
-                              }
-
-                              if (e.key === 'Escape') {
-                                setShowListsPopover(false);
-                              }
-                            }}
-                            className="w-full bg-transparent text-[11px] font-sans focus:outline-none placeholder-gray-400 font-bold uppercase"
-                            onClick={e => e.stopPropagation()}
-                          />
-                          {listSearch && (
-                            <button onClick={() => setListSearch('')} className="hover:text-red-500 font-bold text-[13px]">
-                              <X size={13} />
-                            </button>
-                          )}
+                        <div className="peri-popover__header p-2">
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-[#6a716b]">
+                            Choose Lists
+                          </span>
                         </div>
                         <div className="max-h-48 overflow-y-auto divide-y divide-[#DDD] font-sans text-[10px] uppercase">
                           {filteredListOptions.map((share, index) => {
@@ -3787,8 +3964,9 @@ export default function App() {
           </div>
         )}
 
-        <h2 className="peri-section-title mb-4">{includeOtherFiles ? 'Files' : 'Images'}</h2>
-        {accessError ? (
+        {showForcedAuthGate ? (
+          <div className="flex-1 min-h-[24vh]" />
+        ) : accessError ? (
           <div className="flex flex-col items-center justify-center h-[40vh] text-center max-w-md mx-auto gap-5">
             <div className="peri-card px-6 py-5 flex flex-col gap-3">
               <h2 className="font-sans text-2xl font-bold uppercase">Private Archive</h2>
@@ -3796,6 +3974,10 @@ export default function App() {
               <div className="flex items-center justify-center gap-3">
                 <button
                   onClick={() => {
+                    if (usesCentralAuth) {
+                      openCentralAuth('login', { popup: true });
+                      return;
+                    }
                     setAccountPanel('auth');
                     setAuthMode('login');
                     setAuthError('');
@@ -3815,7 +3997,7 @@ export default function App() {
                     }}
                     className="peri-button--secondary px-4 py-2 text-[11px] uppercase tracking-widest"
                   >
-                    Create Admin
+                    Sign In
                   </button>
                 )}
               </div>
@@ -3988,6 +4170,60 @@ export default function App() {
         )}
       </main>
 
+      {localFolderConsentOpen && (
+        <div
+          className="fixed inset-0 z-[66] bg-[#F0F0F0]/92 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setLocalFolderConsentOpen(false)}
+        >
+          <div
+            className="peri-card w-full max-w-[640px]"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="peri-card__divider flex items-center justify-between px-4 py-3 bg-[#fafafa]">
+              <div className="min-w-0">
+                <h2 className="font-sans text-sm font-bold uppercase tracking-wide">Open Local Folder</h2>
+                <p className="mt-0.5 text-[10px] font-sans text-[#888] truncate">Temporary local session access</p>
+              </div>
+              <button
+                onClick={() => setLocalFolderConsentOpen(false)}
+                className="text-[#888] hover:text-black transition-colors"
+              >
+                <X size={18} strokeWidth={2.25} />
+              </button>
+            </div>
+
+            <div className="p-4 flex flex-col gap-3 font-sans text-sm leading-relaxed text-black">
+              <p>
+                Perihelion will make its own working copies from the folder you choose. This information is deleted when the page is refreshed or closed.
+              </p>
+              <p className="text-[13px] text-[#666]">
+                I only keep a timestamp, no folder or identifying details.
+              </p>
+              <p className="text-[13px] text-[#666]">
+                I won't do anything until you confirm below.
+              </p>
+            </div>
+
+            <div className="peri-card__divider flex items-center justify-end gap-3 px-4 py-3 bg-[#fafafa]">
+              <button
+                type="button"
+                onClick={() => setLocalFolderConsentOpen(false)}
+                className="peri-button--secondary px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em]"
+              >
+                Don&apos;t Allow
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmOpenLocalFolder()}
+                className="peri-button px-4 py-2 text-[11px] font-bold uppercase tracking-[0.2em]"
+              >
+                Allow
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {folderQuickEditPath && (
         <div
           className="fixed inset-0 z-[68] bg-[#F0F0F0]/94 backdrop-blur-sm flex items-center justify-center p-4"
@@ -4033,121 +4269,123 @@ export default function App() {
                 />
               </label>
 
-              <div className="peri-card__divider border-[1px] border-[#d4d4d8] bg-[#fafafa] px-3 py-3">
-                <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#888]">Access</div>
-                <div className="grid gap-2 font-sans text-[12px] font-bold uppercase tracking-wider text-black sm:grid-cols-3">
-                  {folderQuickParentAccess.visibleToUsers ? (
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={folderQuickVisibleToUsers}
-                        onChange={event => setFolderQuickVisibleToUsers(event.target.checked)}
-                        className="h-4 w-4 accent-black"
-                      />
-                      User
-                    </label>
-                  ) : (
-                    <div className="flex items-center gap-2 text-[#888]">
-                      <Minus size={14} strokeWidth={2.25} />
-                      User inherited off
+              {canEditServerFolderPermissions && (
+                <div className="peri-card__divider border-[1px] border-[#d4d4d8] bg-[#fafafa] px-3 py-3">
+                  <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#888]">Access</div>
+                  <div className="grid gap-2 font-sans text-[12px] font-bold uppercase tracking-wider text-black sm:grid-cols-3">
+                    {folderQuickParentAccess.visibleToUsers ? (
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={folderQuickVisibleToUsers}
+                          onChange={event => setFolderQuickVisibleToUsers(event.target.checked)}
+                          className="h-4 w-4 accent-black"
+                        />
+                        User
+                      </label>
+                    ) : (
+                      <div className="flex items-center gap-2 text-[#888]">
+                        <Minus size={14} strokeWidth={2.25} />
+                        User inherited off
+                      </div>
+                    )}
+                    {folderQuickParentAccess.visibleToAdmins ? (
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={folderQuickVisibleToAdmins}
+                          onChange={event => setFolderQuickVisibleToAdmins(event.target.checked)}
+                          className="h-4 w-4 accent-black"
+                        />
+                        Reg Admin
+                      </label>
+                    ) : (
+                      <div className="flex items-center gap-2 text-[#888]">
+                        <Minus size={14} strokeWidth={2.25} />
+                        Reg Admin inherited off
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-[#666]">
+                      <Check size={14} strokeWidth={2.25} />
+                      Pref Admin
                     </div>
-                  )}
-                  {folderQuickParentAccess.visibleToAdmins ? (
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={folderQuickVisibleToAdmins}
-                        onChange={event => setFolderQuickVisibleToAdmins(event.target.checked)}
-                        className="h-4 w-4 accent-black"
-                      />
-                      Reg Admin
-                    </label>
-                  ) : (
-                    <div className="flex items-center gap-2 text-[#888]">
-                      <Minus size={14} strokeWidth={2.25} />
-                      Reg Admin inherited off
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-[#666]">
-                    <Check size={14} strokeWidth={2.25} />
-                    Pref Admin
+                  </div>
+                  <div className="mt-3 border-t border-[#d4d4d8] pt-3">
+                    <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#888]">Approved Accounts</div>
+                    {folderQuickApprovedUsers.length === 0 ? (
+                      <p className="font-sans text-[12px] text-[#777]">No approved accounts are available.</p>
+                    ) : (
+                      <div className="grid gap-2 font-sans text-[12px] sm:grid-cols-2">
+                        {folderQuickApprovedUsers.map(user => {
+                          const userId = String(user.id);
+                          const parentAllowsAccount = folderQuickParentAccess.accounts[userId] ?? true;
+                          const locked = Boolean(user.isOwner) || !parentAllowsAccount;
+                          const levelAllowsAccount = user.isAdmin ? folderQuickVisibleToAdmins : folderQuickVisibleToUsers;
+                          const currentMode = folderQuickAccountAccess[userId];
+                          const inheritedLabel = levelAllowsAccount ? 'Inherit: allowed' : 'Inherit: denied';
+                          const effectiveLabel = user.isOwner
+                            ? 'Always allowed'
+                            : !parentAllowsAccount
+                              ? 'Inherited deny from parent'
+                              : currentMode === 'allow'
+                                ? 'Explicit allow'
+                                : currentMode === 'deny'
+                                  ? 'Explicit deny'
+                                  : inheritedLabel;
+                          const role = user.isOwner ? 'Pref Admin' : user.isAdmin ? 'Reg Admin' : 'User';
+                          const setAccountMode = (mode: FolderAccountAccessMode | 'inherit') => {
+                            setFolderQuickAccountAccess(prev => {
+                              const next = { ...prev };
+                              if (mode === 'inherit') {
+                                delete next[userId];
+                              } else {
+                                next[userId] = mode;
+                              }
+                              return next;
+                            });
+                          };
+
+                          return (
+                            <div
+                              key={userId}
+                              className={`flex flex-col gap-2 border border-[#d4d4d8] bg-white px-2.5 py-2 ${locked ? 'text-[#999]' : 'text-black'}`}
+                            >
+                              <div className="min-w-0">
+                                <span className="block truncate font-bold">{user.username}</span>
+                                <span className="block text-[10px] uppercase tracking-wider text-[#888]">
+                                  {role} / {effectiveLabel}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-3 gap-1 text-[9px] font-bold uppercase tracking-widest">
+                                {(['inherit', 'allow', 'deny'] as const).map(mode => {
+                                  const active = mode === 'inherit' ? currentMode == null : currentMode === mode;
+                                  return (
+                                    <button
+                                      key={mode}
+                                      type="button"
+                                      disabled={locked}
+                                      onClick={() => setAccountMode(mode)}
+                                      className={`border px-2 py-1 transition-colors ${
+                                        active
+                                          ? mode === 'deny'
+                                            ? 'border-[#8A1F1F] bg-[#F6E2E2] text-[#8A1F1F]'
+                                            : 'border-black bg-black text-white'
+                                          : 'border-[#d4d4d8] bg-[#fafafa] text-[#777] hover:border-black hover:text-black'
+                                      } disabled:border-[#d4d4d8] disabled:bg-[#f2f2f2] disabled:text-[#aaa] disabled:cursor-not-allowed`}
+                                    >
+                                      {mode}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="mt-3 border-t border-[#d4d4d8] pt-3">
-                  <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#888]">Approved Accounts</div>
-                  {folderQuickApprovedUsers.length === 0 ? (
-                    <p className="font-sans text-[12px] text-[#777]">No approved accounts are available.</p>
-                  ) : (
-                    <div className="grid gap-2 font-sans text-[12px] sm:grid-cols-2">
-                      {folderQuickApprovedUsers.map(user => {
-                        const userId = String(user.id);
-                        const parentAllowsAccount = folderQuickParentAccess.accounts[userId] ?? true;
-                        const locked = Boolean(user.isOwner) || !parentAllowsAccount;
-                        const levelAllowsAccount = user.isAdmin ? folderQuickVisibleToAdmins : folderQuickVisibleToUsers;
-                        const currentMode = folderQuickAccountAccess[userId];
-                        const inheritedLabel = levelAllowsAccount ? 'Inherit: allowed' : 'Inherit: denied';
-                        const effectiveLabel = user.isOwner
-                          ? 'Always allowed'
-                          : !parentAllowsAccount
-                            ? 'Inherited deny from parent'
-                            : currentMode === 'allow'
-                              ? 'Explicit allow'
-                              : currentMode === 'deny'
-                                ? 'Explicit deny'
-                                : inheritedLabel;
-                        const role = user.isOwner ? 'Pref Admin' : user.isAdmin ? 'Reg Admin' : 'User';
-                        const setAccountMode = (mode: FolderAccountAccessMode | 'inherit') => {
-                          setFolderQuickAccountAccess(prev => {
-                            const next = { ...prev };
-                            if (mode === 'inherit') {
-                              delete next[userId];
-                            } else {
-                              next[userId] = mode;
-                            }
-                            return next;
-                          });
-                        };
-
-                        return (
-                          <div
-                            key={userId}
-                            className={`flex flex-col gap-2 border border-[#d4d4d8] bg-white px-2.5 py-2 ${locked ? 'text-[#999]' : 'text-black'}`}
-                          >
-                            <div className="min-w-0">
-                              <span className="block truncate font-bold">{user.username}</span>
-                              <span className="block text-[10px] uppercase tracking-wider text-[#888]">
-                                {role} / {effectiveLabel}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-1 text-[9px] font-bold uppercase tracking-widest">
-                              {(['inherit', 'allow', 'deny'] as const).map(mode => {
-                                const active = mode === 'inherit' ? currentMode == null : currentMode === mode;
-                                return (
-                                  <button
-                                    key={mode}
-                                    type="button"
-                                    disabled={locked}
-                                    onClick={() => setAccountMode(mode)}
-                                    className={`border px-2 py-1 transition-colors ${
-                                      active
-                                        ? mode === 'deny'
-                                          ? 'border-[#8A1F1F] bg-[#F6E2E2] text-[#8A1F1F]'
-                                          : 'border-black bg-black text-white'
-                                        : 'border-[#d4d4d8] bg-[#fafafa] text-[#777] hover:border-black hover:text-black'
-                                    } disabled:border-[#d4d4d8] disabled:bg-[#f2f2f2] disabled:text-[#aaa] disabled:cursor-not-allowed`}
-                                  >
-                                    {mode}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
+              )}
 
               <div className="flex items-center gap-2">
                 <button
@@ -4169,92 +4407,103 @@ export default function App() {
         </div>
       )}
 
-      {!showPrivateGate && (
+      {(showForcedAuthGate || !showPrivateGate) && (
         <footer className="page-banner page-banner--bottom">
           <div className="page-banner__inner shell-frame">
-          <div className="font-sans text-[13px] font-bold uppercase tracking-wider text-[#202522]">
-            PAGE {page} OF {computedTotalPages} / {selectedImages.size > 0 ? <span className="text-black bg-[#e0e0e0] px-1.5 py-0.5 mr-1">{selectedImages.size} SELECTED /</span> : null} {pagedEntries.length} SHOWN / {totalVisibleItems} TOTAL
-          </div>
-          <div className="flex items-center gap-1 font-sans text-[13px] font-bold uppercase tracking-wider whitespace-nowrap text-[#202522]">
-            {previousSiblingFolder && (
-              <button
-                type="button"
-                onClick={() => navigateToPath(previousSiblingFolder.path)}
-                className="max-w-[18rem] truncate text-left text-[#666] hover:text-black hover:underline transition-colors"
-                title={previousSiblingFolder.title || previousSiblingFolder.name}
-              >
-                {previousSiblingFolder.title || previousSiblingFolder.name}
-              </button>
-            )}
-
-            {previousSiblingFolder && (computedTotalPages > 1 || nextSiblingFolder) && (
-              <span className="select-none px-0.5 text-[#888]">|</span>
-            )}
-
-            {computedTotalPages > 1 && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    queueHistoryUpdate('push');
-                    setPage(1);
-                  }}
-                  disabled={page === 1}
-                  className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
-                >
-                  First
-                </button>
-                <button
-                  onClick={() => {
-                    queueHistoryUpdate('push');
-                    setPage(p => Math.max(1, p - 1));
-                  }}
-                  disabled={page === 1}
-                  className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
-                >
-                  Prev
-                </button>
-                <button
-                  onClick={() => {
-                    queueHistoryUpdate('push');
-                    setPage(p => Math.min(computedTotalPages, p + 1));
-                  }}
-                  disabled={page === computedTotalPages}
-                  className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
-                >
-                  Next
-                </button>
-                <button
-                  onClick={() => {
-                    queueHistoryUpdate('push');
-                    setPage(computedTotalPages);
-                  }}
-                  disabled={page === computedTotalPages}
-                  className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
-                >
-                  Last
-                </button>
+          {showForcedAuthGate ? (
+            <>
+              <div />
+              <div className="font-sans text-[13px] font-bold uppercase tracking-wider whitespace-nowrap text-[#202522]">
+                © 2026 Jefferson Williams. All rights reserved.
               </div>
-            )}
+            </>
+          ) : (
+            <>
+              <div className="font-sans text-[13px] font-bold uppercase tracking-wider text-[#202522]">
+                PAGE {page} OF {computedTotalPages} / {selectedImages.size > 0 ? <span className="text-black bg-[#e0e0e0] px-1.5 py-0.5 mr-1">{selectedImages.size} SELECTED /</span> : null} {pagedEntries.length} SHOWN / {totalVisibleItems} TOTAL / {visibleFolderCount} FOLDERS
+              </div>
+              <div className="flex items-center gap-1 font-sans text-[13px] font-bold uppercase tracking-wider whitespace-nowrap text-[#202522]">
+                {previousSiblingFolder && (
+                  <button
+                    type="button"
+                    onClick={() => navigateToPath(previousSiblingFolder.path)}
+                    className="max-w-[18rem] truncate text-left text-[#666] hover:text-black hover:underline transition-colors"
+                    title={previousSiblingFolder.title || previousSiblingFolder.name}
+                  >
+                    {previousSiblingFolder.title || previousSiblingFolder.name}
+                  </button>
+                )}
 
-            {computedTotalPages > 1 && nextSiblingFolder && (
-              <span className="select-none px-0.5 text-[#888]">|</span>
-            )}
+                {previousSiblingFolder && (computedTotalPages > 1 || nextSiblingFolder) && (
+                  <span className="select-none px-0.5 text-[#888]">|</span>
+                )}
 
-            {computedTotalPages <= 1 && previousSiblingFolder && nextSiblingFolder && (
-              <span className="select-none px-0.5 text-[#888]">|</span>
-            )}
+                {computedTotalPages > 1 && (
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        queueHistoryUpdate('push');
+                        setPage(1);
+                      }}
+                      disabled={page === 1}
+                      className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                    >
+                      First
+                    </button>
+                    <button
+                      onClick={() => {
+                        queueHistoryUpdate('push');
+                        setPage(p => Math.max(1, p - 1));
+                      }}
+                      disabled={page === 1}
+                      className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                    >
+                      Prev
+                    </button>
+                    <button
+                      onClick={() => {
+                        queueHistoryUpdate('push');
+                        setPage(p => Math.min(computedTotalPages, p + 1));
+                      }}
+                      disabled={page === computedTotalPages}
+                      className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                    >
+                      Next
+                    </button>
+                    <button
+                      onClick={() => {
+                        queueHistoryUpdate('push');
+                        setPage(computedTotalPages);
+                      }}
+                      disabled={page === computedTotalPages}
+                      className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                    >
+                      Last
+                    </button>
+                  </div>
+                )}
 
-            {nextSiblingFolder && (
-              <button
-                type="button"
-                onClick={() => navigateToPath(nextSiblingFolder.path)}
-                className="max-w-[18rem] truncate text-right text-[#666] hover:text-black hover:underline transition-colors"
-                title={nextSiblingFolder.title || nextSiblingFolder.name}
-              >
-                {nextSiblingFolder.title || nextSiblingFolder.name}
-              </button>
-            )}
-          </div>
+                {computedTotalPages > 1 && nextSiblingFolder && (
+                  <span className="select-none px-0.5 text-[#888]">|</span>
+                )}
+
+                {computedTotalPages <= 1 && previousSiblingFolder && nextSiblingFolder && (
+                  <span className="select-none px-0.5 text-[#888]">|</span>
+                )}
+
+                {nextSiblingFolder && (
+                  <button
+                    type="button"
+                    onClick={() => navigateToPath(nextSiblingFolder.path)}
+                    className="max-w-[18rem] truncate text-right text-[#666] hover:text-black hover:underline transition-colors"
+                    title={nextSiblingFolder.title || nextSiblingFolder.name}
+                  >
+                    {nextSiblingFolder.title || nextSiblingFolder.name}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
           </div>
         </footer>
       )}
@@ -4272,13 +4521,13 @@ export default function App() {
               href={sourceMode === 'local' ? (localObjectUrls[selectedImage] || '#') : `${API_PATH}/download/${encodeURI(selectedImage)}`}
               download={basename(selectedImage)}
               onClick={e => e.stopPropagation()}
-              className="p-2 bg-white border-[2px] border-black hover:bg-black hover:text-white transition-colors flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+              className="peri-button--secondary p-2 flex items-center justify-center"
               title={sourceMode === 'local' ? 'Download Local File' : 'Download File'}
             >
               <Download size={20} strokeWidth={2.5} />
             </a>
             <button
-              className="p-2 bg-white border-[2px] border-black hover:bg-black hover:text-white transition-colors flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+              className="peri-button--secondary p-2 flex items-center justify-center"
               onClick={e => {
                 e.stopPropagation();
                 closeLightbox();
@@ -4313,7 +4562,7 @@ export default function App() {
                         src={imageUrl}
                         alt={selectedImage || ''}
                         referrerPolicy="no-referrer"
-                        className="max-w-full max-h-[60vh] object-contain border-[2px] border-black bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] cursor-pointer"
+                        className="max-w-full max-h-[60vh] object-contain border border-[#d4d4d8] bg-white shadow-[0_18px_40px_rgba(15,23,42,0.12)] cursor-pointer"
                         onClick={closeLightbox}
                       />
                       {isSelectedImageLarge && !showFullImage && (
@@ -4322,7 +4571,7 @@ export default function App() {
                             onClick={() => {
                               setForceFullImage(prev => ({ ...prev, [selectedImage || '']: true }));
                             }}
-                            className="bg-yellow-400 text-black border-[2px] border-black px-4 py-1.5 font-bold uppercase text-[11px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all flex items-center gap-1.5"
+                            className="peri-button--secondary px-4 py-1.5 text-[11px] uppercase flex items-center gap-1.5 bg-[#eef2f6]"
                           >
                             <Download size={14} strokeWidth={2.5} />
                             Load Full Image ({formatBytes(selectedImageSize)})
@@ -4342,9 +4591,9 @@ export default function App() {
                 })()
               ) : (
                 <div
-                  className={`w-full max-w-2xl aspect-video border-[2px] border-black bg-white flex flex-col items-center justify-center gap-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] ${selectedFileTone?.accent || 'text-[#888]'}`}
+                  className={`peri-card w-full max-w-2xl aspect-video flex flex-col items-center justify-center gap-4 shadow-[0_18px_40px_rgba(15,23,42,0.12)] ${selectedFileTone?.accent || 'text-[#888]'}`}
                 >
-                  <div className={`w-20 h-20 rounded-full border-[2px] border-black flex items-center justify-center ${selectedFileTone?.bg || 'bg-[#F3F3F3]'}`}>
+                  <div className={`w-20 h-20 rounded-full border border-[#d4d4d8] flex items-center justify-center ${selectedFileTone?.bg || 'bg-[#F3F3F3]'}`}>
                     <FileImage size={36} strokeWidth={1.5} />
                   </div>
                   <div className="flex flex-col items-center gap-2 text-center px-6">
@@ -4362,7 +4611,7 @@ export default function App() {
 
             {/* Copy Link Widget */}
             {selectedImage && (
-              <div className="w-full max-w-2xl bg-white border-[2px] border-black px-3 py-1.5 font-sans text-[10px] sm:text-xs shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between gap-2">
+              <div className="peri-card w-full max-w-2xl px-3 py-2 font-sans text-[10px] sm:text-xs shadow-[0_18px_40px_rgba(15,23,42,0.08)] flex items-center justify-between gap-2">
                 <div className="truncate flex-1">
                   <span className="text-[#888] uppercase font-bold tracking-wider mr-1">{sourceMode === 'local' ? 'Local File:' : 'Direct URL:'}</span>
                   <a 
@@ -4380,7 +4629,7 @@ export default function App() {
                     setCopiedImageLink(true);
                     setTimeout(() => setCopiedImageLink(false), 2000);
                   }}
-                  className="shrink-0 hover:bg-gray-100 p-1 border border-transparent hover:border-black active:bg-gray-200 transition-all flex items-center justify-center"
+                  className="peri-button--secondary shrink-0 p-1 flex items-center justify-center"
                   title={sourceMode === 'local' ? 'Copy local file path' : 'Copy direct URL to clipboard'}
                 >
                   {copiedImageLink ? (
@@ -4393,8 +4642,8 @@ export default function App() {
             )}
 
             {selectedImage && isRenderable(selectedImage) && currentPath && canEditServerFolders && (
-              <div className="w-full max-w-2xl border-[2px] border-black bg-[#F9F9F9] p-3 flex flex-col gap-3 font-sans text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                <div className="flex items-center justify-between gap-3">
+              <div className="peri-card w-full max-w-2xl flex flex-col gap-3 font-sans text-xs shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+                <div className="peri-card__divider flex items-center justify-between gap-3 px-4 py-3 bg-[#fafafa]">
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[#888]">Folder Covers</span>
                     <span className="text-[10px] text-[#aaa] uppercase tracking-wider truncate">
@@ -4406,14 +4655,14 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 px-4 pb-4 sm:grid-cols-2">
                   {[
                     { slot: 1 as const, label: 'Cover 1', current: folderCoverPaths.cover1Path },
                     { slot: 2 as const, label: 'Cover 2', current: folderCoverPaths.cover2Path },
                   ].map(({ slot, label, current }) => {
                     const isCurrent = current === selectedImage;
                     return (
-                      <div key={slot} className="border-[1px] border-[#DDD] bg-white p-3 flex flex-col gap-2">
+                      <div key={slot} className="peri-card bg-[#fafafa] p-3 flex flex-col gap-2">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-[#888]">{label}</span>
                           <span className="text-[9px] uppercase tracking-widest text-[#aaa] truncate">
@@ -4424,7 +4673,7 @@ export default function App() {
                           <button
                             onClick={() => saveFolderCoverSlot(slot, selectedImage)}
                             disabled={setCoverStatus === 'saving' || isCurrent}
-                            className="bg-black text-white px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors border-[2px] border-black disabled:bg-[#888] disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap"
+                            className="peri-button px-2.5 py-1 text-[9px] uppercase disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap"
                           >
                             <BookImage size={9} strokeWidth={2.5} />
                             Set as {label}
@@ -4448,7 +4697,7 @@ export default function App() {
             )}
 
             {/* Info panel below the image */}
-            <div className="w-full max-w-2xl bg-white border-[2px] border-black p-4 flex flex-col gap-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-left font-sans">
+            <div className="peri-card w-full max-w-2xl p-4 flex flex-col gap-3 shadow-[0_18px_40px_rgba(15,23,42,0.08)] text-left font-sans">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <h3 className="font-sans text-sm font-bold uppercase tracking-wide truncate" title={labelWithoutExtension(selectedImage)}>
@@ -4460,7 +4709,7 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => setShowEditBox(!showEditBox)}
-                  className="bg-black text-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors border-[2px] border-black shrink-0"
+                  className="peri-button px-3 py-1.5 text-[10px] uppercase shrink-0"
                 >
                   {showEditBox ? 'Close Edit' : 'Edit Details'}
                 </button>
@@ -4468,7 +4717,7 @@ export default function App() {
 
               {/* Description if present */}
               {imageDetail?.description && !showEditBox && (
-                <p className="text-xs text-[#444] font-sans leading-relaxed border-l-2 border-black pl-2 py-0.5">
+                <p className="text-xs text-[#444] font-sans leading-relaxed border-l border-[#d4d4d8] pl-3 py-0.5">
                   {imageDetail.description}
                 </p>
               )}
@@ -4534,7 +4783,7 @@ export default function App() {
 
             {/* Edit metadata box below info panel */}
             {showEditBox && (
-              <div className="w-full max-w-2xl border-[2px] border-black bg-[#F9F9F9] p-4 flex flex-col gap-3 font-sans text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <div className="peri-card w-full max-w-2xl p-4 flex flex-col gap-3 font-sans text-xs shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
                 <div className="flex flex-col gap-2.5">
                   <label className="flex flex-col gap-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[#888]">title</span>
@@ -4542,7 +4791,7 @@ export default function App() {
                       type="text"
                       value={editTitle}
                       onChange={e => setEditTitle(e.target.value)}
-                      className="border-[2px] border-black bg-white px-2 py-1 font-sans text-xs focus:outline-none font-bold"
+                      className="peri-input bg-[#fafafa] px-2 py-1 font-sans text-xs font-bold"
                     />
                   </label>
 
@@ -4551,7 +4800,7 @@ export default function App() {
                     <textarea
                       value={editDescription}
                       onChange={e => setEditDescription(e.target.value)}
-                      className="border-[2px] border-black bg-white px-2 py-1 font-sans text-xs focus:outline-none min-h-[60px] resize-y"
+                      className="peri-input bg-[#fafafa] px-2 py-1 font-sans text-xs min-h-[60px] resize-y"
                       placeholder="add description..."
                     />
                   </label>
@@ -4566,7 +4815,7 @@ export default function App() {
                         editTags.map(tag => (
                           <span
                             key={tag}
-                            className="inline-flex items-center gap-1 bg-white border border-black text-black px-1.5 py-0.5 text-[10px] font-sans lowercase"
+                            className="peri-chip inline-flex items-center gap-1 text-black px-1.5 py-0.5 text-[10px] font-sans lowercase"
                           >
                             #{tag}
                             <button
@@ -4669,10 +4918,10 @@ export default function App() {
           onClick={() => setAccountPanel(null)}
         >
           <div
-            className="w-full max-w-[560px] border-[2px] border-[#666] bg-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+            className="peri-card w-full max-w-[560px] shadow-[0_18px_40px_rgba(15,23,42,0.14)]"
             onClick={event => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b-[2px] border-[#666] px-4 py-3">
+            <div className="peri-card__divider flex items-center justify-between px-4 py-3 bg-[#fafafa]">
               <h2 className="font-sans text-sm font-bold uppercase tracking-wide">{accountPanelTitle}</h2>
               <button
                 onClick={() => setAccountPanel(null)}
@@ -4689,7 +4938,7 @@ export default function App() {
               {accountPanel === 'manage' && (
                 <div className="flex flex-col gap-4 font-sans">
                   {/* Tab toggles */}
-                  <div className="flex items-center gap-3 border-b-[2px] border-black pb-2 text-[11px] font-bold uppercase tracking-wider">
+                  <div className="flex items-center gap-3 border-b border-[#d4d4d8] pb-2 text-[11px] font-bold uppercase tracking-wider">
                     <button
                       onClick={() => setManageTab('tags')}
                       className={manageTab === 'tags' ? 'text-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#888] hover:text-black'}
@@ -4705,12 +4954,12 @@ export default function App() {
                   </div>
 
                   {manageTab === 'tags' ? (
-                    <div className="divide-y-[1px] divide-gray-200 max-h-[350px] overflow-y-auto pr-1">
+                    <div className="max-h-[350px] overflow-y-auto pr-1">
                       {allTags.length === 0 ? (
                         <div className="py-6 text-center text-[11px] font-bold uppercase tracking-widest text-[#888]">No tags found.</div>
                       ) : (
                         allTags.map(tag => (
-                          <div key={tag} className="flex items-center justify-between gap-3 py-2 text-[11px] font-sans lowercase">
+                          <div key={tag} className="peri-card mb-2 flex items-center justify-between gap-3 px-3 py-2 text-[11px] font-sans lowercase">
                             {renamingTag === tag ? (
                               <div className="flex min-w-0 flex-1 items-center gap-2">
                                 <span className="font-bold text-black">#</span>
@@ -4728,7 +4977,7 @@ export default function App() {
                                       setRenamingTagValue('');
                                     }
                                   }}
-                                  className="min-w-0 flex-1 border-[2px] border-black bg-white px-2 py-1 text-[11px] font-bold lowercase focus:outline-none"
+                                  className="peri-input min-w-0 flex-1 bg-[#fafafa] px-2 py-1 text-[11px] font-bold lowercase"
                                   autoFocus
                                 />
                               </div>
@@ -4781,12 +5030,12 @@ export default function App() {
                       )}
                     </div>
                   ) : (
-                    <div className="divide-y-[1px] divide-gray-200 max-h-[350px] overflow-y-auto pr-1">
+                    <div className="max-h-[350px] overflow-y-auto pr-1">
                       {allShares.length === 0 ? (
                         <div className="py-6 text-center text-[11px] font-bold uppercase tracking-widest text-[#888]">No lists found.</div>
                       ) : (
                         allShares.map(share => (
-                          <div key={share.id} className="flex items-center justify-between py-2 text-[11px] font-sans uppercase">
+                          <div key={share.id} className="peri-card mb-2 flex items-center justify-between px-3 py-2 text-[11px] font-sans uppercase">
                             <div className="flex flex-col min-w-0 pr-2">
                               <span className="font-bold text-black truncate">{share.title || share.id}</span>
                               <span className="text-[9px] text-[#888] mt-0.5">{share.itemCount} items ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {share.id}</span>
@@ -4817,10 +5066,10 @@ export default function App() {
                     </div>
                   )}
 
-                  <div className="flex justify-end border-t-[2px] border-black pt-3 mt-1">
+                  <div className="flex justify-end border-t border-[#d4d4d8] pt-3 mt-1">
                     <button
                       onClick={() => setAccountPanel(null)}
-                      className="bg-black text-white px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors border-[2px] border-black"
+                      className="peri-button px-4 py-1.5 text-[11px] uppercase"
                     >
                       Close
                     </button>
@@ -4846,10 +5095,16 @@ export default function App() {
                         Close
                       </button>
                       <button
-                        onClick={() => openCentralAuth()}
+                        onClick={() => openCentralAuth('register', { popup: true })}
+                        className="border-[2px] border-[#666] px-4 py-2 text-[11px] font-bold uppercase tracking-widest hover:border-black transition-colors"
+                      >
+                        Register
+                      </button>
+                      <button
+                        onClick={() => openCentralAuth('login', { popup: true })}
                         className="bg-black text-white px-4 py-2 text-[11px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors"
                       >
-                        Open Auth
+                        Sign In
                       </button>
                     </div>
                   </>
@@ -4955,7 +5210,7 @@ export default function App() {
                       onClick={handleAuthSubmit}
                       className="bg-black text-white px-4 py-2 text-[11px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors"
                     >
-                      {authMode === 'login' ? 'Sign In' : 'Create Account'}
+              {authMode === 'login' ? 'Sign In' : 'Create Account'}
                     </button>
                   </div>
                 </>
@@ -4981,7 +5236,7 @@ export default function App() {
                         Sign Out
                       </button>
                       <button
-                        onClick={() => openCentralAuth()}
+                        onClick={openRoleDashboard}
                         className="bg-black text-white px-4 py-2 text-[11px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors"
                       >
                         Open Account
@@ -5130,7 +5385,7 @@ export default function App() {
                         Close
                       </button>
                       <button
-                        onClick={() => openCentralAuth()}
+                        onClick={() => openRoleDashboard()}
                         className="bg-black text-white px-4 py-2 text-[11px] font-bold uppercase tracking-widest hover:bg-[#333] transition-colors"
                       >
                         Open Dashboard
@@ -5316,6 +5571,7 @@ export default function App() {
         </div>
       )}
     </div>
+    )
   );
 }
 

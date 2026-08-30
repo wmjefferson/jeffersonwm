@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Aphelion selected downloads and Auth logging checkpoint",
+  "content": "<p>Tonight's Aphelion/Auth pass turned selected-image download into a real signed-in workflow instead of a loose prototype edge case. The visible change is small on the page, but the structure behind it matters: selection, download, account state, and audit history now line up more cleanly.</p><p>What changed:</p><ul><li><strong>Selected-page controls:</strong> Aphelion's selected view now includes <code>Select all</code>, <code>Deselect all</code>, and <code>Download (n)</code>, so larger download sessions no longer require one-by-one checkbox cleanup.</li><li><strong>Detailed local manifest:</strong> every selected-image zip download now writes a local JSONL log entry inside Aphelion with the timestamp, account name, item count, and exact downloaded items.</li><li><strong>Auth activity bridge:</strong> Auth now records a higher-level <code>aphelion.selected_zip_downloaded</code> event, keeping the central timeline aware that a download happened without stuffing the full manifest into the shared notification surface.</li><li><strong>Smoother signed-in handoff:</strong> the popup sign-in gate was loosened so Auth admins can complete the Aphelion handoff and use signed-in public tools even before the owner-only admin/options surface is reopened to them.</li></ul><p>The key logic here is separation of layers: Auth should know that an important cross-app action happened, while Aphelion itself should keep the exact downloaded set. That gives us both accountability and clarity without overloading the central activity stream.</p>",
+  "url": "https://jeffersonwm.com/aphelion/",
+  "source": "manual",
+  "external_id": "aphelion-selected-download-auth-log-2026-08-25",
+  "created_at": "2026-08-25 21:15:00"
+}

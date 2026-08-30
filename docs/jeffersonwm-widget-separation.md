@@ -36,7 +36,7 @@ Do not consolidate this into one giant Lionship database. Use separate live/dev 
 - Lionship live/dev databases for linkstream data.
 - JeffersonWM widget live/dev databases for homepage widget and personalization data.
 
-The current `jeffers4_dates` and `jeffers4_fonts` databases should be copied into the new JeffersonWM widget database, verified, and then treated as legacy archives until it is safe to retire them.
+The original standalone dates and fonts databases were copied into the JeffersonWM widget database, verified, and then retired once the live code paths were removed.
 
 The old `jeffers4_jefferson` database was verified as a legacy links-only database. Current link data lives in the dedicated links database, so `jeffers4_jefferson` can be exported for safety and removed from cPanel when convenient.
 
@@ -49,14 +49,14 @@ The JeffersonWM homepage should eventually read widget data from a JeffersonWM-o
 - `/api/widget/fonts`
 - `/api/widget/preferences`
 
-Those routes can be served by a future JeffersonWM API/tunnel or by a fuller JeffersonWM app server. Lionship's existing widget routes should remain only as a migration source until JeffersonWM owns the feature.
+Those routes can be served by a future JeffersonWM API/tunnel or by a fuller JeffersonWM app server. Lionship's former widget routes were only temporary migration scaffolding before JeffersonWM took ownership of the feature.
 
 ## Migration Phases
 
 1. Freeze the public widget and remove Lionship from the JeffersonWM homepage while ownership is being moved.
 2. Create the JeffersonWM widget database and matching dev database.
-3. Copy `jeffers4_dates.events` into JeffersonWM widget special dates.
-4. Copy `jeffers4_fonts.fonts` into JeffersonWM widget fonts.
+3. Copy the legacy special-dates records into JeffersonWM widget special dates.
+4. Copy the legacy font records into JeffersonWM widget fonts.
 5. Add JeffersonWM widget API routes and point the homepage widget at `/api/widget`.
 6. Add central-auth-aware preferences for location, dates, and display options.
 7. Remove widget routes from Lionship after JeffersonWM is verified live.

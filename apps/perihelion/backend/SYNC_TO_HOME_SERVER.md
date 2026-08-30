@@ -73,6 +73,14 @@ Pillow is intended for metadata access and future preview/inspection work even i
 
 ## After patching the live script
 
+Set this explicitly in the live Perihelion environment:
+
+```powershell
+$env:PERIHELION_SERVER_LIBRARY_REQUIRE_AUTH='true'
+```
+
+This keeps server-backed folders, thumbnails, downloads, and direct file URLs locked behind login even if we later loosen the shell for local-folder experiments.
+
 1. restart the Perihelion API process on port `8010`
 2. ensure the `api-perihelion` tunnel is running
 3. test:

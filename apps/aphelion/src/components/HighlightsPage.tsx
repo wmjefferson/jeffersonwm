@@ -34,7 +34,28 @@ interface HighlightSummary {
   recentEvents: HighlightEvent[];
 }
 
-export function HighlightsPage({ apiBaseUrl }: { apiBaseUrl: string }) {
+type AuthStatus = {
+  user: null | {
+    username: string;
+    displayName: string | null;
+    isAdmin: boolean;
+    isOwner: boolean;
+  };
+};
+
+export function HighlightsPage({
+  apiBaseUrl,
+  authStatus,
+  authLoading,
+  onSignIn,
+  onSignOut,
+}: {
+  apiBaseUrl: string;
+  authStatus: AuthStatus | null;
+  authLoading: boolean;
+  onSignIn: () => void;
+  onSignOut: () => void;
+}) {
   const [summary, setSummary] = useState<HighlightSummary | null>(null);
   const [error, setError] = useState<string>('');
 
@@ -77,6 +98,17 @@ export function HighlightsPage({ apiBaseUrl }: { apiBaseUrl: string }) {
           <a href="/aphelion/" className="hover:text-[#de8bf7]">
             Back
           </a>
+          {!authLoading && (
+            authStatus?.user ? (
+              <button type="button" onClick={onSignOut} className="font-semibold hover:text-[#de8bf7]">
+                Sign Out
+              </button>
+            ) : (
+              <button type="button" onClick={onSignIn} className="font-semibold hover:text-[#de8bf7]">
+                Sign In
+              </button>
+            )
+          )}
         </div>
       </header>
 

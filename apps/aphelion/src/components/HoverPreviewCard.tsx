@@ -45,9 +45,9 @@ export const HoverPreviewCard: React.FC<HoverPreviewCardProps> = ({ hover, size 
     let cancelled = false;
     setImgError(false);
 
-    // Use thumb/original URL as an immediate fast fallback while processing
+    // Use thumb/original URL as an immediate fallback for each newly hovered image.
     const fastSrc = image.thumbUrl || image.imageUrl;
-    setPreviewSrc((prev) => prev || fastSrc);
+    setPreviewSrc(fastSrc);
 
     getBrowserThumbnailUrl(image.imageUrl, imgWidth)
       .then((thumbnailUrl) => {

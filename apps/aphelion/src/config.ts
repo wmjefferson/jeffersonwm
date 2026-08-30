@@ -1,0 +1,3 @@
+export const DEFAULT_TARGET_COUNT = 4506;
+
+export const TARGET_COUNT_PRESETS = [DEFAULT_TARGET_COUNT, 25000, 50000] as const;

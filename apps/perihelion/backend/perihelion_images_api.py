@@ -51,6 +51,10 @@ ALLOWED_ORIGINS = {
 SESSION_COOKIE_NAME = "perihelion_session"
 SESSION_DAYS = int(os.environ.get("PERIHELION_SESSION_DAYS", "30"))
 REQUIRE_AUTH = os.environ.get("PERIHELION_REQUIRE_AUTH", "true").lower() in {"1", "true", "yes", "on"}
+SERVER_LIBRARY_REQUIRE_AUTH = os.environ.get(
+    "PERIHELION_SERVER_LIBRARY_REQUIRE_AUTH",
+    "true" if REQUIRE_AUTH else "false",
+).lower() in {"1", "true", "yes", "on"}
 AUTH_PROVIDER = os.environ.get("PERIHELION_AUTH_PROVIDER", "local").strip().lower()
 CENTRAL_AUTH_BASE_URL = os.environ.get("PERIHELION_AUTH_BASE_URL", "https://auth.jeffersonwm.com").rstrip("/")
 AUTH_INTERNAL_LOG_TOKEN = os.environ.get("PERIHELION_AUTH_INTERNAL_LOG_TOKEN", "").strip()
@@ -132,6 +136,15 @@ def post_auth_history(action: str, target: str, user: dict | None = None, site: 
             response.read()
     except URLError as exc:
         print(f"Failed to post auth history for {action}: {exc}")
+
+
+def post_local_folder_opened_event() -> None:
+    post_auth_history(
+        "peri.local_folder_opened",
+        json.dumps({"kind": "local-folder-opened"}),
+        None,
+        "perihelion",
+    )
 
 
 def parse_iso(value: str) -> datetime:
@@ -1245,6 +1258,30 @@ def central_auth_enabled() -> bool:
     return AUTH_PROVIDER == "central"
 
 
+def request_host_name(handler: BaseHTTPRequestHandler) -> str:
+    host = (handler.headers.get("Host") or "").strip().lower()
+    if ":" in host:
+        host = host.split(":", 1)[0]
+    return host
+
+
+def central_auth_available() -> bool:
+    return bool(CENTRAL_AUTH_BASE_URL) and CENTRAL_AUTH_DB_PATH.is_file()
+
+
+def effective_central_auth_enabled(handler: BaseHTTPRequestHandler) -> bool:
+    if central_auth_enabled():
+        return True
+    host = request_host_name(handler)
+    if host.endswith("jeffersonwm.com") and central_auth_available():
+        return True
+    return False
+
+
+def effective_auth_provider(handler: BaseHTTPRequestHandler) -> str:
+    return "central" if effective_central_auth_enabled(handler) else "local"
+
+
 def central_auth_db_connect() -> sqlite3.Connection | None:
     if not CENTRAL_AUTH_DB_PATH.is_file():
         return None
@@ -1344,9 +1381,24 @@ def current_central_user_from_handler(handler: BaseHTTPRequestHandler) -> dict |
 
 
 def current_user_from_handler(handler: BaseHTTPRequestHandler) -> dict | None:
-    if central_auth_enabled():
-        return current_central_user_from_handler(handler)
+    if effective_central_auth_enabled(handler):
+        central_user = current_central_user_from_handler(handler)
+        if central_user:
+            return central_user
+        if central_auth_enabled():
+            return None
     return current_local_user_from_handler(handler)
+
+
+def count_users_for_handler(handler: BaseHTTPRequestHandler) -> int:
+    if effective_central_auth_enabled(handler):
+        conn = central_auth_db_connect()
+        if not conn:
+            return 0
+        with conn:
+            row = conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()
+            return int(row["count"]) if row else 0
+    return count_users()
 
 
 def create_session(user_id: int) -> tuple[str, datetime]:
@@ -1420,6 +1472,16 @@ def require_access(handler: BaseHTTPRequestHandler) -> dict | None:
     if user:
         return user
     handler._send_json({"error": "Authentication required"}, 401)
+    return None
+
+
+def require_server_library_access(handler: BaseHTTPRequestHandler) -> dict | None:
+    user = current_user_from_handler(handler)
+    if user:
+        return user
+    if SERVER_LIBRARY_REQUIRE_AUTH:
+        handler._send_json({"error": "Authentication required"}, 401)
+        return None
     return None
 
 
@@ -1710,6 +1772,16 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return user
 
+    def _require_owner(self) -> dict | None:
+        user = current_user_from_handler(self)
+        if not user:
+            self._send_json({"error": "Authentication required"}, 401)
+            return None
+        if not user.get("isOwner"):
+            self._send_json({"error": "Preferred admin access required"}, 403)
+            return None
+        return user
+
     def do_OPTIONS(self):
         self.send_response(204)
         send_cors_headers(self)
@@ -1723,19 +1795,21 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/auth/status":
                 user = current_user_from_handler(self)
+                central_mode = effective_central_auth_enabled(self)
                 self._send_json({
                     "ok": True,
                     "user": user,
                     "requireAuth": REQUIRE_AUTH,
-                    "hasUsers": count_users() > 0,
-                    "provider": AUTH_PROVIDER,
-                    "authBaseUrl": CENTRAL_AUTH_BASE_URL if central_auth_enabled() else None,
-                    "requiredAppMembership": REQUIRED_APP_MEMBERSHIP if central_auth_enabled() else None,
+                    "serverLibraryRequireAuth": SERVER_LIBRARY_REQUIRE_AUTH,
+                    "hasUsers": count_users_for_handler(self) > 0,
+                    "provider": effective_auth_provider(self),
+                    "authBaseUrl": CENTRAL_AUTH_BASE_URL if central_mode else None,
+                    "requiredAppMembership": REQUIRED_APP_MEMBERSHIP if central_mode else None,
                 })
                 return
 
             if path == "/api/history/downloads":
-                if central_auth_enabled():
+                if effective_central_auth_enabled(self):
                     self._send_json({"error": "Download history now lives in Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 user = current_user_from_handler(self)
@@ -1772,7 +1846,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/admin/users":
-                if central_auth_enabled():
+                if effective_central_auth_enabled(self):
                     self._send_json({"error": "Account administration now lives in Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 user = self._require_admin()
@@ -1791,8 +1865,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path in ("/api/list", "/api/images"):
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 rel = unquote(query.get("path", [""])[0])
                 tag_filter = (query.get("tag", [""])[0] or "").strip().lower()
@@ -1974,8 +2048,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path.startswith("/images/") or path.startswith("/media/"):
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 prefix = "/images/" if path.startswith("/images/") else "/media/"
                 rel = unquote(path[len(prefix):])
@@ -1987,8 +2061,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path.startswith("/thumbs/"):
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 rel = unquote(path[len("/thumbs/"):])
                 if not can_access_file_path(rel, user):
@@ -1999,8 +2073,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path.startswith("/api/image-meta/"):
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 rel = unquote(path[len("/api/image-meta/"):])
                 if not can_access_file_path(rel, user):
@@ -2014,8 +2088,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path.startswith("/api/image-details/"):
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 rel = unquote(path[len("/api/image-details/"):])
                 if not can_access_file_path(rel, user):
@@ -2037,23 +2111,23 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/tags":
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 tags, tag_counts = collect_tag_stats(user)
                 self._send_json({"ok": True, "tags": tags, "tagCounts": tag_counts})
                 return
 
             if path == "/api/shares":
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 self._send_json({"ok": True, "shares": list_share_records()})
                 return
 
             if path.startswith("/api/download/"):
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 rel = unquote(path[len("/api/download/"):])
                 if not can_access_file_path(rel, user):
@@ -2065,8 +2139,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path.startswith("/api/share/"):
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 share_id = unquote(path[len("/api/share/"):]).strip("/")
                 share = load_share_record(share_id)
@@ -2079,8 +2153,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/folder-cover":
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 folder_path = (query.get("path", [""])[0] or "").strip().strip("/")
                 if folder_path and not visible_rel_path(folder_path):
@@ -2215,7 +2289,7 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             if path == "/api/auth/register":
-                if central_auth_enabled():
+                if effective_central_auth_enabled(self):
                     self._send_json({"error": "Registration is handled by Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 payload = load_json_body(self)
@@ -2259,7 +2333,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/auth/login":
-                if central_auth_enabled():
+                if effective_central_auth_enabled(self):
                     self._send_json({"error": "Sign-in is handled by Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 payload = load_json_body(self)
@@ -2295,7 +2369,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/auth/logout":
-                if central_auth_enabled():
+                if effective_central_auth_enabled(self):
                     self._send_json({"error": "Sign-out is handled by Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 destroy_session(cookie_map(self).get(SESSION_COOKIE_NAME))
@@ -2303,7 +2377,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/auth/change-password":
-                if central_auth_enabled():
+                if effective_central_auth_enabled(self):
                     self._send_json({"error": "Password changes are handled by Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 user = current_user_from_handler(self)
@@ -2343,7 +2417,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/auth/change-username":
-                if central_auth_enabled():
+                if effective_central_auth_enabled(self):
                     self._send_json({"error": "Username changes are handled by Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 user = current_user_from_handler(self)
@@ -2397,7 +2471,7 @@ class Handler(BaseHTTPRequestHandler):
 
             match = re.fullmatch(r"/api/admin/users/(\d+)/(approve|block|delete)", path)
             if match:
-                if central_auth_enabled():
+                if effective_central_auth_enabled(self):
                     self._send_json({"error": "Account administration now lives in Multimillion.", "authBaseUrl": CENTRAL_AUTH_BASE_URL}, 409)
                     return
                 admin = self._require_admin()
@@ -2430,8 +2504,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path.startswith("/api/image-details/"):
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 rel = unquote(path[len("/api/image-details/"):])
                 target = safe_path(rel)
@@ -2449,8 +2523,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/bulk-tags":
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 payload = load_json_body(self)
                 images = payload.get("images") or []
@@ -2464,8 +2538,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/tags/rename":
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 payload = load_json_body(self)
                 old_tag = (payload.get("oldTag") or "").strip().lower()
@@ -2478,8 +2552,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/tags/delete":
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 payload = load_json_body(self)
                 tag = (payload.get("tag") or "").strip().lower()
@@ -2491,8 +2565,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/share":
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 ensure_shares_dir()
                 payload = load_json_body(self)
@@ -2523,8 +2597,8 @@ class Handler(BaseHTTPRequestHandler):
 
             match = re.fullmatch(r"/api/share/([^/]+)", path)
             if match:
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 share_id = unquote(match.group(1)).strip()
                 share = load_share_record(share_id)
@@ -2541,10 +2615,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "share": updated})
                 return
 
+            if path == "/api/local-folder-opened":
+                post_local_folder_opened_event()
+                self._send_json({"ok": True}, 201)
+                return
+
             match = re.fullmatch(r"/api/share/([^/]+)/delete", path)
             if match:
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 share_id = unquote(match.group(1)).strip()
                 share_file = SHARES_DIR / f"{share_id}.json"
@@ -2566,6 +2645,11 @@ class Handler(BaseHTTPRequestHandler):
                 visible_to_users = payload.get("visibleToUsers")
                 visible_to_admins = payload.get("visibleToAdmins")
                 account_access = payload.get("accountAccess")
+                permission_update_requested = (
+                    "visibleToUsers" in payload
+                    or "visibleToAdmins" in payload
+                    or "accountAccess" in payload
+                )
                 has_cover_update = "imagePath" in payload or "slot" in payload
                 image_path = (payload.get("imagePath") or "").strip() or None
                 slot = int(payload.get("slot") or 1)
@@ -2574,6 +2658,9 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if not visible_rel_path(folder_path) or not can_access_folder(folder_path, user):
                     self._send_json({"error": "Folder access denied"}, 403)
+                    return
+                if permission_update_requested and not user.get("isOwner"):
+                    self._send_json({"error": "Preferred admin access required to edit folder permissions"}, 403)
                     return
                 if has_cover_update:
                     if slot not in (1, 2):
@@ -2631,11 +2718,19 @@ class Handler(BaseHTTPRequestHandler):
                 visible_to_users = payload.get("visibleToUsers")
                 visible_to_admins = payload.get("visibleToAdmins")
                 account_access = payload.get("accountAccess")
+                permission_update_requested = (
+                    "visibleToUsers" in payload
+                    or "visibleToAdmins" in payload
+                    or "accountAccess" in payload
+                )
                 if not folder_path:
                     self._send_json({"error": "folderPath is required"}, 400)
                     return
                 if not visible_rel_path(folder_path) or not can_access_folder(folder_path, user):
                     self._send_json({"error": "Folder access denied"}, 403)
+                    return
+                if permission_update_requested and not user.get("isOwner"):
+                    self._send_json({"error": "Preferred admin access required to edit folder permissions"}, 403)
                     return
                 details = save_folder_detail_record(
                     folder_path,
@@ -2658,8 +2753,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/api/download":
-                user = require_access(self)
-                if REQUIRE_AUTH and not user:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 payload = load_json_body(self)
                 files = payload.get("files") or []

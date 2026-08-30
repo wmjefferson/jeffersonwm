@@ -31,7 +31,7 @@
       body {
         margin: 0;
         min-height: 100vh;
-        padding: 102px var(--frame) var(--frame);
+        padding: var(--frame);
         background: #fdfdfd;
         color: var(--ink);
         font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -56,11 +56,22 @@
       }
 
       .topline {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 1.5rem;
+        display: block;
         margin-bottom: 2rem;
+      }
+
+      .logo-wrapper {
+        margin-bottom: 0.75rem;
+      }
+
+      .logo-link {
+        display: inline-block;
+      }
+
+      .logo {
+        display: block;
+        width: 84px;
+        height: 84px;
       }
 
       h1 {
@@ -115,7 +126,7 @@
 
       .summary-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 1rem;
         margin: 0 0 1.5rem;
       }
@@ -146,8 +157,23 @@
 
       .control-row {
         display: flex;
+        align-items: center;
         justify-content: flex-end;
+        gap: 1rem;
+        flex-wrap: wrap;
         margin: 0 0 1.5rem;
+      }
+
+      .sort-label {
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .control-row > .search-wrap {
+        margin-left: auto;
       }
 
       .search-wrap {
@@ -171,11 +197,18 @@
 
       .panel-header {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 1rem;
         padding: 0.95rem 1rem;
         border-bottom: 1px solid var(--line);
+      }
+
+      .panel-head-main {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem 1rem;
       }
 
       .panel-title {
@@ -185,6 +218,74 @@
         font-weight: 700;
         letter-spacing: 0.13em;
         text-transform: uppercase;
+      }
+
+      .sort-inline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.9rem;
+      }
+
+      .sort-popout-wrap {
+        position: relative;
+      }
+
+      .sort-trigger {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        font-size: 0.94rem;
+        font-weight: 500;
+        line-height: 1.2;
+        padding: 0;
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 0.18rem;
+        cursor: pointer;
+      }
+
+      .sort-trigger:hover,
+      .sort-trigger[aria-expanded="true"] {
+        color: var(--blue);
+      }
+
+      .sort-popout {
+        position: absolute;
+        top: calc(100% + 0.55rem);
+        left: 0;
+        min-width: 180px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.96);
+        padding: 0.45rem 0;
+        box-shadow: 0 14px 32px rgba(17, 24, 39, 0.08);
+        z-index: 10;
+      }
+
+      .sort-popout[hidden] {
+        display: none;
+      }
+
+      .sort-option {
+        display: block;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 400;
+        line-height: 1.2;
+        text-align: left;
+        padding: 0.55rem 0.85rem;
+        cursor: pointer;
+      }
+
+      .sort-option:hover,
+      .sort-option.is-active {
+        background: rgba(224, 232, 255, 0.52);
+        color: var(--blue);
       }
 
       .panel-body {
@@ -304,19 +405,37 @@
         .summary-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-
-        .control-row {
-          grid-template-columns: 1fr;
-        }
       }
 
       @media (max-width: 760px) {
         body {
-          padding: 72px 24px 24px;
+          padding: 24px;
         }
 
-        .topline {
+        .control-row {
+          align-items: stretch;
+        }
+
+        .control-row > .search-wrap {
+          margin-left: 0;
+        }
+
+        .search-wrap {
+          width: 100%;
+        }
+
+        .panel-header {
           flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .panel-head-main {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .sort-inline {
+          gap: 0.7rem;
         }
 
         .bottom-links {
@@ -334,6 +453,11 @@
   <body>
     <main>
       <header class="topline">
+        <a class="logo-link" href="/" aria-label="Return to JeffersonWM home">
+          <div class="logo-wrapper">
+            <img src="/jeffersonwm/assets/favicon-DxRHekBS.svg" alt="" class="logo" />
+          </div>
+        </a>
         <h1>Project Activity</h1>
       </header>
 
@@ -346,18 +470,32 @@
         <div class="summary-card"><span>Visible Issues</span><strong id="total-issues">--</strong></div>
         <div class="summary-card"><span>Open</span><strong id="open-issues">--</strong></div>
         <div class="summary-card"><span>Closed</span><strong id="closed-issues">--</strong></div>
-        <div class="summary-card"><span>Public Repos</span><strong id="repo-count">--</strong></div>
       </section>
 
-      <section class="control-row" aria-label="Search issues">
+      <section class="control-row" aria-label="Issue controls">
         <div class="search-wrap">
-          <input id="search-input" class="search-input" type="search" placeholder="Search repo, title, or issue number" />
+          <input id="search-input" class="search-input" type="search" placeholder="Search title or issue number" />
         </div>
       </section>
 
       <section class="panel" aria-labelledby="timeline-title">
         <div class="panel-header">
-          <h2 class="panel-title" id="timeline-title">Issue Durations</h2>
+          <div class="panel-head-main">
+            <h2 class="panel-title" id="timeline-title">Issue Durations</h2>
+            <div class="sort-inline" aria-label="Timeline sorting">
+              <span class="sort-label">Sort</span>
+              <div class="sort-popout-wrap">
+                <button id="sort-field-trigger" class="sort-trigger" type="button" aria-haspopup="true" aria-expanded="false">Date Opened</button>
+                <div id="sort-field-popout" class="sort-popout" hidden>
+                  <button class="sort-option" type="button" data-sort-field="opened">Date Opened</button>
+                  <button class="sort-option" type="button" data-sort-field="closed">Date Closed</button>
+                  <button class="sort-option" type="button" data-sort-field="duration">Duration</button>
+                  <button class="sort-option" type="button" data-sort-field="alpha">Alphabetical</button>
+                </div>
+              </div>
+              <button id="sort-direction-trigger" class="sort-trigger" type="button">Descending</button>
+            </div>
+          </div>
         </div>
         <div class="panel-body timeline-wrap" id="timeline-wrap">
           <div class="empty-state">Loading timeline...</div>
@@ -408,11 +546,26 @@
       const state = {
         payload: null,
         search: "",
+        sortField: "opened",
+        sortDirection: "desc",
       };
 
       const searchInput = document.getElementById("search-input");
+      const sortFieldTrigger = document.getElementById("sort-field-trigger");
+      const sortDirectionTrigger = document.getElementById("sort-direction-trigger");
+      const sortFieldPopout = document.getElementById("sort-field-popout");
       const timelineWrap = document.getElementById("timeline-wrap");
       const metaLine = document.getElementById("meta-line");
+      const SORT_FIELD_LABELS = {
+        opened: "Date Opened",
+        closed: "Date Closed",
+        duration: "Duration",
+        alpha: "Alphabetical",
+      };
+      const SORT_DIRECTION_LABELS = {
+        desc: "Descending",
+        asc: "Ascending",
+      };
 
       function apiUrl(path) {
         return `${API_ORIGIN}${path}`;
@@ -478,8 +631,37 @@
         document.getElementById("total-issues").textContent = String(payload.summary.totalIssues);
         document.getElementById("open-issues").textContent = String(payload.summary.openIssues);
         document.getElementById("closed-issues").textContent = String(payload.summary.closedIssues);
-        document.getElementById("repo-count").textContent = String(payload.summary.repoCount);
         metaLine.textContent = `${payload.project.owner} / project ${payload.project.number} (${payload.project.title}) · updated ${new Date(payload.updatedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`;
+      }
+
+      function closeSortPopouts() {
+        sortFieldPopout.hidden = true;
+        sortFieldTrigger.setAttribute("aria-expanded", "false");
+      }
+
+      function syncSortControls() {
+        sortFieldTrigger.textContent = SORT_FIELD_LABELS[state.sortField] || "Date Opened";
+        sortDirectionTrigger.textContent = SORT_DIRECTION_LABELS[state.sortDirection] || "Descending";
+
+        document.querySelectorAll("[data-sort-field]").forEach((button) => {
+          button.classList.toggle("is-active", button.dataset.sortField === state.sortField);
+        });
+      }
+
+      function getIssueSortValue(issue, field) {
+        if (field === "alpha") {
+          return `${issue.repo}#${issue.number} ${issue.title}`.toLowerCase();
+        }
+
+        if (field === "duration") {
+          return Number(issue.durationDays || 0);
+        }
+
+        if (field === "closed") {
+          return issue.closedAt ? new Date(issue.closedAt).getTime() : (state.sortDirection === "asc" ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY);
+        }
+
+        return new Date(issue.createdAt).getTime();
       }
 
       function renderTimeline() {
@@ -502,11 +684,21 @@
         const span = Math.max(1, end - start);
 
         const ordered = [...issues].sort((left, right) => {
-          const repoOrder = left.repo.localeCompare(right.repo);
-          if (repoOrder !== 0) {
-            return repoOrder;
+          const leftValue = getIssueSortValue(left, state.sortField);
+          const rightValue = getIssueSortValue(right, state.sortField);
+
+          let comparison = 0;
+          if (typeof leftValue === "string" && typeof rightValue === "string") {
+            comparison = leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: "base" });
+          } else {
+            comparison = Number(leftValue) - Number(rightValue);
           }
-          return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+
+          if (comparison === 0) {
+            comparison = left.repo.localeCompare(right.repo) || left.number - right.number;
+          }
+
+          return state.sortDirection === "asc" ? comparison : comparison * -1;
         });
 
         const groups = [];
@@ -607,6 +799,7 @@
 
       function render() {
         renderSummary();
+        syncSortControls();
         renderTimeline();
       }
 
@@ -629,7 +822,44 @@
         render();
       });
 
+      sortFieldTrigger.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const nextOpen = sortFieldPopout.hidden;
+        closeSortPopouts();
+        sortFieldPopout.hidden = !nextOpen;
+        sortFieldTrigger.setAttribute("aria-expanded", String(nextOpen));
+      });
+
+      sortDirectionTrigger.addEventListener("click", (event) => {
+        event.stopPropagation();
+        state.sortDirection = state.sortDirection === "desc" ? "asc" : "desc";
+        syncSortControls();
+        renderTimeline();
+      });
+
+      document.querySelectorAll("[data-sort-field]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          state.sortField = event.currentTarget.dataset.sortField;
+          syncSortControls();
+          closeSortPopouts();
+          renderTimeline();
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".sort-popout-wrap")) {
+          closeSortPopouts();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeSortPopouts();
+        }
+      });
+
       loadProjectActivity();
+      syncSortControls();
       window.addEventListener("resize", () => {
         if (state.payload) {
           renderTimeline();

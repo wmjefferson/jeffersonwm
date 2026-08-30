@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Perihelion staging and video-readiness checkpoint",
+  "content": "<p>Tonight's Perihelion pass was a practical staging checkpoint with one clear forward-looking question attached: if FFmpeg is now available on both computers, what would it actually take to adapt video into the archive instead of just treating it like an unknown file type?</p><p>What changed:</p><ul><li><strong>Staging defaults opened up:</strong> the <code>Resize Dimensions</code> and <code>Compress File Size</code> controls now start expanded by default, so the most common export options are visible immediately instead of requiring two extra clicks on every visit.</li><li><strong>Left-rail summary added:</strong> staging now ends with a compact summary card showing whether the source is the server library or a local folder, how many items are selected, how many are missing, and the image/video/other-file breakdown. When file sizes are available, the same card also reports the total known size of the current selection.</li><li><strong>Video support was mapped honestly:</strong> Peri already recognizes video extensions and can serve those files through the protected backend routes, but thumbnail generation is still image-only and the frontend still treats video as a managed file rather than as previewable media.</li></ul><p>Why this matters: the staging screen is now easier to use during real export sessions, and the media review gives us a clean next step for video instead of folding it into the app blindly. The sensible path from here is browser playback first, FFmpeg poster thumbnails second, and optional video-specific compression/transcode tooling later.</p>",
+  "url": "https://jeffersonwm.com/perihelion/",
+  "source": "manual",
+  "external_id": "perihelion-staging-video-readiness-2026-08-28",
+  "created_at": "2026-08-28 21:45:00"
+}

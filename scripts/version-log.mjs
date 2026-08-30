@@ -4,6 +4,7 @@ const defaultActionsVersioningPath = '\\\\JEFFERSHIZZLE-D\\Dotcoms E\\other\\act
 const actionsVersioningPath = process.env.JEFFWM_VERSION_LOG || defaultActionsVersioningPath;
 
 const appAliases = new Map([
+  ['aph', 'aphelion'],
   ['aphelion', 'aphelion'],
   ['auth', 'auth / multimillion'],
   ['batt', 'battalion'],

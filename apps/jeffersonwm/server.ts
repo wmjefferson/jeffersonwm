@@ -1561,7 +1561,7 @@ app.get('/api/widget/schema', (_req, res) => {
       'user_widget_preferences',
       'user_widget_special_dates',
     ],
-    migrationSources: ['jeffers4_dates.events', 'jeffers4_fonts.fonts'],
+    migrationSources: ['legacy special-dates source retired', 'legacy fonts source retired'],
   });
 });
 

@@ -32,7 +32,7 @@ export interface GridZone {
 }
 
 export interface GridConfig {
-  targetCount: number; // Default: 9170
+  targetCount: number; // Default comes from src/config.ts
   cols: number;
   rows: number;
   totalBlocks: number;

@@ -108,7 +108,7 @@
     "publish:aphelion": "node scripts/publish-aphelion.mjs",
     "publish:battalion": "node scripts/publish-aso.mjs --app battalion",
     "publish:bullion": "node scripts/publish-aso.mjs --app bullion",
-    "publish:feed": "node scripts/publish-aso.mjs --app feed",
+    "publish:feed": "node scripts/publish-feed.mjs",
     "publish:perihelion": "node scripts/publish-perihelion.mjs",
     "publish:peri": "node scripts/publish-perihelion.mjs",
     "publish:perihelion:frontend": "node scripts/publish-aso.mjs --app perihelion",

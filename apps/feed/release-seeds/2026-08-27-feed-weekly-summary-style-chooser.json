@@ -1,0 +1,8 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Feed weekly summary style chooser",
+  "content": "<p>Feed's weekly TL;DR tool just moved from a single generated draft into a compare-and-choose editor, which is a much better fit for how these summaries are actually written.</p><p>What changed:</p><ul><li><strong>Six generated options at once:</strong> the weekly summary editor now shows all six summary styles side by side instead of one dropdown preview at a time.</li><li><strong>Direct comparison workflow:</strong> each option shows its label, purpose, and rendered preview so the strongest version can be chosen in context.</li><li><strong>One-click handoff into editing:</strong> <code>Use This Style</code> drops the selected generated version into the editable summary box, where it can still be refined before saving.</li><li><strong>Style registry preserved in shared files:</strong> the available summary types are now exposed from <code>styles.json</code>, keeping the system easier to tune later.</li></ul><p>The point of this pass was editorial control. Weekly summaries stay hand-selected and hand-written, but the generation step is now much better at helping compare voice, compression, and emphasis before publishing.</p>",
+  "url": "https://jeffersonwm.com/feed/",
+  "source": "manual",
+  "external_id": "feed-weekly-summary-style-chooser-2026-08-27"
+}

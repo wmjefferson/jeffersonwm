@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Perihelion server-library auth checkpoint",
+  "content": "<p>This Perihelion pass tightened the line between the page shell and the real hosted archive. The goal was to keep local-folder experiments flexible while making sure the server-backed library still behaves like a protected archive.</p><p>What changed:</p><ul><li><strong>Separate archive auth flag:</strong> the Python API now has an explicit <code>PERIHELION_SERVER_LIBRARY_REQUIRE_AUTH</code> setting so server-backed folders, thumbnails, shares, downloads, and direct file URLs can stay locked independently of the broader page shell.</li><li><strong>Frontend and backend aligned:</strong> Peri's auth-status response now exposes that server-library rule directly, and the React app uses it when deciding whether Server Library mode should be available.</li><li><strong>Deliberate no-split on Vite:</strong> we checked the current production bundle during this pass and intentionally left it unsplit because it still builds cleanly at a reasonable size with no chunk warning.</li></ul><p>Why this matters: Perihelion now has a cleaner future-facing model for two different jobs in one app. The browser-side local folder workflow can keep evolving without weakening the hosted archive, and the archive itself remains protected from manual asset requests by logged-out visitors.</p>",
+  "url": "https://jeffersonwm.com/perihelion/",
+  "source": "manual",
+  "external_id": "perihelion-server-library-auth-checkpoint-2026-08-27",
+  "created_at": "2026-08-27 21:20:00"
+}
