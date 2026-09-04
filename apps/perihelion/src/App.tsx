@@ -113,7 +113,9 @@ interface DownloadHistoryEntry {
   created_at: string;
 }
 
-type AccountPanel = 'auth' | 'user' | 'admin' | 'manage' | null;
+type ThemeMode = 'system' | 'light' | 'dark';
+type ManageTab = 'options' | 'tags' | 'lists';
+type AccountPanel = 'auth' | 'user' | 'admin' | 'manage' | 'options' | null;
 
 const isRenderable = (filename: string) => {
   const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
@@ -706,7 +708,7 @@ export default function App() {
   const [showTagsPopover, setShowTagsPopover] = useState(false);
   const [showListsPopover, setShowListsPopover] = useState(false);
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
-  const [manageTab, setManageTab] = useState<'tags' | 'lists'>('tags');
+  const [manageTab, setManageTab] = useState<ManageTab>('options');
   const [tagSearch, setTagSearch] = useState('');
   const [listSearch, setListSearch] = useState('');
   const [activeTagIndex, setActiveTagIndex] = useState(0);
@@ -756,7 +758,7 @@ export default function App() {
 
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [isDownloading, setIsDownloading] = useState(false);
-  const [view, setView] = useState<'gallery' | 'staging'>('gallery');
+  const [view, setView] = useState<'gallery' | 'staging' | 'options'>('gallery');
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -796,6 +798,49 @@ export default function App() {
     !isSharedView,
   );
   const holdInitialShellForAuth = Boolean(!isSharedView && authStatus === null && authLoading);
+
+  useEffect(() => {
+    if (!authLoading && !authStatus?.user && view === 'options') {
+      setView('gallery');
+    }
+  }, [authLoading, authStatus?.user, view]);
+
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    const saved = localStorage.getItem('perihelion_theme');
+    return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('perihelion_theme', themeMode);
+
+    const applyTheme = () => {
+      let effectiveTheme: 'light' | 'dark' = 'light';
+      if (!authStatus?.user) {
+        effectiveTheme = 'light';
+      } else if (themeMode === 'system') {
+        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      } else {
+        effectiveTheme = themeMode;
+      }
+
+      if (effectiveTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    applyTheme();
+
+    if (themeMode === 'system' && authStatus?.user) {
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+      const listener = () => applyTheme();
+      media.addEventListener('change', listener);
+      return () => media.removeEventListener('change', listener);
+    }
+  }, [themeMode, authStatus?.user]);
 
   const replaceLocalObjectUrls = (nextMap: LocalObjectUrlMap) => {
     Object.values(localObjectUrls).forEach(url => URL.revokeObjectURL(url));
@@ -1395,8 +1440,10 @@ export default function App() {
     setNewUsernameInput(authStatus?.user?.username || '');
   };
 
-  const loadAuthStatus = async () => {
-    setAuthLoading(true);
+  const loadAuthStatus = async (isInitial = false) => {
+    if (isInitial || !authStatus) {
+      setAuthLoading(true);
+    }
     try {
       const response = await fetch(`${API_PATH}/auth/status`, {
         credentials: 'include',
@@ -1517,7 +1564,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    loadAuthStatus();
+    loadAuthStatus(true);
     const refreshAuthStatus = () => {
       if (document.visibilityState === 'hidden') {
         return;
@@ -3040,12 +3087,21 @@ export default function App() {
     };
   }, [authOrigin]);
 
-  const accountPanelTitle = accountPanel === 'user'
-    ? 'Your Account'
-    : accountPanel === 'admin'
-      ? usesCentralAuth ? 'Dashboard' : 'Account Dashboard'
-      : accountPanel === 'manage'
-        ? 'Manage Tags & Lists'
+  const returnTo = `${window.location.origin}${window.location.pathname}${window.location.hash}`;
+  const authDashboardUrl = usesCentralAuth
+    ? (authBaseUrl || 'https://auth.jeffersonwm.com')
+    : 'https://auth.jeffersonwm.com/';
+  const jeffwmAccountUrl = 'https://jeffersonwm.com/account/';
+  const accountLink = authStatus?.user
+    ? (authStatus.user.isAdmin || authStatus.user.isOwner ? authDashboardUrl : jeffwmAccountUrl)
+    : null;
+
+  const accountPanelTitle = accountPanel === 'options' || accountPanel === 'manage'
+    ? 'Options'
+    : accountPanel === 'user'
+      ? 'Your Account'
+      : accountPanel === 'admin'
+        ? usesCentralAuth ? 'Dashboard' : 'Account Dashboard'
         : authStatus?.user
           ? 'Account'
           : 'Sign In';
@@ -3179,70 +3235,70 @@ export default function App() {
       ) : (
         <>
           <header className="page-banner page-banner--top">
-        <div className="page-banner__inner shell-frame">
-        <h1 className="font-sans text-[15px] font-bold">
-          <a href={getPerihelionAppUrl()} className="page-banner__brand">
-            Perihelion
-          </a>
-        </h1>
-        <div className="flex items-center gap-3 font-sans text-[11px] font-bold">
-          {authLoading ? (
-            <span className="text-[#888]">Checking Account...</span>
-          ) : authStatus?.user ? (
-            <>
-              {authStatus.user.isAdmin && (
-                <>
-                  <button
-                    onClick={() => {
-                      setAccountPanel('manage');
-                      setManageTab('tags');
-                    }}
-                    className="text-[#888] hover:text-black transition-colors"
-                  >
-                    Manage
-                  </button>
-                  <span className="text-[#DDD]">|</span>
-                </>
-              )}
-              <button
-                onClick={openRoleDashboard}
-                className="text-[#888] hover:text-black transition-colors"
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => {
-                  setAccountPanel('user');
-                  setAuthError('');
-                  setAuthMessage('');
+            <div className="page-banner__inner shell-frame">
+              <a
+                href={getPerihelionAppUrl()}
+                className="page-banner__brand"
+                onClick={e => {
+                  if (view === 'options') {
+                    e.preventDefault();
+                    setView('gallery');
+                  }
                 }}
-                className="text-black underline decoration-[1.5px] underline-offset-[3px]"
               >
-                {authStatus.user.username}
-              </button>
-              <button onClick={handleLogout} className="text-[#888] hover:text-black transition-colors">
-                Sign Out
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => {
-                if (usesCentralAuth) {
-                  openCentralAuth(authStatus?.hasUsers ? 'login' : 'register', { popup: true });
-                  return;
-                }
-                setAccountPanel('auth');
-                setAuthError('');
-                setAuthMessage('');
-              }}
-              className="text-[#888] hover:text-black transition-colors"
-            >
-              Sign In
-            </button>
-          )}
-        </div>
-        </div>
-      </header>
+                Perihelion
+              </a>
+              <nav className="page-banner__nav" aria-label="Perihelion pages">
+                {authLoading && !authStatus ? (
+                  <span className="page-banner__button opacity-60">Checking Account...</span>
+                ) : authStatus?.user ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView(v => (v === 'options' ? 'gallery' : 'options'));
+                        setManageTab('options');
+                      }}
+                      className="page-banner__button"
+                    >
+                      {view === 'options' ? 'Return' : 'Options'}
+                    </button>
+                    <a
+                      href={accountLink || jeffwmAccountUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="page-banner__link"
+                    >
+                      {authStatus.user.username}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="page-banner__button"
+                    >
+                      Sign Out
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (usesCentralAuth) {
+                        openCentralAuth(authStatus?.hasUsers ? 'login' : 'register', { popup: true });
+                        return;
+                      }
+                      setAccountPanel('auth');
+                      setAuthError('');
+                      setAuthMessage('');
+                    }}
+                    className="page-banner__button"
+                  >
+                    Sign In
+                  </button>
+                )}
+              </nav>
+            </div>
+          </header>
 
       {!showForcedAuthGate && (
         <div className="shell-gutters" aria-hidden="true">
@@ -3259,58 +3315,309 @@ export default function App() {
         className="hidden"
       />
 
-      <main className="peri-shell__body text-[15px]">
+      {view === 'options' ? (
+        <main className="peri-shell__body max-w-4xl pt-4 pb-20">
+          <div className="peri-options-page flex flex-col gap-6 font-sans">
+            {/* Page Header */}
+            <div className="peri-options-header flex items-center justify-between border-b border-[#d4d4d8] dark:border-[#333a35] pb-4">
+              <div>
+                <h1 className="peri-options-title font-title text-2xl font-bold uppercase tracking-tight text-[#202522] dark:text-[#fafafa]">
+                  Options
+                </h1>
+                <p className="peri-options-subtitle mt-1 text-xs font-sans text-[#6a716b] dark:text-[#9da69e]">
+                  Preferences, tag management, and shared lists
+                </p>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="peri-options-tabs flex items-center gap-6 border-b border-[#d4d4d8] dark:border-[#333a35] pb-2 text-xs font-bold uppercase tracking-wider">
+              <button
+                type="button"
+                onClick={() => setManageTab('options')}
+                className={`peri-options-tab font-bold ${
+                  manageTab === 'options'
+                    ? 'is-active text-[#202522] dark:text-[#fafafa] underline decoration-[2px] underline-offset-[6px]'
+                    : 'text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#de8bf7]'
+                }`}
+              >
+                Theme
+              </button>
+              <button
+                type="button"
+                onClick={() => setManageTab('tags')}
+                className={`peri-options-tab font-bold ${
+                  manageTab === 'tags'
+                    ? 'is-active text-[#202522] dark:text-[#fafafa] underline decoration-[2px] underline-offset-[6px]'
+                    : 'text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#de8bf7]'
+                }`}
+              >
+                Tags ({allTags.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setManageTab('lists')}
+                className={`peri-options-tab font-bold ${
+                  manageTab === 'lists'
+                    ? 'is-active text-[#202522] dark:text-[#fafafa] underline decoration-[2px] underline-offset-[6px]'
+                    : 'text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#de8bf7]'
+                }`}
+              >
+                Lists ({allShares.length})
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            {manageTab === 'options' ? (
+              <div className="flex flex-col gap-4 py-2">
+                <div>
+                  <h2 className="peri-options-section-title text-sm font-bold uppercase tracking-wider text-[#202522] dark:text-[#fafafa]">Page Appearance</h2>
+                  <p className="peri-options-section-desc text-xs text-[#6a716b] dark:text-[#9da69e] mt-0.5">Select your preferred color theme for Perihelion.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('light')}
+                    className={`peri-card flex flex-col items-start p-4 text-left cursor-pointer transition-all ${
+                      themeMode === 'light'
+                        ? 'is-selected ring-2 ring-[#202522] dark:ring-[#60a5fa] font-bold'
+                        : 'opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#202522] dark:text-[#fafafa]">Light Mode</span>
+                      {themeMode === 'light' && <Check size={16} className="text-[#202522] dark:text-[#60a5fa]" />}
+                    </div>
+                    <span className="text-xs text-[#6a716b] dark:text-[#9da69e]">Classic bright paper theme</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('dark')}
+                    className={`peri-card flex flex-col items-start p-4 text-left cursor-pointer transition-all ${
+                      themeMode === 'dark'
+                        ? 'is-selected ring-2 ring-[#202522] dark:ring-[#60a5fa] font-bold'
+                        : 'opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#202522] dark:text-[#fafafa]">Dark Mode</span>
+                      {themeMode === 'dark' && <Check size={16} className="text-[#202522] dark:text-[#60a5fa]" />}
+                    </div>
+                    <span className="text-xs text-[#6a716b] dark:text-[#9da69e]">Low-light dark theme</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('system')}
+                    className={`peri-card flex flex-col items-start p-4 text-left cursor-pointer transition-all ${
+                      themeMode === 'system'
+                        ? 'is-selected ring-2 ring-[#202522] dark:ring-[#60a5fa] font-bold'
+                        : 'opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#202522] dark:text-[#fafafa]">System</span>
+                      {themeMode === 'system' && <Check size={16} className="text-[#202522] dark:text-[#60a5fa]" />}
+                    </div>
+                    <span className="text-xs text-[#6a716b] dark:text-[#9da69e]">Follows your operating system preference</span>
+                  </button>
+                </div>
+              </div>
+            ) : manageTab === 'tags' ? (
+              <div className="flex flex-col gap-4 py-2">
+                <div>
+                  <h2 className="peri-options-section-title text-sm font-bold uppercase tracking-wider text-[#202522] dark:text-[#fafafa]">Tag Management</h2>
+                  <p className="peri-options-section-desc text-xs text-[#6a716b] dark:text-[#9da69e] mt-0.5">Rename or remove tags globally across all media files.</p>
+                </div>
+                <div className="flex flex-col gap-2 max-w-3xl">
+                  {allTags.length === 0 ? (
+                    <div className="py-12 text-center text-xs font-bold uppercase tracking-widest text-[#6a716b] dark:text-[#9da69e]">No tags found.</div>
+                  ) : (
+                    allTags.map(tag => (
+                      <div key={tag} className="peri-card flex items-center justify-between gap-4 px-4 py-3 text-xs font-sans lowercase">
+                        {renamingTag === tag ? (
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <span className="font-bold text-[#202522] dark:text-[#fafafa] text-sm">#</span>
+                            <input
+                              type="text"
+                              value={renamingTagValue}
+                              onChange={event => setRenamingTagValue(event.target.value.toLowerCase())}
+                              onKeyDown={event => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault();
+                                  handleRenameTag(tag);
+                                }
+                                if (event.key === 'Escape') {
+                                  setRenamingTag(null);
+                                  setRenamingTagValue('');
+                                }
+                              }}
+                              className="peri-input min-w-0 flex-1 px-3 py-1.5 text-xs font-bold lowercase"
+                              autoFocus
+                            />
+                          </div>
+                        ) : (
+                          <span className="min-w-0 flex-1 truncate font-bold text-[#202522] dark:text-[#fafafa] text-sm">
+                            #{tag} <span className="text-xs uppercase text-[#6a716b] dark:text-[#9da69e] font-normal">({tagCounts[tag] || 0} items)</span>
+                          </span>
+                        )}
+                        <div className="flex shrink-0 items-center gap-3 font-sans text-xs font-bold uppercase">
+                          {renamingTag === tag ? (
+                            <>
+                              <button
+                                onClick={() => handleRenameTag(tag)}
+                                className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-[#202522] dark:hover:text-[#fafafa] cursor-pointer"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setRenamingTag(null);
+                                  setRenamingTagValue('');
+                                }}
+                                className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-[#202522] dark:hover:text-[#fafafa] cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setRenamingTag(tag);
+                                  setRenamingTagValue(tag);
+                                }}
+                                className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-[#202522] dark:hover:text-[#fafafa] cursor-pointer"
+                              >
+                                Rename
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTag(tag)}
+                                className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4 py-2">
+                <div>
+                  <h2 className="peri-options-section-title text-sm font-bold uppercase tracking-wider text-[#202522] dark:text-[#fafafa]">Shared Lists</h2>
+                  <p className="peri-options-section-desc text-xs text-[#6a716b] dark:text-[#9da69e] mt-0.5">Manage curated lists and shared collections.</p>
+                </div>
+                <div className="flex flex-col gap-2 max-w-3xl">
+                  {allShares.length === 0 ? (
+                    <div className="py-12 text-center text-xs font-bold uppercase tracking-widest text-[#6a716b] dark:text-[#9da69e]">No lists found.</div>
+                  ) : (
+                    allShares.map(share => (
+                      <div key={share.id} className="peri-card flex items-center justify-between gap-4 px-4 py-3 text-xs font-sans">
+                        <div className="flex flex-col min-w-0 pr-2">
+                          <span className="font-bold text-[#202522] dark:text-[#fafafa] truncate text-sm uppercase">{share.title || share.id}</span>
+                          <span className="text-[10px] text-[#6a716b] dark:text-[#9da69e] mt-0.5 uppercase tracking-wide">{share.itemCount} items • ID: {share.id}</span>
+                        </div>
+                        <div className="flex items-center gap-4 uppercase font-sans text-xs font-bold shrink-0">
+                          <button
+                            onClick={() => window.open(buildSharePageUrl(share.id), '_blank')}
+                            className="text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#fafafa] transition-colors cursor-pointer"
+                          >
+                            Open
+                          </button>
+                          <button
+                            onClick={() => handleRenameList(share.id, share.title)}
+                            className="text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#fafafa] transition-colors cursor-pointer"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            onClick={() => handleDeleteList(share.id, share.title)}
+                            className="text-[#6a716b] dark:text-[#9da69e] hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      ) : (
+        <main className="peri-shell__body text-[15px]">
         {!showForcedAuthGate && <h2 className="peri-section-title mb-4">{includeOtherFiles ? 'Files' : 'Images'}</h2>}
         {!showPrivateGate && (
           <div className="peri-toolbar-divider mb-6 flex flex-col gap-1 pb-2">
             <div className="flex w-full items-center gap-x-5 overflow-x-auto pb-1">
               <div className="peri-toolbar-group shrink-0">
-                <span className={`peri-control-label ${isMaxMode ? 'text-[#c8c8c8]' : 'text-[#6a716b]'}`}>Image Height</span>
-                {ROW_HEIGHT_OPTIONS.map(num => (
-                  <button
-                    onClick={() => {
-                      setRowHeight(num);
-                      if (isMaxMode) setLimit(10);
-                    }}
-                    className={
-                      isMaxMode
-                        ? 'text-[#c8c8c8] hover:text-[#888]'
-                        : rowHeight === num
+                <span className={`peri-control-label ${isMaxMode ? 'text-[#c8c8c8] dark:text-[#52525b]' : 'text-[#6a716b] dark:text-[#9da69e]'}`}>Image Height</span>
+                {ROW_HEIGHT_OPTIONS.map(num => {
+                  const isSelected = isMaxMode ? num === 100 : rowHeight === num;
+                  const isGhosted = isMaxMode ? num !== 100 : num === 100;
+                  return (
+                    <button
+                      onClick={() => {
+                        if (num === 100) {
+                          setRowHeight(MAX_MODE_ROW_HEIGHT);
+                          setLimit(MAX_MODE_LIMIT);
+                        } else {
+                          setRowHeight(num);
+                          if (isMaxMode) setLimit(10);
+                        }
+                        setPage(1);
+                      }}
+                      className={
+                        isSelected
                           ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
-                          : 'text-[#888] hover:text-black'
-                    }
-                    key={num}
-                  >
-                    {num}px
-                  </button>
-                ))}
+                          : isGhosted
+                            ? 'text-[#c8c8c8] dark:text-[#52525b] hover:text-[#888] dark:hover:text-[#a1a1aa]'
+                            : 'text-[#888] dark:text-[#a1a1aa] hover:text-black dark:hover:text-white'
+                      }
+                      key={num}
+                    >
+                      {num}px
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="peri-toolbar-group shrink-0">
-                <span className={`peri-control-label ${isMaxMode ? 'text-[#c8c8c8]' : 'text-[#6a716b]'}`}>Items per page</span>
+                <span className={`peri-control-label ${isMaxMode ? 'text-[#c8c8c8] dark:text-[#52525b]' : 'text-[#6a716b] dark:text-[#9da69e]'}`}>Items per page</span>
                 {Array.from(new Set([...LIMIT_OPTIONS, ...(isMaxMode ? [MAX_MODE_LIMIT] : []), limit]))
                   .sort((a, b) => a - b)
-                  .map(num => (
-                  <button
-                    onClick={() => {
-                      if (isMaxMode && num !== MAX_MODE_LIMIT) setRowHeight(250);
-                      setLimit(num);
-                      setPage(1);
-                    }}
-                    className={
-                      isMaxMode
-                        ? num === MAX_MODE_LIMIT
-                          ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
-                          : 'text-[#c8c8c8] hover:text-[#888]'
-                        : limit === num
+                  .map(num => {
+                    const isSelected = isMaxMode ? num === 100 : limit === num;
+                    const isGhosted = isMaxMode ? num !== 100 : num === 100;
+                    return (
+                      <button
+                        onClick={() => {
+                          if (num === 100) {
+                            setRowHeight(MAX_MODE_ROW_HEIGHT);
+                            setLimit(MAX_MODE_LIMIT);
+                          } else {
+                            setLimit(num);
+                            if (isMaxMode) setRowHeight(250);
+                          }
+                          setPage(1);
+                        }}
+                        className={
+                          isSelected
                             ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]'
-                          : 'text-[#888] hover:text-black'
-                    }
-                    key={num}
-                  >
-                    {num}
-                  </button>
-                ))}
+                            : isGhosted
+                              ? 'text-[#c8c8c8] dark:text-[#52525b] hover:text-[#888] dark:hover:text-[#a1a1aa]'
+                              : 'text-[#888] dark:text-[#a1a1aa] hover:text-black dark:hover:text-white'
+                        }
+                        key={num}
+                      >
+                        {num}
+                      </button>
+                    );
+                  })}
                 <button
                   type="button"
                   onClick={() => {
@@ -3323,7 +3630,7 @@ export default function App() {
                     }
                     setPage(1);
                   }}
-                  className={`peri-control-label ml-3 ${isMaxMode ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] hover:text-black'}`}
+                  className={`peri-control-label ml-3 ${isMaxMode ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] dark:text-[#9da69e] hover:text-black dark:hover:text-white'}`}
                 >
                   MAX MODE
                 </button>
@@ -3333,7 +3640,7 @@ export default function App() {
                     setIncludeOtherFiles(prev => !prev);
                     setPage(1);
                   }}
-                  className={`peri-control-label ml-5 ${includeOtherFiles ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] hover:text-black'}`}
+                  className={`peri-control-label ml-5 ${includeOtherFiles ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] dark:text-[#9da69e] hover:text-black dark:hover:text-white'}`}
                 >
                   INCLUDE OTHER FILES
                 </button>
@@ -3691,18 +3998,18 @@ export default function App() {
                 </>
               )}
             </div>
-            <div className="font-sans text-xs font-bold uppercase tracking-wider text-[#666] flex flex-wrap items-center gap-y-1">
+            <div className="font-sans text-xs font-bold uppercase tracking-wider text-[#6a716b] dark:text-[#9da69e] flex flex-wrap items-center gap-y-1">
               {selectedTag ? (
                 <>
                   <span>Global Tag:&nbsp;</span>
-                  <span className="text-black">#{selectedTag}</span>
-                  <span className="ml-2 text-[#8A5A44]">across all folders</span>
+                  <span className="text-[#202522] dark:text-[#fafafa]">#{selectedTag}</span>
+                  <span className="ml-2 text-[#8A5A44] dark:text-[#d97706]">across all folders</span>
                   <button
                     onClick={() => {
                       setSelectedTag('');
                       setPage(1);
                     }}
-                    className="ml-2 text-[#888] transition-colors hover:text-black"
+                    className="ml-2 text-[#888] dark:text-[#9da69e] transition-colors hover:text-black dark:hover:text-white"
                   >
                     Clear Tag
                   </button>
@@ -3710,10 +4017,10 @@ export default function App() {
               ) : (
                 <>
                   <span>Location:&nbsp;</span>
-                  <span className="text-black">
+                  <span className="text-[#202522] dark:text-[#fafafa]">
                     <button
                       onClick={() => navigateToPath('')}
-                      className="hover:text-[#F27D26] transition-colors"
+                      className="text-[#202522] dark:text-[#fafafa] hover:text-[#de8bf7] dark:hover:text-[#de8bf7] transition-colors font-bold"
                     >
                       root
                     </button>
@@ -3722,10 +4029,10 @@ export default function App() {
                         const path = parts.slice(0, index + 1).join('/');
                         return (
                           <React.Fragment key={path}>
-                            <span className="text-[#666]"> / </span>
+                            <span className="text-[#6a716b] dark:text-[#9da69e]"> / </span>
                             <button
                               onClick={() => navigateToPath(path)}
-                              className="hover:text-[#F27D26] transition-colors"
+                              className="text-[#202522] dark:text-[#fafafa] hover:text-[#de8bf7] dark:hover:text-[#de8bf7] transition-colors font-bold"
                             >
                               {part}
                             </button>
@@ -4115,44 +4422,46 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <div className="p-3 bg-white shrink-0" style={{ width: '0', minWidth: '100%' }}>
-                  <p
-                    className={`peri-card-name truncate w-full block ${selectedImages.has(entry.path) ? 'text-black' : 'text-[#6a716b]'}`}
-                    title={entry.path}
-                  >
-                    {entry.name}
-                  </p>
-                  {isGlobalSearch && entry.folderPath ? (
-                    <button
-                      type="button"
-                      onClick={event => {
-                        event.stopPropagation();
-                        navigateToPath(entry.folderPath === 'root' ? '' : entry.folderPath);
-                      }}
-                       className="peri-path-link mt-1 block max-w-full truncate text-left transition-colors hover:text-black hover:underline"
-                      title={`Open folder: ${entry.folderPath}`}
+                {!isMaxMode && (
+                  <div className="p-3 bg-white dark:bg-[#191d1a] shrink-0" style={{ width: '0', minWidth: '100%' }}>
+                    <p
+                      className={`peri-card-name truncate w-full block ${selectedImages.has(entry.path) ? 'text-black dark:text-white' : 'text-[#6a716b] dark:text-[#9da69e]'}`}
+                      title={entry.path}
                     >
-                      {entry.folderPath}
-                    </button>
-                  ) : selectedTag && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedTag('');
-                        navigateToPath(dirname(entry.path) === 'root' ? '' : dirname(entry.path));
-                      }}
-                       className="peri-path-link mt-1 block max-w-full truncate text-left transition-colors hover:text-black hover:underline"
-                      title={`Open folder: ${dirname(entry.path)}`}
-                    >
-                      {dirname(entry.path)}
-                    </button>
-                  )}
-                  {entry.isMissing && (
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#8A5A44]">
-                      Missing from library
+                      {entry.name}
                     </p>
-                  )}
-                </div>
+                    {isGlobalSearch && entry.folderPath ? (
+                      <button
+                        type="button"
+                        onClick={event => {
+                          event.stopPropagation();
+                          navigateToPath(entry.folderPath === 'root' ? '' : entry.folderPath);
+                        }}
+                         className="peri-path-link mt-1 block max-w-full truncate text-left transition-colors hover:text-black dark:hover:text-white hover:underline text-[#888] dark:text-[#9da69e]"
+                        title={`Open folder: ${entry.folderPath}`}
+                      >
+                        {entry.folderPath}
+                      </button>
+                    ) : selectedTag && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTag('');
+                          navigateToPath(dirname(entry.path) === 'root' ? '' : dirname(entry.path));
+                        }}
+                         className="peri-path-link mt-1 block max-w-full truncate text-left transition-colors hover:text-black dark:hover:text-white hover:underline text-[#888] dark:text-[#9da69e]"
+                        title={`Open folder: ${dirname(entry.path)}`}
+                      >
+                        {dirname(entry.path)}
+                      </button>
+                    )}
+                    {entry.isMissing && (
+                      <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[#8A5A44] dark:text-[#f87171]">
+                        Missing from library
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               )})()
             ))}
@@ -4169,42 +4478,43 @@ export default function App() {
           </div>
         )}
       </main>
+      )}
 
       {localFolderConsentOpen && (
         <div
-          className="fixed inset-0 z-[66] bg-[#F0F0F0]/92 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[66] bg-[#F0F0F0]/92 dark:bg-[#111214]/94 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setLocalFolderConsentOpen(false)}
         >
           <div
             className="peri-card w-full max-w-[640px]"
             onClick={event => event.stopPropagation()}
           >
-            <div className="peri-card__divider flex items-center justify-between px-4 py-3 bg-[#fafafa]">
+            <div className="peri-card__divider flex items-center justify-between px-4 py-3 bg-[#fafafa] dark:bg-[#202522]">
               <div className="min-w-0">
-                <h2 className="font-sans text-sm font-bold uppercase tracking-wide">Open Local Folder</h2>
-                <p className="mt-0.5 text-[10px] font-sans text-[#888] truncate">Temporary local session access</p>
+                <h2 className="font-sans text-sm font-bold uppercase tracking-wide text-[#202522] dark:text-[#fafafa]">Open Local Folder</h2>
+                <p className="mt-0.5 text-[10px] font-sans text-[#888] dark:text-[#9da69e] truncate">Temporary local session access</p>
               </div>
               <button
                 onClick={() => setLocalFolderConsentOpen(false)}
-                className="text-[#888] hover:text-black transition-colors"
+                className="text-[#888] dark:text-[#9da69e] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
               >
                 <X size={18} strokeWidth={2.25} />
               </button>
             </div>
 
-            <div className="p-4 flex flex-col gap-3 font-sans text-sm leading-relaxed text-black">
+            <div className="p-4 flex flex-col gap-3 font-sans text-sm leading-relaxed text-[#202522] dark:text-[#ededed]">
               <p>
                 Perihelion will make its own working copies from the folder you choose. This information is deleted when the page is refreshed or closed.
               </p>
-              <p className="text-[13px] text-[#666]">
+              <p className="text-[13px] text-[#666] dark:text-[#9da69e]">
                 I only keep a timestamp, no folder or identifying details.
               </p>
-              <p className="text-[13px] text-[#666]">
+              <p className="text-[13px] text-[#666] dark:text-[#9da69e]">
                 I won't do anything until you confirm below.
               </p>
             </div>
 
-            <div className="peri-card__divider flex items-center justify-end gap-3 px-4 py-3 bg-[#fafafa]">
+            <div className="peri-card__divider flex items-center justify-end gap-3 px-4 py-3 bg-[#fafafa] dark:bg-[#202522]">
               <button
                 type="button"
                 onClick={() => setLocalFolderConsentOpen(false)}
@@ -4410,7 +4720,14 @@ export default function App() {
       {(showForcedAuthGate || !showPrivateGate) && (
         <footer className="page-banner page-banner--bottom">
           <div className="page-banner__inner shell-frame">
-          {showForcedAuthGate ? (
+          {view === 'options' ? (
+            <>
+              <div />
+              <p className="page-banner__copyright">
+                &copy; 2026 Jefferson Williams. All rights reserved.
+              </p>
+            </>
+          ) : showForcedAuthGate ? (
             <>
               <div />
               <div className="font-sans text-[13px] font-bold uppercase tracking-wider whitespace-nowrap text-[#202522]">
@@ -4934,148 +5251,6 @@ export default function App() {
             <div className="p-4 flex flex-col gap-4">
               {authMessage && <div className="text-xs font-bold uppercase tracking-widest text-[#476E66]">{authMessage}</div>}
               {authError && <div className="text-xs font-bold uppercase tracking-widest text-[#8A5A44]">{authError}</div>}
-
-              {accountPanel === 'manage' && (
-                <div className="flex flex-col gap-4 font-sans">
-                  {/* Tab toggles */}
-                  <div className="flex items-center gap-3 border-b border-[#d4d4d8] pb-2 text-[11px] font-bold uppercase tracking-wider">
-                    <button
-                      onClick={() => setManageTab('tags')}
-                      className={manageTab === 'tags' ? 'text-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#888] hover:text-black'}
-                    >
-                      Tags ({allTags.length})
-                    </button>
-                    <button
-                      onClick={() => setManageTab('lists')}
-                      className={manageTab === 'lists' ? 'text-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#888] hover:text-black'}
-                    >
-                      Lists ({allShares.length})
-                    </button>
-                  </div>
-
-                  {manageTab === 'tags' ? (
-                    <div className="max-h-[350px] overflow-y-auto pr-1">
-                      {allTags.length === 0 ? (
-                        <div className="py-6 text-center text-[11px] font-bold uppercase tracking-widest text-[#888]">No tags found.</div>
-                      ) : (
-                        allTags.map(tag => (
-                          <div key={tag} className="peri-card mb-2 flex items-center justify-between gap-3 px-3 py-2 text-[11px] font-sans lowercase">
-                            {renamingTag === tag ? (
-                              <div className="flex min-w-0 flex-1 items-center gap-2">
-                                <span className="font-bold text-black">#</span>
-                                <input
-                                  type="text"
-                                  value={renamingTagValue}
-                                  onChange={event => setRenamingTagValue(event.target.value.toLowerCase())}
-                                  onKeyDown={event => {
-                                    if (event.key === 'Enter') {
-                                      event.preventDefault();
-                                      handleRenameTag(tag);
-                                    }
-                                    if (event.key === 'Escape') {
-                                      setRenamingTag(null);
-                                      setRenamingTagValue('');
-                                    }
-                                  }}
-                                  className="peri-input min-w-0 flex-1 bg-[#fafafa] px-2 py-1 text-[11px] font-bold lowercase"
-                                  autoFocus
-                                />
-                              </div>
-                            ) : (
-                              <span className="min-w-0 flex-1 truncate font-bold text-black">
-                                #{tag} <span className="text-[9px] uppercase text-[#888]">({tagCounts[tag] || 0} items)</span>
-                              </span>
-                            )}
-                            <div className="flex shrink-0 items-center gap-3 font-sans text-[10px] font-bold uppercase">
-                              {renamingTag === tag ? (
-                                <>
-                                  <button
-                                    onClick={() => handleRenameTag(tag)}
-                                    className="text-gray-500 transition-colors hover:text-black"
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setRenamingTag(null);
-                                      setRenamingTagValue('');
-                                    }}
-                                    className="text-gray-500 transition-colors hover:text-black"
-                                  >
-                                    Cancel
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      setRenamingTag(tag);
-                                      setRenamingTagValue(tag);
-                                    }}
-                                    className="text-gray-500 transition-colors hover:text-black"
-                                  >
-                                    Rename
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTag(tag)}
-                                    className="text-gray-500 transition-colors hover:text-red-600"
-                                  >
-                                    Delete
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  ) : (
-                    <div className="max-h-[350px] overflow-y-auto pr-1">
-                      {allShares.length === 0 ? (
-                        <div className="py-6 text-center text-[11px] font-bold uppercase tracking-widest text-[#888]">No lists found.</div>
-                      ) : (
-                        allShares.map(share => (
-                          <div key={share.id} className="peri-card mb-2 flex items-center justify-between px-3 py-2 text-[11px] font-sans uppercase">
-                            <div className="flex flex-col min-w-0 pr-2">
-                              <span className="font-bold text-black truncate">{share.title || share.id}</span>
-                              <span className="text-[9px] text-[#888] mt-0.5">{share.itemCount} items ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {share.id}</span>
-                            </div>
-                            <div className="flex items-center gap-3 uppercase font-sans text-[10px] font-bold shrink-0">
-                              <button
-                                onClick={() => window.open(buildSharePageUrl(share.id), '_blank')}
-                                className="text-gray-500 hover:text-black transition-colors"
-                              >
-                                Open
-                              </button>
-                              <button
-                                onClick={() => handleRenameList(share.id, share.title)}
-                                className="text-gray-500 hover:text-black transition-colors"
-                              >
-                                Rename
-                              </button>
-                              <button
-                                onClick={() => handleDeleteList(share.id, share.title)}
-                                className="text-gray-500 hover:text-red-600 transition-colors"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex justify-end border-t border-[#d4d4d8] pt-3 mt-1">
-                    <button
-                      onClick={() => setAccountPanel(null)}
-                      className="peri-button px-4 py-1.5 text-[11px] uppercase"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {accountPanel === 'auth' && (
                 usesCentralAuth ? (

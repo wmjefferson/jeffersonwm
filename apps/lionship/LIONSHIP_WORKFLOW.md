@@ -53,6 +53,22 @@ Build output:
 
 - `dist`
 
+## Publish
+
+Publish command:
+
+```powershell
+npm run publish
+```
+
+That command now:
+
+- builds and uploads the static frontend to ASO
+- syncs the backend/source files to `\\JEFFERSHIZZLE-D\Dotcoms E\lionship\backend`
+- preserves the live backend `.env` and `node_modules`
+
+After backend code changes, restart the Lionship API task so the running server picks up the synced files.
+
 ## Production Model
 
 Recommended live setup:
@@ -72,7 +88,6 @@ Recommended live setup:
 
 1. Edit code locally.
 2. Test with `npm run dev`.
-3. Build with `npm run build`.
-4. Commit and push from the repo.
-5. Deploy the frontend build.
-6. If backend code changed, update the live backend copy and restart it.
+3. Publish with `npm run publish`.
+4. If backend code changed, restart the Lionship API task.
+5. Commit and push from the repo.

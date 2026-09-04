@@ -6,15 +6,15 @@
   "scripts": {
     "dev": "tsx server.ts",
     "start": "node server.ts",
-    "build": "vite build",
-    "publish": "node ..\\..\\scripts\\publish-perihelion.mjs",
+    "build": "vite build && node ..\\..\\scripts\\finish-stamp.mjs --label \"build\"",
+    "publish": "node ..\\..\\scripts\\publish-perihelion.mjs && node ..\\..\\scripts\\finish-stamp.mjs --label \"publish\"",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist && node ..\\..\\scripts\\finish-stamp.mjs --label \"clean\"",
     "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",
-    "version:patch": "npm version patch --no-git-tag-version",
-    "version:minor": "npm version minor --no-git-tag-version",
-    "version:major": "npm version major --no-git-tag-version",
-    "lint": "tsc --noEmit"
+    "version:patch": "npm version patch --no-git-tag-version && node ..\\..\\scripts\\finish-stamp.mjs --label \"version:patch\"",
+    "version:minor": "npm version minor --no-git-tag-version && node ..\\..\\scripts\\finish-stamp.mjs --label \"version:minor\"",
+    "version:major": "npm version major --no-git-tag-version && node ..\\..\\scripts\\finish-stamp.mjs --label \"version:major\"",
+    "lint": "tsc --noEmit && node ..\\..\\scripts\\finish-stamp.mjs --label \"lint\""
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

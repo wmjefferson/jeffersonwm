@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Lionship auth API and layout checkpoint",
+  "content": "<p>Lionship got a practical integration pass today: less spectacle, more reliability. The immediate problem was that the live app could fall back into offline mode even though the API itself was reachable. Tracing the request showed the real issue was credentialed CORS: the frontend was correctly sending account-aware requests, but the API response was missing <code>Access-Control-Allow-Credentials: true</code>.</p><p>What changed:</p><ul><li><strong>Credentialed API requests:</strong> Lionship's Express CORS setup now allows credentialed requests from the live JeffersonWM origin, so authenticated browser calls no longer collapse into offline mode.</li><li><strong>Safer publish path:</strong> Lionship now has its own publish helper that uploads the static frontend and syncs backend/source files to the server share while preserving live <code>.env</code> and <code>node_modules</code>.</li><li><strong>Layout polish:</strong> the Lionship list/card views were tightened so search alignment, footer text, card spacing, and compact list rows feel closer to the shared Auth/Peri/Billionaire visual language.</li></ul><p>The important lesson was deployment shape. Publishing only the frontend was not enough once Lionship became an Auth-aware API app. The new command reduces the chance of fixing code locally while leaving the live server quietly running the old copy.</p>",
+  "url": "https://jeffersonwm.com/lionship/",
+  "source": "manual",
+  "external_id": "lionship-auth-api-layout-checkpoint-2026-09-03",
+  "created_at": "2026-09-03 17:35:00"
+}

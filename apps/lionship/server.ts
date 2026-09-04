@@ -42,6 +42,7 @@ async function startServer() {
 
   app.use(express.json());
   app.use(cors({
+    credentials: true,
     origin(origin, callback) {
       if (!origin) {
         callback(null, true);
@@ -298,7 +299,7 @@ async function startServer() {
         place-items: center;
         background: #f3f4f6;
         color: #111827;
-        font: 16px/1.5 "Segoe UI", Arial, sans-serif;
+        font: 16px/1.5 "Inter Tight", "Segoe UI", Arial, sans-serif;
       }
       main {
         width: min(560px, calc(100vw - 48px));

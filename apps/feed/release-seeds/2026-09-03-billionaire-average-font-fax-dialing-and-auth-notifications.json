@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Billionaire dynamic sizing, fax dialing characters, and Auth notifications",
+  "content": "<p>Billionaire and Auth received a focused pass refining input typography, dialing flexibility, full-screen stage responsiveness, and central notification stream integration.</p><p>What changed:</p><ul><li><strong>Average Typeface & Dynamic Full-Page Sizing:</strong> Switched Billionaire's numeral input to Google Webfonts' \"Average\" serif. Sized the container to cleanly fill the viewport between the top and bottom banners, with dynamic font scaling where single digits fill the screen and 10+ digits smoothly scale to span the container width without clipping or wrapping. Updated the ghost placeholder to a single-digit scale <code>+1</code>.</li><li><strong>Functional Fax/Phone Dialing Character Set:</strong> Programmed input sanitization and backend validation to support only functional dialing control characters (<code>0-9</code>, <code>+</code>, <code>,</code> for 2s pause, <code>*</code> and <code>#</code> for DTMF tones, <code>w</code>/<code>W</code> for wait-for-dial-tone, and <code>;</code> for hard wait) while preserving control sequences during formatting.</li><li><strong>Centralized Auth Notifications Integration:</strong> Wired all Billionaire submission and review lifecycle events (<code>billionaire.phone_submitted</code>, <code>billionaire.phone_associated</code>, <code>billionaire.phone_saved</code>, <code>billionaire.phone_archived</code>, <code>billionaire.phone_processed</code>, and <code>billionaire.phone_deleted</code>) into Auth's notifications and activity dashboard, including actual formatted phone numbers in the notification targets and brief descriptions.</li></ul>",
+  "url": "https://jeffersonwm.com/billionaire/",
+  "source": "manual",
+  "external_id": "billionaire-dynamic-sizing-fax-dialing-auth-notifications-2026-09-03",
+  "created_at": "2026-09-03 21:30:00"
+}

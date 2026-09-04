@@ -7,6 +7,8 @@ const appAliases = new Map([
   ['aph', 'aphelion'],
   ['aphelion', 'aphelion'],
   ['auth', 'auth / multimillion'],
+  ['bill', 'billionaire'],
+  ['billionaire', 'billionaire'],
   ['batt', 'battalion'],
   ['battalion', 'battalion'],
   ['bullion', 'bullion'],

@@ -13,6 +13,8 @@ const actionsVersioningPath = '\\\\JEFFERSHIZZLE-D\\Dotcoms E\\other\\actions\\v
 const versionsManifestPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'versions.json');
 const appRegistry = {
   aphelion: monorepoApp('Aphelion', 'aphelion'),
+  billionaire: monorepoApp('Billionaire', 'billionaire'),
+  bill: monorepoApp('Billionaire', 'billionaire'),
   battalion: monorepoApp('Battalion', 'battalion'),
   batt: monorepoApp('Battalion', 'battalion'),
   bullion: monorepoApp('Bullion', 'bullion'),

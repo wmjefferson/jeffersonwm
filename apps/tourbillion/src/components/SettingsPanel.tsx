@@ -18,6 +18,7 @@ interface SettingsPanelProps {
   resetTimeMin: number;
   resetTimeMax: number;
   resetTilesLimit: number;
+  disableScreensaver: boolean;
   onClose: () => void;
   onModeChange: (mode: Mode) => void;
   onSpeedChange: (value: number) => void;
@@ -32,6 +33,7 @@ interface SettingsPanelProps {
   onResetTimeMinChange: (value: number) => void;
   onResetTimeMaxChange: (value: number) => void;
   onResetTilesLimitChange: (value: number) => void;
+  onDisableScreensaverToggle: () => void;
   onTriggerFadeReset: () => void;
   onResetDefaults: () => void;
 }
@@ -60,6 +62,7 @@ export function SettingsPanel({
   resetTimeMin,
   resetTimeMax,
   resetTilesLimit,
+  disableScreensaver,
   onClose,
   onModeChange,
   onSpeedChange,
@@ -74,6 +77,7 @@ export function SettingsPanel({
   onResetTimeMinChange,
   onResetTimeMaxChange,
   onResetTilesLimitChange,
+  onDisableScreensaverToggle,
   onTriggerFadeReset,
   onResetDefaults,
 }: SettingsPanelProps) {
@@ -340,15 +344,29 @@ export function SettingsPanel({
           </div>
         )}
 
-        <div className="space-y-3 pt-4">
+        <div className="space-y-4 pt-4 border-t border-white/5">
           <div className="flex items-center justify-between text-xs font-mono text-zinc-500 uppercase tracking-widest">
             <span>Spectral Shift</span>
             <button
               onClick={onMulticolorToggle}
               className={`w-10 h-5 rounded-full transition-all relative ${multicolor ? 'bg-indigo-500' : 'bg-zinc-800'}`}
+              id="multicolor-toggle-btn"
             >
               <div
                 className={`absolute top-1 w-3 h-3 rounded-full transition-all ${multicolor ? 'left-6 bg-white' : 'left-1 bg-zinc-500'}`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between text-xs font-mono text-zinc-500 uppercase tracking-widest">
+            <span>Disable Screensaver</span>
+            <button
+              onClick={onDisableScreensaverToggle}
+              className={`w-10 h-5 rounded-full transition-all relative ${disableScreensaver ? 'bg-indigo-500' : 'bg-zinc-800'}`}
+              id="disable-screensaver-toggle-btn"
+            >
+              <div
+                className={`absolute top-1 w-3 h-3 rounded-full transition-all ${disableScreensaver ? 'left-6 bg-white' : 'left-1 bg-zinc-500'}`}
               />
             </button>
           </div>

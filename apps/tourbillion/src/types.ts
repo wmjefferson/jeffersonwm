@@ -4,6 +4,24 @@ export type ResetTrigger = 'time' | 'tiles' | 'none';
 
 export type QualityLevel = 'low' | 'medium' | 'high';
 
+export interface TourbillionSettings {
+  mode: Mode;
+  speed: number;
+  count: number;
+  size: number;
+  trail: number;
+  multicolor: boolean;
+  quality: QualityLevel;
+  disableScreensaver: boolean;
+  trainSpeed: number;
+  trackPlacementInterval: number;
+  straightness: number;
+  resetTrigger: ResetTrigger;
+  resetTimeMin: number;
+  resetTimeMax: number;
+  resetTilesLimit: number;
+}
+
 export interface Star {
   x: number;
   y: number;

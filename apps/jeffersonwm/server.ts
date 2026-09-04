@@ -27,6 +27,7 @@ const projectActivityService = createProjectActivityService(process.env);
 type WidgetFont = {
   id?: number;
   name: string;
+  round?: number;
   weight?: number;
   probability?: number;
 };
@@ -1379,7 +1380,7 @@ async function getFonts() {
   }
 
   const [rows] = await pool.query(
-    `SELECT id, name, weight, probability
+    `SELECT id, name, round, weight, probability
      FROM widget_fonts
      ORDER BY name ASC`,
   );

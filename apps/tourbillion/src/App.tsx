@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { AnimatePresence } from 'motion/react';
 
-import { DEFAULT_SETTINGS, TRAIN_QUALITY_PROFILES } from './constants';
+import { INITIAL_SETTINGS, TRAIN_QUALITY_PROFILES } from './constants';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SettingsTrigger } from './components/SettingsTrigger';
 import { StatusOverlay } from './components/StatusOverlay';
@@ -32,29 +32,116 @@ import type {
   Star,
   TrainSim,
   Toaster,
+  TourbillionSettings,
 } from './types';
+
+const SETTINGS_STORAGE_KEY = 'tourbillion:settings';
+
+function loadStoredSettings(): TourbillionSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...INITIAL_SETTINGS, ...parsed };
+    }
+  } catch {
+    // Ignore error
+  }
+  return INITIAL_SETTINGS;
+}
+
+function saveStoredSettings(settings: TourbillionSettings) {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Ignore error
+  }
+}
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D>(null);
-  const [mode, setMode] = useState<Mode>('starfield');
-  
-  // Settings state
-  const [speed, setSpeed] = useState(DEFAULT_SETTINGS.speed);
-  const [count, setCount] = useState(DEFAULT_SETTINGS.count);
-  const [size, setSize] = useState(DEFAULT_SETTINGS.size);
-  const [trail, setTrail] = useState(DEFAULT_SETTINGS.trail);
-  const [multicolor, setMulticolor] = useState(DEFAULT_SETTINGS.multicolor);
-  const [quality, setQuality] = useState<QualityLevel>(DEFAULT_SETTINGS.quality);
-  
-  // Custom train state options
-  const [trainSpeed, setTrainSpeed] = useState(1.5);
-  const [trackPlacementInterval, setTrackPlacementInterval] = useState(300); // ms delay between tiles
-  const [straightness, setStraightness] = useState(0.5); // 0 = max turns, 1 = max straight
-  const [resetTrigger, setResetTrigger] = useState<ResetTrigger>('time');
-  const [resetTimeMin, setResetTimeMin] = useState(30);
-  const [resetTimeMax, setResetTimeMax] = useState(60);
-  const [resetTilesLimit, setResetTilesLimit] = useState(200);
+  const broadcastRef = useRef<BroadcastChannel | null>(null);
+
+  // Settings state with multi-window synchronization
+  const [settings, setSettings] = useState<TourbillionSettings>(() => loadStoredSettings());
+  const {
+    mode,
+    speed,
+    count,
+    size,
+    trail,
+    multicolor,
+    quality,
+    disableScreensaver,
+    trainSpeed,
+    trackPlacementInterval,
+    straightness,
+    resetTrigger,
+    resetTimeMin,
+    resetTimeMax,
+    resetTilesLimit,
+  } = settings;
+
+  const updateSetting = useCallback(<K extends keyof TourbillionSettings>(key: K, value: TourbillionSettings[K]) => {
+    setSettings((prev) => {
+      const next = { ...prev, [key]: value };
+      saveStoredSettings(next);
+      try {
+        broadcastRef.current?.postMessage({ type: 'UPDATE_SETTINGS', settings: next });
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
+  }, []);
+
+  const updateSettings = useCallback((partial: Partial<TourbillionSettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...partial };
+      saveStoredSettings(next);
+      try {
+        broadcastRef.current?.postMessage({ type: 'UPDATE_SETTINGS', settings: next });
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel('tourbillion_sync_channel');
+      broadcastRef.current = channel;
+
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'UPDATE_SETTINGS' && event.data?.settings) {
+          setSettings(event.data.settings);
+        }
+      };
+    }
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === SETTINGS_STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setSettings((prev) => ({ ...prev, ...parsed }));
+        } catch {
+          // Ignore
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      if (broadcastRef.current) {
+        broadcastRef.current.close();
+        broadcastRef.current = null;
+      }
+    };
+  }, []);
 
   // Screen-fading state
   const [isFading, setIsFading] = useState(false);
@@ -72,6 +159,7 @@ export default function App() {
   const animationRef = useRef<number>(null);
   const idleTimerRef = useRef<number>(null);
   const hueRef = useRef(0);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   // Sync state to refs for use in the animation loop
   const trainSpeedRef = useRef(trainSpeed);
@@ -94,6 +182,69 @@ export default function App() {
   useEffect(() => { resetTimeMaxRef.current = resetTimeMax; }, [resetTimeMax]);
   useEffect(() => { resetTilesLimitRef.current = resetTilesLimit; }, [resetTilesLimit]);
   useEffect(() => { qualityRef.current = quality; }, [quality]);
+  const showSettingsRef = useRef(showSettings);
+  useEffect(() => {
+    showSettingsRef.current = showSettings;
+  }, [showSettings]);
+
+  useEffect(() => {
+    const handleActivity = () => {
+      setIsMouseIdle(false);
+      if (idleTimerRef.current) {
+        window.clearTimeout(idleTimerRef.current);
+      }
+      idleTimerRef.current = window.setTimeout(() => {
+        if (!showSettingsRef.current) {
+          setIsMouseIdle(true);
+        }
+      }, 5000);
+    };
+
+    const handleMouseLeave = (e: globalThis.MouseEvent) => {
+      if (e.relatedTarget !== null) {
+        return;
+      }
+      if (idleTimerRef.current) {
+        window.clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+      if (!showSettingsRef.current) {
+        setIsMouseIdle(true);
+      }
+    };
+
+    const handleBlur = () => {
+      if (idleTimerRef.current) {
+        window.clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+      if (!showSettingsRef.current) {
+        setIsMouseIdle(true);
+      }
+    };
+
+    handleActivity();
+
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('mouseenter', handleActivity);
+    window.addEventListener('focus', handleActivity);
+    document.addEventListener('mouseleave', handleMouseLeave);
+    window.addEventListener('mouseout', handleMouseLeave);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('mouseenter', handleActivity);
+      window.removeEventListener('focus', handleActivity);
+      document.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('mouseout', handleMouseLeave);
+      window.removeEventListener('blur', handleBlur);
+      if (idleTimerRef.current) {
+        window.clearTimeout(idleTimerRef.current);
+      }
+    };
+  }, [showSettings]);
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
@@ -102,6 +253,58 @@ export default function App() {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+      } catch {
+        // Ignore wake lock release error
+      }
+      wakeLockRef.current = null;
+    }
+  }, []);
+
+  const requestWakeLock = useCallback(async () => {
+    if ('wakeLock' in navigator && isFullscreen && disableScreensaver && document.visibilityState === 'visible') {
+      try {
+        if (!wakeLockRef.current || wakeLockRef.current.released) {
+          wakeLockRef.current = await navigator.wakeLock.request('screen');
+          wakeLockRef.current.addEventListener('release', () => {
+            wakeLockRef.current = null;
+          });
+        }
+      } catch {
+        // Wake lock request failed or rejected
+      }
+    } else {
+      await releaseWakeLock();
+    }
+  }, [isFullscreen, disableScreensaver, releaseWakeLock]);
+
+  useEffect(() => {
+    if (isFullscreen && disableScreensaver) {
+      requestWakeLock().catch(() => undefined);
+    } else {
+      releaseWakeLock().catch(() => undefined);
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (isFullscreen && disableScreensaver) {
+          requestWakeLock().catch(() => undefined);
+        }
+      } else {
+        releaseWakeLock().catch(() => undefined);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseWakeLock().catch(() => undefined);
+    };
+  }, [isFullscreen, disableScreensaver, requestWakeLock, releaseWakeLock]);
 
   const initStars = useCallback(() => {
     const { innerWidth: width, innerHeight: height } = window;
@@ -321,42 +524,25 @@ export default function App() {
       animationRef.current = requestAnimationFrame(update);
     };
 
-    const handleGlobalMouseMove = () => {
-      setIsMouseIdle(false);
-      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = window.setTimeout(() => {
-        if (!showSettings) setIsMouseIdle(true);
-      }, 3000);
-    };
-
     window.addEventListener('resize', handleResize);
-    window.addEventListener('mousemove', handleGlobalMouseMove);
     
     handleResize(); 
     animationRef.current = requestAnimationFrame(update);
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
     };
-  }, [mode, speed, size, trail, multicolor, initStars, initMatrix, initMystify, initPipes, initToasters, initTrains, showSettings]);
+  }, [mode, speed, size, trail, multicolor, initStars, initMatrix, initMystify, initPipes, initToasters, initTrains]);
 
   const resetToDefaults = () => {
-    setSpeed(DEFAULT_SETTINGS.speed);
-    setCount(DEFAULT_SETTINGS.count);
-    setSize(DEFAULT_SETTINGS.size);
-    setTrail(DEFAULT_SETTINGS.trail);
-    setMulticolor(DEFAULT_SETTINGS.multicolor);
-    setQuality(DEFAULT_SETTINGS.quality);
-    setTrainSpeed(1.5);
-    setTrackPlacementInterval(300);
-    setStraightness(0.5);
-    setResetTrigger('time');
-    setResetTimeMin(30);
-    setResetTimeMax(60);
-    setResetTilesLimit(200);
+    setSettings(INITIAL_SETTINGS);
+    saveStoredSettings(INITIAL_SETTINGS);
+    try {
+      broadcastRef.current?.postMessage({ type: 'UPDATE_SETTINGS', settings: INITIAL_SETTINGS });
+    } catch {
+      // Ignore
+    }
   };
 
   const toggleFullscreen = async () => {
@@ -422,25 +608,28 @@ export default function App() {
           resetTimeMin={resetTimeMin}
           resetTimeMax={resetTimeMax}
           resetTilesLimit={resetTilesLimit}
+          disableScreensaver={disableScreensaver}
           onClose={() => setShowSettings(false)}
-          onModeChange={setMode}
-          onSpeedChange={setSpeed}
-          onSizeChange={setSize}
-          onTrailChange={setTrail}
-          onMulticolorToggle={() => setMulticolor(!multicolor)}
-          onQualityChange={setQuality}
-          onTrainSpeedChange={setTrainSpeed}
-          onTrackPlacementIntervalChange={setTrackPlacementInterval}
-          onStraightnessChange={setStraightness}
-          onResetTriggerChange={setResetTrigger}
+          onModeChange={(m) => updateSetting('mode', m)}
+          onSpeedChange={(s) => updateSetting('speed', s)}
+          onSizeChange={(sz) => updateSetting('size', sz)}
+          onTrailChange={(t) => updateSetting('trail', t)}
+          onMulticolorToggle={() => updateSetting('multicolor', !multicolor)}
+          onQualityChange={(q) => updateSetting('quality', q)}
+          onTrainSpeedChange={(ts) => updateSetting('trainSpeed', ts)}
+          onTrackPlacementIntervalChange={(tpi) => updateSetting('trackPlacementInterval', tpi)}
+          onStraightnessChange={(st) => updateSetting('straightness', st)}
+          onResetTriggerChange={(rt) => updateSetting('resetTrigger', rt)}
           onResetTimeMinChange={(value) => {
-            setResetTimeMin(value);
             if (value > resetTimeMax) {
-              setResetTimeMax(value);
+              updateSettings({ resetTimeMin: value, resetTimeMax: value });
+            } else {
+              updateSetting('resetTimeMin', value);
             }
           }}
-          onResetTimeMaxChange={setResetTimeMax}
-          onResetTilesLimitChange={setResetTilesLimit}
+          onResetTimeMaxChange={(value) => updateSetting('resetTimeMax', value)}
+          onResetTilesLimitChange={(value) => updateSetting('resetTilesLimit', value)}
+          onDisableScreensaverToggle={() => updateSetting('disableScreensaver', !disableScreensaver)}
           onTriggerFadeReset={triggerFadeReset}
           onResetDefaults={resetToDefaults}
         />

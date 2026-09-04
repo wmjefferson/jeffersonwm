@@ -1,4 +1,4 @@
-import type { QualityLevel } from './types';
+import type { QualityLevel, TourbillionSettings } from './types';
 
 export const DEFAULT_SETTINGS = {
   speed: 1.5,
@@ -6,7 +6,26 @@ export const DEFAULT_SETTINGS = {
   size: 3,
   trail: 0.3,
   multicolor: false,
-  quality: 'medium',
+  quality: 'medium' as QualityLevel,
+  disableScreensaver: true,
+};
+
+export const INITIAL_SETTINGS: TourbillionSettings = {
+  mode: 'starfield',
+  speed: DEFAULT_SETTINGS.speed,
+  count: DEFAULT_SETTINGS.count,
+  size: DEFAULT_SETTINGS.size,
+  trail: DEFAULT_SETTINGS.trail,
+  multicolor: DEFAULT_SETTINGS.multicolor,
+  quality: DEFAULT_SETTINGS.quality,
+  disableScreensaver: DEFAULT_SETTINGS.disableScreensaver,
+  trainSpeed: 1.5,
+  trackPlacementInterval: 300,
+  straightness: 0.5,
+  resetTrigger: 'time',
+  resetTimeMin: 30,
+  resetTimeMax: 60,
+  resetTilesLimit: 200,
 };
 
 export const TRAIN_QUALITY_PROFILES = {

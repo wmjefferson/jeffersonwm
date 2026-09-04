@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 
 interface LinkItem {
   id: string;
@@ -46,7 +46,7 @@ const App: React.FC = () => {
   const [links, setLinks] = useState<LinkItem[]>(INITIAL_LINKS);
   const [dbStatus, setDbStatus] = useState<'LOADING' | 'CONNECTED' | 'DISCONNECTED'>('LOADING');
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authNotice, setAuthNotice] = useState('');
+  const authPopupPollRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,45 +106,31 @@ const App: React.FC = () => {
     };
   }, [authUser?.isOwner]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadAuthStatus = async () => {
-      try {
-        const authResponse = await fetch(authUrl('/api/auth/status'), {
-          credentials: 'include',
-        });
-        if (!authResponse.ok) {
-          if (!cancelled) {
-            setAuthUser(null);
-            setAuthNotice('Public view active. Sign in to add or edit your own links.');
-          }
-          return;
-        }
-
-        const authData = await authResponse.json() as AuthStatusResponse;
-        const user = authData.user;
-        if (cancelled) return;
-
-        if (user && user.isApproved && !user.isBlocked && !user.isDeleted) {
-          setAuthUser(user);
-          setAuthNotice(`Signed in as ${user.displayName || user.username}.`);
-        } else {
-          setAuthUser(null);
-          setAuthNotice('Public view active. Sign in to add or edit your own links.');
-        }
-      } catch {
-        if (!cancelled) {
-          setAuthUser(null);
-          setAuthNotice('Public view active. Sign in to add or edit your own links.');
-        }
+  const loadAuthStatus = useCallback(async () => {
+    try {
+      const authResponse = await fetch(authUrl('/api/auth/status'), {
+        credentials: 'include',
+      });
+      if (!authResponse.ok) {
+        setAuthUser(null);
+        return;
       }
-    };
 
-    void loadAuthStatus();
-    return () => {
-      cancelled = true;
-    };
+      const authData = await authResponse.json() as AuthStatusResponse;
+      const user = authData.user;
+      if (user && user.isApproved && !user.isBlocked && !user.isDeleted) {
+        setAuthUser(user);
+      } else {
+        setAuthUser(null);
+      }
+    } catch {
+      setAuthUser(null);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadAuthStatus();
+  }, [loadAuthStatus]);
 
   useEffect(() => {
     // We only rely on localStorage as a permanent backup when disconnected format
@@ -153,7 +139,7 @@ const App: React.FC = () => {
     }
   }, [links, dbStatus]);
 
-  const [currentView, setCurrentView] = useState<'MAIN' | 'EDIT' | 'ABOUT'>('MAIN');
+  const [currentView, setCurrentView] = useState<'MAIN' | 'EDIT'>('MAIN');
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState({ title: '', url: '', acronym: '', category: '', tags: '', scope: 'global' as 'global' | 'personal' });
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -618,6 +604,62 @@ const App: React.FC = () => {
   };
   const returnTo = `${window.location.origin}${window.location.pathname}${window.location.hash}`;
   const authSigninLink = `${AUTH_BASE_URL}/home?returnTo=${encodeURIComponent(returnTo)}`;
+  const accountLink = authUser
+    ? (authUser.isOwner || authUser.isAdmin ? `${AUTH_BASE_URL}/home?returnTo=${encodeURIComponent(returnTo)}` : 'https://jeffersonwm.com/account/')
+    : authSigninLink;
+
+  const stopAuthPopupPoll = useCallback(() => {
+    if (authPopupPollRef.current !== null) {
+      window.clearInterval(authPopupPollRef.current);
+      authPopupPollRef.current = null;
+    }
+  }, []);
+
+  const startAuthPopupPoll = useCallback((popup: Window | null) => {
+    stopAuthPopupPoll();
+    authPopupPollRef.current = window.setInterval(() => {
+      if (!popup || popup.closed) {
+        stopAuthPopupPoll();
+        void loadAuthStatus();
+      }
+    }, 700);
+  }, [loadAuthStatus, stopAuthPopupPoll]);
+
+  const openCentralAuth = useCallback(() => {
+    const url = new URL(`${AUTH_BASE_URL}/home`);
+    url.searchParams.set('returnTo', returnTo);
+    url.searchParams.set('popup', '1');
+
+    const width = 440;
+    const height = 620;
+    const left = Math.max(0, Math.round(window.screenX + ((window.outerWidth - width) / 2)));
+    const top = Math.max(0, Math.round(window.screenY + ((window.outerHeight - height) / 2)));
+    const popup = window.open(
+      url.toString(),
+      'lionship-auth-popup',
+      `width=${width},height=${height},left=${left},top=${top}`,
+    );
+
+    if (!popup) {
+      window.location.assign(url.toString());
+      return;
+    }
+
+    popup.focus();
+    startAuthPopupPoll(popup);
+  }, [returnTo, startAuthPopupPoll]);
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      await fetch(authUrl('/api/auth/logout'), {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } finally {
+      setAuthUser(null);
+      window.location.assign('/lionship/');
+    }
+  }, []);
 
   useEffect(() => {
     if (!canEditLinks && currentView === 'EDIT') {
@@ -625,75 +667,83 @@ const App: React.FC = () => {
     }
   }, [canEditLinks, currentView]);
 
+  useEffect(() => {
+    return () => stopAuthPopupPoll();
+  }, [stopAuthPopupPoll]);
+
   return (
-    <div className="min-h-screen pb-[72px] bg-[#F0F0F0]">
+    <div className="min-h-screen bg-[#fafafa] pt-[36px] pb-[36px] text-[#202522]">
+      <div className="shell-gutters" aria-hidden="true">
+        <div className="shell-gutter shell-gutter--left" />
+        <div className="shell-gutter shell-gutter--right" />
+      </div>
       {dbStatus === 'DISCONNECTED' && (
-        <div className="bg-yellow-100 text-yellow-800 text-xs px-4 py-2 border-b border-yellow-300 font-heading tracking-widest uppercase text-center font-bold">
+        <div className="border-b border-[#e5e5e5] bg-[#fff8db]/90 px-4 py-2 text-center font-heading text-[10px] font-bold uppercase tracking-widest text-[#8a6a1d]">
           Running in offline mode. The live API could not be reached, so this device is using local storage.
         </div>
       )}
-      {authNotice ? (
-        <div className="bg-white/80 text-zinc-600 text-[10px] px-4 py-2 border-b border-zinc-200 font-heading tracking-widest uppercase text-center font-bold">
-          {authNotice}
-        </div>
-      ) : null}
-      <header className="top-banner">
-        <div className="px-[36px] w-full flex items-center justify-between">
+      <header className="page-banner page-banner--top">
+        <div className="page-banner__inner shell-frame">
           <button 
             onClick={() => setCurrentView('MAIN')}
-            className="text-sm font-bold font-heading uppercase tracking-tighter text-black hover:opacity-80 transition-opacity"
+            className="page-banner__brand"
           >
-            LIONSHIP
+            Lionship
           </button>
-          <div className="flex gap-4 items-center">
-            {authUser ? (
-              <span className="text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-500">
-                {authUser.displayName || authUser.username} • {authUser.isOwner ? 'Owner' : authUser.isAdmin ? 'Admin' : 'User'}
-              </span>
-            ) : (
-              <a
-                href={authSigninLink}
-                className="text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-500 hover:text-black hover:underline"
-              >
-                Sign in to manage links
-              </a>
-            )}
-            <button 
-              onClick={() => setCurrentView(currentView === 'ABOUT' ? 'MAIN' : 'ABOUT')}
-              className={`text-[10px] font-bold font-heading uppercase tracking-widest hover:underline text-black ${currentView === 'ABOUT' ? 'underline' : ''}`}
-            >
-              ABOUT
-            </button>
+          <nav className="page-banner__nav" aria-label="Lionship pages">
             {canEditLinks ? (
               <button 
                 onClick={() => setCurrentView(currentView === 'EDIT' ? 'MAIN' : 'EDIT')}
-                className={`text-[10px] font-bold font-heading uppercase tracking-widest hover:underline text-black ${currentView === 'EDIT' ? 'underline' : ''}`}
+                className={currentView === 'EDIT' ? 'page-banner__button active' : 'page-banner__button'}
               >
-                {currentView === 'EDIT' ? 'DONE EDITING' : 'EDIT LINKS'}
+                {currentView === 'EDIT' ? 'Done Editing' : 'Edit Links'}
               </button>
             ) : null}
-          </div>
+            {authUser ? (
+              <>
+                <a
+                  href={accountLink}
+                  className="page-banner__link"
+                >
+                  {authUser.displayName || authUser.username}
+                </a>
+                <button
+                  onClick={() => void handleSignOut()}
+                  className="page-banner__button"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={openCentralAuth}
+                className="page-banner__button"
+              >
+                Sign in
+              </button>
+            )}
+          </nav>
         </div>
       </header>
 
       {currentView === 'EDIT' && canEditLinks ? (
-        <main className="mt-[20px] px-[36px] max-w-4xl pb-20">
-          <div className="bg-white p-4 border border-black mb-6 shadow-sm">
-            <h2 className="text-[12px] font-bold font-heading uppercase tracking-widest mb-4">
+        <main className="shell-frame mt-[26px] max-w-4xl pb-20">
+          <div className="mb-6 border border-[#d4d4d8] bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+            <h2 className="mb-4 text-[12px] font-bold font-heading uppercase tracking-widest text-[#59615a]">
               {editingLinkId ? 'Edit Link' : 'Add New Link'}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-500 mb-1">Name</label>
-                <input type="text" value={editFormData.title} onChange={e => setEditFormData({...editFormData, title: e.target.value})} className="w-full border border-black px-2 py-1 text-[14px] font-heading focus:outline-none focus:border-blue-500" />
+                <input type="text" value={editFormData.title} onChange={e => setEditFormData({...editFormData, title: e.target.value})} className="w-full border border-[#d4d4d8] bg-white px-2 py-1 text-[14px] font-heading focus:border-[#9faab4] focus:outline-none" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-500 mb-1">URL (use %s for query)</label>
-                <input type="text" value={editFormData.url} onChange={e => setEditFormData({...editFormData, url: e.target.value})} className="w-full border border-black px-2 py-1 text-[14px] font-heading focus:outline-none focus:border-blue-500" />
+                <input type="text" value={editFormData.url} onChange={e => setEditFormData({...editFormData, url: e.target.value})} className="w-full border border-[#d4d4d8] bg-white px-2 py-1 text-[14px] font-heading focus:border-[#9faab4] focus:outline-none" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-500 mb-1">Acronym</label>
-                <input type="text" value={editFormData.acronym} onChange={e => setEditFormData({...editFormData, acronym: e.target.value})} className="w-full border border-black px-2 py-1 text-[14px] font-heading focus:outline-none focus:border-blue-500" />
+                <input type="text" value={editFormData.acronym} onChange={e => setEditFormData({...editFormData, acronym: e.target.value})} className="w-full border border-[#d4d4d8] bg-white px-2 py-1 text-[14px] font-heading focus:border-[#9faab4] focus:outline-none" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-500 mb-1">Category</label>
@@ -705,7 +755,7 @@ const App: React.FC = () => {
                       setNewCategoryName('');
                     }
                   }} 
-                  className="w-full border border-black px-2 py-1.5 text-[14px] font-heading focus:outline-none focus:border-blue-500 bg-white"
+                  className="w-full border border-[#d4d4d8] bg-white px-2 py-1.5 text-[14px] font-heading focus:border-[#9faab4] focus:outline-none"
                 >
                   <option value="">-- Select Category --</option>
                   {uniqueCategories.filter(cat => cat !== 'ALL').map(cat => (
@@ -719,7 +769,7 @@ const App: React.FC = () => {
                     placeholder="New Category Name" 
                     value={newCategoryName} 
                     onChange={e => setNewCategoryName(e.target.value)} 
-                    className="w-full border border-black px-2 py-1 text-[14px] font-heading focus:outline-none focus:border-blue-500 mt-2" 
+                    className="mt-2 w-full border border-[#d4d4d8] bg-white px-2 py-1 text-[14px] font-heading focus:border-[#9faab4] focus:outline-none"
                   />
                 )}
               </div>
@@ -730,7 +780,7 @@ const App: React.FC = () => {
                 type="text" 
                 value={editFormData.tags} 
                 onChange={e => setEditFormData({...editFormData, tags: e.target.value})} 
-                className="w-full border border-black px-2 py-1 text-[14px] font-heading focus:outline-none focus:border-blue-500" 
+                className="w-full border border-[#d4d4d8] bg-white px-2 py-1 text-[14px] font-heading focus:border-[#9faab4] focus:outline-none"
                 placeholder="e.g. WORK, REFERENCE, TOOLS" 
               />
             </div>
@@ -740,13 +790,13 @@ const App: React.FC = () => {
                 <select
                   value={editFormData.scope}
                   onChange={e => setEditFormData({...editFormData, scope: e.target.value as 'global' | 'personal'})}
-                  className="w-full border border-black px-2 py-1.5 text-[14px] font-heading focus:outline-none focus:border-blue-500 bg-white"
+                  className="w-full border border-[#d4d4d8] bg-white px-2 py-1.5 text-[14px] font-heading focus:border-[#9faab4] focus:outline-none"
                 >
                   <option value="global">Global master list</option>
                   <option value="personal">Personal admin links</option>
                 </select>
               ) : (
-                <div className="w-full border border-black px-2 py-1.5 text-[14px] font-heading bg-zinc-50 text-zinc-500">
+                <div className="w-full border border-[#d4d4d8] bg-[#f8fafc] px-2 py-1.5 text-[14px] font-heading text-zinc-500">
                   Personal admin links only
                 </div>
               )}
@@ -755,20 +805,20 @@ const App: React.FC = () => {
               </p>
             </div>
             <div className="flex gap-2">
-              <button onClick={handleSaveEdit} className="bg-black text-white px-4 py-1 font-heading text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors">
+              <button onClick={handleSaveEdit} className="border border-[#202522] bg-[#202522] px-4 py-1 font-heading text-[10px] font-bold uppercase tracking-widest text-[#fafafa] transition-colors hover:bg-[#3f4a41] hover:border-[#3f4a41]">
                 {editingLinkId ? 'Save Changes' : 'Add Link'}
               </button>
               {editingLinkId && (
-                <button onClick={handleCancelEdit} className="border border-black text-black px-4 py-1 font-heading text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors">
+                <button onClick={handleCancelEdit} className="border border-[#d4d4d8] px-4 py-1 font-heading text-[10px] font-bold uppercase tracking-widest text-[#202522] transition-colors hover:border-[#9faab4] hover:bg-[#fafafa]">
                   Cancel
                 </button>
               )}
             </div>
           </div>
 
-          <div className="border-t border-black pt-4">
+          <div className="border-t border-[#e5e5e5] pt-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-[12px] font-bold font-heading uppercase tracking-widest">Existing Links</h2>
+              <h2 className="text-[12px] font-bold font-heading uppercase tracking-widest text-[#59615a]">Existing Links</h2>
               <div className="flex gap-4">
                 <button 
                   onClick={() => handleEditSort('title')}
@@ -786,7 +836,7 @@ const App: React.FC = () => {
             </div>
             <div className="flex flex-col gap-2">
               {sortedEditLinks.map(link => (
-                <div key={link.id} className="flex items-center justify-between bg-white p-2 border border-zinc-300 hover:border-black transition-colors">
+                <div key={link.id} className="flex items-center justify-between border border-[#d4d4d8] bg-white p-2 transition-colors hover:border-[#9faab4]">
                   <div className="flex flex-col overflow-hidden">
                     <div className="flex flex-wrap items-baseline gap-2">
                       <span className="font-bold text-[14px]">{link.title}</span>
@@ -818,54 +868,9 @@ const App: React.FC = () => {
             </div>
           </div>
         </main>
-      ) : currentView === 'ABOUT' ? (
-        <main className="mt-[20px] px-[36px] max-w-4xl pb-20">
-          <div className="bg-white p-6 border border-black shadow-sm">
-            <h2 className="text-[12px] font-bold font-heading uppercase tracking-widest mb-6 border-b border-black pb-2 text-black">
-              About LionShip
-            </h2>
-            
-            <div className="space-y-4 text-[13px] leading-relaxed text-zinc-700 font-heading">
-              <p>
-                Welcome to LionShip, a streamlined link index directory and custom search workspace.
-              </p>
-              
-              {/* Space for future copy */}
-              <p className="text-zinc-400 italic">
-                [Space for custom copy to be written later. You can edit this section inside App.tsx to add your background information, description of your workflows, or list of resources.]
-              </p>
-              
-              <div className="pt-6 border-t border-zinc-200 flex flex-wrap gap-6 text-[10px] font-bold uppercase tracking-wider">
-                <a 
-                  href="https://github.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="flex items-center gap-1.5 text-black hover:text-blue-600 transition-colors"
-                >
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                  </svg>
-                  GitHub
-                </a>
-                <a 
-                  href="https://jeffersonwm.com" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="flex items-center gap-1.5 text-black hover:text-blue-600 transition-colors"
-                >
-                  <svg className="w-4 h-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
-                  </svg>
-                  jeffwm home
-                </a>
-              </div>
-            </div>
-          </div>
-        </main>
       ) : (
         <>
-      <div className={`px-[36px] mt-4 ${viewMode === 'LIST' ? 'max-w-4xl' : 'max-w-full'}`} ref={containerRef}>
+      <div className="shell-frame mt-4 max-w-full" ref={containerRef}>
         <div className="mb-2 w-full max-w-[600px] relative">
           <div className="flex justify-between items-end mb-0.5 min-h-[16px]">
             <div className="flex items-center gap-4">
@@ -911,7 +916,7 @@ const App: React.FC = () => {
               ref={inputRef}
               type="text"
               autoComplete="off"
-              className="flex-1 bg-transparent border-b border-black py-0.5 px-0.5 text-[18px] md:text-[20px] font-heading focus:outline-none placeholder:text-zinc-300 transition-all focus:border-blue-500"
+              className="flex-1 border-b border-[#202522] bg-transparent px-0.5 py-0.5 text-[18px] md:text-[20px] font-heading transition-all placeholder:text-zinc-300 focus:border-[#9faab4] focus:outline-none"
               placeholder="Search term..."
               value={universalQuery}
               onChange={(e) => {
@@ -924,21 +929,21 @@ const App: React.FC = () => {
             />
             <button 
               onClick={handleClear}
-              className="border border-black text-black px-4 py-1 font-heading text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors mb-[1px]"
+              className="mb-[1px] border border-[#d4d4d8] px-4 py-1 font-heading text-[10px] font-bold uppercase tracking-widest text-[#202522] transition-colors hover:border-[#9faab4] hover:bg-[#fafafa]"
             >
               Clear
             </button>
             <button 
               onClick={() => handleSubmit()}
-              className="bg-black text-white px-4 py-1 font-heading text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors mb-[1px]"
+              className="mb-[1px] border border-[#202522] bg-[#202522] px-4 py-1 font-heading text-[10px] font-bold uppercase tracking-widest text-[#fafafa] transition-colors hover:border-[#3f4a41] hover:bg-[#3f4a41]"
             >
               Submit
             </button>
 
             {/* Custom Dropdown for History */}
             {isHistoryVisible && searchHistory.length > 0 && (
-              <div className="absolute top-full left-0 right-[150px] bg-white border border-black z-[60] mt-1 shadow-lg max-h-[200px] overflow-y-auto">
-                <div className="bg-zinc-100 px-2 py-1 border-b border-zinc-200">
+              <div className="absolute top-full left-0 right-[150px] z-[60] mt-1 max-h-[200px] overflow-y-auto border border-[#d4d4d8] bg-white shadow-[0_18px_40px_rgba(15,23,42,0.12)]">
+                <div className="border-b border-zinc-200 bg-[#fafafa] px-2 py-1">
                   <span className="text-[9px] font-bold font-heading text-zinc-500 uppercase tracking-widest">Recent Searches (15)</span>
                 </div>
                 {searchHistory.map((h, i) => (
@@ -979,72 +984,77 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <main className={`mt-[20px] px-[36px] pb-16 ${viewMode === 'LIST' ? 'max-w-4xl' : 'max-w-full'}`}>
+      <main className="shell-frame mt-[20px] max-w-full pb-16">
         {viewMode === 'LIST' && (
-          <>
-            <div className="grid grid-cols-[80px_50px_1fr] gap-x-2 mb-1 border-b border-zinc-300 pb-1 items-center">
+          <div className="border border-[#d4d4d8] bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+            <div className="grid grid-cols-[70px_40px_1fr] gap-x-2 mb-0 items-center">
               <button 
                 onClick={() => handleSort('acronym')}
-                className={`text-left text-[11px] font-bold font-heading uppercase tracking-widest transition-colors ${sortKey === 'acronym' ? 'text-black underline decoration-2' : 'text-zinc-400 hover:text-black'}`}
+                className={`text-left text-[10px] font-bold font-heading uppercase tracking-widest transition-colors ${sortKey === 'acronym' ? 'text-black underline decoration-2' : 'text-zinc-400 hover:text-black'}`}
               >
                 ACR {sortKey === 'acronym' && (sortOrder === 'asc' ? '↑' : '↓')}
               </button>
               
               <div className="flex flex-col items-center">
-                <span className="text-center text-[11px] font-bold font-heading uppercase tracking-widest text-zinc-400 select-none">
+                <span className="text-center text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-400 select-none">
                   SEL
                 </span>
               </div>
 
               <button 
                 onClick={() => handleSort('title')}
-                className={`text-left text-[11px] font-bold font-heading uppercase tracking-widest transition-colors ${sortKey === 'title' ? 'text-black underline decoration-2' : 'text-zinc-400 hover:text-black'}`}
+                className={`text-left text-[10px] font-bold font-heading uppercase tracking-widest transition-colors ${sortKey === 'title' ? 'text-black underline decoration-2' : 'text-zinc-400 hover:text-black'}`}
               >
                 RESOURCE {sortKey === 'title' && (sortOrder === 'asc' ? '↑' : '↓')}
               </button>
             </div>
 
-            <div className="grid grid-cols-[80px_50px_1fr] gap-x-2 gap-y-0 items-center">
-              {sortedAndFilteredLinks.map((link, index) => {
-                const isSelected = selectedIds.has(link.id);
-                
+            <div className="pt-0.5">
+              {Array.from({ length: Math.ceil(sortedAndFilteredLinks.length / 5) }, (_, groupIndex) => {
+                const groupLinks = sortedAndFilteredLinks.slice(groupIndex * 5, groupIndex * 5 + 5);
+                const bandClass = groupIndex % 2 === 0 ? 'bg-white' : 'bg-[#f7f7f5]';
+
                 return (
-                  <React.Fragment key={link.id}>
-                    <span className="text-[14px] leading-none text-zinc-400 select-none font-heading uppercase tracking-tighter self-center">
-                      {link.acronym.toUpperCase()}
-                    </span>
+                  <div key={groupIndex} className={`${bandClass} py-0.5`}>
+                    <div className="grid grid-cols-[70px_40px_1fr] gap-x-2 gap-y-0 items-center">
+                      {groupLinks.map((link) => {
+                        const isSelected = selectedIds.has(link.id);
 
-                    <div className="flex justify-center items-center h-full">
-                      <input 
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(link)}
-                        className="w-5 h-5 border-zinc-400 rounded-none cursor-pointer accent-black"
-                      />
-                    </div>
+                        return (
+                          <React.Fragment key={link.id}>
+                            <span className="text-[14px] leading-none text-zinc-400 select-none font-heading uppercase tracking-tighter self-center">
+                              {link.acronym.toUpperCase()}
+                            </span>
 
-                    <div className="py-[0px]">
-                      <a
-                        href={link.url.replace(/%s/g, encodeURIComponent(universalQuery || ''))}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => handleResourceClick(e, link)}
-                        className={`text-[12px] md:text-[13px] leading-[1.2] transition-colors inline-block align-middle ${isSelected ? 'text-blue-600 font-bold' : 'text-black hover:text-zinc-500'}`}
-                      >
-                        {link.title}
-                      </a>
+                            <div className="flex justify-center items-center h-full">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelect(link)}
+                                className="w-5 h-5 border-zinc-400 rounded-none cursor-pointer accent-black"
+                              />
+                            </div>
+
+                            <div className="py-[0px]">
+                              <a
+                                href={link.url.replace(/%s/g, encodeURIComponent(universalQuery || ''))}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => handleResourceClick(e, link)}
+                                className={`text-[12px] md:text-[13px] leading-[1.2] transition-colors inline-block align-middle ${isSelected ? 'text-blue-600 font-bold' : 'text-black hover:text-zinc-500'}`}
+                              >
+                                {link.title}
+                              </a>
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
                     </div>
-                    
-                    {(index + 1) % 5 === 0 && index !== sortedAndFilteredLinks.length - 1 && (
-                      <div className="col-span-3 h-1.5 flex items-center" aria-hidden="true">
-                        <div className="w-full h-[1px] bg-zinc-300 opacity-30" />
-                      </div>
-                    )}
-                  </React.Fragment>
+                  </div>
                 );
               })}
             </div>
-          </>
+          </div>
         )}
 
         {viewMode === 'CARDS' && (
@@ -1059,13 +1069,13 @@ const App: React.FC = () => {
                   if (catLinks.length === 0) return null;
 
                   return (
-                    <div key={cat} className="bg-white p-4 border-t-[3px] border-t-black shadow-sm">
+                    <div key={cat} className="border border-[#d4d4d8] bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
                       <h3 className="text-xs font-bold font-heading uppercase tracking-widest mb-1.5">
                         {cat.toUpperCase()}
                       </h3>
 
                       {/* Scoped column headers inside the card */}
-                      <div className="grid grid-cols-[70px_40px_1fr] gap-x-2 mb-1 border-b border-zinc-300 pb-0.5 items-center">
+                      <div className="grid grid-cols-[70px_40px_1fr] gap-x-2 mb-0 items-center">
                         <button 
                           onClick={() => handleSort('acronym')}
                           className={`text-left text-[10px] font-bold font-heading uppercase tracking-widest transition-colors ${sortKey === 'acronym' ? 'text-black underline decoration-2' : 'text-zinc-400 hover:text-black'}`}
@@ -1089,7 +1099,7 @@ const App: React.FC = () => {
                       </div>
 
                       {/* List of links inside the card */}
-                      <div className="grid grid-cols-[70px_40px_1fr] gap-x-2 gap-y-0 items-center">
+                      <div className="grid grid-cols-[70px_40px_1fr] gap-x-2 gap-y-0 items-center pt-0.5">
                         {catLinks.map((link) => {
                           const isSelected = selectedIds.has(link.id);
                           
@@ -1144,7 +1154,7 @@ const App: React.FC = () => {
                   if (tagLinks.length === 0) return null;
 
                   return (
-                    <div key={tag} className="bg-white p-4 border-t-[3px] border-t-black shadow-sm">
+                    <div key={tag} className="border border-[#d4d4d8] bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
                       <h3 className="text-xs font-bold font-heading uppercase tracking-widest mb-1.5 text-blue-700">
                         {tag}
                       </h3>
@@ -1174,7 +1184,7 @@ const App: React.FC = () => {
                       </div>
 
                       {/* List of links inside the card */}
-                      <div className="grid grid-cols-[70px_40px_1fr] gap-x-2 gap-y-0 items-center">
+                      <div className="grid grid-cols-[70px_40px_1fr] gap-x-2 gap-y-0 items-center pt-1">
                         {tagLinks.map((link, idx) => {
                           const isSelected = selectedIds.has(link.id);
                           
@@ -1220,14 +1230,30 @@ const App: React.FC = () => {
       </>
       )}
 
-      <footer className="bottom-banner">
-        <div className="px-[36px] w-full flex items-center justify-between">
-          <span className="text-[10px] font-bold font-heading uppercase tracking-widest text-black">
-            {selectedIds.size} SELECTED / {shownLinksCount} SHOWN
-          </span>
-          <span className="text-[10px] font-bold font-heading uppercase tracking-widest text-zinc-300">
-            {selectedCategory === 'ALL' ? 'FULL INDEX' : `CATEGORY: ${selectedCategory.toUpperCase()}`}
-          </span>
+      <footer className="page-banner page-banner--bottom">
+        <div className="page-banner__inner shell-frame">
+          <span aria-hidden="true" />
+          <p className="page-banner__copyright">
+            &copy; {new Date().getFullYear()}{' '}
+            <a
+              href="https://jeffersonwm.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="page-banner__copyright-link page-banner__copyright-link--primary"
+            >
+              Jefferson Williams
+            </a>
+            . All rights reserved.{' '}
+            <a
+              href="https://github.com/wmjefferson/jeffersonwm"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="page-banner__copyright-link"
+            >
+              GitHub
+            </a>
+            .
+          </p>
         </div>
       </footer>
     </div>

@@ -124,35 +124,136 @@
         margin: 0 0 1.5rem;
       }
 
-      .summary-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 1rem;
+      .issue-state-list {
+        display: flex;
+        gap: 1.25rem;
+        align-items: center;
+        flex-wrap: wrap;
         margin: 0 0 1.5rem;
-      }
-
-      .summary-card {
-        border: 1px solid var(--line);
-        background: var(--paper);
-        padding: 1rem;
-      }
-
-      .summary-card span {
-        display: block;
-        margin-bottom: 0.4rem;
+        padding: 0;
+        list-style: none;
         color: var(--muted);
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.13em;
-        text-transform: uppercase;
+        font-size: 0.98rem;
+        line-height: 1.35;
       }
 
-      .summary-card strong {
+      .issue-state-list strong {
+        color: var(--ink);
+        font-weight: 700;
+      }
+
+      .report-picker {
+        position: relative;
+        display: inline-block;
+      }
+
+      .report-trigger {
+        border: 0;
+        background: transparent;
+        color: #111827;
+        font-family: inherit;
+        font-size: 0.96rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        padding: 0;
+        text-decoration: underline;
+        text-decoration-color: rgba(17, 24, 39, 0.22);
+        text-underline-offset: 0.18rem;
+        cursor: pointer;
+      }
+
+      .report-trigger:hover {
+        color: var(--blue);
+        text-decoration-color: rgba(51, 86, 214, 0.42);
+      }
+
+      .report-popout {
+        position: absolute;
+        top: calc(100% + 0.55rem);
+        left: 0;
+        width: min(28rem, calc(100vw - (var(--frame) * 2)));
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.96);
+        padding: 0.55rem 0;
+        box-shadow: 0 14px 32px rgba(17, 24, 39, 0.08);
+        z-index: 15;
+      }
+
+      .report-popout[hidden],
+      .activity-view[hidden],
+      .report-view[hidden] {
+        display: none;
+      }
+
+      .report-option {
         display: block;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        font-size: 0.94rem;
+        font-weight: 500;
+        line-height: 1.25;
+        text-align: left;
+        padding: 0.62rem 0.9rem;
+        cursor: pointer;
+      }
+
+      .report-option:hover {
+        background: rgba(224, 232, 255, 0.52);
+        color: var(--blue);
+      }
+
+      .report-content {
+        max-width: 58rem;
+        color: rgba(17, 24, 39, 0.82);
+        font-size: 1.02rem;
+        line-height: 1.68;
+      }
+
+      .report-content h1,
+      .report-content h2,
+      .report-content h3 {
+        color: var(--ink);
         font-family: "Young Serif", "Times New Roman", serif;
-        font-size: 2rem;
         font-weight: 400;
-        line-height: 1;
+        line-height: 1.08;
+      }
+
+      .report-content h1 {
+        font-size: 1.9rem;
+        margin: 2.25rem 0 0.85rem;
+      }
+
+      .report-content h2 {
+        font-size: 1.45rem;
+        margin: 2rem 0 0.75rem;
+      }
+
+      .report-content h3 {
+        font-size: 1.16rem;
+        margin: 1.5rem 0 0.6rem;
+      }
+
+      .report-content p,
+      .report-content ul,
+      .report-content ol {
+        margin: 0 0 1rem;
+      }
+
+      .report-content ul,
+      .report-content ol {
+        padding-left: 1.4rem;
+      }
+
+      .report-content li {
+        margin: 0.35rem 0;
+      }
+
+      .report-content code {
+        background: rgba(17, 24, 39, 0.06);
+        padding: 0.08rem 0.24rem;
       }
 
       .control-row {
@@ -401,12 +502,6 @@
         transform: scaleX(1);
       }
 
-      @media (max-width: 900px) {
-        .summary-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-
       @media (max-width: 760px) {
         body {
           padding: 24px;
@@ -441,11 +536,9 @@
         .bottom-links {
           margin-top: 4rem;
         }
-      }
 
-      @media (max-width: 520px) {
-        .summary-grid {
-          grid-template-columns: 1fr;
+        .report-popout {
+          width: calc(100vw - 48px);
         }
       }
     </style>
@@ -458,81 +551,93 @@
             <img src="/jeffersonwm/assets/favicon-DxRHekBS.svg" alt="" class="logo" />
           </div>
         </a>
-        <h1>Project Activity</h1>
+        <h1 id="page-title">Project Activity</h1>
       </header>
 
-      <p class="note">
-        This page tracks public GitHub project issue activity across JeffersonWM repos. It updates automatically from the JeffersonWM API and excludes private and archived repositories before anything is sent to the browser.
-      </p>
-      <p class="meta-line" id="meta-line">Loading project activity...</p>
+      <div id="activity-view" class="activity-view">
+        <p class="note">
+          This page tracks public GitHub project issue activity across JeffersonWM repos. It updates automatically from the JeffersonWM API and excludes private and archived repositories before anything is sent to the browser.
+        </p>
+        <p class="meta-line" id="meta-line">Loading project activity...</p>
 
-      <section class="summary-grid" aria-label="Project activity summary">
-        <div class="summary-card"><span>Visible Issues</span><strong id="total-issues">--</strong></div>
-        <div class="summary-card"><span>Open</span><strong id="open-issues">--</strong></div>
-        <div class="summary-card"><span>Closed</span><strong id="closed-issues">--</strong></div>
-      </section>
+        <ul class="issue-state-list" aria-label="Project activity issue states">
+          <li>Open - <strong id="open-issues">--</strong></li>
+          <li>Closed - <strong id="closed-issues">--</strong></li>
+          <li>
+            <span class="report-picker">
+              <button id="report-trigger" class="report-trigger" type="button" aria-haspopup="true" aria-expanded="false">Available Reports</button>
+              <span id="report-popout" class="report-popout" hidden></span>
+            </span>
+          </li>
+        </ul>
 
-      <section class="control-row" aria-label="Issue controls">
-        <div class="search-wrap">
-          <input id="search-input" class="search-input" type="search" placeholder="Search title or issue number" />
-        </div>
-      </section>
+        <section class="control-row" aria-label="Issue controls">
+          <div class="search-wrap">
+            <input id="search-input" class="search-input" type="search" placeholder="Search title or issue number" />
+          </div>
+        </section>
 
-      <section class="panel" aria-labelledby="timeline-title">
-        <div class="panel-header">
-          <div class="panel-head-main">
-            <h2 class="panel-title" id="timeline-title">Issue Durations</h2>
-            <div class="sort-inline" aria-label="Timeline sorting">
-              <span class="sort-label">Sort</span>
-              <div class="sort-popout-wrap">
-                <button id="sort-field-trigger" class="sort-trigger" type="button" aria-haspopup="true" aria-expanded="false">Date Opened</button>
-                <div id="sort-field-popout" class="sort-popout" hidden>
-                  <button class="sort-option" type="button" data-sort-field="opened">Date Opened</button>
-                  <button class="sort-option" type="button" data-sort-field="closed">Date Closed</button>
-                  <button class="sort-option" type="button" data-sort-field="duration">Duration</button>
-                  <button class="sort-option" type="button" data-sort-field="alpha">Alphabetical</button>
+        <section class="panel" aria-labelledby="timeline-title">
+          <div class="panel-header">
+            <div class="panel-head-main">
+              <h2 class="panel-title" id="timeline-title">Issue Durations</h2>
+              <div class="sort-inline" aria-label="Timeline sorting">
+                <span class="sort-label">Sort</span>
+                <div class="sort-popout-wrap">
+                  <button id="sort-field-trigger" class="sort-trigger" type="button" aria-haspopup="true" aria-expanded="false">Date Opened</button>
+                  <div id="sort-field-popout" class="sort-popout" hidden>
+                    <button class="sort-option" type="button" data-sort-field="opened">Date Opened</button>
+                    <button class="sort-option" type="button" data-sort-field="closed">Date Closed</button>
+                    <button class="sort-option" type="button" data-sort-field="duration">Duration</button>
+                    <button class="sort-option" type="button" data-sort-field="alpha">Alphabetical</button>
+                  </div>
                 </div>
+                <button id="sort-direction-trigger" class="sort-trigger" type="button">Descending</button>
               </div>
-              <button id="sort-direction-trigger" class="sort-trigger" type="button">Descending</button>
             </div>
           </div>
-        </div>
-        <div class="panel-body timeline-wrap" id="timeline-wrap">
-          <div class="empty-state">Loading timeline...</div>
-        </div>
-      </section>
+          <div class="panel-body timeline-wrap" id="timeline-wrap">
+            <div class="empty-state">Loading timeline...</div>
+          </div>
+        </section>
 
-      <!--
-      <section class="panel" aria-labelledby="issues-title">
-        <div class="panel-header">
-          <h2 class="panel-title" id="issues-title">Issues</h2>
-          <div class="muted" id="issue-count-line">Loading issues...</div>
-        </div>
-        <div class="panel-body table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Repo</th>
-                <th>Issue</th>
-                <th>Title</th>
-                <th>State</th>
-                <th>Opened</th>
-                <th>Closed</th>
-                <th>Days</th>
-              </tr>
-            </thead>
-            <tbody id="issue-table-body">
-              <tr><td colspan="7" class="muted">Loading issues...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-      -->
+        <!--
+        <section class="panel" aria-labelledby="issues-title">
+          <div class="panel-header">
+            <h2 class="panel-title" id="issues-title">Issues</h2>
+            <div class="muted" id="issue-count-line">Loading issues...</div>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Repo</th>
+                  <th>Issue</th>
+                  <th>Title</th>
+                  <th>State</th>
+                  <th>Opened</th>
+                  <th>Closed</th>
+                  <th>Days</th>
+                </tr>
+              </thead>
+              <tbody id="issue-table-body">
+                <tr><td colspan="7" class="muted">Loading issues...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        -->
+      </div>
+
+      <article id="report-view" class="report-view" hidden>
+        <div id="report-content" class="report-content"></div>
+      </article>
     </main>
 
     <div class="bottom-links" aria-label="Site links">
       <a class="personal-link" href="/">Home</a>
       <a class="personal-link" href="/status/">Status</a>
+      <a class="personal-link" href="/project-activity/">Project Activity</a>
       <a class="personal-link" href="/account/">Account</a>
       <a class="personal-link" href="https://wmjefferson.com" target="_blank" rel="noopener noreferrer">William Jefferson</a>
     </div>
@@ -554,8 +659,22 @@
       const sortFieldTrigger = document.getElementById("sort-field-trigger");
       const sortDirectionTrigger = document.getElementById("sort-direction-trigger");
       const sortFieldPopout = document.getElementById("sort-field-popout");
+      const reportTrigger = document.getElementById("report-trigger");
+      const reportPopout = document.getElementById("report-popout");
+      const activityView = document.getElementById("activity-view");
+      const reportView = document.getElementById("report-view");
+      const reportContent = document.getElementById("report-content");
+      const pageTitle = document.getElementById("page-title");
       const timelineWrap = document.getElementById("timeline-wrap");
       const metaLine = document.getElementById("meta-line");
+      const REPORTS = [
+        { title: "Codex - August 2026 - Thread Report", path: "reports/2026-08-codex-report.md" },
+        { title: "Antigravity - August 2026 - Platform Development Report", path: "reports/2026-08-antigravity-report.md" },
+        { title: "Codex - July 2026 - Thread Report", path: "reports/2026-07-codex-report.md" },
+        { title: "Antigravity - July 2026 - Platform Development Report", path: "reports/2026-07-antigravity-report.md" },
+        { title: "Codex - June 2026 - Thread Report", path: "reports/2026-06-codex-report.md" },
+        { title: "Antigravity - June 2026 - Platform Development Report", path: "reports/2026-06-antigravity-report.md" },
+      ];
       const SORT_FIELD_LABELS = {
         opened: "Date Opened",
         closed: "Date Closed",
@@ -578,6 +697,154 @@
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#39;");
+      }
+
+      function slugifyReportTitle(title) {
+        return String(title)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+      }
+
+      function closeReportPopout() {
+        reportPopout.hidden = true;
+        reportTrigger.setAttribute("aria-expanded", "false");
+      }
+
+      function renderReportList() {
+        reportPopout.innerHTML = REPORTS.map((report) => `
+          <a class="report-option" href="#report=${escapeHtml(slugifyReportTitle(report.title))}" data-report="${escapeHtml(slugifyReportTitle(report.title))}">
+            ${escapeHtml(report.title)}
+          </a>
+        `).join("");
+      }
+
+      function renderInlineMarkdown(markdown) {
+        const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+        const html = [];
+        let paragraph = [];
+        let listType = null;
+
+        const flushParagraph = () => {
+          if (!paragraph.length) {
+            return;
+          }
+          html.push(`<p>${formatInlineMarkdown(paragraph.join(" "))}</p>`);
+          paragraph = [];
+        };
+
+        const closeList = () => {
+          if (!listType) {
+            return;
+          }
+          html.push(`</${listType}>`);
+          listType = null;
+        };
+
+        lines.forEach((line) => {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            flushParagraph();
+            closeList();
+            return;
+          }
+
+          const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+          if (heading) {
+            flushParagraph();
+            closeList();
+            const level = heading[1].length;
+            html.push(`<h${level}>${formatInlineMarkdown(heading[2])}</h${level}>`);
+            return;
+          }
+
+          const unordered = trimmed.match(/^[-*]\s+(.+)$/);
+          if (unordered) {
+            flushParagraph();
+            if (listType !== "ul") {
+              closeList();
+              html.push("<ul>");
+              listType = "ul";
+            }
+            html.push(`<li>${formatInlineMarkdown(unordered[1])}</li>`);
+            return;
+          }
+
+          const ordered = trimmed.match(/^\d+\.\s+(.+)$/);
+          if (ordered) {
+            flushParagraph();
+            if (listType !== "ol") {
+              closeList();
+              html.push("<ol>");
+              listType = "ol";
+            }
+            html.push(`<li>${formatInlineMarkdown(ordered[1])}</li>`);
+            return;
+          }
+
+          closeList();
+          paragraph.push(trimmed);
+        });
+
+        flushParagraph();
+        closeList();
+        return html.join("\n");
+      }
+
+      function formatInlineMarkdown(value) {
+        return escapeHtml(value)
+          .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+          .replace(/`([^`]+)`/g, "<code>$1</code>");
+      }
+
+      async function showReport(reportKey, pushState = true) {
+        const report = REPORTS.find((item) => slugifyReportTitle(item.title) === reportKey);
+        if (!report) {
+          showProjectActivity(false);
+          return;
+        }
+
+        closeReportPopout();
+        activityView.hidden = true;
+        reportView.hidden = false;
+        pageTitle.textContent = report.title;
+        reportContent.innerHTML = '<p class="muted">Loading report...</p>';
+
+        if (pushState) {
+          history.pushState(null, "", `#report=${encodeURIComponent(reportKey)}`);
+        }
+
+        try {
+          const response = await fetch(report.path, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const markdown = await response.text();
+          reportContent.innerHTML = renderInlineMarkdown(markdown.replace(/^#\s+.+\n?/, ""));
+        } catch (error) {
+          reportContent.innerHTML = '<p class="muted">This report could not be loaded yet.</p>';
+        }
+      }
+
+      function showProjectActivity(pushState = true) {
+        closeReportPopout();
+        reportView.hidden = true;
+        activityView.hidden = false;
+        pageTitle.textContent = "Project Activity";
+        if (pushState) {
+          history.pushState(null, "", window.location.pathname);
+        }
+      }
+
+      function syncRouteFromHash() {
+        const hash = window.location.hash.replace(/^#/, "");
+        const params = new URLSearchParams(hash);
+        const reportKey = params.get("report");
+        if (reportKey) {
+          showReport(reportKey, false);
+          return;
+        }
+        showProjectActivity(false);
       }
 
       function formatDate(value) {
@@ -628,7 +895,6 @@
           return;
         }
 
-        document.getElementById("total-issues").textContent = String(payload.summary.totalIssues);
         document.getElementById("open-issues").textContent = String(payload.summary.openIssues);
         document.getElementById("closed-issues").textContent = String(payload.summary.closedIssues);
         metaLine.textContent = `${payload.project.owner} / project ${payload.project.number} (${payload.project.title}) · updated ${new Date(payload.updatedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`;
@@ -826,8 +1092,27 @@
         event.stopPropagation();
         const nextOpen = sortFieldPopout.hidden;
         closeSortPopouts();
+        closeReportPopout();
         sortFieldPopout.hidden = !nextOpen;
         sortFieldTrigger.setAttribute("aria-expanded", String(nextOpen));
+      });
+
+      reportTrigger.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const nextOpen = reportPopout.hidden;
+        closeSortPopouts();
+        closeReportPopout();
+        reportPopout.hidden = !nextOpen;
+        reportTrigger.setAttribute("aria-expanded", String(nextOpen));
+      });
+
+      reportPopout.addEventListener("click", (event) => {
+        const option = event.target.closest("[data-report]");
+        if (!option) {
+          return;
+        }
+        event.preventDefault();
+        showReport(option.dataset.report);
       });
 
       sortDirectionTrigger.addEventListener("click", (event) => {
@@ -850,14 +1135,22 @@
         if (!event.target.closest(".sort-popout-wrap")) {
           closeSortPopouts();
         }
+        if (!event.target.closest(".report-picker")) {
+          closeReportPopout();
+        }
       });
 
       document.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
           closeSortPopouts();
+          closeReportPopout();
         }
       });
 
+      window.addEventListener("popstate", syncRouteFromHash);
+      window.addEventListener("hashchange", syncRouteFromHash);
+      renderReportList();
+      syncRouteFromHash();
       loadProjectActivity();
       syncSortControls();
       window.addEventListener("resize", () => {

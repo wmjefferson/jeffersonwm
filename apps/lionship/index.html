@@ -13,48 +13,149 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Signika:wght@300..700&family=Cactus+Classical+Serif&family=Archivo:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Faculty+Glyphic&family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        :root {
+            color-scheme: light;
+            font-family: 'Inter Tight', 'Segoe UI', Arial, sans-serif;
+            background: #fafafa;
+            color: #202522;
+            --frame: 36px;
+            --topbar-height: 36px;
+            --top-gap: 24px;
+            --footer-height: 36px;
+            --body-top-offset: calc(var(--topbar-height) + var(--top-gap));
+        }
+        html {
+            scrollbar-gutter: stable;
+        }
+        * {
+            box-sizing: border-box;
+        }
         body {
-            font-family: 'Cactus Classical Serif', serif;
-            background-color: #F0F0F0;
+            font-family: 'Inter Tight', 'Segoe UI', Arial, sans-serif;
+            background-color: #fafafa;
             margin: 0;
             padding: 0;
             overflow-x: hidden;
+            color: #202522;
+        }
+        #root {
+            isolation: isolate;
+            min-height: 100vh;
+            position: relative;
         }
         .font-heading {
-            font-family: 'Signika', sans-serif;
+            font-family: 'Inter Tight', 'Segoe UI', Arial, sans-serif;
         }
         .font-archivo {
-            font-family: 'Archivo', sans-serif;
+            font-family: 'Inter Tight', 'Segoe UI', Arial, sans-serif;
         }
-        .top-banner {
-            height: 36px;
-            background-color: white;
-            border-bottom: 3px solid black;
-            display: flex;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            width: 100%;
-        }
-        .bottom-banner {
-            height: 36px;
-            background-color: white;
-            border-top: 3px solid black;
-            display: flex;
-            align-items: center;
-            position: fixed;
-            bottom: 0;
+        .page-banner {
+            background: rgba(250, 250, 250, 0.93);
+            border-bottom: 1px solid #e5e5e5;
             left: 0;
+            min-height: var(--topbar-height);
+            padding: 0;
+            position: fixed;
             right: 0;
-            z-index: 50;
-            width: 100%;
+            z-index: 1000;
         }
-        /* Custom scrollbar to keep it minimalist */
-        ::-webkit-scrollbar {
-            width: 0px;
+        .page-banner--top {
+            top: 0;
+        }
+        .page-banner--bottom {
+            bottom: 0;
+            border-top: 1px solid #e5e5e5;
+            border-bottom: 0;
+            margin-top: auto;
+            top: auto;
+        }
+        .shell-frame {
+            width: calc(100% - (var(--frame) * 2));
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        .page-banner__inner {
+            min-height: var(--topbar-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        .page-banner__brand,
+        .page-banner__link,
+        .page-banner__button {
+            color: #202522;
+            font-family: 'Inter Tight', 'Segoe UI', Arial, sans-serif;
+            font-size: 0.875rem;
+            font-weight: 700;
+            letter-spacing: 0;
+            line-height: 1;
+            text-decoration: none;
+            transition: color 150ms ease;
+        }
+        .page-banner__brand,
+        .page-banner__button {
+            background: transparent;
+            border: 0;
+            padding: 0;
+        }
+        .page-banner__brand:hover,
+        .page-banner__link:hover,
+        .page-banner__button:hover,
+        .page-banner__button.active {
+            color: #de8bf7;
+        }
+        .page-banner__nav {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .page-banner--bottom .page-banner__inner {
+            color: #6b7280;
+            font-size: 0.875rem;
+            letter-spacing: 0;
+            text-transform: none;
+        }
+        .page-banner__copyright {
+            margin: 0;
+            line-height: 1;
+            text-align: right;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .page-banner__copyright-link {
+            color: #111827;
+            text-decoration: none;
+            transition: color 1000ms ease;
+        }
+        .page-banner__copyright-link--primary {
+            font-weight: 600;
+        }
+        .page-banner__copyright-link:hover {
+            color: #de8bf7;
+            transition-duration: 150ms;
+        }
+        .shell-gutters {
+            pointer-events: none;
+            position: fixed;
+            inset: var(--topbar-height) 0 var(--footer-height);
+            z-index: 900;
+        }
+        .shell-gutter {
+            border-left: 1px solid #e5e5e5;
+            bottom: 0;
+            position: absolute;
+            top: 0;
+        }
+        .shell-gutter--left {
+            left: var(--frame);
+        }
+        .shell-gutter--right {
+            right: var(--frame);
         }
     </style>
 <script type="importmap">

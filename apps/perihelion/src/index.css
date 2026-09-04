@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
 @theme {
   --font-sans: "Inter Tight", "Segoe UI", Arial, sans-serif;
@@ -18,10 +19,39 @@
 
 body {
   font-family: "Inter Tight", "Segoe UI", Arial, sans-serif;
-  background-color: #fafafa;
+  background-color: #ededed;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+}
+
+[data-theme="dark"] body,
+.dark body {
+  background-color: #171a18;
+}
+
+#root {
+  isolation: isolate;
+  min-height: 100vh;
+  position: relative;
+}
+
+#root::before {
+  background-image: url("/images/backgrounds/peri-cameras-pattern.jpeg");
+  background-position: top left;
+  background-repeat: repeat;
+  content: "";
+  inset: 0;
+  opacity: 0.08;
+  pointer-events: none;
+  position: fixed;
+  z-index: 0;
+}
+
+[data-theme="dark"] #root::before,
+.dark #root::before {
+  opacity: 0.10;
+  filter: invert(1);
 }
 
 .peri-shell {
@@ -32,11 +62,11 @@ body {
   padding-bottom: calc(var(--footer-height) + 24px);
   position: relative;
   overflow-x: hidden;
-  background: #fafafa;
+  background: transparent;
 }
 
 .page-banner {
-  background: #fafafa;
+  background: rgba(250, 250, 250, 0.93);
   border-bottom: 1px solid #e5e5e5;
   left: 0;
   min-height: var(--topbar-height);
@@ -55,6 +85,7 @@ body {
   top: auto;
   border-top: 1px solid #e5e5e5;
   border-bottom: 0;
+  margin-top: auto;
 }
 
 .shell-gutters {
@@ -65,6 +96,7 @@ body {
 }
 
 .shell-gutter {
+  border-left: 1px solid #e5e5e5;
   bottom: 0;
   position: absolute;
   top: 0;
@@ -114,14 +146,53 @@ body {
 
 .page-banner__brand:hover,
 .page-banner__link:hover,
-.page-banner__button:hover {
-  color: #59615a;
+.page-banner__button:hover,
+.page-banner__button.active {
+  color: #de8bf7;
 }
 
 .page-banner__nav {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
+}
+
+.page-banner--bottom .page-banner__inner {
+  color: #6b7280;
+  font-size: 0.875rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.page-banner__copyright {
+  margin: 0;
+  line-height: 1;
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #202522;
+}
+
+.page-banner__copyright-link {
+  color: #111827;
+  text-decoration: none;
+  transition: color 1000ms ease;
+}
+
+.page-banner__copyright-link--primary {
+  font-weight: 600;
+}
+
+.page-banner__copyright-link:hover {
+  color: #de8bf7;
+  transition-duration: 150ms;
+}
+
+.page-banner__link--inline {
+  font-size: inherit;
+  font-weight: 700;
 }
 
 .peri-shell__body {
@@ -160,6 +231,10 @@ body {
   line-height: 1;
   min-height: 24px;
   text-transform: uppercase;
+}
+
+.peri-control-label.is-active {
+  color: #1d4ed8;
 }
 
 .peri-section-title {
@@ -297,4 +372,204 @@ body {
 ::-webkit-scrollbar {
   width: 0px;
   background: transparent;
+}
+
+/* Dark Theme Overrides */
+[data-theme="dark"],
+.dark {
+  color-scheme: dark;
+}
+
+[data-theme="dark"] body,
+.dark body,
+[data-theme="dark"] .peri-shell,
+.dark .peri-shell {
+  background-color: #111214;
+  color: #ededed;
+}
+
+[data-theme="dark"] .page-banner,
+.dark .page-banner {
+  background: rgba(32, 37, 34, 0.93);
+  border-color: #333a35;
+}
+
+[data-theme="dark"] .page-banner__brand,
+.dark .page-banner__brand,
+[data-theme="dark"] .page-banner__link,
+.dark .page-banner__link,
+[data-theme="dark"] .page-banner__button,
+.dark .page-banner__button {
+  color: #fafafa;
+}
+
+[data-theme="dark"] .page-banner__brand:hover,
+.dark .page-banner__brand:hover,
+[data-theme="dark"] .page-banner__link:hover,
+.dark .page-banner__link:hover,
+[data-theme="dark"] .page-banner__button:hover,
+.dark .page-banner__button:hover,
+[data-theme="dark"] .page-banner__button.active,
+.dark .page-banner__button.active {
+  color: #de8bf7;
+}
+
+[data-theme="dark"] .page-banner--bottom .page-banner__inner,
+.dark .page-banner--bottom .page-banner__inner {
+  color: #9da69e;
+}
+
+[data-theme="dark"] .page-banner__copyright,
+.dark .page-banner__copyright {
+  color: #9da69e;
+}
+
+[data-theme="dark"] .page-banner__copyright-link,
+.dark .page-banner__copyright-link,
+[data-theme="dark"] .page-banner__copyright-link--primary,
+.dark .page-banner__copyright-link--primary {
+  color: #fafafa;
+}
+
+[data-theme="dark"] .page-banner__copyright-link:hover,
+.dark .page-banner__copyright-link:hover {
+  color: #de8bf7;
+}
+
+[data-theme="dark"] .shell-gutter,
+.dark .shell-gutter {
+  border-left-color: #333a35;
+}
+
+[data-theme="dark"] .peri-toolbar-divider,
+.dark .peri-toolbar-divider {
+  border-bottom-color: #333a35;
+}
+
+[data-theme="dark"] .peri-control-label,
+.dark .peri-control-label {
+  color: #9da69e;
+}
+
+[data-theme="dark"] .peri-control-label.is-active,
+.dark .peri-control-label.is-active {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .peri-section-title,
+.dark .peri-section-title {
+  color: #fafafa;
+}
+
+[data-theme="dark"] .peri-card,
+.dark .peri-card,
+[data-theme="dark"] .peri-popover,
+.dark .peri-popover {
+  background: #191d1a;
+  border-color: #333a35;
+  color: #fafafa;
+}
+
+[data-theme="dark"] .peri-card:hover,
+.dark .peri-card:hover {
+  border-color: #4a544c;
+}
+
+[data-theme="dark"] .peri-card.is-selected,
+.dark .peri-card.is-selected {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 1px #60a5fa;
+}
+
+[data-theme="dark"] .peri-popover__header,
+.dark .peri-popover__header {
+  background: #202522;
+  border-bottom-color: #333a35;
+}
+
+[data-theme="dark"] .peri-card__divider,
+.dark .peri-card__divider {
+  border-bottom-color: #333a35;
+  background: #202522;
+}
+
+[data-theme="dark"] .peri-card-title,
+.dark .peri-card-title {
+  color: #fafafa;
+}
+
+[data-theme="dark"] .peri-card-description,
+.dark .peri-card-description {
+  color: #9da69e;
+}
+
+[data-theme="dark"] .peri-chip,
+.dark .peri-chip {
+  background: #252c27;
+  border-color: #333a35;
+  color: #fafafa;
+}
+
+[data-theme="dark"] .peri-input,
+.dark .peri-input,
+[data-theme="dark"] .peri-select,
+.dark .peri-select,
+[data-theme="dark"] .peri-button--secondary,
+.dark .peri-button--secondary,
+[data-theme="dark"] .peri-toggle,
+.dark .peri-toggle {
+  background: #191d1a;
+  border-color: #333a35;
+  color: #fafafa;
+}
+
+[data-theme="dark"] .peri-input:focus,
+.dark .peri-input:focus,
+[data-theme="dark"] .peri-select:focus,
+.dark .peri-select:focus {
+  border-color: #78909c;
+  box-shadow: 0 0 0 1px #333a35;
+}
+
+[data-theme="dark"] .peri-button,
+.dark .peri-button {
+  background: #fafafa;
+  border-color: #fafafa;
+  color: #202522;
+}
+
+[data-theme="dark"] .peri-button:hover,
+.dark .peri-button:hover {
+  background: #e4e4e7;
+  border-color: #e4e4e7;
+}
+
+[data-theme="dark"] .peri-toggle.is-active,
+.dark .peri-toggle.is-active {
+  background: #1e3a8a;
+  border-color: #3b82f6;
+  color: #eff6ff;
+}
+
+/* Options page dark mode helpers */
+[data-theme="dark"] .peri-options-header,
+.dark .peri-options-header,
+[data-theme="dark"] .peri-options-tabs,
+.dark .peri-options-tabs {
+  border-bottom-color: #333a35;
+}
+
+[data-theme="dark"] .peri-options-tab,
+.dark .peri-options-tab {
+  color: #9da69e;
+}
+
+[data-theme="dark"] .peri-options-tab:hover,
+.dark .peri-options-tab:hover {
+  color: #fafafa;
+}
+
+[data-theme="dark"] .peri-options-tab.is-active,
+.dark .peri-options-tab.is-active {
+  color: #fafafa;
 }

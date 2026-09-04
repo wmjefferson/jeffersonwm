@@ -8,6 +8,8 @@ const dotcomsRoot = path.resolve(repoRoot, '..');
 
 const appRegistry = {
   aphelion: monorepoApp('Aphelion', 'aphelion', 'aphelion'),
+  billionaire: monorepoApp('Billionaire', 'billionaire', 'billionaire'),
+  bill: monorepoApp('Billionaire', 'billionaire', 'bill'),
   battalion: monorepoApp('Battalion', 'battalion', 'battalion'),
   batt: monorepoApp('Battalion', 'battalion', 'batt'),
   bullion: monorepoApp('Bullion', 'bullion', 'bullion'),

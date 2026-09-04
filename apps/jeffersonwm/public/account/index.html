@@ -55,11 +55,13 @@
       .layout {
         width: 100%;
         min-height: calc(100vh - (var(--frame) * 2));
-        display: block;
+        display: flex;
+        flex-direction: column;
       }
 
       .page {
         width: min(640px, 100%);
+        flex: 1 0 auto;
       }
 
       .logo-wrapper {
@@ -422,14 +424,13 @@
       }
 
       .bottom-links {
-        position: fixed;
-        left: var(--frame);
-        bottom: var(--frame);
-        z-index: 2;
         display: flex;
         flex-direction: column;
         align-items: flex-start;
         gap: 0.4rem;
+        margin-top: auto;
+        padding-top: 3rem;
+        width: min(640px, 100%);
       }
 
       .bottom-links .personal-link {
@@ -444,8 +445,8 @@
         }
 
         .bottom-links {
-          position: static;
           margin-top: 4rem;
+          padding-top: 0;
         }
 
         .field-grid {

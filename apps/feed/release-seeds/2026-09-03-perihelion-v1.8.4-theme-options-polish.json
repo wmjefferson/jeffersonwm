@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Perihelion v1.8.4 theme overhaul, options full-page navigation, and banner styling polish",
+  "content": "<p>This update refines Perihelion with unified banner typography, a dedicated full-page options management layout, and theme/wallpaper enhancements.</p><p>Key highlights:</p><ul><li><strong>Banner and typography alignment:</strong> Synchronized top and bottom banner font styles, line heights, and hover behaviors to match Lionship and Auth, with purple (#de8bf7) hover accents and exact copyright styling.</li><li><strong>Dedicated options page & auth flow:</strong> Converted options into a dedicated full-page view for tags and lists, routed account links to new tabs, and streamlined auth verification for instant single-click navigation.</li><li><strong>Dark mode & camera pattern wallpaper:</strong> Added full light/dark theme adaptation with subtle background tinting, dark mode local folder dialogs, and bold blue indicators for Max Mode thumbnail controls (100px / 100 limit).</li></ul>",
+  "url": "https://jeffersonwm.com/perihelion/",
+  "source": "release",
+  "external_id": "perihelion-v1.8.4-theme-options-polish",
+  "created_at": "2026-09-03 21:35:00"
+}

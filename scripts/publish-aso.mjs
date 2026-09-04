@@ -10,6 +10,8 @@ const deployConfigPath = path.join(repoRoot, '.vscode', 'sftp.json');
 
 const appRegistry = {
   aphelion: app('Aphelion', 'aphelion', 'aphelion'),
+  billionaire: app('Billionaire', 'billionaire', 'billionaire'),
+  bill: app('Billionaire', 'billionaire', 'billionaire'),
   battalion: app('Battalion', 'battalion', 'battalion', 'client/dist'),
   bullion: app('Bullion', 'bullion', 'bullion'),
   feed: app('Feed', 'feed', 'feed'),

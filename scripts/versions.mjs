@@ -8,6 +8,7 @@ const versionsManifestPath = path.join(repoRoot, 'apps', 'jeffersonwm', 'version
 
 const apps = [
   monorepoApp('Aphelion', 'aphelion'),
+  monorepoApp('Billionaire', 'billionaire'),
   monorepoApp('JeffersonWM', 'jeffersonwm'),
   monorepoApp('Feed', 'feed'),
   monorepoApp('Perihelion', 'perihelion'),
