@@ -23,14 +23,14 @@ router.post('/', async (req, res) => {
 
     // Update player mood
     await db.execute(
-      `UPDATE player SET current_mood = ?, mood_modifier = ?, updated_at = NOW() WHERE id = 1`,
-      [mood, modifier]
+      `UPDATE player SET current_mood = ?, mood_modifier = ?, updated_at = NOW() WHERE id = ?`,
+      [mood, modifier, req.userId]
     );
 
     // Insert mood log
     await db.execute(
-      `INSERT INTO mood_log (mood, note, modifier) VALUES (?, ?, ?)`,
-      [mood, note || '', modifier]
+      `INSERT INTO mood_log (user_id, mood, note, modifier) VALUES (?, ?, ?, ?)`,
+      [req.userId, mood, note || '', modifier]
     );
 
     // Mood emoji map
@@ -53,7 +53,7 @@ router.post('/', async (req, res) => {
       activityMessage += ` - ${note}`;
     }
 
-    await gameEngine.addActivity('mood', activityMessage, emoji, 0, 0);
+    await gameEngine.addActivity(req.userId, 'mood', activityMessage, emoji, 0, 0);
 
     res.json({ success: true, modifier, mood });
 
@@ -64,10 +64,13 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/mood/history - Get mood history
+// GET /api/mood/history - Get mood history for current user
 router.get('/history', async (req, res) => {
   try {
-    const [moods] = await db.execute('SELECT * FROM mood_log ORDER BY logged_at DESC LIMIT 50');
+    const [moods] = await db.execute(
+      'SELECT * FROM mood_log WHERE user_id = ? ORDER BY logged_at DESC LIMIT 50',
+      [req.userId]
+    );
     res.json(moods);
   } catch (err) {
     console.error('Get mood history error:', err);

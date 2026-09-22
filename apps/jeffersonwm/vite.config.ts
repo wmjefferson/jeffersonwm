@@ -21,6 +21,7 @@ function copyStaticRuntimeFilesToDist() {
       const legacyDistDummyPath = resolve(distDir, 'dummyjeffersonwm')
       const utilityPages = [
         resolve(distDir, 'account', 'index.html'),
+        resolve(distDir, 'account', 'widget', 'index.html'),
         resolve(distDir, 'development', 'index.html'),
         resolve(distDir, 'project-activity', 'index.html'),
         resolve(distDir, 'status', 'index.html'),
@@ -82,6 +83,8 @@ function prettyRootPagesInDev() {
   const pageRoutes = new Map([
     ['/account', '/account/index.html'],
     ['/account/', '/account/index.html'],
+    ['/account/widget', '/account/widget/index.html'],
+    ['/account/widget/', '/account/widget/index.html'],
     ['/project-activity', '/project-activity/index.html'],
     ['/project-activity/', '/project-activity/index.html'],
     ['/status', '/status/index.html'],

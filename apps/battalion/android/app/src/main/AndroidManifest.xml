@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!--
   AndroidManifest.xml
   The "table of contents" for the Android app. Every Activity,
@@ -64,14 +64,53 @@
             android:name=".BattalionWidget"
             android:exported="true">
             <intent-filter>
-                <!-- Standard system broadcast: "time to update the widget" -->
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <!-- Our custom broadcast: "a quick-action button was tapped" -->
-                <action android:name="com.jeffersonwm.battalion.PERFORM_ACTION" />
+                <action android:name="com.jeffersonwm.battalion.CYCLE_STAT" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/battalion_widget_info" />
+        </receiver>
+
+        <!-- StatsWidgetConfigActivity: display settings for stats widget -->
+        <activity
+            android:name=".StatsWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.BattalionCompanion">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- ShortcutWidgetConfigActivity: configures action/emotion for 1x1 shortcut widget -->
+        <activity
+            android:name=".ShortcutWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.BattalionCompanion">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- ShortcutActionDialogActivity: Android confirmation dialog when shortcut widget is pressed -->
+        <activity
+            android:name=".ShortcutActionDialogActivity"
+            android:exported="false"
+            android:theme="@style/Theme.BattalionCompanion.Dialog"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance" />
+
+        <!-- BattalionShortcutWidget: 1x1 one-tap widget for any action or emotion -->
+        <receiver
+            android:name=".BattalionShortcutWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.jeffersonwm.battalion.TRIGGER_SHORTCUT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/battalion_shortcut_widget_info" />
         </receiver>
 
     </application>

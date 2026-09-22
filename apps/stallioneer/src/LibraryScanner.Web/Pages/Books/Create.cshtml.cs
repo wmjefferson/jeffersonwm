@@ -11,7 +11,11 @@ using Microsoft.EntityFrameworkCore;
 namespace LibraryScanner.Web.Pages.Books;
 
 [Authorize]
-public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbnLookupService) : PageModel
+public class CreateModel(
+    ApplicationDbContext dbContext,
+    IIsbnLookupService isbnLookupService,
+    InventoryAccessService inventoryAccess,
+    AuthHistoryLogService authHistoryLog) : PageModel
 {
     [BindProperty]
     public BookInput Input { get; set; } = new();
@@ -50,8 +54,8 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
     public IReadOnlyList<SelectListItem> LookupProviderOptions { get; } =
     [
         new("Open Library first", LookupProviderPreference.OpenLibrary.ToString()),
-        new("Google Books first", LookupProviderPreference.GoogleBooks.ToString()),
-        new("ISBNdb first", LookupProviderPreference.IsbnDb.ToString())
+        new("ISBNdb first", LookupProviderPreference.IsbnDb.ToString()),
+        new("Google Books fallback", LookupProviderPreference.GoogleBooks.ToString())
     ];
 
     [BindProperty]
@@ -170,9 +174,10 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
             return Page();
         }
 
-        var location = await ResolveLocationAsync();
+        var account = inventoryAccess.GetAccount(User);
+        var location = await ResolveLocationAsync(account);
         var normalizedIsbn13 = NormalizeIdentifierValue(BookIdentifierType.Isbn13, isbn13!);
-        var existingBook = await dbContext.Books
+        var existingBook = await inventoryAccess.ScopeBooks(dbContext.Books, User)
             .Include(book => book.BookTags)
             .ThenInclude(bookTag => bookTag.Tag)
             .Include(book => book.CollectionBooks)
@@ -189,7 +194,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
             await SyncPrimaryIdentifiersAsync(existingBook, isbn13!, Input.Isbn10, IsManualEntry);
             AddCopies(existingBook, location, Input.Quantity);
             existingBook.Quantity = existingBook.Copies.Count;
-            await MergeTagsAsync(existingBook, Input.TagNames, SelectedTagIds);
+            await MergeTagsAsync(existingBook, Input.TagNames, SelectedTagIds, account);
             if (SpeedMode)
             {
                 await MergeCollectionsAsync(existingBook, SelectedCollectionIds);
@@ -204,13 +209,18 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
         }
         else
         {
-            var book = new Book { Isbn13 = isbn13! };
+            var book = new Book
+            {
+                Isbn13 = isbn13!,
+                OwnerAuthId = account.AuthId,
+                OwnerUsername = account.Username
+            };
             ApplyInput(book, location);
             dbContext.Books.Add(book);
             await SyncPrimaryIdentifiersAsync(book, isbn13!, Input.Isbn10, IsManualEntry);
             AddCopies(book, location, Input.Quantity);
             book.Quantity = book.Copies.Count;
-            await SyncTagsAsync(book, Input.TagNames, SelectedTagIds);
+            await SyncTagsAsync(book, Input.TagNames, SelectedTagIds, account);
             if (SpeedMode)
             {
                 await SyncCollectionsAsync(book, SelectedCollectionIds);
@@ -225,6 +235,13 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
         }
 
         await dbContext.SaveChangesAsync();
+        await authHistoryLog.LogAsync(account, existingBook is null ? "stallioneer.book_added" : "stallioneer.book_updated", new
+        {
+            title = Input.Title,
+            isbn13,
+            quantity = Input.Quantity,
+            mode = SpeedMode ? "speed" : "standard"
+        });
         StatusMessage = $"Saved {Input.Title}.";
         if (scanNext && SpeedMode)
         {
@@ -247,7 +264,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
         {
             code = $"M{Guid.NewGuid():N}"[..13];
             var normalizedCode = NormalizeIdentifierValue(BookIdentifierType.Internal, code);
-            if (!await dbContext.Books.AnyAsync(book =>
+            if (!await inventoryAccess.ScopeBooks(dbContext.Books, User).AnyAsync(book =>
                 book.Isbn13 == code ||
                 book.Identifiers.Any(identifier => identifier.NormalizedValue == normalizedCode)))
             {
@@ -301,7 +318,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
         }
 
         var normalizedIsbn13 = NormalizeIdentifierValue(BookIdentifierType.Isbn13, isbn13);
-        var existingBook = await dbContext.Books
+        var existingBook = await inventoryAccess.ScopeBooks(dbContext.Books, User)
             .AsNoTracking()
             .Include(book => book.Location)
             .Include(book => book.Copies)
@@ -435,18 +452,20 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
 
     private async Task LoadOptionsAsync()
     {
-        var locations = await dbContext.Locations.AsNoTracking().OrderBy(location => location.Name).ToListAsync();
+        var locations = await inventoryAccess.ScopeLocations(dbContext.Locations, User).AsNoTracking().OrderBy(location => location.Name).ToListAsync();
         LocationOptions = locations
             .Select(location => new SelectListItem(location.Name, location.Id.ToString()))
             .Prepend(new SelectListItem("No location", string.Empty))
             .ToList();
 
-        AvailableTags = await dbContext.Tags.AsNoTracking().OrderBy(tag => tag.Name).ToListAsync();
-        AvailableCollections = await dbContext.Collections.AsNoTracking().OrderBy(collection => collection.Name).ToListAsync();
+        AvailableTags = await inventoryAccess.ScopeTags(dbContext.Tags, User).AsNoTracking().OrderBy(tag => tag.Name).ToListAsync();
+        AvailableCollections = await inventoryAccess.ScopeCollections(dbContext.Collections, User).AsNoTracking().OrderBy(collection => collection.Name).ToListAsync();
 
+        var visibleBookIds = inventoryAccess.ScopeBooks(dbContext.Books, User).Select(book => book.Id);
         RecentScans = await dbContext.InventoryEvents
             .AsNoTracking()
             .Include(inventoryEvent => inventoryEvent.Book)
+            .Where(inventoryEvent => visibleBookIds.Contains(inventoryEvent.BookId))
             .OrderByDescending(inventoryEvent => inventoryEvent.Id)
             .Take(8)
             .Select(inventoryEvent => new RecentScanRow(
@@ -569,12 +588,13 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
         ScanDefaults = defaults.Keep ? defaults.ToString() : null;
     }
 
-    private async Task<Location?> ResolveLocationAsync()
+    private async Task<Location?> ResolveLocationAsync(InventoryAccount account)
     {
         if (!string.IsNullOrWhiteSpace(Input.NewLocationName))
         {
             var normalized = InventoryText.NormalizeName(Input.NewLocationName);
-            var location = await dbContext.Locations.FirstOrDefaultAsync(location => location.NormalizedName == normalized);
+            var location = await inventoryAccess.ScopeLocations(dbContext.Locations, User)
+                .FirstOrDefaultAsync(location => location.NormalizedName == normalized);
             if (location is not null)
             {
                 return location;
@@ -583,7 +603,9 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
             location = new Location
             {
                 Name = Input.NewLocationName.Trim(),
-                NormalizedName = normalized
+                NormalizedName = normalized,
+                OwnerAuthId = account.AuthId,
+                OwnerUsername = account.Username
             };
             dbContext.Locations.Add(location);
             return location;
@@ -591,16 +613,16 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
 
         return Input.LocationId is null
             ? null
-            : await dbContext.Locations.FirstOrDefaultAsync(location => location.Id == Input.LocationId);
+            : await inventoryAccess.ScopeLocations(dbContext.Locations, User).FirstOrDefaultAsync(location => location.Id == Input.LocationId);
     }
 
-    private async Task SyncTagsAsync(Book book, string? tagNames, IReadOnlyCollection<int> selectedTagIds)
+    private async Task SyncTagsAsync(Book book, string? tagNames, IReadOnlyCollection<int> selectedTagIds, InventoryAccount account)
     {
         book.BookTags.Clear();
 
         var selectedTags = selectedTagIds.Count == 0
             ? []
-            : await dbContext.Tags
+            : await inventoryAccess.ScopeTags(dbContext.Tags, User)
                 .Where(tag => selectedTagIds.Contains(tag.Id))
                 .ToListAsync();
 
@@ -615,7 +637,8 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
             var normalized = InventoryText.NormalizeName(tagName);
             var requestedTag = InventoryText.ParseTagDefinitions(tagNames)
                 .FirstOrDefault(definition => string.Equals(definition.Name, tagName, StringComparison.OrdinalIgnoreCase));
-            var tag = await dbContext.Tags.FirstOrDefaultAsync(tag => tag.NormalizedName == normalized);
+            var tag = await inventoryAccess.ScopeTags(dbContext.Tags, User)
+                .FirstOrDefaultAsync(tag => tag.NormalizedName == normalized);
             if (tag is null)
             {
                 tag = new Tag
@@ -623,7 +646,9 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
                     Name = tagName.Trim(),
                     NormalizedName = normalized,
                     Color = InventoryText.DefaultTagColor(tagName),
-                    Description = requestedTag?.Description
+                    Description = requestedTag?.Description,
+                    OwnerAuthId = account.AuthId,
+                    OwnerUsername = account.Username
                 };
                 dbContext.Tags.Add(tag);
             }
@@ -645,7 +670,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
             return;
         }
 
-        var collections = await dbContext.Collections
+        var collections = await inventoryAccess.ScopeCollections(dbContext.Collections, User)
             .Where(collection => selectedCollectionIds.Contains(collection.Id))
             .ToListAsync();
 
@@ -659,7 +684,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
         }
     }
 
-    private async Task MergeTagsAsync(Book book, string? tagNames, IReadOnlyCollection<int> selectedTagIds)
+    private async Task MergeTagsAsync(Book book, string? tagNames, IReadOnlyCollection<int> selectedTagIds, InventoryAccount account)
     {
         var existingTags = book.BookTags
             .Select(bookTag => bookTag.Tag.Name)
@@ -672,7 +697,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
 
         if (selectedTagIds.Count > 0)
         {
-            var selectedTags = await dbContext.Tags
+            var selectedTags = await inventoryAccess.ScopeTags(dbContext.Tags, User)
                 .Where(tag => selectedTagIds.Contains(tag.Id))
                 .Select(tag => tag.Name)
                 .ToListAsync();
@@ -683,7 +708,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
                 .ToList();
         }
 
-        await SyncTagsAsync(book, string.Join(", ", mergedTagNames), []);
+        await SyncTagsAsync(book, string.Join(", ", mergedTagNames), [], account);
     }
 
     private async Task MergeCollectionsAsync(Book book, IReadOnlyCollection<int> selectedCollectionIds)
@@ -928,7 +953,7 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
                 Decode(parts[3]),
                 Decode(parts[4]),
                 Enum.TryParse<LookupProviderPreference>(Decode(parts[5]), true, out var preferredProvider)
-                    ? preferredProvider
+                    ? NormalizePreferredLookupProvider(preferredProvider)
                     : LookupProviderPreference.OpenLibrary,
                 ParseIds(Decode(parts[6]) ?? string.Empty),
                 ParseIds(Decode(parts[7]) ?? string.Empty),
@@ -973,6 +998,13 @@ public class CreateModel(ApplicationDbContext dbContext, IIsbnLookupService isbn
         {
             var decoded = Uri.UnescapeDataString(value);
             return string.IsNullOrWhiteSpace(decoded) ? null : decoded;
+        }
+
+        private static LookupProviderPreference NormalizePreferredLookupProvider(LookupProviderPreference preferredProvider)
+        {
+            return preferredProvider == LookupProviderPreference.GoogleBooks
+                ? LookupProviderPreference.OpenLibrary
+                : preferredProvider;
         }
     }
 }

@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace LibraryScanner.Web.Pages.Locations;
 
 [Authorize]
-public class IndexModel(ApplicationDbContext dbContext) : PageModel
+public class IndexModel(ApplicationDbContext dbContext, InventoryAccessService inventoryAccess) : PageModel
 {
     public List<LocationRow> Locations { get; private set; } = [];
 
@@ -31,14 +31,17 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
         }
 
         var normalized = InventoryText.NormalizeName(Input.Name);
-        var exists = await dbContext.Locations.AnyAsync(location => location.NormalizedName == normalized);
+        var account = inventoryAccess.GetAccount(User);
+        var exists = await inventoryAccess.ScopeLocations(dbContext.Locations, User).AnyAsync(location => location.NormalizedName == normalized);
         if (!exists)
         {
             dbContext.Locations.Add(new Location
             {
                 Name = Input.Name.Trim(),
                 NormalizedName = normalized,
-                Description = Input.Description
+                Description = Input.Description,
+                OwnerAuthId = account.AuthId,
+                OwnerUsername = account.Username
             });
             await dbContext.SaveChangesAsync();
         }
@@ -48,7 +51,7 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
 
     public async Task<IActionResult> OnPostUpdateAsync(int id, string name, string? description)
     {
-        var location = await dbContext.Locations.FirstOrDefaultAsync(location => location.Id == id);
+        var location = await inventoryAccess.ScopeLocations(dbContext.Locations, User).FirstOrDefaultAsync(location => location.Id == id);
         if (location is null)
         {
             return NotFound();
@@ -67,7 +70,7 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
 
     public async Task<IActionResult> OnPostDeleteAsync(int id)
     {
-        var location = await dbContext.Locations.Include(location => location.Books).FirstOrDefaultAsync(location => location.Id == id);
+        var location = await inventoryAccess.ScopeLocations(dbContext.Locations, User).Include(location => location.Books).FirstOrDefaultAsync(location => location.Id == id);
         if (location is null)
         {
             return NotFound();
@@ -85,10 +88,11 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
 
     private async Task LoadLocationsAsync()
     {
-        Locations = await dbContext.Locations
+        var visibleBookIds = inventoryAccess.ScopeBooks(dbContext.Books, User).Select(book => book.Id);
+        Locations = await inventoryAccess.ScopeLocations(dbContext.Locations, User)
             .AsNoTracking()
             .OrderBy(location => location.Name)
-            .Select(location => new LocationRow(location.Id, location.Name, location.Description, location.Books.Count))
+            .Select(location => new LocationRow(location.Id, location.Name, location.Description, location.Books.Count(book => visibleBookIds.Contains(book.Id))))
             .ToListAsync();
     }
 

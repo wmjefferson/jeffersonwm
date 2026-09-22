@@ -198,6 +198,17 @@ function formatRows(entries) {
   return [header, rule, ...body].join('\n');
 }
 
+function printUsageExamples() {
+  console.log(`\nUsage examples:`);
+  console.log(`  npm run jeffvers                              # Show current package versions`);
+  console.log(`  npm run jeffvers:log                          # Show recent version log entries`);
+  console.log(`  npm run jeffvers:aphelion                     # Show recent Aphelion entries`);
+  console.log(`  npm run jeffvers:peri                         # Show recent Perihelion entries`);
+  console.log(`  node scripts/version-log.mjs --limit 30       # Show more entries`);
+  console.log(`  node scripts/version-log.mjs --app lionship --type patch`);
+  console.log(`  node scripts/version-log.mjs --json           # Output matching entries as JSON\n`);
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
 
@@ -234,10 +245,12 @@ function main() {
 
   if (entries.length === 0) {
     console.log('No version log entries matched.');
+    printUsageExamples();
     return;
   }
 
   console.log(formatRows(entries));
+  printUsageExamples();
 }
 
 main();

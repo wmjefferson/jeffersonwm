@@ -72,7 +72,7 @@ Apply the library rename plan:
   npm run rename:apply
 
 Check an outside folder for duplicates before importing:
-  npm run rename:check -- --incoming "E:\\outside-folder"
+  node scripts/rename-library.mjs --preview --incoming "E:\\outside-folder"
 
 Options:
   --library <path>      Image library root. Defaults to APHELION_IMAGE_DIR(S), then E:\\images\\keep.
@@ -83,6 +83,15 @@ Options:
   --apply               Actually rename files and write history.
   --preview             Preview only. This is the default.
 `);
+}
+
+function printUsageExamples() {
+  console.log(`\nUsage examples:`);
+  console.log(`  npm run rename:preview                        # Review planned library renames`);
+  console.log(`  npm run rename:apply                          # Apply the library rename plan`);
+  console.log(`  node scripts/rename-library.mjs --preview --incoming "E:\\outside-folder"`);
+  console.log(`  node scripts/rename-library.mjs --preview --library "\\\\JEFFERSHIZZLE-D\\Dotcoms E\\images\\keep"`);
+  console.log(`  node scripts/rename-library.mjs --apply --block-size 1000 --digits 5\n`);
 }
 
 function parseEnvFile(filePath) {
@@ -478,12 +487,14 @@ async function main() {
 
   if (!args.apply) {
     console.log(`Preview only. Re-run with --apply to rename and write history.`);
+    printUsageExamples();
     return;
   }
 
   const entries = await applyRenamePlan(plan, libraryRoot, history, historyPath);
   console.log(`Applied ${entries.length} rename(s).`);
   console.log(`History updated: ${historyPath}`);
+  printUsageExamples();
 }
 
 main().catch((error) => {

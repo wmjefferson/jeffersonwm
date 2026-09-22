@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Windows 11 Fax application architecture & HP M283cdw integration roadmap",
+  "content": "<p>Explored architecture and system requirements for building a dedicated Windows 11 desktop fax suite integrating directly with the hardware HP Color LaserJet Pro MFP M283cdw.</p><p>Key architectural foundations:</p><ul><li><strong>Hardware & Modem Integration:</strong> Mapped the printer's onboard 33.6 kbps analog fax modem (RJ-11 <code>1-LINE</code> / <code>2-EXT</code> ports) and VoIP ATA pass-through options for direct physical line transmission.</li><li><strong>Dual Inbound/Outbound Engine:</strong> Leveraged <em>HP Digital Fax</em> (EWS Fax-to-Network-Folder) to automatically save incoming faxes as PDFs into a watched folder, paired with the HP PC Fax spooler driver for automated outbound document transmission.</li><li><strong>Windows 11 Desktop Suite:</strong> Outlined a React + Tauri/Electron desktop architecture incorporating Billionaire's telephony sanitization and hybrid vanity word matching, local SQLite audit storage, embedded PDF preview, and Windows 11 Toast notifications.</li></ul>",
+  "url": "https://jeffersonwm.com/billionaire/",
+  "source": "manual",
+  "external_id": "windows-11-fax-app-m283cdw-architecture-2026-09-05",
+  "created_at": "2026-09-05 21:12:00"
+}

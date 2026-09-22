@@ -17,13 +17,13 @@ SQLite keeps the project free to run on a Windows 10 home server. The data model
 ```powershell
 dotnet tool restore
 dotnet tool run dotnet-ef database update --project src/LibraryScanner.Web/LibraryScanner.Web.csproj
-dotnet run --project src/LibraryScanner.Web/LibraryScanner.Web.csproj --urls http://localhost:5107
+dotnet run --project src/LibraryScanner.Web/LibraryScanner.Web.csproj --urls http://127.0.0.1:8150
 ```
 
 Open:
 
 ```text
-http://localhost:5107
+http://127.0.0.1:8150
 ```
 
 Register a local account, then use Inventory > Add book.

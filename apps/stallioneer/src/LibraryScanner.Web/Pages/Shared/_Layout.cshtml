@@ -1,4 +1,12 @@
-﻿<!DOCTYPE html>
+@inject Microsoft.Extensions.Options.IOptions<LibraryScanner.Web.Services.CentralAuthOptions> CentralAuthOptions
+@{
+    var currentPage = (ViewContext.RouteData.Values["page"] as string) ?? string.Empty;
+    string BannerLinkClass(string page) =>
+        string.Equals(currentPage, page, StringComparison.OrdinalIgnoreCase)
+            ? "page-banner__link is-active"
+            : "page-banner__link";
+}
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -12,34 +20,27 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/LibraryScanner.Web.styles.css" asp-append-version="true" />
 </head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white app-topbar">
-            <div class="shell-frame shell-frame--topbar">
-                <a class="navbar-brand" asp-area="" asp-page="/Index">Stallioneer</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Books/Index">Inventory</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Books/Bulk">Bulk</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Tags/Index">Tags</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Locations/Index">Locations</a>
-                        </li>
-                    </ul>
-                    <partial name="_LoginPartial" />
-                </div>
-            </div>
-        </nav>
+<body data-stallioneer-auth-base-url="@CentralAuthOptions.Value.AuthBaseUrl.TrimEnd('/')">
+    <div class="shell-gutters" aria-hidden="true">
+        <div class="shell-gutter shell-gutter--left"></div>
+        <div class="shell-gutter shell-gutter--right"></div>
+    </div>
+    <header class="page-banner page-banner--top">
+        <div class="page-banner__inner shell-frame">
+            <a class="page-banner__brand" asp-area="" asp-page="/Index">Stallioneer</a>
+            <nav class="page-banner__nav" aria-label="Stallioneer pages">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a class="@BannerLinkClass("/Books/Index")" asp-area="" asp-page="/Books/Index">Inventory</a>
+                    <a class="@BannerLinkClass("/Books/Bulk")" asp-area="" asp-page="/Books/Bulk">Bulk</a>
+                    @if (User.IsInRole(LibraryScanner.Web.Models.AppRoles.Admin))
+                    {
+                        <a class="@BannerLinkClass("/Users/Admin")" asp-area="" asp-page="/Users/Admin">Options</a>
+                    }
+                }
+                <partial name="_LoginPartial" />
+            </nav>
+        </div>
     </header>
     <div class="shell-frame shell-frame--body">
         <main role="main" class="pb-3">
@@ -47,9 +48,15 @@
         </main>
     </div>
 
-    <footer class="footer text-muted app-footer">
-        <div class="shell-frame shell-frame--footer">
-            &copy; 2026 - Stallioneer
+    <footer class="page-banner page-banner--bottom">
+        <div class="page-banner__inner shell-frame">
+            <span aria-hidden="true"></span>
+            <p class="page-banner__copyright">
+                &copy; 2026
+                <a href="https://jeffersonwm.com" class="page-banner__copyright-link page-banner__copyright-link--primary">Jefferson Williams</a>.
+                All rights reserved.
+                <a href="https://github.com/wmjefferson/jeffersonwm" class="page-banner__copyright-link">GitHub</a>.
+            </p>
         </div>
     </footer>
 

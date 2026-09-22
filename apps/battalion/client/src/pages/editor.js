@@ -607,6 +607,7 @@ function showForm(item) {
 function getCurrentData() {
   if (activeTab === 'actions') return allActions;
   if (activeTab === 'tasks') return allTasks;
+  if (activeTab === 'emotions') return allEmotions;
   return allHabits;
 }
 

@@ -90,6 +90,14 @@ public sealed class OpenLibraryIsbnLookupService(
                 cache.Set(cacheKey, deferredResponse, GetCacheDuration(deferredResponse));
                 return deferredResponse;
             }
+
+            lookupResponse = new BookLookupResponse(
+                BookLookupStatus.NotFound,
+                null,
+                isbn13,
+                "No online match found from Open Library or ISBNdb. You can enter the details manually.");
+            cache.Set(cacheKey, lookupResponse, GetCacheDuration(lookupResponse));
+            return lookupResponse;
         }
 
         lookupResponse = digits.Length is >= 8 and <= 14
@@ -111,12 +119,20 @@ public sealed class OpenLibraryIsbnLookupService(
 
     private static IReadOnlyList<LookupProviderPreference> GetProviderOrder(LookupProviderPreference preferredProvider)
     {
-        var providers = new[]
+        LookupProviderPreference[] providers = preferredProvider switch
         {
-            preferredProvider,
-            LookupProviderPreference.OpenLibrary,
-            LookupProviderPreference.GoogleBooks,
-            LookupProviderPreference.IsbnDb
+            LookupProviderPreference.IsbnDb =>
+            [
+                LookupProviderPreference.IsbnDb,
+                LookupProviderPreference.OpenLibrary,
+                LookupProviderPreference.GoogleBooks
+            ],
+            _ =>
+            [
+                LookupProviderPreference.OpenLibrary,
+                LookupProviderPreference.IsbnDb,
+                LookupProviderPreference.GoogleBooks
+            ]
         };
 
         return providers.Distinct().ToArray();
@@ -152,11 +168,7 @@ public sealed class OpenLibraryIsbnLookupService(
             if (IsRateLimited(ex))
             {
                 logger.LogWarning(ex, "Google Books ISBN lookup was rate limited for {Isbn13}.", isbn13);
-                return new BookLookupResponse(
-                    BookLookupStatus.NotFound,
-                    null,
-                    isbn13,
-                    "Google Books rate limit reached for the moment. Try this ISBN again in a minute.");
+                return null;
             }
 
             logger.LogWarning(ex, "Google Books ISBN lookup failed for {Isbn13}.", isbn13);
@@ -211,7 +223,7 @@ public sealed class OpenLibraryIsbnLookupService(
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or NotSupportedException)
         {
-            logger.LogWarning(ex, "Open Library lookup failed for {Isbn13}. Falling back to Google Books.", isbn13);
+            logger.LogWarning(ex, "Open Library lookup failed for {Isbn13}. Falling back to the next configured provider.", isbn13);
             return null;
         }
     }

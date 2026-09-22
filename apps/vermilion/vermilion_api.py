@@ -14,6 +14,7 @@ from datetime import datetime, date, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
+from urllib.request import Request, urlopen
 
 try:
     from PIL import Image
@@ -42,6 +43,37 @@ CENTRAL_SESSION_COOKIE_NAME = os.environ.get('VERMILION_CENTRAL_SESSION_COOKIE_N
                                                             'auth_jeffersonwm_session'))
 REQUIRED_APP_MEMBERSHIP = os.environ.get('VERMILION_REQUIRED_APP_MEMBERSHIP', 'vermilion').strip()
 REQUIRE_AUTH = os.environ.get('VERMILION_REQUIRE_AUTH', 'true').lower() in {'1', 'true', 'yes', 'on'}
+
+AUTH_BASE_URL = os.environ.get('VERMILION_AUTH_BASE_URL', os.environ.get('AUTH_BASE_URL', 'https://auth.jeffersonwm.com')).rstrip('/')
+AUTH_INTERNAL_LOG_TOKEN = os.environ.get('VERMILION_AUTH_INTERNAL_LOG_TOKEN', os.environ.get('AUTH_INTERNAL_LOG_TOKEN', '0fd4b372cabf46e4afdae1be1a1d4fa5a49b076fa53c62b8619f2faeab1b12ee')).strip()
+
+
+def post_auth_history(action: str, target: str, user: dict | None = None, site: str = "vermilion") -> None:
+    if not AUTH_BASE_URL or not AUTH_INTERNAL_LOG_TOKEN:
+        return
+    payload = {
+        "action": action,
+        "target": target,
+        "site": site,
+        "userId": str(user.get("id")) if user and user.get("id") is not None else "",
+        "username": str(user.get("username")) if user and user.get("username") else "",
+        "internalToken": AUTH_INTERNAL_LOG_TOKEN,
+    }
+    try:
+        req = Request(
+            f"{AUTH_BASE_URL}/api/history/log",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "x-auth-internal-token": AUTH_INTERNAL_LOG_TOKEN,
+            },
+            method="POST",
+        )
+        with urlopen(req, timeout=8) as response:
+            response.read()
+    except Exception as exc:
+        print(f"Failed to post auth history for {action}: {exc}")
+
 
 DEFAULT_ORIGIN = 'https://jeffersonwm.com'
 ALLOWED_ORIGINS = {
@@ -304,6 +336,18 @@ def run_execution_job(job_id, config, mode, conflict):
             "errors": stats["errors"],
             "undo_log_path": stats["undo_log_path"]
         })
+        post_auth_history(
+            "vermilion.files_organized",
+            json.dumps({
+                "source": source_dir,
+                "dest": config.get("dest_dir", ""),
+                "mode": mode,
+                "copied": stats["copied"],
+                "moved": stats["moved"],
+                "skipped": stats["skipped"],
+                "errors": len(stats["errors"]) if isinstance(stats["errors"], list) else stats["errors"],
+            })
+        )
     except Exception as e:
         emit({"type": "error", "error": str(e)})
     finally:
@@ -589,6 +633,17 @@ class Handler(BaseHTTPRequestHandler):
                 images, non_images = scan_directory(source_dir, recursive=body.get("recursive", True))
                 plan_config = build_plan_config(body)
                 plan = generate_plan(images, non_images, plan_config)
+                post_auth_history(
+                    "vermilion.plan_created",
+                    json.dumps({
+                        "source": source_dir,
+                        "dest": body.get("dest_dir", ""),
+                        "total_images": plan.total_images,
+                        "total_non_images": plan.total_non_images,
+                        "total_folders": plan.total_folders,
+                    }),
+                    user
+                )
                 self._send_json(serialize_plan(plan))
             except Exception as e:
                 self._send_json({'error': str(e)}, 500)

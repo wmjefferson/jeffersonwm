@@ -1,0 +1,137 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_1row_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Background Art: batthorz01 -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/batthorz01"
+        android:scaleType="centerCrop" />
+
+    <!-- Dark Overlay Scrim -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/widget_bg_scrim" />
+
+    <!-- Content layer -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical">
+
+        <!-- Top info row: Title/Level, Gold, Stat Switcher Badge, Settings ⚙ -->
+        <LinearLayout
+            android:id="@+id/widget_1row_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/widget_1row_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="⚔ Lv.1 Recruit"
+                android:textColor="#4fc3f7"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:clickable="true"
+                android:focusable="true"
+                android:singleLine="true"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/widget_1row_gold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="💰 0g"
+                android:textColor="#ffd54f"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_marginEnd="6dp" />
+
+            <TextView
+                android:id="@+id/widget_1row_stat_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="[HP ⟳]"
+                android:textColor="#4fc3f7"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="2dp" />
+
+            <TextView
+                android:id="@+id/widget_1row_settings"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" ⚙"
+                android:textColor="#90caf9"
+                android:textSize="16sp"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="3dp" />
+        </LinearLayout>
+
+        <!-- Single Stat Bar Row (Tapping cycles HP -> XP -> Health) -->
+        <LinearLayout
+            android:id="@+id/widget_1row_stat_click_area"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:clickable="true"
+            android:focusable="true"
+            android:layout_marginTop="6dp">
+
+            <TextView
+                android:id="@+id/widget_1row_stat_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="HP 35/100"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:clickable="true"
+                android:focusable="true"
+                android:minWidth="135dp" />
+
+            <ProgressBar
+                android:id="@+id/widget_1row_progress_bar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="0dp"
+                android:layout_height="8dp"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="6dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:progressTint="#66bb6a"
+                android:progressBackgroundTint="#2a2a4a"
+                android:max="100"
+                android:progress="35" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+</FrameLayout>

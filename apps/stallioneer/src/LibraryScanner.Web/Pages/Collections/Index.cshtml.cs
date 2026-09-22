@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace LibraryScanner.Web.Pages.Collections;
 
 [Authorize]
-public class IndexModel(ApplicationDbContext dbContext) : PageModel
+public class IndexModel(ApplicationDbContext dbContext, InventoryAccessService inventoryAccess) : PageModel
 {
     public List<CollectionRow> Collections { get; private set; } = [];
 
@@ -34,14 +34,17 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
         }
 
         var normalized = InventoryText.NormalizeName(Input.Name);
-        var exists = await dbContext.Collections.AnyAsync(collection => collection.NormalizedName == normalized);
+        var account = inventoryAccess.GetAccount(User);
+        var exists = await inventoryAccess.ScopeCollections(dbContext.Collections, User).AnyAsync(collection => collection.NormalizedName == normalized);
         if (!exists)
         {
             dbContext.Collections.Add(new Collection
             {
                 Name = Input.Name.Trim(),
                 NormalizedName = normalized,
-                Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim()
+                Description = string.IsNullOrWhiteSpace(Input.Description) ? null : Input.Description.Trim(),
+                OwnerAuthId = account.AuthId,
+                OwnerUsername = account.Username
             });
             await dbContext.SaveChangesAsync();
             StatusMessage = "Collection created.";
@@ -56,7 +59,7 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
 
     public async Task<IActionResult> OnPostUpdateAsync(int id, string name, string? description)
     {
-        var collection = await dbContext.Collections.FirstOrDefaultAsync(item => item.Id == id);
+        var collection = await inventoryAccess.ScopeCollections(dbContext.Collections, User).FirstOrDefaultAsync(item => item.Id == id);
         if (collection is null)
         {
             return NotFound();
@@ -66,7 +69,7 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
         {
             var trimmedName = name.Trim();
             var normalized = InventoryText.NormalizeName(trimmedName);
-            var duplicateExists = await dbContext.Collections.AnyAsync(other => other.Id != id && other.NormalizedName == normalized);
+            var duplicateExists = await inventoryAccess.ScopeCollections(dbContext.Collections, User).AnyAsync(other => other.Id != id && other.NormalizedName == normalized);
             if (duplicateExists)
             {
                 StatusMessage = $"Collection \"{trimmedName}\" already exists.";
@@ -85,7 +88,7 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
 
     public async Task<IActionResult> OnPostDeleteAsync(int id)
     {
-        var collection = await dbContext.Collections.FirstOrDefaultAsync(item => item.Id == id);
+        var collection = await inventoryAccess.ScopeCollections(dbContext.Collections, User).FirstOrDefaultAsync(item => item.Id == id);
         if (collection is null)
         {
             return NotFound();
@@ -99,14 +102,15 @@ public class IndexModel(ApplicationDbContext dbContext) : PageModel
 
     private async Task LoadCollectionsAsync()
     {
-        Collections = await dbContext.Collections
+        var visibleBookIds = inventoryAccess.ScopeBooks(dbContext.Books, User).Select(book => book.Id);
+        Collections = await inventoryAccess.ScopeCollections(dbContext.Collections, User)
             .AsNoTracking()
             .OrderBy(collection => collection.Name)
             .Select(collection => new CollectionRow(
                 collection.Id,
                 collection.Name,
                 collection.Description,
-                collection.CollectionBooks.Count))
+                collection.CollectionBooks.Count(collectionBook => visibleBookIds.Contains(collectionBook.BookId))))
             .ToListAsync();
     }
 

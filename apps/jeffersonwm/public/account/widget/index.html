@@ -1,0 +1,1471 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>JeffersonWM Widget</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Young+Serif&family=IBM+Plex+Sans+Condensed:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --frame: 42px;
+        --ink: #111827;
+        --line: rgba(17, 24, 39, 0.14);
+        --muted: rgba(17, 24, 39, 0.58);
+        --card-bg: #ffffff;
+        --accent: #5b7ea3;
+        --accent-hover: #4a6c90;
+        --danger: #b91c1c;
+        --active-tint: #de8bf7;
+        --radius: 6px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: var(--frame);
+        background: #fdfdfd;
+        color: var(--ink);
+        font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        position: relative;
+        isolation: isolate;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("../../images/backgrounds/jeffwm-feed-lion-pattern-20260627.jpeg");
+        background-repeat: repeat;
+        background-size: 900px auto;
+        opacity: 0.05;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .layout {
+        width: 100%;
+        min-height: calc(100vh - (var(--frame) * 2));
+        display: flex;
+        flex-direction: column;
+      }
+
+      .logo-wrapper {
+        margin-bottom: 0.75rem;
+      }
+
+      .logo-link {
+        display: inline-block;
+      }
+
+      .logo {
+        display: block;
+        width: 84px;
+        height: 84px;
+      }
+
+      h1 {
+        margin: 0 0 1.75rem 0;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: clamp(2rem, 3vw, 2.4rem);
+        font-weight: 400;
+      }
+
+      .bottom-links {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+        margin-top: auto;
+        padding-top: 3.5rem;
+        width: min(640px, 100%);
+      }
+
+      .personal-link {
+        position: relative;
+        color: #111827;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        font-family: inherit;
+        font-size: 0.92rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-decoration: none;
+        cursor: pointer;
+        width: max-content;
+      }
+
+      .personal-link::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.1rem;
+        width: 100%;
+        height: 1px;
+        background: #d4d4d4;
+        transform-origin: left;
+        transform: scaleX(0);
+        transition: transform 0.15s ease-out;
+      }
+
+      .personal-link:hover::after {
+        transform: scaleX(1);
+      }
+
+      /* View Tabs */
+      .tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 0.5rem;
+      }
+
+      .tab-button {
+        background: none;
+        border: none;
+        font-family: inherit;
+        font-size: 1.05rem;
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        color: var(--muted);
+        cursor: pointer;
+        border-radius: var(--radius);
+        transition: color 0.15s ease, background 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+      }
+
+      .tab-button:hover {
+        color: var(--ink);
+        background: rgba(17, 24, 39, 0.04);
+      }
+
+      .tab-button.is-active {
+        color: var(--ink);
+        background: rgba(17, 24, 39, 0.08);
+        border-bottom: 2px solid var(--ink);
+      }
+
+      .tab-badge {
+        font-size: 0.75rem;
+        background: rgba(17, 24, 39, 0.1);
+        padding: 0.15rem 0.45rem;
+        border-radius: 999px;
+        font-weight: 700;
+      }
+
+      /* Control Toolbar */
+      .toolbar {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-bottom: 1.75rem;
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 1rem 1.25rem;
+        backdrop-filter: blur(8px);
+      }
+
+      .toolbar-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+
+      .round-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+
+      .round-pill {
+        background: rgba(17, 24, 39, 0.04);
+        border: 1px solid var(--line);
+        font-family: inherit;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--muted);
+        padding: 0.3rem 0.65rem;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .round-pill:hover {
+        border-color: var(--ink);
+        color: var(--ink);
+      }
+
+      .round-pill.is-active {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: #ffffff;
+      }
+
+      .filter-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .search-input {
+        font-family: inherit;
+        font-size: 0.92rem;
+        padding: 0.4rem 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #ffffff;
+        color: var(--ink);
+        min-width: 220px;
+        outline: none;
+      }
+
+      .search-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(91, 126, 163, 0.15);
+      }
+
+      .select-input {
+        font-family: inherit;
+        font-size: 0.88rem;
+        font-weight: 500;
+        padding: 0.4rem 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #ffffff;
+        color: var(--ink);
+        outline: none;
+        cursor: pointer;
+      }
+
+      .sample-text-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        width: 100%;
+      }
+
+      .sample-text-input {
+        flex: 1;
+        font-family: inherit;
+        font-size: 0.95rem;
+        padding: 0.45rem 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #ffffff;
+        color: var(--ink);
+        outline: none;
+      }
+
+      .sample-text-input:focus {
+        border-color: var(--accent);
+      }
+
+      /* Font Cards Grid */
+      .font-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.25rem;
+      }
+
+      .font-card {
+        background: var(--card-bg);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 1rem;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        position: relative;
+      }
+
+      .font-card:hover {
+        border-color: rgba(17, 24, 39, 0.35);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      }
+
+      .font-card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .font-card-title {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--ink);
+      }
+
+      .font-card-title-link {
+        color: var(--ink);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: color 0.15s ease;
+      }
+
+      .font-card-title-link:hover {
+        color: var(--accent);
+        text-decoration: underline;
+        text-underline-offset: 0.15em;
+      }
+
+      .font-card-title-link .external-icon {
+        font-size: 0.78rem;
+        opacity: 0.45;
+        transition: opacity 0.15s ease, transform 0.15s ease;
+      }
+
+      .font-card-title-link:hover .external-icon {
+        opacity: 1;
+        transform: translate(1px, -1px);
+      }
+
+      .font-card-meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .round-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0.15rem 0.45rem;
+        border-radius: 4px;
+        background: rgba(17, 24, 39, 0.06);
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .font-preview-stage {
+        min-height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 0.75rem;
+        background: #fafafa;
+        border: 1px solid rgba(17, 24, 39, 0.06);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .font-preview-text {
+        font-size: 1.6rem;
+        line-height: 1.2;
+        word-break: break-word;
+        margin: 0;
+      }
+
+      .font-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid rgba(17, 24, 39, 0.06);
+      }
+
+      .control-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.84rem;
+      }
+
+      .control-label {
+        font-weight: 600;
+        color: var(--muted);
+      }
+
+      .number-buttons {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .num-btn {
+        background: #ffffff;
+        border: none;
+        border-right: 1px solid var(--line);
+        font-family: inherit;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--muted);
+        padding: 0.25rem 0.6rem;
+        cursor: pointer;
+        transition: all 0.12s ease;
+      }
+
+      .num-btn:last-child {
+        border-right: none;
+      }
+
+      .num-btn:hover {
+        background: rgba(17, 24, 39, 0.06);
+        color: var(--ink);
+      }
+
+      .num-btn.is-active {
+        background: var(--ink);
+        color: #ffffff;
+      }
+
+      .num-btn.is-active-prob {
+        background: #5b7ea3;
+        color: #ffffff;
+      }
+
+      .saving-indicator {
+        font-size: 0.72rem;
+        color: var(--accent);
+        font-weight: 600;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+
+      .saving-indicator.is-saving {
+        opacity: 1;
+      }
+
+      /* Special Dates Section */
+      .dates-section {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .dates-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .primary-btn {
+        background: var(--ink);
+        color: #ffffff;
+        border: none;
+        font-family: inherit;
+        font-size: 0.92rem;
+        font-weight: 600;
+        padding: 0.5rem 1.1rem;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: opacity 0.15s ease, transform 0.1s ease;
+      }
+
+      .primary-btn:hover {
+        opacity: 0.9;
+      }
+
+      .dates-list {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .date-item {
+        background: var(--card-bg);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 1rem 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      .date-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+      }
+
+      .date-title {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+
+      .date-meta {
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+
+      .date-desc {
+        font-size: 0.88rem;
+        color: var(--ink);
+        margin-top: 0.2rem;
+      }
+
+      .date-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .action-btn {
+        background: none;
+        border: 1px solid var(--line);
+        font-family: inherit;
+        font-size: 0.84rem;
+        font-weight: 600;
+        padding: 0.35rem 0.75rem;
+        border-radius: 4px;
+        cursor: pointer;
+        color: var(--ink);
+        transition: all 0.15s ease;
+      }
+
+      .action-btn:hover {
+        border-color: var(--ink);
+      }
+
+      .action-btn--danger {
+        color: var(--danger);
+      }
+
+      .action-btn--danger:hover {
+        border-color: var(--danger);
+        background: rgba(185, 28, 28, 0.05);
+      }
+
+      /* Modal */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        z-index: 999;
+        backdrop-filter: blur(4px);
+      }
+
+      .modal-backdrop[hidden] {
+        display: none;
+      }
+
+      .modal-card {
+        background: #ffffff;
+        border-radius: var(--radius);
+        width: min(540px, 100%);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        padding: 1.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+
+      .modal-card h2 {
+        margin: 0;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: 1.6rem;
+      }
+
+      .modal-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .form-group label {
+        font-size: 0.84rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .form-group input,
+      .form-group textarea {
+        font-family: inherit;
+        font-size: 0.95rem;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        outline: none;
+      }
+
+      .form-group input:focus,
+      .form-group textarea:focus {
+        border-color: var(--accent);
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+
+      .modal-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.6rem;
+        margin-top: 0.5rem;
+      }
+
+      /* Login Prompt */
+      .auth-prompt-card {
+        background: #ffffff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 2.5rem;
+        text-align: center;
+        max-width: 480px;
+        margin: 3rem auto;
+      }
+
+      .auth-prompt-card h2 {
+        margin: 0 0 0.5rem;
+        font-family: "Young Serif", "Times New Roman", serif;
+      }
+
+      .auth-prompt-card p {
+        color: var(--muted);
+        margin: 0 0 1.5rem;
+        font-size: 1rem;
+      }
+
+      /* Empty States & Feedback */
+      .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: var(--ink);
+        color: #ffffff;
+        padding: 0.65rem 1.25rem;
+        border-radius: var(--radius);
+        font-size: 0.92rem;
+        font-weight: 600;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        transform: translateY(10px);
+        transition: all 0.2s ease;
+        pointer-events: none;
+        z-index: 1000;
+      }
+
+      .toast.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (max-width: 720px) {
+        body {
+          padding: 1.5rem;
+        }
+
+        .top-bar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 1rem;
+        }
+
+        .font-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <div class="logo-wrapper">
+        <a class="logo-link" href="/" aria-label="Return to JeffersonWM home">
+          <img src="/favicon.svg" alt="" class="logo" />
+        </a>
+      </div>
+
+      <h1>Widget</h1>
+
+      <!-- Main Authenticated Container -->
+      <main id="editor-main" hidden>
+        <div class="tabs">
+          <button class="tab-button is-active" id="tab-fonts" type="button">
+            Typefaces <span class="tab-badge" id="fonts-total-badge">213</span>
+          </button>
+          <button class="tab-button" id="tab-dates" type="button">
+            Special Dates <span class="tab-badge" id="dates-total-badge">0</span>
+          </button>
+        </div>
+
+        <!-- VIEW 1: TYPEFACES -->
+        <section id="view-fonts">
+          <div class="toolbar">
+            <div class="toolbar-row">
+              <div class="round-pills" id="round-pills">
+                <button class="round-pill is-active" data-round="all" type="button">All Rounds</button>
+                <button class="round-pill" data-round="1" type="button">R1</button>
+                <button class="round-pill" data-round="2" type="button">R2</button>
+                <button class="round-pill" data-round="3" type="button">R3</button>
+                <button class="round-pill" data-round="4" type="button">R4</button>
+                <button class="round-pill" data-round="5" type="button">R5</button>
+                <button class="round-pill" data-round="6" type="button">R6</button>
+                <button class="round-pill" data-round="7" type="button">R7</button>
+                <button class="round-pill" data-round="8" type="button">R8</button>
+              </div>
+
+              <div class="filter-controls">
+                <input
+                  type="text"
+                  class="search-input"
+                  id="font-search"
+                  placeholder="Search font names..."
+                  autocomplete="off"
+                />
+                <select class="select-input" id="font-sort">
+                  <option value="alpha">Sort: Alphabetical (A-Z)</option>
+                  <option value="prob">Sort: Probability (High-Low)</option>
+                  <option value="round">Sort: Round (1-8)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="toolbar-row">
+              <div class="sample-text-bar">
+                <select class="select-input" id="sample-preset">
+                  <option value="default">Sample: Widget Default</option>
+                  <option value="pangram">Sample: Pangram</option>
+                  <option value="alphabet">Sample: Alphabet & Digits</option>
+                  <option value="custom">Sample: Custom Text</option>
+                </select>
+                <input
+                  type="text"
+                  class="sample-text-input"
+                  id="sample-text"
+                  value="12:00 PM • San Francisco"
+                  placeholder="Type preview text..."
+                />
+              </div>
+              <button class="action-btn" id="btn-reset-all" type="button" title="Reset all 213 typefaces to Weight: 3 and Probability: 3">
+                ↺ Reset All (3/3)
+              </button>
+            </div>
+          </div>
+
+          <div class="font-grid" id="font-grid"></div>
+          <div class="empty-state" id="fonts-empty" hidden>No typefaces match your filter.</div>
+        </section>
+
+        <!-- VIEW 2: SPECIAL DATES -->
+        <section id="view-dates" hidden>
+          <div class="dates-section">
+            <div class="dates-header-row">
+              <div>
+                <h2 style="margin: 0; font-family: 'Young Serif', serif; font-size: 1.4rem;">Special Dates</h2>
+                <p style="margin: 0.2rem 0 0; font-size: 0.88rem; color: var(--muted);">Dates displayed across widget events and notifications.</p>
+              </div>
+              <button class="primary-btn" id="btn-add-date" type="button">+ Add Special Date</button>
+            </div>
+
+            <div class="dates-list" id="dates-list"></div>
+            <div class="empty-state" id="dates-empty" hidden>No special dates configured yet.</div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Login Required Prompt (for unauthenticated visitors) -->
+      <div class="auth-prompt-card" id="auth-prompt" hidden>
+        <h2>Admin Authentication Required</h2>
+        <p>You must be signed in with an approved administrator account to adjust widget fonts and special dates.</p>
+        <button class="primary-btn" id="btn-login" type="button">Sign In to JeffersonWM</button>
+      </div>
+
+      <!-- Bottom Links -->
+      <div class="bottom-links" aria-label="Site links">
+        <a class="personal-link" href="/">Home</a>
+        <a class="personal-link" href="/status/">Status</a>
+        <a class="personal-link" href="/project-activity/">Project Activity</a>
+        <a class="personal-link" href="/account/">Account</a>
+        <a
+          class="personal-link"
+          href="https://wmjefferson.com"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          William Jefferson
+        </a>
+      </div>
+    </div>
+
+    <!-- Modal: Add / Edit Date -->
+    <div class="modal-backdrop" id="date-modal" hidden>
+      <div class="modal-card">
+        <h2 id="modal-title">Add Special Date</h2>
+        <form class="modal-form" id="date-form">
+          <input type="hidden" id="event-id" name="id" />
+          
+          <div class="form-group">
+            <label for="event-name">Event Name</label>
+            <input type="text" id="event-name" name="name" required placeholder="e.g. Summer Solstice" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="event-date">Start Date</label>
+              <input type="date" id="event-date" name="date" required />
+            </div>
+            <div class="form-group">
+              <label for="event-end-date">End Date (Optional)</label>
+              <input type="date" id="event-end-date" name="end_date" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="event-desc">Description (Optional)</label>
+            <textarea id="event-desc" name="description" rows="3" placeholder="Brief event notes..."></textarea>
+          </div>
+
+          <div class="modal-buttons">
+            <button class="action-btn" id="btn-modal-cancel" type="button">Cancel</button>
+            <button class="primary-btn" type="submit" id="btn-modal-save">Save Event</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">Saved successfully</div>
+
+    <script>
+      (function() {
+        const JEFFERSONWM_API_ORIGIN = (() => {
+          const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
+          if (localHosts.has(window.location.hostname)) {
+            return "";
+          }
+          return "https://api-jeffersonwm.jeffersonwm.com";
+        })();
+
+        function apiUrl(url) {
+          if (typeof url === "string" && url.startsWith("/api/")) {
+            return `${JEFFERSONWM_API_ORIGIN}${url}`;
+          }
+          return url;
+        }
+
+        const AUTH_ORIGIN = 'https://auth.jeffersonwm.com';
+        const WIDGET_API_BASE = '/api/widget';
+
+        const FONT_ROUNDS = {
+          'Archivo Black': 1, 'Archivo': 1, 'Baskervville': 1, 'Betania Patmos In': 1, 'DM Sans': 1,
+          'Graduate': 1, 'Jost': 1, 'Libre Baskerville': 1, 'Lobster': 1, 'Lobster Two': 1,
+          'Marcellus': 1, 'Merriweather': 1, 'Michroma': 1, 'Nabla': 1, 'Onest': 1,
+          'Oswald': 1, 'Playfair Display': 1, 'Playwrite NZ Guides': 1, 'Playwrite NZ': 1,
+          'Purple Purse': 1, 'Raleway': 1, 'Rock 3D': 1, 'Saira Stencil': 1, 'Schoolbell': 1,
+          'Sirin Stencil': 1, 'Smokum': 1, 'Smooch': 1, 'Smooch Sans': 1, 'Stalemate': 1, 'Stardos Stencil': 1,
+          'Asimovian': 2, 'Barriecito': 2, 'Barrio': 2, 'Bitcount Grid Double': 2, 'Cabin Sketch': 2,
+          'Chokokutai': 2, 'DotGothic16': 2, 'Dr Sugiyama': 2, 'DynaPuff': 2, 'Fleur De Leah': 2,
+          'Grand Hotel': 2, 'Kirang Haerang': 2, 'Lacquer': 2, 'Libertinus Keyboard': 2,
+          'Libre Barcode 39 Extended': 2, 'Life Savers': 2, 'Londrina Sketch': 2, 'Monoton': 2,
+          'Noto Color Emoji': 2, 'Palette Mosaic': 2, 'Permanent Marker': 2, 'Sacramento': 2,
+          'Shizuru': 2, 'Slackside One': 2, 'Stick': 2, 'Stick No Bills': 2, 'Story Script': 2,
+          'UnifrakturMaguntia': 2, 'Vibes': 2, 'Wavefont': 2,
+          'Abril Fatface': 3, 'Akaya Kanadaka': 3, 'Arbutus': 3, 'Bangers': 3, 'Blaka Ink': 3,
+          'Bungee Spice': 3, 'Caesar Dressing': 3, 'Caprasimo': 3, 'Cinzel': 3, 'Eater': 3,
+          'Ewert': 3, 'Fontdiner Swanky': 3, 'Fredericka the Great': 3, 'Honk': 3, 'Kablammo': 3,
+          'Kranky': 3, 'Miniver': 3, 'Moo Lah Lah': 3, 'Nosifer': 3, 'Notable': 3,
+          'Orbitron': 3, 'Press Start 2P': 3, 'Rubik Broken Fax': 3, 'Rubik Doodle Triangles': 3,
+          'Rubik Maps': 3, 'Rubik Puddles': 3, 'Sarina': 3, 'Shrikhand': 3, 'Vast Shadow': 3,
+          'Zilla Slab Highlight': 3,
+          'ADLaM Display': 4, 'Alkalami': 4, 'Boldonse': 4, 'Bungee Shade': 4, 'Cal Sans': 4,
+          'Carter One': 4, 'Comic Relief': 4, 'Dhurjati': 4, 'Exile': 4, 'Fascinate Inline': 4,
+          'Faster One': 4, 'Freckle Face': 4, 'Frijole': 4, 'Gloock': 4, 'Henny Penny': 4,
+          'Jacquard 24 Charted': 4, 'Jacques Francois Shadow': 4, 'Kumar One': 4,
+          'Love Ya Like A Sister': 4, 'Mogra': 4, 'New Amsterdam': 4, 'Pacifico': 4, 'Plaster': 4,
+          'Ribeye': 4, 'Rozha One': 4, 'Special Elite': 4, 'Tourney': 4, 'Trade Winds': 4,
+          'Yarndings 20': 4,
+          'Aboreto': 5, 'Aclonica': 5, 'Akronim': 5, 'Aladin': 5, 'Aleo': 5,
+          'Alfa Slab One': 5, 'Alien Block': 5, 'Allkin': 5, 'Almarai': 5, 'Almendra Display': 5,
+          'Alumni Sans Pinstripe': 5, 'Amatic SC': 5, 'Anek Kannada': 5, 'Angkor': 5,
+          'Annie Use Your Telescope': 5, 'Antic': 5, 'Antic Didone': 5, 'Antic Slab': 5,
+          'Aoboshi One': 5, 'Arbutus Slab': 5, 'Asset': 5, 'Atomic Age': 5, 'Aubrey': 5,
+          'Audiowide': 5, 'Imperial Script': 5, 'Lavishly Yours': 5, 'Limelight': 5,
+          'Autour One': 6, 'Averia Gruesa Libre': 6, 'Averia Serif Libre': 6, 'Bad Script': 6,
+          'Bagel Fat One': 6, 'Bahiana': 6, 'Bahianita': 6, 'Balthazar': 6,
+          'BioRhyme Expanded': 6, 'Bitcount Grid Double Ink': 6, 'Bitcount Prop Single': 6,
+          'Bitter': 6, 'Black And White Picture': 6, 'Black Ops One': 6, 'Bonbon': 6,
+          'Boogaloo': 6, 'Bruno Ace': 6, 'Bubblegum Sans': 6, 'Bubbler One': 6, 'Buda': 6,
+          'Butcherman': 6, 'Bytesized': 6, 'Cabin': 6, 'Cagliostro': 6, 'Cairo Play': 6,
+          'Calistoga': 6, 'Candal': 6, 'Cedarville Cursive': 6, 'Ceviche One': 6,
+          'Abel': 7, 'Abhaya Libre': 7, 'Acme': 7, 'Agu Display': 7, 'Aguafina Script': 7,
+          'Akt': 7, 'Alan Sans': 7, 'Aldrich': 7, 'Alexandria': 7, 'Alike Angular': 7,
+          'Allan': 7, 'Allerta Stencil': 7, 'Almendra': 7, 'Alumni Sans Collegiate One': 7,
+          'Amarante': 7, 'Amethysta': 7, 'Amiri': 7, 'Amita': 7,
+          'Anonymous Pro': 8, 'Anta': 8, 'Anton': 8, 'Antonio': 8, 'Anybody': 8,
+          'Arapey': 8, 'Architects Daughter': 8, 'Are You Serious': 8, 'Arizonia': 8,
+          'Arsenal': 8, 'Arvo': 8, 'Astloch': 8, 'Athiti': 8, 'Azeret Mono': 8,
+          'Bacasime Antique': 8, 'Badeen Display': 8, 'Bai Jamjuree': 8, 'Baumans': 8,
+          'BBH Bogle': 8, 'BBH Hegarty': 8
+        };
+
+        const WEIGHT_CSS_MAP = {
+          1: '300',
+          2: '400',
+          3: '500',
+          4: '700',
+          5: '900'
+        };
+
+        const WEIGHT_LABELS = {
+          1: 'Light (300)',
+          2: 'Reg (400)',
+          3: 'Med (500)',
+          4: 'Bold (700)',
+          5: 'Black (900)'
+        };
+        
+        let allFonts = [];
+        let allEvents = [];
+        let activeTab = 'fonts';
+        let selectedRound = 'all';
+        let searchQuery = '';
+        let sortMode = 'alpha';
+        let sampleText = '12:00 PM • San Francisco';
+        let loadedGoogleFonts = new Set();
+        let authUser = null;
+
+        // Elements
+        const editorMain = document.getElementById('editor-main');
+        const authPrompt = document.getElementById('auth-prompt');
+        const fontGrid = document.getElementById('font-grid');
+        const fontsEmpty = document.getElementById('fonts-empty');
+        const fontSearch = document.getElementById('font-search');
+        const fontSort = document.getElementById('font-sort');
+        const samplePreset = document.getElementById('sample-preset');
+        const sampleTextInput = document.getElementById('sample-text');
+        const roundPills = document.getElementById('round-pills');
+        const btnResetAll = document.getElementById('btn-reset-all');
+        const tabFonts = document.getElementById('tab-fonts');
+        const tabDates = document.getElementById('tab-dates');
+        const viewFonts = document.getElementById('view-fonts');
+        const viewDates = document.getElementById('view-dates');
+        const fontsTotalBadge = document.getElementById('fonts-total-badge');
+        const datesTotalBadge = document.getElementById('dates-total-badge');
+        const datesList = document.getElementById('dates-list');
+        const datesEmpty = document.getElementById('dates-empty');
+        const btnAddDate = document.getElementById('btn-add-date');
+        const dateModal = document.getElementById('date-modal');
+        const dateForm = document.getElementById('date-form');
+        const btnModalCancel = document.getElementById('btn-modal-cancel');
+        const modalTitle = document.getElementById('modal-title');
+        const toastEl = document.getElementById('toast');
+        const btnLogin = document.getElementById('btn-login');
+
+        function showToast(msg) {
+          toastEl.textContent = msg;
+          toastEl.classList.add('is-visible');
+          setTimeout(() => toastEl.classList.remove('is-visible'), 2200);
+        }
+
+        async function fetchJson(url, options = {}) {
+          try {
+            const res = await fetch(apiUrl(url), { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...options });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+          } catch (e) {
+            console.error('Fetch error:', url, e);
+            return null;
+          }
+        }
+
+        function loadGoogleFontCss(fontName) {
+          if (loadedGoogleFonts.has(fontName)) return;
+          loadedGoogleFonts.add(fontName);
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName).replace(/%20/g, '+')}:ital,wght@0,100..900;1,100..900&display=swap`;
+          document.head.appendChild(link);
+        }
+
+        // Lazy font loader via IntersectionObserver
+        const fontObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const fontName = entry.target.getAttribute('data-font-name');
+              const fontWeight = entry.target.getAttribute('data-font-weight') || '500';
+              if (fontName) {
+                loadGoogleFontCss(fontName);
+                const previewText = entry.target.querySelector('.font-preview-text');
+                if (previewText) {
+                  previewText.style.fontFamily = `"${fontName}", "IBM Plex Sans Condensed", sans-serif`;
+                  previewText.style.fontWeight = fontWeight;
+                }
+              }
+            }
+          });
+        }, { rootMargin: '200px' });
+
+        function renderFontCards() {
+          let filtered = [...allFonts];
+
+          if (selectedRound !== 'all') {
+            const rNum = parseInt(selectedRound, 10);
+            filtered = filtered.filter(f => f.round === rNum);
+          }
+
+          if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase().trim();
+            filtered = filtered.filter(f => f.name.toLowerCase().includes(q));
+          }
+
+          if (sortMode === 'prob') {
+            filtered.sort((a, b) => (b.probability || 3) - (a.probability || 3) || a.name.localeCompare(b.name));
+          } else if (sortMode === 'round') {
+            filtered.sort((a, b) => (a.round || 1) - (b.round || 1) || a.name.localeCompare(b.name));
+          } else {
+            filtered.sort((a, b) => a.name.localeCompare(b.name));
+          }
+
+          fontsTotalBadge.textContent = allFonts.length;
+          fontGrid.innerHTML = '';
+
+          if (filtered.length === 0) {
+            fontsEmpty.hidden = false;
+            return;
+          }
+          fontsEmpty.hidden = true;
+
+          filtered.forEach(font => {
+            const assignedRound = Number(font.round) || FONT_ROUNDS[font.name] || 1;
+            font.round = assignedRound;
+            font.weight = Number(font.weight) || 3;
+            font.probability = Number(font.probability) || 3;
+
+            const card = document.createElement('div');
+            card.className = 'font-card';
+            card.setAttribute('data-font-name', font.name);
+            card.setAttribute('data-font-weight', WEIGHT_CSS_MAP[font.weight] || '500');
+
+            const weightBtns = [1, 2, 3, 4, 5].map(w => `
+              <button type="button" class="num-btn ${font.weight === w ? 'is-active' : ''}" data-type="weight" data-val="${w}">${w}</button>
+            `).join('');
+
+            const probBtns = [1, 2, 3, 4, 5].map(p => `
+              <button type="button" class="num-btn ${font.probability === p ? 'is-active-prob' : ''}" data-type="prob" data-val="${p}">${p}</button>
+            `).join('');
+
+            const googleFontUrl = `https://fonts.google.com/specimen/${encodeURIComponent(font.name.replace(/ /g, '+'))}`;
+
+            card.innerHTML = `
+              <div>
+                <div class="font-card-header">
+                  <h3 class="font-card-title">
+                    <a class="font-card-title-link" href="${googleFontUrl}" target="_blank" rel="noopener noreferrer" title="View ${escapeHtml(font.name)} on Google Fonts">
+                      ${escapeHtml(font.name)} <span class="external-icon">↗</span>
+                    </a>
+                  </h3>
+                  <div class="font-card-meta">
+                    <span class="round-badge">Round ${assignedRound}</span>
+                    <span class="saving-indicator" id="save-${encodeURIComponent(font.name)}">Saved</span>
+                  </div>
+                </div>
+                <div class="font-preview-stage" style="margin-top: 0.75rem;">
+                  <p class="font-preview-text" style="font-family: 'IBM Plex Sans Condensed', sans-serif; font-weight: ${WEIGHT_CSS_MAP[font.weight] || '500'};">
+                    ${escapeHtml(sampleText)}
+                  </p>
+                </div>
+              </div>
+
+              <div class="font-controls">
+                <div class="control-row">
+                  <span class="control-label weight-label">Weight Scale (${WEIGHT_LABELS[font.weight] || 'Med (500)'})</span>
+                  <div class="number-buttons">${weightBtns}</div>
+                </div>
+                <div class="control-row">
+                  <span class="control-label prob-label">Probability (Rating ${font.probability || 3}/5)</span>
+                  <div class="number-buttons">${probBtns}</div>
+                </div>
+              </div>
+            `;
+
+            const previewEl = card.querySelector('.font-preview-text');
+            const weightLabelEl = card.querySelector('.weight-label');
+            const probLabelEl = card.querySelector('.prob-label');
+
+            card.querySelectorAll('.num-btn').forEach(btn => {
+              btn.addEventListener('click', async (e) => {
+                const type = e.currentTarget.getAttribute('data-type');
+                const val = parseInt(e.currentTarget.getAttribute('data-val'), 10);
+                if (isNaN(val)) return;
+
+                if (type === 'weight') {
+                  font.weight = val;
+                  const cssWeight = WEIGHT_CSS_MAP[val] || '500';
+                  card.setAttribute('data-font-weight', cssWeight);
+                  if (previewEl) {
+                    previewEl.style.fontWeight = cssWeight;
+                  }
+                  if (weightLabelEl) {
+                    weightLabelEl.textContent = `Weight Scale (${WEIGHT_LABELS[val] || val})`;
+                  }
+                  btn.parentElement.querySelectorAll('.num-btn').forEach(b => {
+                    b.classList.toggle('is-active', parseInt(b.getAttribute('data-val'), 10) === val);
+                  });
+                } else if (type === 'prob') {
+                  font.probability = val;
+                  if (probLabelEl) {
+                    probLabelEl.textContent = `Probability (Rating ${val}/5)`;
+                  }
+                  btn.parentElement.querySelectorAll('.num-btn').forEach(b => {
+                    b.classList.toggle('is-active-prob', parseInt(b.getAttribute('data-val'), 10) === val);
+                  });
+                }
+
+                await saveFont(font);
+              });
+            });
+
+            fontGrid.appendChild(card);
+            fontObserver.observe(card);
+          });
+        }
+
+        async function saveFont(font) {
+          const indicator = document.getElementById(`save-${encodeURIComponent(font.name)}`);
+          if (indicator) {
+            indicator.textContent = 'Saving...';
+            indicator.classList.add('is-saving');
+          }
+
+          const res = await fetchJson(`${WIDGET_API_BASE}/fonts/${encodeURIComponent(font.name)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ weight: font.weight || 3, probability: font.probability || 3 })
+          });
+
+          if (indicator) {
+            indicator.textContent = res?.ok !== false ? 'Saved' : 'Error';
+            setTimeout(() => indicator.classList.remove('is-saving'), 1500);
+          }
+          if (res?.ok !== false) {
+            showToast(`Updated "${font.name}" settings`);
+          }
+        }
+
+        function renderDates() {
+          datesTotalBadge.textContent = allEvents.length;
+          datesList.innerHTML = '';
+
+          if (allEvents.length === 0) {
+            datesEmpty.hidden = false;
+            return;
+          }
+          datesEmpty.hidden = true;
+
+          allEvents.forEach(evt => {
+            const row = document.createElement('div');
+            row.className = 'date-item';
+
+            const startStr = formatDate(evt.date);
+            const endStr = evt.end_date ? ` – ${formatDate(evt.end_date)}` : '';
+
+            row.innerHTML = `
+              <div class="date-info">
+                <h3 class="date-title">${escapeHtml(evt.name)}</h3>
+                <div class="date-meta">📅 ${startStr}${endStr}</div>
+                ${evt.description ? `<div class="date-desc">${escapeHtml(evt.description)}</div>` : ''}
+              </div>
+              <div class="date-actions">
+                <button type="button" class="action-btn btn-edit-event" data-id="${evt.id}">Edit</button>
+                <button type="button" class="action-btn action-btn--danger btn-del-event" data-id="${evt.id}">Delete</button>
+              </div>
+            `;
+
+            row.querySelector('.btn-edit-event').addEventListener('click', () => openEditEventModal(evt));
+            row.querySelector('.btn-del-event').addEventListener('click', () => deleteEvent(evt.id, evt.name));
+
+            datesList.appendChild(row);
+          });
+        }
+
+        function formatDate(str) {
+          if (!str) return '';
+          const d = new Date(`${str}T00:00:00`);
+          return isNaN(d.getTime()) ? str : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function escapeHtml(str) {
+          return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function openAddEventModal() {
+          modalTitle.textContent = 'Add Special Date';
+          document.getElementById('event-id').value = '';
+          document.getElementById('event-name').value = '';
+          document.getElementById('event-date').value = '';
+          document.getElementById('event-end-date').value = '';
+          document.getElementById('event-desc').value = '';
+          dateModal.hidden = false;
+        }
+
+        function openEditEventModal(evt) {
+          modalTitle.textContent = 'Edit Special Date';
+          document.getElementById('event-id').value = evt.id || '';
+          document.getElementById('event-name').value = evt.name || '';
+          document.getElementById('event-date').value = evt.date ? evt.date.slice(0, 10) : '';
+          document.getElementById('event-end-date').value = evt.end_date ? evt.end_date.slice(0, 10) : '';
+          document.getElementById('event-desc').value = evt.description || '';
+          dateModal.hidden = false;
+        }
+
+        async function deleteEvent(id, name) {
+          if (!confirm(`Are you sure you want to delete the special date "${name}"?`)) return;
+          const res = await fetchJson(`${WIDGET_API_BASE}/events/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          if (res?.ok !== false) {
+            allEvents = allEvents.filter(e => e.id !== id);
+            renderDates();
+            showToast(`Deleted "${name}"`);
+          }
+        }
+
+        dateForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const id = document.getElementById('event-id').value;
+          const name = document.getElementById('event-name').value.trim();
+          const date = document.getElementById('event-date').value;
+          const endDate = document.getElementById('event-end-date').value || null;
+          const description = document.getElementById('event-desc').value.trim() || null;
+
+          if (!name || !date) return;
+
+          const isEdit = Boolean(id);
+          const url = isEdit ? `${WIDGET_API_BASE}/events/${encodeURIComponent(id)}` : `${WIDGET_API_BASE}/events`;
+          const method = isEdit ? 'PUT' : 'POST';
+
+          const res = await fetchJson(url, {
+            method,
+            body: JSON.stringify({ name, date, end_date: endDate, description })
+          });
+
+          if (res?.ok !== false) {
+            dateModal.hidden = true;
+            await loadEvents();
+            showToast(isEdit ? `Updated "${name}"` : `Added "${name}"`);
+          } else {
+            alert('Failed to save special date: ' + (res?.error || 'Unknown error'));
+          }
+        });
+
+        btnModalCancel.addEventListener('click', () => { dateModal.hidden = true; });
+        btnAddDate.addEventListener('click', openAddEventModal);
+
+        // Tab Switching
+        tabFonts.addEventListener('click', () => {
+          activeTab = 'fonts';
+          tabFonts.classList.add('is-active');
+          tabDates.classList.remove('is-active');
+          viewFonts.hidden = false;
+          viewDates.hidden = true;
+        });
+
+        tabDates.addEventListener('click', () => {
+          activeTab = 'dates';
+          tabDates.classList.add('is-active');
+          tabFonts.classList.remove('is-active');
+          viewDates.hidden = false;
+          viewFonts.hidden = true;
+        });
+
+        // Round Pills
+        roundPills.querySelectorAll('.round-pill').forEach(pill => {
+          pill.addEventListener('click', (e) => {
+            roundPills.querySelectorAll('.round-pill').forEach(p => p.classList.remove('is-active'));
+            e.currentTarget.classList.add('is-active');
+            selectedRound = e.currentTarget.getAttribute('data-round');
+            renderFontCards();
+          });
+        });
+
+        fontSearch.addEventListener('input', (e) => {
+          searchQuery = e.target.value;
+          renderFontCards();
+        });
+
+        fontSort.addEventListener('change', (e) => {
+          sortMode = e.target.value;
+          renderFontCards();
+        });
+
+        function updateSamplePreviewText(text) {
+          sampleText = text || '12:00 PM • San Francisco';
+          const previewEls = document.querySelectorAll('.font-preview-text');
+          previewEls.forEach(el => {
+            el.textContent = sampleText;
+          });
+        }
+
+        samplePreset.addEventListener('change', (e) => {
+          const val = e.target.value;
+          if (val === 'default') sampleText = '12:00 PM • San Francisco';
+          if (val === 'pangram') sampleText = 'The quick brown fox jumps over the lazy dog';
+          if (val === 'alphabet') sampleText = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789';
+          sampleTextInput.value = sampleText;
+          updateSamplePreviewText(sampleText);
+        });
+
+        sampleTextInput.addEventListener('input', (e) => {
+          updateSamplePreviewText(e.target.value);
+        });
+
+        if (btnResetAll) {
+          btnResetAll.addEventListener('click', async () => {
+            if (!confirm('Reset all 213 typefaces to defaults (Weight: 3, Probability: 3)?')) {
+              return;
+            }
+
+            btnResetAll.disabled = true;
+            btnResetAll.textContent = 'Resetting...';
+
+            allFonts.forEach(f => {
+              f.weight = 3;
+              f.probability = 3;
+            });
+            renderFontCards();
+
+            try {
+              const res = await fetchJson(`${WIDGET_API_BASE}/fonts/reset-all`, {
+                method: 'POST',
+                body: JSON.stringify({ weight: 3, probability: 3 })
+              });
+
+              if (res?.ok === false) {
+                // If endpoint not supported, batch save
+                await Promise.all(allFonts.map(f => saveFont(f)));
+              }
+              showToast('Reset all 213 typefaces to Weight: 3, Probability: 3');
+            } catch (err) {
+              console.error('Reset all error:', err);
+              showToast('Reset applied locally');
+            } finally {
+              btnResetAll.disabled = false;
+              btnResetAll.textContent = '↺ Reset All (3/3)';
+            }
+          });
+        }
+
+        btnLogin.addEventListener('click', () => {
+          window.location.href = `${AUTH_ORIGIN}/?returnTo=${encodeURIComponent(window.location.href)}`;
+        });
+
+        async function loadFonts() {
+          const data = await fetchJson(`${WIDGET_API_BASE}/fonts`);
+          if (Array.isArray(data)) {
+            allFonts = data.map(f => ({
+              ...f,
+              round: Number(f.round) || FONT_ROUNDS[f.name] || 1,
+              weight: Number(f.weight) || 3,
+              probability: Number(f.probability) || 3,
+            }));
+            renderFontCards();
+          }
+        }
+
+        async function loadEvents() {
+          const data = await fetchJson(`${WIDGET_API_BASE}/all-events`);
+          if (Array.isArray(data)) {
+            allEvents = data;
+            renderDates();
+          }
+        }
+
+        let isDataLoaded = false;
+
+        async function checkAuth() {
+          const authData = await fetchJson('https://auth.jeffersonwm.com/api/auth/status');
+          authUser = authData?.user || null;
+          const isAllowed = Boolean(authUser && authUser.isApproved && !authUser.isBlocked && !authUser.isDeleted && authUser.isOwner);
+
+          if (isAllowed) {
+            editorMain.hidden = false;
+            authPrompt.hidden = true;
+            if (!isDataLoaded) {
+              isDataLoaded = true;
+              await Promise.all([loadFonts(), loadEvents()]);
+            }
+          } else {
+            isDataLoaded = false;
+            editorMain.hidden = true;
+            authPrompt.hidden = false;
+            if (authUser) {
+              const promptTitle = authPrompt.querySelector('h2');
+              const promptP = authPrompt.querySelector('p');
+              if (promptTitle) promptTitle.textContent = 'You do not have permission';
+              if (promptP) promptP.textContent = 'You do not have permission to view this page.';
+              if (btnLogin) btnLogin.hidden = true;
+            } else {
+              const promptTitle = authPrompt.querySelector('h2');
+              const promptP = authPrompt.querySelector('p');
+              if (promptTitle) promptTitle.textContent = 'Sign In Required';
+              if (promptP) promptP.textContent = 'Please sign in with an account that has permission to edit widget typography and calendar dates.';
+              if (btnLogin) btnLogin.hidden = false;
+            }
+          }
+        }
+
+        checkAuth();
+
+        const handleVisibilityOrFocus = () => {
+          if (document.visibilityState === 'hidden') {
+            return;
+          }
+          void checkAuth();
+        };
+
+        window.addEventListener('focus', handleVisibilityOrFocus);
+        window.addEventListener('pageshow', handleVisibilityOrFocus);
+        document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+        window.setInterval(() => {
+          if (document.visibilityState !== 'hidden') {
+            void checkAuth();
+          }
+        }, 4000);
+      })();
+    </script>
+  </body>
+</html>

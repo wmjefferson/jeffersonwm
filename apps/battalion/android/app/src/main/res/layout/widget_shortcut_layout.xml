@@ -1,0 +1,77 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_shortcut_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Base Background Image: batthorz01 -->
+    <ImageView
+        android:id="@+id/widget_shortcut_bg_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/batthorz01"
+        android:scaleType="centerCrop" />
+
+    <!-- Button Color Tint Overlay: setBackgroundColor is applied dynamically -->
+    <ImageView
+        android:id="@+id/widget_shortcut_color_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC16213E" />
+
+    <!-- Border highlight outline -->
+    <ImageView
+        android:id="@+id/widget_shortcut_border"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/widget_shortcut_border" />
+
+    <!-- Foreground Content -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="8dp">
+
+        <!-- Emoji / Icon -->
+        <TextView
+            android:id="@+id/widget_shortcut_icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚔"
+            android:textSize="22sp" />
+
+        <!-- Action / Emotion Name -->
+        <TextView
+            android:id="@+id/widget_shortcut_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Action"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:maxLines="4"
+            android:ellipsize="end" />
+
+        <!-- Type / Delta badge -->
+        <TextView
+            android:id="@+id/widget_shortcut_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Tap to log"
+            android:textColor="#90caf9"
+            android:textSize="10sp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+    </LinearLayout>
+
+</FrameLayout>

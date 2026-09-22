@@ -1,20 +1,18 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<!--
-  battalion_widget_info.xml
-  Metadata Android uses to describe the widget to the launcher.
-
-  minWidth/minHeight: minimum size in dp (4x2 cells ≈ 250x110dp)
-  updatePeriodMillis: how often Android calls onUpdate() — 0 means we manage
-                      updates ourselves via AlarmManager (more reliable).
-  previewImage: shown in the widget picker gallery.
-  widgetCategory: home_screen means it can be placed on the home screen.
--->
+<?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="250dp"
-    android:minHeight="110dp"
+    android:minWidth="180dp"
+    android:minHeight="45dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="45dp"
+    android:maxResizeWidth="450dp"
+    android:maxResizeHeight="220dp"
     android:updatePeriodMillis="0"
-    android:initialLayout="@layout/widget_layout"
+    android:initialLayout="@layout/widget_stats_1row"
+    android:configure="com.jeffersonwm.battalion.StatsWidgetConfigActivity"
     android:widgetCategory="home_screen"
     android:resizeMode="horizontal|vertical"
+    android:widgetFeatures="reconfigurable"
     android:description="@string/widget_description" />

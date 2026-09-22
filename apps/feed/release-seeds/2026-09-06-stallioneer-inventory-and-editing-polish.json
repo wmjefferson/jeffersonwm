@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Stallioneer inventory and editing polish",
+  "content": "<p>Stallioneer moved another step from prototype toward a real daily cataloging tool.</p><p><strong>What changed:</strong></p><ul><li><strong>Inventory filtering:</strong> the inventory page now uses a compact Filter popup with grouped sort, collection, and tag toggles, including live counts and in-place list updates.</li><li><strong>Edit-copy flow:</strong> multiple physical copies now share one edit surface, selected from an Editing copy dropdown instead of stacking separate full panels down the page.</li><li><strong>Form styling:</strong> Edit Book and Add From Code now use the same compact square-edged control language as Perihelion, including buttons, copy controls, inputs, repeated cards, candidate results, and tag helpers.</li><li><strong>Live deployment:</strong> builds, publishes, network copies, and hash checks were completed throughout the pass so the server runtime stayed aligned with the working source.</li></ul>",
+  "url": "https://stallioneer.jeffersonwm.com",
+  "source": "manual",
+  "external_id": "stallioneer-inventory-and-editing-polish-2026-09-06",
+  "created_at": "2026-09-06 21:32:00"
+}

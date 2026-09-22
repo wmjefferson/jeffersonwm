@@ -44,6 +44,13 @@ async function initDatabase() {
   `);
 
   // Migration for existing tables:
+  try { await db.execute('ALTER TABLE player MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT'); } catch (e) {}
+  try { await db.execute('ALTER TABLE player ADD COLUMN auth_user_id VARCHAR(100) UNIQUE DEFAULT NULL'); } catch (e) {}
+  try { await db.execute('ALTER TABLE player ADD COLUMN slug VARCHAR(60) UNIQUE DEFAULT NULL'); } catch (e) {}
+  try { await db.execute('ALTER TABLE player ADD COLUMN is_master_template TINYINT(1) DEFAULT 0'); } catch (e) {}
+  try { await db.execute("ALTER TABLE player ADD COLUMN role ENUM('owner','admin','user') DEFAULT 'user'"); } catch (e) {}
+  try { await db.execute('ALTER TABLE player ADD COLUMN is_public TINYINT(1) DEFAULT 1'); } catch (e) {}
+  try { await db.execute("UPDATE player SET role = 'owner', username = 'wm', slug = 'wm', is_master_template = 0, is_public = 1 WHERE id = 1"); } catch (e) {}
   try { await db.execute('ALTER TABLE player ADD COLUMN health_level INT DEFAULT 1'); } catch (e) {}
   try { await db.execute('ALTER TABLE player ADD COLUMN health_xp INT DEFAULT 0'); } catch (e) {}
   try { await db.execute('ALTER TABLE player ADD COLUMN health_xp_to_next INT DEFAULT 100'); } catch (e) {}
@@ -255,6 +262,139 @@ async function initDatabase() {
       logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+
+  // ─── Template Changelog Table ───────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS template_changelog (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      version VARCHAR(20) DEFAULT '1.0.0',
+      changed_by VARCHAR(50) NOT NULL,
+      change_summary VARCHAR(255) NOT NULL,
+      details JSON DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // ─── Multi-user scoping migrations for personal tables ────────────
+  const personalTables = [
+    'tasks',
+    'task_log',
+    'habits',
+    'habit_log',
+    'mood_log',
+    'action_log',
+    'emotion_log',
+    'activity_feed',
+    'minigame_scores',
+    'achievements'
+  ];
+
+  for (const table of personalTables) {
+    try {
+      await db.execute(`ALTER TABLE ${table} ADD COLUMN user_id INT NOT NULL DEFAULT 1`);
+    } catch (e) {}
+    try {
+      await db.execute(`ALTER TABLE ${table} ADD INDEX idx_${table}_user_id (user_id)`);
+    } catch (e) {}
+  }
+
+  // Adjust achievements unique key from key-only to (user_id, `key`)
+  try {
+    await db.execute('ALTER TABLE achievements DROP INDEX `key`');
+  } catch (e) {}
+  try {
+    await db.execute('ALTER TABLE achievements ADD UNIQUE KEY unique_user_key (user_id, `key`)');
+  } catch (e) {}
+
+  // ─── Ensure Master Startup Template Account Exists ────────────────
+  const [[existingTemplate]] = await db.execute('SELECT * FROM player WHERE is_master_template = 1 LIMIT 1');
+  let templateId = existingTemplate ? existingTemplate.id : null;
+
+  if (!existingTemplate) {
+    const [templateRes] = await db.execute(`
+      INSERT INTO player (
+        username, slug, is_master_template, role, is_public, password_hash,
+        title, avatar, stat_energy, stat_stress, stat_money, stat_social,
+        stat_health, stat_hygiene, stat_fun, stat_discipline, level, hp, max_hp, gold
+      ) VALUES (
+        'master_template', 'template', 1, 'admin', 0, '',
+        'Template Base', 'warrior', 50, 30, 100, 20,
+        50, 50, 20, 20, 1, 100, 100, 50
+      )
+    `);
+    templateId = templateRes.insertId;
+    console.log(`✨ Master Startup Template player record created (id: ${templateId})`);
+
+    // Add initial changelog entry
+    await db.execute(`
+      INSERT INTO template_changelog (version, changed_by, change_summary, details)
+      VALUES ('1.0.0', 'system', 'Master Startup Template baseline created', ?)
+    `, [JSON.stringify({ baseline: true, initial_tasks_count: 18, initial_habits_count: 8 })]);
+  }
+
+  // Ensure starter tasks exist for the Master Template
+  if (templateId) {
+    const [[{ cnt: templateTasksCount }]] = await db.execute(
+      'SELECT count(*) as cnt FROM tasks WHERE user_id = ?',
+      [templateId]
+    );
+    if (templateTasksCount === 0) {
+      const starterTasks = [
+        ['Make the bed', 'Start the day with order', 'discipline', 'easy', 'daily', 15, 5, 2, 1, 1],
+        ['Clean kitchen', 'Keep the kitchen spotless', 'discipline', 'medium', 'daily', 25, 10, 5, 2, 2],
+        ['Organize workspace', 'Declutter and organize your desk', 'discipline', 'medium', 'daily', 25, 10, 5, 2, 3],
+        ['Exercise 30 min', 'Get moving for at least 30 minutes', 'vitality', 'hard', 'daily', 40, 15, 10, 3, 4],
+        ['Drink 8 glasses water', 'Stay hydrated throughout the day', 'vitality', 'easy', 'daily', 15, 5, 2, 1, 5],
+        ['Go for a walk', 'Take a walk outside for fresh air', 'vitality', 'easy', 'daily', 15, 5, 2, 1, 6],
+        ['Call a friend', 'Reach out to someone you care about', 'social', 'medium', 'daily', 25, 10, 5, 2, 7],
+        ['Family time', 'Spend quality time with family', 'social', 'medium', 'daily', 25, 10, 5, 2, 8],
+        ['Help someone', 'Do something kind for another person', 'social', 'medium', 'daily', 30, 12, 5, 2, 9],
+        ['Read 30 minutes', 'Read a book or educational material', 'intellect', 'medium', 'daily', 25, 10, 5, 2, 10],
+        ['Learn something new', 'Study a new topic or skill', 'intellect', 'hard', 'daily', 40, 15, 10, 3, 11],
+        ['Solve a puzzle', 'Exercise your brain with puzzles', 'intellect', 'easy', 'daily', 15, 5, 2, 1, 12],
+        ['Work on a project', 'Dedicate time to a creative project', 'creativity', 'hard', 'daily', 40, 15, 10, 3, 13],
+        ['Write/journal', 'Write in your journal or create content', 'creativity', 'medium', 'daily', 25, 10, 5, 2, 14],
+        ['Practice a skill', 'Practice drawing, music, or another skill', 'creativity', 'medium', 'daily', 25, 10, 5, 2, 15],
+        ['Review budget', 'Check your finances and spending', 'finance', 'medium', 'weekly', 30, 15, 5, 2, 16],
+        ['Work on side hustle', 'Invest time in earning extra income', 'finance', 'hard', 'daily', 40, 20, 10, 3, 17],
+        ['Save money', 'Avoid unnecessary spending today', 'finance', 'easy', 'daily', 15, 10, 2, 1, 18],
+      ];
+      for (const t of starterTasks) {
+        await db.execute(
+          `INSERT INTO tasks (user_id, name, description, category, difficulty, recurrence, xp_reward, gold_reward, hp_penalty, stat_reward, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [templateId, ...t]
+        );
+      }
+      console.log(`📋 Seeded ${starterTasks.length} starter tasks for Master Template`);
+    }
+
+    // Ensure starter habits exist for the Master Template
+    const [[{ cnt: templateHabitsCount }]] = await db.execute(
+      'SELECT count(*) as cnt FROM habits WHERE user_id = ?',
+      [templateId]
+    );
+    if (templateHabitsCount === 0) {
+      const starterHabits = [
+        ['Morning routine', 'positive', 'discipline', '🌅', 20, 8, 2],
+        ['Meditation', 'positive', 'vitality', '🧘', 15, 5, 1],
+        ['Healthy eating', 'positive', 'vitality', '🥗', 15, 5, 1],
+        ['Early to bed', 'positive', 'discipline', '🌙', 20, 8, 2],
+        ['Junk food', 'negative', 'vitality', '🍔', 0, 0, 1],
+        ['Doomscrolling', 'negative', 'intellect', '📱', 0, 0, 1],
+        ['Staying up late', 'negative', 'discipline', '🦉', 0, 0, 1],
+        ['Skipping meals', 'negative', 'vitality', '🚫', 0, 0, 1],
+      ];
+      for (const h of starterHabits) {
+        await db.execute(
+          `INSERT INTO habits (user_id, name, type, category, icon, xp_reward, gold_reward, stat_reward)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [templateId, ...h]
+        );
+      }
+      console.log(`⭐ Seeded ${starterHabits.length} starter habits for Master Template`);
+    }
+  }
 
   console.log('✅ Game data tables ready (jeffers4_battact)');
 

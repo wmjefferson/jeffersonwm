@@ -193,6 +193,16 @@
         text-transform: uppercase;
       }
 
+      .section-label-link {
+        color: inherit;
+        text-decoration: none;
+        transition: color 0.15s ease;
+      }
+
+      .section-label-link:hover {
+        color: var(--ink);
+      }
+
       .status-lines {
         margin: 0;
         padding: 0;
@@ -490,12 +500,13 @@
           <div class="account-role" id="account-role">Visitor</div>
         </div>
 
-        <section id="widget" aria-labelledby="widget-heading">
-          <h2 class="section-label" id="widget-heading">Widget</h2>
+        <section id="widget" aria-labelledby="widget-heading" hidden>
+          <h2 class="section-label" id="widget-heading">
+            <a class="section-label-link" href="/account/widget/">Widget</a>
+          </h2>
           <ul class="status-lines">
-            <li><span>Status:</span> JeffersonWM-owned widget API is in dev.</li>
+            <li><span>Status:</span> Connected to central widget database (213 typefaces).</li>
             <li><span>Database:</span> jeffers4_jeffwm_widget</li>
-            <li><span>Writes:</span> disabled until token/Auth admin access is enabled.</li>
           </ul>
         </section>
 
@@ -863,7 +874,8 @@
         perihelion: 'Perihelion',
         stallioneer: 'Stallioneer',
         tourbillion: 'Tourbillion',
-        vermilion: 'Vermilion'
+        vermilion: 'Vermilion',
+        widget: 'Widget'
       };
       const APP_URLS = {
         aphelion: '/aphelion/',
@@ -878,7 +890,8 @@
         millionfold: '/millionfold/',
         perihelion: '/perihelion/',
         tourbillion: '/tourbillion/',
-        vermilion: '/vermilion/'
+        vermilion: '/vermilion/',
+        widget: '/account/widget/'
       };
       let authSession = null;
       let accountProfile = null;
@@ -1097,6 +1110,11 @@
         if (editButton) {
           editButton.hidden = !Boolean(authSession?.user);
         }
+
+        const widgetSection = document.getElementById("widget");
+        if (widgetSection) {
+          widgetSection.hidden = !Boolean(authSession?.user?.isOwner);
+        }
       };
 
       const formatMembershipLabel = appKey => {
@@ -1124,12 +1142,20 @@
           ? [...new Set(memberships.map(value => String(value || "").trim()).filter(Boolean))]
           : [];
 
-        if (!normalizedMemberships.length) {
+        const isOwner = Boolean(authSession?.user?.isOwner);
+        const filteredMemberships = normalizedMemberships.filter(appKey => {
+          const lower = appKey.toLowerCase();
+          if (lower === 'billionaire') return false;
+          if (lower === 'widget' && !isOwner) return false;
+          return true;
+        });
+
+        if (!filteredMemberships.length) {
           list.innerHTML = '<li class="muted">No app access has been granted yet.</li>';
           return;
         }
 
-        const sortedMemberships = normalizedMemberships
+        const sortedMemberships = filteredMemberships
           .map(appKey => ({
             key: appKey,
             label: formatMembershipLabel(appKey),
@@ -1351,9 +1377,22 @@
         openAuthPopup('login');
       });
 
-      window.addEventListener('pageshow', () => {
+      const handleVisibilityOrFocus = () => {
+        if (document.visibilityState === 'hidden') {
+          return;
+        }
         void syncAccountState();
-      });
+      };
+
+      window.addEventListener('focus', handleVisibilityOrFocus);
+      window.addEventListener('pageshow', handleVisibilityOrFocus);
+      document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+      window.setInterval(() => {
+        if (document.visibilityState !== 'hidden') {
+          void syncAccountState();
+        }
+      }, 4000);
 
       document.getElementById('account-title-edit')?.addEventListener('click', async () => {
         if (accountTitleSaveInFlight) {

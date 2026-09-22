@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Widget typography dashboard, round filtering, and preview stability",
+  "content": "<p>A comprehensive update to the JeffersonWM typography management dashboard brings round-based typeface filtering, instant weight previews, direct Google Fonts specimen links, and session-sync stabilization.</p><p>Key highlights:</p><ul><li><strong>Round Filtering & Badges (R1 – R8):</strong> Added complete dictionary mapping for all 213 fonts across 8 release rounds with round badge indicators and toolbar filter pills.</li><li><strong>Direct Google Fonts Links:</strong> Connected every typeface card title directly to its official Google Fonts specimen page (<code>https://fonts.google.com/specimen/...</code>) with external link indicators.</li><li><strong>Instant Sample Text Weight Updates:</strong> Mapped weight scale buttons (1–5) to live font weights (<code>300</code>, <code>400</code>, <code>500</code>, <code>700</code>, <code>900</code>) that update preview samples in real-time on click.</li><li><strong>Defaults & Bulk Reset:</strong> Established default weight (3) and probability (3) with a dedicated <code>↺ Reset All (3/3)</code> toolbar action and backend endpoint (<code>POST /api/widget/fonts/reset-all</code>) connected to central auth logging.</li><li><strong>Preview Stability & Session Optimization:</strong> Guarded background auth checks to prevent periodic full-grid DOM reloads every 4 seconds, keeping sample text steady while maintaining cross-site session sync.</li></ul>",
+  "url": "https://jeffersonwm.com/account/widget/",
+  "source": "manual",
+  "external_id": "widget-typography-dashboard-round-filtering-2026-09-04",
+  "created_at": "2026-09-04 21:30:00"
+}

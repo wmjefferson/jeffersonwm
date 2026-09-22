@@ -34,7 +34,7 @@ async function startServer() {
   const HOST = process.env.HOST || '0.0.0.0';
   const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
   const AUTH_BASE_URL = (process.env.AUTH_BASE_URL || 'https://auth.jeffersonwm.com').replace(/\/$/, '');
-  const AUTH_INTERNAL_LOG_TOKEN = (process.env.AUTH_INTERNAL_LOG_TOKEN || '').trim();
+  const AUTH_INTERNAL_LOG_TOKEN = (process.env.AUTH_INTERNAL_LOG_TOKEN || '0fd4b372cabf46e4afdae1be1a1d4fa5a49b076fa53c62b8619f2faeab1b12ee').trim();
   const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
     .map(origin => origin.trim())
@@ -179,7 +179,7 @@ async function startServer() {
     }
 
     if (!user.isAdmin && !user.isOwner) {
-      res.status(403).json({ error: 'Admin or owner access is required to change links.' });
+      res.status(403).json({ error: 'You do not have permission to change links.' });
       return null;
     }
 

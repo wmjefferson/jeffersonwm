@@ -97,3 +97,11 @@ for (const row of rows) {
   const version = row.version === '-' ? '-' : `v${row.version}`;
   console.log(`${row.app.padEnd(appWidth)}  ${row.name.padEnd(nameWidth)}  ${version.padEnd(versionWidth)}  ${row.packageName.padEnd(packageWidth)}  ${row.source}`);
 }
+
+console.log(`\nUsage examples:`);
+console.log(`  npm run versions                              # Show current package versions`);
+console.log(`  npm run jeffvers                              # Same current-version summary`);
+console.log(`  npm run jeffvers:log                          # Show recent version log entries`);
+console.log(`  npm run jeffvers:aphelion                     # Show recent Aphelion log entries`);
+console.log(`  npm run version:patch:aphelion                # Bump and log Aphelion patch version`);
+console.log(`  npm run version:minor:peri                    # Bump and log Perihelion minor version\n`);

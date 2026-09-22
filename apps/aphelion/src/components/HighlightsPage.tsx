@@ -89,8 +89,8 @@ export function HighlightsPage({
   }, [apiBaseUrl]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#FAFAFA] text-gray-950">
-      <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-between border-b border-[#e5e5e5]">
+    <div className="relative z-10 flex min-h-screen flex-col bg-transparent text-gray-950">
+      <header className="h-[36px] px-6 bg-[#FAFAFA]/95 flex items-center justify-between border-b border-[#e5e5e5]">
         <a href="/aphelion/" className="font-sans text-sm font-semibold text-gray-900">
           Aphelion
         </a>
@@ -145,10 +145,28 @@ export function HighlightsPage({
           )
         )}
       </main>
-      <footer className="flex h-[36px] items-center justify-end border-t border-[#e5e5e5] bg-[#FAFAFA] px-6 font-sans text-sm text-gray-700">
-        <div>
-          © 2026 Jefferson Williams. All rights reserved.
-        </div>
+      <footer className="flex h-[36px] items-center justify-end border-t border-[#e5e5e5] bg-[#FAFAFA]/95 px-6 font-sans text-sm text-gray-700">
+        <p className="m-0 leading-none text-gray-500 text-xs sm:text-sm font-sans truncate">
+          &copy; {new Date().getFullYear()}{' '}
+          <a
+            href="https://jeffersonwm.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+          >
+            Jefferson Williams
+          </a>
+          . All rights reserved.{' '}
+          <a
+            href="https://github.com/wmjefferson/jeffersonwm"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+          >
+            GitHub
+          </a>
+          .
+        </p>
       </footer>
     </div>
   );

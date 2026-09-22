@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Stallioneer background and inventory layout checkpoint",
+  "content": "<p>Stallioneer just received a focused visual and inventory usability pass.</p><p><strong>What changed:</strong></p><ul><li><strong>New background treatment:</strong> the newer camera pattern is now converted into transparent black line art and displayed at 8% opacity, keeping the page atmosphere visible without competing with the catalog.</li><li><strong>Inventory filters clarified:</strong> search remains on its own row, while title/sort, tags, collections, and entries per page now sit beneath it in a predictable five-column layout.</li><li><strong>Responsive behavior preserved:</strong> the filter row collapses cleanly on narrow screens instead of forcing controls to overlap.</li><li><strong>Verification:</strong> Stallioneer build and publish completed with zero warnings and zero errors. The live server copy is waiting for the running process to be stopped so the locked executable can be replaced cleanly.</li></ul>",
+  "url": "https://stallioneer.jeffersonwm.com",
+  "source": "manual",
+  "external_id": "stallioneer-background-inventory-layout-2026-09-05",
+  "created_at": "2026-09-05 21:00:00"
+}

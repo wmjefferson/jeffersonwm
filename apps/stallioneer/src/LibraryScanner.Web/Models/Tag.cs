@@ -7,6 +7,14 @@ public class Tag
     public int Id { get; set; }
 
     [Required]
+    [StringLength(120)]
+    public string OwnerAuthId { get; set; } = "wm";
+
+    [Required]
+    [StringLength(80)]
+    public string OwnerUsername { get; set; } = "wm";
+
+    [Required]
     [StringLength(80)]
     public string Name { get; set; } = string.Empty;
 

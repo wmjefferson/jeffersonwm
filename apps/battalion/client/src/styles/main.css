@@ -33,6 +33,23 @@ body.body--public-dashboard::before {
   z-index: 0;
 }
 
+body.body--admin {
+  position: relative;
+  isolation: isolate;
+}
+
+body.body--admin::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: var(--batt-admin-pattern-url);
+  background-repeat: repeat;
+  background-size: 820px auto;
+  opacity: 0.07;
+  pointer-events: none;
+  z-index: 0;
+}
+
 /* ─── Toast Notifications ─── */
 .toast-container { position: fixed; top: 8px; right: 8px; z-index: 9999; display: flex; flex-direction: column; gap: 4px; }
 .toast { padding: 6px 12px; font-size: 12px; border: 1px solid #ddd; background: #fff; color: #111; max-width: 320px; animation: slideIn 0.2s ease; }

@@ -39,6 +39,14 @@ function parseArgs(argv) {
   return args;
 }
 
+function printUsageExamples() {
+  console.log(`\nUsage examples:`);
+  console.log(`  npm run count:preview                         # Count images without changing config`);
+  console.log(`  npm run count:sync                            # Count images and update src/config.ts`);
+  console.log(`  node scripts/sync-target-count.mjs --preview --library "E:\\images\\keep"`);
+  console.log(`  node scripts/sync-target-count.mjs --library "\\\\JEFFERSHIZZLE-D\\Dotcoms E\\images\\keep"\n`);
+}
+
 function parseEnvFile(filePath) {
   try {
     const text = readFileSync(filePath, 'utf8');
@@ -151,6 +159,7 @@ async function main() {
   if (args.preview) {
     console.log(`Library: ${libraryRoot}`);
     console.log(`Image count: ${count}`);
+    printUsageExamples();
     return;
   }
 
@@ -161,12 +170,14 @@ async function main() {
 
   if (updatedText === currentText) {
     console.log(`Aphelion default target count already matches ${count}.`);
+    printUsageExamples();
     return;
   }
 
   await writeFile(configPath, updatedText, 'utf8');
   console.log(`Aphelion default target count updated to ${count}.`);
   console.log(`Updated: ${configPath}`);
+  printUsageExamples();
 }
 
 main().catch((error) => {

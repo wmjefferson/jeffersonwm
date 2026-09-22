@@ -9,10 +9,10 @@ const router = express.Router();
 // All routes require authentication
 router.use(requireAuth);
 
-// GET /api/habits - Get all habits
+// GET /api/habits - Get all habits for current user
 router.get('/', async (req, res) => {
   try {
-    const [habits] = await db.execute('SELECT * FROM habits ORDER BY type, name');
+    const [habits] = await db.execute('SELECT * FROM habits WHERE user_id = ? ORDER BY type, name', [req.userId]);
     res.json(habits);
   } catch (err) {
     console.error('Get habits error:', err);
@@ -30,11 +30,11 @@ router.post('/', async (req, res) => {
     }
 
     const [result] = await db.execute(
-      `INSERT INTO habits (name, type, category, icon) VALUES (?, ?, ?, ?)`,
-      [name, type, category, icon || '⭐']
+      `INSERT INTO habits (user_id, name, type, category, icon) VALUES (?, ?, ?, ?, ?)`,
+      [req.userId, name, type, category, icon || '⭐']
     );
 
-    const [[habit]] = await db.execute('SELECT * FROM habits WHERE id = ?', [result.insertId]);
+    const [[habit]] = await db.execute('SELECT * FROM habits WHERE id = ? AND user_id = ?', [result.insertId, req.userId]);
     res.status(201).json(habit);
   } catch (err) {
     console.error('Create habit error:', err);
@@ -46,7 +46,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const [[existing]] = await db.execute('SELECT * FROM habits WHERE id = ?', [id]);
+    const [[existing]] = await db.execute('SELECT * FROM habits WHERE id = ? AND user_id = ?', [id, req.userId]);
     if (!existing) {
       return res.status(404).json({ error: 'Habit not found' });
     }
@@ -59,16 +59,16 @@ router.put('/:id', async (req, res) => {
     if (type !== undefined) { updates.push('type = ?'); values.push(type); }
     if (category !== undefined) { updates.push('category = ?'); values.push(category); }
     if (icon !== undefined) { updates.push('icon = ?'); values.push(icon); }
-    if (is_active !== undefined) { updates.push('is_active = ?'); values.push(is_active); }
+    if (is_active !== undefined) { updates.push('is_active = ?'); values.push(is_active ? 1 : 0); }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
-    values.push(id);
-    await db.execute(`UPDATE habits SET ${updates.join(', ')} WHERE id = ?`, values);
+    values.push(id, req.userId);
+    await db.execute(`UPDATE habits SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`, values);
 
-    const [[habit]] = await db.execute('SELECT * FROM habits WHERE id = ?', [id]);
+    const [[habit]] = await db.execute('SELECT * FROM habits WHERE id = ? AND user_id = ?', [id, req.userId]);
     res.json(habit);
   } catch (err) {
     console.error('Update habit error:', err);
@@ -80,12 +80,12 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const [[existing]] = await db.execute('SELECT * FROM habits WHERE id = ?', [id]);
+    const [[existing]] = await db.execute('SELECT * FROM habits WHERE id = ? AND user_id = ?', [id, req.userId]);
     if (!existing) {
       return res.status(404).json({ error: 'Habit not found' });
     }
 
-    await db.execute('DELETE FROM habits WHERE id = ?', [id]);
+    await db.execute('DELETE FROM habits WHERE id = ? AND user_id = ?', [id, req.userId]);
     res.json({ success: true });
   } catch (err) {
     console.error('Delete habit error:', err);
@@ -98,12 +98,15 @@ router.post('/:id/log', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [[habit]] = await db.execute('SELECT * FROM habits WHERE id = ?', [id]);
+    const [[habit]] = await db.execute('SELECT * FROM habits WHERE id = ? AND user_id = ?', [id, req.userId]);
     if (!habit) {
       return res.status(404).json({ error: 'Habit not found' });
     }
 
-    const [[player]] = await db.execute('SELECT * FROM player WHERE id = 1');
+    const [[player]] = await db.execute('SELECT * FROM player WHERE id = ?', [req.userId]);
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
 
     let xpEarned = 0;
     let goldEarned = 0;
@@ -135,13 +138,13 @@ router.post('/:id/log', async (req, res) => {
           hp = ?,
           total_habits_logged = total_habits_logged + 1,
           updated_at = NOW()
-        WHERE id = 1`,
-        [xpEarned, goldEarned, statChange, newHp]
+        WHERE id = ?`,
+        [xpEarned, goldEarned, statChange, newHp, req.userId]
       );
 
       // Reward Health XP for positive vitality habits
       if (habit.category === 'vitality') {
-        await gameEngine.addHealthXP(xpEarned);
+        await gameEngine.addHealthXP(req.userId, xpEarned);
       }
 
       // Update habit
@@ -151,12 +154,12 @@ router.post('/:id/log', async (req, res) => {
           best_streak = ?,
           times_logged = times_logged + 1,
           last_logged = NOW()
-        WHERE id = ?`,
-        [newStreak, bestStreak, id]
+        WHERE id = ? AND user_id = ?`,
+        [newStreak, bestStreak, id, req.userId]
       );
 
       // Add activity
-      await gameEngine.addActivity('habit_positive', `🔥 ${habit.name} (streak: ${newStreak})`, '🔥', xpEarned, goldEarned);
+      await gameEngine.addActivity(req.userId, 'habit_positive', `🔥 ${habit.name} (streak: ${newStreak})`, '🔥', xpEarned, goldEarned);
 
     } else if (habit.type === 'negative') {
       // Negative habit logged — penalty (toned down to -3 HP)
@@ -165,7 +168,6 @@ router.post('/:id/log', async (req, res) => {
 
       const categoryToStat2 = { discipline:'stat_discipline', vitality:'stat_health', social:'stat_social', intellect:'stat_discipline', creativity:'stat_fun', finance:'stat_money' };
       const statColumn = categoryToStat2[habit.category] || 'stat_discipline';
-      // Decrease stat by 1, minimum 0
       const currentStat = player[statColumn];
       statChange = currentStat > 0 ? -1 : 0;
 
@@ -175,8 +177,8 @@ router.post('/:id/log', async (req, res) => {
           hp = ?,
           total_habits_logged = total_habits_logged + 1,
           updated_at = NOW()
-        WHERE id = 1`,
-        [newHp]
+        WHERE id = ?`,
+        [newHp, req.userId]
       );
 
       // Reset streak
@@ -186,32 +188,32 @@ router.post('/:id/log', async (req, res) => {
           current_streak = 0,
           times_logged = times_logged + 1,
           last_logged = NOW()
-        WHERE id = ?`,
-        [id]
+        WHERE id = ? AND user_id = ?`,
+        [id, req.userId]
       );
 
       // Add activity
-      await gameEngine.addActivity('habit_negative', `💀 ${habit.name} (streak broken)`, '💀', 0, 0);
+      await gameEngine.addActivity(req.userId, 'habit_negative', `💀 ${habit.name} (streak broken)`, '💀', 0, 0);
     }
 
     // Insert habit log
     await db.execute(
-      `INSERT INTO habit_log (habit_id, habit_name, habit_type, xp_earned, gold_earned, stat_category, stat_change)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, habit.name, habit.type, xpEarned, goldEarned, habit.category, statChange]
+      `INSERT INTO habit_log (user_id, habit_id, habit_name, habit_type, xp_earned, gold_earned, stat_category, stat_change)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.userId, id, habit.name, habit.type, xpEarned, goldEarned, habit.category, statChange]
     );
 
     // Check level up (for positive habits)
     let levelResult = { leveled_up: false, new_level: player.level, new_title: player.title };
     if (habit.type === 'positive') {
-      levelResult = await gameEngine.checkLevelUp();
+      levelResult = await gameEngine.checkLevelUp(req.userId);
     }
 
     // Check achievements
-    const achievementsUnlocked = await gameEngine.checkAchievements();
+    const achievementsUnlocked = await gameEngine.checkAchievements(req.userId);
 
     // Get updated player
-    const [[updatedPlayer]] = await db.execute('SELECT * FROM player WHERE id = 1');
+    const [[updatedPlayer]] = await db.execute('SELECT * FROM player WHERE id = ?', [req.userId]);
     const { password_hash, ...playerData } = updatedPlayer;
 
     res.json({

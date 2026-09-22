@@ -233,6 +233,7 @@ body {
 .phone-stage__input::placeholder {
   color: #c4c9c5;
   opacity: 0.8;
+  font-family: inherit;
 }
 
 .phone-stage__input:focus {
@@ -401,8 +402,8 @@ body {
 
 .submission-card {
   display: grid;
-  gap: 18px;
-  grid-template-columns: minmax(220px, 0.8fr) minmax(280px, 1.3fr) auto;
+  gap: 20px;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(260px, 1.2fr) auto;
 }
 
 .submission-card__phone {
@@ -418,6 +419,124 @@ body {
   font-weight: 700;
   margin: 0;
   text-transform: capitalize;
+}
+
+.vanity-container {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vanity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vanity-label {
+  color: #59615a;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.vanity-empty {
+  color: #9aa29b;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.vanity-toggle-btn {
+  background: transparent;
+  border: 0;
+  color: #111827;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 4px;
+  text-decoration: underline;
+  transition: color 150ms ease;
+}
+
+.vanity-toggle-btn:hover {
+  color: #de8bf7;
+}
+
+.vanity-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vanity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f4f5f3;
+  border: 1px solid #dcdfd9;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  cursor: default;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.vanity-chip:hover {
+  background: #edf0ea;
+  border-color: #202522;
+}
+
+.vanity-chip--full {
+  background: #fdf2f8;
+  border-color: #f472b6;
+  box-shadow: 0 1px 2px rgba(244, 114, 182, 0.15);
+}
+
+.vanity-chip--full .vanity-chip__word {
+  color: #9d174d;
+}
+
+.vanity-chip--major {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.vanity-chip--major .vanity-chip__word {
+  color: #166534;
+}
+
+.vanity-chip__word {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #202522;
+}
+
+.vanity-chip__method {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 2px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.vanity-chip__method--dtmf {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.vanity-chip__method--a1z26 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.vanity-chip__method--hybrid {
+  background: #f3e8ff;
+  color: #6b21a8;
 }
 
 .submission-card__details {

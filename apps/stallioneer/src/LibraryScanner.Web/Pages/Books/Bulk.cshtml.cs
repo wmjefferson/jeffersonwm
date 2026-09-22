@@ -13,7 +13,10 @@ using System.ComponentModel.DataAnnotations;
 namespace LibraryScanner.Web.Pages.Books;
 
 [Authorize]
-public class BulkModel(ApplicationDbContext dbContext) : PageModel
+public class BulkModel(
+    ApplicationDbContext dbContext,
+    InventoryAccessService inventoryAccess,
+    AuthHistoryLogService authHistoryLog) : PageModel
 {
     private static readonly string[] SharedStatuses =
     [
@@ -241,7 +244,7 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
             return RedirectWithStatus("Choose a collection first.");
         }
 
-        var collection = await dbContext.Collections
+        var collection = await inventoryAccess.ScopeCollections(dbContext.Collections, User)
             .Include(item => item.CollectionBooks)
             .FirstOrDefaultAsync(item => item.Id == SelectedCollectionId);
         if (collection is null)
@@ -296,7 +299,7 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
             return RedirectWithStatus("Choose a location first.");
         }
 
-        var location = await dbContext.Locations.FirstOrDefaultAsync(item => item.Id == SelectedLocationId);
+        var location = await inventoryAccess.ScopeLocations(dbContext.Locations, User).FirstOrDefaultAsync(item => item.Id == SelectedLocationId);
         if (location is null)
         {
             return RedirectWithStatus("That location was not found.");
@@ -418,7 +421,7 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
             return RedirectWithStatus("Select at least one book first.");
         }
 
-        var books = await dbContext.Books
+        var books = await inventoryAccess.ScopeBooks(dbContext.Books, User)
             .AsNoTracking()
             .Include(book => book.Location)
             .Include(book => book.BookTags)
@@ -431,6 +434,13 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
 
         var csv = InventoryCsv.ExportBooks(books);
         var fileName = $"stallioneer-bulk-export-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
+        await authHistoryLog.LogAsync(inventoryAccess.GetAccount(User), "stallioneer.exported", new
+        {
+            type = "selected-csv",
+            count = books.Count,
+            fileName,
+            books = CreateExportElements(books)
+        });
         return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
     }
 
@@ -439,6 +449,13 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
         var books = await GetInventoryBooksAsync();
         var csv = InventoryCsv.ExportBooks(books);
         var fileName = $"stallioneer-inventory-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
+        await authHistoryLog.LogAsync(inventoryAccess.GetAccount(User), "stallioneer.exported", new
+        {
+            type = "inventory-csv",
+            count = books.Count,
+            fileName,
+            books = CreateExportElements(books)
+        });
         return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
     }
 
@@ -448,6 +465,14 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
         var books = await GetInventoryBooksAsync();
         var pdf = InventoryPdf.ExportBooks(books, fields);
         var fileName = $"stallioneer-inventory-{DateTime.UtcNow:yyyyMMdd-HHmmss}.pdf";
+        await authHistoryLog.LogAsync(inventoryAccess.GetAccount(User), "stallioneer.exported", new
+        {
+            type = "inventory-pdf",
+            count = books.Count,
+            fields = fields.Select(field => field.Key).ToArray(),
+            fileName,
+            books = CreateExportElements(books)
+        });
         return File(pdf, "application/pdf", fileName);
     }
 
@@ -463,15 +488,35 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
         var start = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Local);
         var endExclusive = endDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Local);
 
+        var visibleBookIds = inventoryAccess.ScopeBooks(dbContext.Books, User).Select(book => book.Id);
         var events = await dbContext.InventoryEvents
             .AsNoTracking()
             .Include(inventoryEvent => inventoryEvent.Book)
+            .Where(inventoryEvent => visibleBookIds.Contains(inventoryEvent.BookId))
             .Where(inventoryEvent => inventoryEvent.CreatedAt >= start && inventoryEvent.CreatedAt < endExclusive)
             .OrderByDescending(inventoryEvent => inventoryEvent.CreatedAt)
             .ToListAsync();
 
         var csv = InventoryLogCsv.ExportEvents(events);
         var fileName = $"stallioneer-log-{startDate:yyyyMMdd}-to-{endDate:yyyyMMdd}.csv";
+        await authHistoryLog.LogAsync(inventoryAccess.GetAccount(User), "stallioneer.exported", new
+        {
+            type = "activity-log-csv",
+            count = events.Count,
+            from = startDate.ToString("yyyy-MM-dd"),
+            to = endDate.ToString("yyyy-MM-dd"),
+            fileName,
+            elements = events.Select(inventoryEvent => new
+            {
+                inventoryEvent.EventType,
+                inventoryEvent.QuantityDelta,
+                inventoryEvent.Note,
+                inventoryEvent.CreatedAt,
+                BookId = inventoryEvent.BookId,
+                Title = inventoryEvent.Book?.Title,
+                Isbn13 = inventoryEvent.Book?.Isbn13
+            }).ToArray()
+        });
         return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
     }
 
@@ -491,20 +536,29 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
         }
 
         var result = await ImportInventoryAsync(rows, ImportMode);
+        await authHistoryLog.LogAsync(inventoryAccess.GetAccount(User), "stallioneer.book_updated", new
+        {
+            type = "csv-import",
+            mode = ImportMode,
+            added = result.Added,
+            updated = result.Updated,
+            skipped = result.Skipped
+        });
         return RedirectWithStatus($"Import complete. Added {result.Added}, updated {result.Updated}, skipped {result.Skipped}.");
     }
 
     private async Task LoadPageAsync()
     {
-        TotalTitles = await dbContext.Books.CountAsync();
-        var totalCopyCount = await dbContext.BookCopies.CountAsync();
+        TotalTitles = await inventoryAccess.ScopeBooks(dbContext.Books, User).CountAsync();
+        var visibleBookIds = inventoryAccess.ScopeBooks(dbContext.Books, User).Select(book => book.Id);
+        var totalCopyCount = await dbContext.BookCopies.Where(copy => visibleBookIds.Contains(copy.BookId)).CountAsync();
         TotalItems = totalCopyCount > 0
             ? totalCopyCount
-            : await dbContext.Books.SumAsync(book => (int?)book.Quantity) ?? 0;
-        TotalTags = await dbContext.Tags.CountAsync();
-        TotalCollections = await dbContext.Collections.CountAsync();
+            : await inventoryAccess.ScopeBooks(dbContext.Books, User).SumAsync(book => (int?)book.Quantity) ?? 0;
+        TotalTags = await inventoryAccess.ScopeTags(dbContext.Tags, User).CountAsync();
+        TotalCollections = await inventoryAccess.ScopeCollections(dbContext.Collections, User).CountAsync();
 
-        var collections = await dbContext.Collections
+        var collections = await inventoryAccess.ScopeCollections(dbContext.Collections, User)
             .AsNoTracking()
             .OrderBy(collection => collection.Name)
             .ToListAsync();
@@ -513,7 +567,7 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
             .Prepend(new SelectListItem("All collections", string.Empty))
             .ToList();
 
-        var tags = await dbContext.Tags
+        var tags = await inventoryAccess.ScopeTags(dbContext.Tags, User)
             .AsNoTracking()
             .OrderBy(tag => tag.Name)
             .ToListAsync();
@@ -524,7 +578,7 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
             .Select(tag => new SelectListItem(tag.Name, tag.Id.ToString()))
             .Prepend(new SelectListItem("All tags", string.Empty))
             .ToList();
-        var locations = await dbContext.Locations
+        var locations = await inventoryAccess.ScopeLocations(dbContext.Locations, User)
             .AsNoTracking()
             .OrderBy(location => location.Name)
             .ToListAsync();
@@ -564,7 +618,7 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
 
     private async Task<List<Book>> GetFilteredBooksAsync()
     {
-        IQueryable<Book> booksQuery = dbContext.Books
+        IQueryable<Book> booksQuery = inventoryAccess.ScopeBooks(dbContext.Books, User)
             .AsNoTracking()
             .Include(book => book.Location)
             .Include(book => book.Identifiers)
@@ -622,7 +676,7 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
             return null;
         }
 
-        return await dbContext.Books
+        return await inventoryAccess.ScopeBooks(dbContext.Books, User)
             .Include(book => book.Location)
             .Include(book => book.BookTags)
             .ThenInclude(bookTag => bookTag.Tag)
@@ -642,7 +696,8 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var existingTags = await dbContext.Tags
+        var account = inventoryAccess.GetAccount(User);
+        var existingTags = await inventoryAccess.ScopeTags(dbContext.Tags, User)
             .Where(tag => normalizedNames.Contains(tag.NormalizedName))
             .ToDictionaryAsync(tag => tag.NormalizedName);
 
@@ -661,7 +716,9 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
                     NormalizedName = normalizedName,
                     Color = InventoryText.DefaultTagColor(tagName),
                     Description = requestedTag.Description,
-                    CreatedAt = now
+                    CreatedAt = now,
+                    OwnerAuthId = account.AuthId,
+                    OwnerUsername = account.Username
                 };
                 dbContext.Tags.Add(tag);
                 existingTags[normalizedName] = tag;
@@ -679,7 +736,7 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
 
     private async Task<List<Book>> GetInventoryBooksAsync()
     {
-        var books = await dbContext.Books
+        var books = await inventoryAccess.ScopeBooks(dbContext.Books, User)
             .AsNoTracking()
             .Include(book => book.Location)
             .Include(book => book.BookTags)
@@ -693,6 +750,34 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
             .OrderBy(book => book.Title)
             .ThenBy(book => book.Authors)
             .ToList();
+    }
+
+    private static object[] CreateExportElements(IEnumerable<Book> books)
+    {
+        return books
+            .Select(book => new
+            {
+                book.Id,
+                book.Title,
+                book.Authors,
+                book.Publisher,
+                book.PublishedDate,
+                book.Isbn13,
+                book.Isbn10,
+                Quantity = book.EffectiveQuantity,
+                book.Status,
+                Location = book.Location?.Name,
+                Tags = book.BookTags
+                    .OrderBy(bookTag => bookTag.Tag.Name)
+                    .Select(bookTag => bookTag.Tag.Name)
+                    .ToArray(),
+                Collections = book.CollectionBooks
+                    .OrderBy(collectionBook => collectionBook.Collection.Name)
+                    .Select(collectionBook => collectionBook.Collection.Name)
+                    .ToArray()
+            })
+            .Cast<object>()
+            .ToArray();
     }
 
     private async Task<ImportResult> ImportInventoryAsync(IReadOnlyList<Dictionary<string, string>> rows, string importMode)
@@ -709,7 +794,8 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var existingBooks = await dbContext.Books
+        var account = inventoryAccess.GetAccount(User);
+        var existingBooks = await inventoryAccess.ScopeBooks(dbContext.Books, User)
             .Include(book => book.Location)
             .Include(book => book.BookTags)
             .ThenInclude(bookTag => bookTag.Tag)
@@ -718,9 +804,9 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
             .Where(book => importedIsbns.Contains(book.Isbn13))
             .ToDictionaryAsync(book => book.Isbn13, StringComparer.OrdinalIgnoreCase);
 
-        var locations = await dbContext.Locations.ToDictionaryAsync(location => location.NormalizedName);
-        var tags = await dbContext.Tags.ToDictionaryAsync(tag => tag.NormalizedName);
-        var collections = await dbContext.Collections.ToDictionaryAsync(collection => collection.NormalizedName);
+        var locations = await inventoryAccess.ScopeLocations(dbContext.Locations, User).ToDictionaryAsync(location => location.NormalizedName);
+        var tags = await inventoryAccess.ScopeTags(dbContext.Tags, User).ToDictionaryAsync(tag => tag.NormalizedName);
+        var collections = await inventoryAccess.ScopeCollections(dbContext.Collections, User).ToDictionaryAsync(collection => collection.NormalizedName);
 
         var result = new ImportResult();
         var now = DateTimeOffset.UtcNow;
@@ -766,7 +852,9 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
                     MetadataSource = "CSV import",
                     Quantity = 1,
                     CreatedAt = now,
-                    UpdatedAt = now
+                    UpdatedAt = now,
+                    OwnerAuthId = account.AuthId,
+                    OwnerUsername = account.Username
                 };
                 dbContext.Books.Add(book);
                 existingBooks[isbn13] = book;
@@ -807,17 +895,17 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
 
             if (TryGetValue(row, InventoryCsv.Location, out var locationValue) && !string.IsNullOrWhiteSpace(locationValue))
             {
-                book!.Location = GetOrCreateLocation(locationValue!, locations, now);
+                book!.Location = GetOrCreateLocation(locationValue!, locations, now, account);
             }
 
             if (TryGetValue(row, InventoryCsv.Tags, out var tagValue))
             {
-                ReplaceTags(book!, tagValue, tags, now);
+                ReplaceTags(book!, tagValue, tags, now, account);
             }
 
             if (TryGetValue(row, InventoryCsv.Collections, out var collectionValue))
             {
-                ReplaceCollections(book!, collectionValue, collections, now);
+                ReplaceCollections(book!, collectionValue, collections, now, account);
             }
 
             SetIfPresent(row, InventoryCsv.Status, value => book!.Status = value);
@@ -830,14 +918,15 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
 
     private async Task ClearInventoryAsync()
     {
-        dbContext.CollectionBooks.RemoveRange(dbContext.CollectionBooks);
-        dbContext.BookTags.RemoveRange(dbContext.BookTags);
-        dbContext.InventoryEvents.RemoveRange(dbContext.InventoryEvents);
-        dbContext.Books.RemoveRange(dbContext.Books);
+        var visibleBookIds = await inventoryAccess.ScopeBooks(dbContext.Books, User).Select(book => book.Id).ToListAsync();
+        dbContext.CollectionBooks.RemoveRange(dbContext.CollectionBooks.Where(item => visibleBookIds.Contains(item.BookId)));
+        dbContext.BookTags.RemoveRange(dbContext.BookTags.Where(item => visibleBookIds.Contains(item.BookId)));
+        dbContext.InventoryEvents.RemoveRange(dbContext.InventoryEvents.Where(item => visibleBookIds.Contains(item.BookId)));
+        dbContext.Books.RemoveRange(inventoryAccess.ScopeBooks(dbContext.Books, User));
         await dbContext.SaveChangesAsync();
     }
 
-    private Location GetOrCreateLocation(string name, Dictionary<string, Location> locations, DateTimeOffset now)
+    private Location GetOrCreateLocation(string name, Dictionary<string, Location> locations, DateTimeOffset now, InventoryAccount account)
     {
         var normalized = InventoryText.NormalizeName(name);
         if (locations.TryGetValue(normalized, out var location))
@@ -849,14 +938,16 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
         {
             Name = name.Trim(),
             NormalizedName = normalized,
-            CreatedAt = now
+            CreatedAt = now,
+            OwnerAuthId = account.AuthId,
+            OwnerUsername = account.Username
         };
         dbContext.Locations.Add(location);
         locations[normalized] = location;
         return location;
     }
 
-    private void ReplaceTags(Book book, string? rawTags, Dictionary<string, Tag> tags, DateTimeOffset now)
+    private void ReplaceTags(Book book, string? rawTags, Dictionary<string, Tag> tags, DateTimeOffset now, InventoryAccount account)
     {
         book.BookTags.Clear();
 
@@ -872,7 +963,9 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
                     NormalizedName = normalized,
                     Color = InventoryText.DefaultTagColor(tagName),
                     Description = tagDefinition.Description,
-                    CreatedAt = now
+                    CreatedAt = now,
+                    OwnerAuthId = account.AuthId,
+                    OwnerUsername = account.Username
                 };
                 dbContext.Tags.Add(tag);
                 tags[normalized] = tag;
@@ -890,7 +983,7 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
         }
     }
 
-    private void ReplaceCollections(Book book, string? rawCollections, Dictionary<string, Collection> collections, DateTimeOffset now)
+    private void ReplaceCollections(Book book, string? rawCollections, Dictionary<string, Collection> collections, DateTimeOffset now, InventoryAccount account)
     {
         book.CollectionBooks.Clear();
 
@@ -903,7 +996,9 @@ public class BulkModel(ApplicationDbContext dbContext) : PageModel
                 {
                     Name = collectionName.Trim(),
                     NormalizedName = normalized,
-                    CreatedAt = now
+                    CreatedAt = now,
+                    OwnerAuthId = account.AuthId,
+                    OwnerUsername = account.Username
                 };
                 dbContext.Collections.Add(collection);
                 collections[normalized] = collection;

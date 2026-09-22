@@ -28,7 +28,8 @@ app.use(cors({
       callback(null, true); // Be permissive for now; tighten later
     }
   },
-  credentials: true
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-acting-user-id', 'x-auth-internal-token']
 }));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'battalion-secret-key-2026',
@@ -58,6 +59,7 @@ app.use('/api/actions', require('./routes/actions'));
 app.use('/api/emotions', require('./routes/emotions'));
 app.use('/api/public', require('./routes/public'));
 app.use('/api/events', require('./routes/events'));
+app.use('/api/template', require('./routes/template'));
 
 // Async initialization
 async function startServer() {

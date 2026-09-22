@@ -21,15 +21,45 @@ function formatPacificTime(dateStr) {
   }
 }
 
+let cachedActions = [];
+let cachedEmotions = [];
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
 export async function renderReports(container) {
   container.innerHTML = `
     <div class="header">
-      <div class="header__content" style="max-width:900px; display:flex; justify-content:space-between; align-items:center;">
+      <div class="header__content" style="max-width:900px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div>
           <h1 class="header__title">📊 Reports & Analytics</h1>
           <div class="header__subtitle">View history and stats</div>
         </div>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn btn--sm" id="btn-create-log" style="background:#10b981; color:#fff; border:none; font-weight:500;" title="Create a new log entry">➕ Create Log</button>
+          
+          <div style="position:relative; display:inline-block;" id="export-dropdown-wrap">
+            <button class="btn btn--sm btn--primary" id="btn-export-log-menu" title="Export Log to JSON">⬇ Export JSON ▾</button>
+            <div id="export-menu-dropdown" style="display:none; position:absolute; right:0; top:100%; margin-top:4px; background:#fff; border:1px solid #ddd; border-radius:6px; box-shadow:0 6px 16px rgba(0,0,0,0.15); z-index:1000; min-width:210px; padding:6px 0;">
+              <div style="padding:4px 12px; font-size:10px; text-transform:uppercase; color:#888; font-weight:700; letter-spacing:0.5px;">Combined (Emotions + Actions)</div>
+              <button class="export-opt-btn" data-type="all" data-tf="all" style="width:100%; text-align:left; background:none; border:none; padding:7px 12px; font-size:12px; cursor:pointer;">📁 All History</button>
+              <button class="export-opt-btn" data-type="all" data-tf="30d" style="width:100%; text-align:left; background:none; border:none; padding:7px 12px; font-size:12px; cursor:pointer;">📅 Last 30 Days</button>
+              <button class="export-opt-btn" data-type="all" data-tf="7d" style="width:100%; text-align:left; background:none; border:none; padding:7px 12px; font-size:12px; cursor:pointer;">📅 Last 7 Days</button>
+              <button class="export-opt-btn" data-type="all" data-tf="today" style="width:100%; text-align:left; background:none; border:none; padding:7px 12px; font-size:12px; cursor:pointer;">☀️ Today Only</button>
+              <div style="border-top:1px solid #eee; margin:4px 0;"></div>
+              <div style="padding:4px 12px; font-size:10px; text-transform:uppercase; color:#888; font-weight:700; letter-spacing:0.5px;">Single Stream</div>
+              <button class="export-opt-btn" data-type="emotions" data-tf="all" style="width:100%; text-align:left; background:none; border:none; padding:7px 12px; font-size:12px; cursor:pointer;">💭 Emotions Log Only</button>
+              <button class="export-opt-btn" data-type="actions" data-tf="all" style="width:100%; text-align:left; background:none; border:none; padding:7px 12px; font-size:12px; cursor:pointer;">▶ Actions Log Only</button>
+            </div>
+          </div>
+
           <button class="btn btn--ghost btn--sm" id="btn-back" title="Back to Admin">◀ Back</button>
         </div>
       </div>
@@ -43,9 +73,12 @@ export async function renderReports(container) {
         
         <!-- Action History -->
         <div class="section">
-          <div class="section__header">
-            <h2 class="section__title">▶ Action History</h2>
-            <div id="action-stats" style="font-size:12px; opacity:0.6;"></div>
+          <div class="section__header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h2 class="section__title">▶ Action History</h2>
+              <div id="action-stats" style="font-size:12px; opacity:0.6;"></div>
+            </div>
+            <button class="btn btn--ghost btn--sm" id="btn-export-actions-quick" title="Export actions as JSON">⬇ Export Actions</button>
           </div>
           <div style="max-height:400px; overflow-y:auto; background:#fff; border:1px solid #e2e8f0; border-radius:6px;">
             <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
@@ -70,7 +103,8 @@ export async function renderReports(container) {
               <div id="emotion-stats" style="font-size:12px; opacity:0.6;"></div>
             </div>
             <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
-              <span class="text-muted">Clear last:</span>
+              <button class="btn btn--ghost btn--sm" id="btn-export-emotions-quick" title="Export emotions as JSON">⬇ Export Emotions</button>
+              <span class="text-muted" style="margin-left:4px;">Clear:</span>
               <button class="btn btn--sm btn--danger btn-clear-emotions" data-days="1">1 Day</button>
               <button class="btn btn--sm btn--danger btn-clear-emotions" data-days="2">2 Days</button>
               <button class="btn btn--sm btn--danger btn-clear-emotions" data-days="3">3 Days</button>
@@ -94,9 +128,254 @@ export async function renderReports(container) {
         
       </div>
     </div>
+
+    <!-- Modal for Creating Log Entry -->
+    <div id="create-log-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center;">
+      <div style="background:#fff; border-radius:8px; width:90%; max-width:480px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); position:relative;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #eee; padding-bottom:8px;">
+          <h3 style="font-size:16px; font-weight:700; margin:0;" id="modal-title">➕ Create Log Entry</h3>
+          <button id="modal-close-btn" style="background:none; border:none; font-size:18px; cursor:pointer; color:#666;">✕</button>
+        </div>
+
+        <!-- Mode Toggle -->
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <button type="button" id="toggle-mode-emotion" class="btn btn--sm" style="flex:1; border:1px solid #7c3aed; background:#7c3aed; color:#fff; font-weight:600;">💭 Log Emotion</button>
+          <button type="button" id="toggle-mode-action" class="btn btn--sm" style="flex:1; border:1px solid #ddd; background:#f8fafc; color:#444;">▶ Log Action</button>
+        </div>
+
+        <form id="create-log-form" style="display:flex; flex-direction:column; gap:12px;">
+          <!-- Item Select -->
+          <div id="group-select-item" style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:12px; font-weight:600;" id="lbl-item-select">Select Emotion</label>
+            <select id="input-item-select" style="padding:7px; border:1px solid #ccc; border-radius:4px; font-size:13px; background:#fff;"></select>
+          </div>
+
+          <!-- Date / Time -->
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:12px; font-weight:600;">Timestamp</label>
+            <input type="datetime-local" id="input-item-time" style="padding:6px; border:1px solid #ccc; border-radius:4px; font-size:13px;" />
+            <span style="font-size:11px; opacity:0.6;">Leave as default for current time.</span>
+          </div>
+
+          <!-- Tier (Emotions Only) -->
+          <div id="group-tier" style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:12px; font-weight:600;">Intensity / Tier (1-5)</label>
+            <select id="input-item-tier" style="padding:6px; border:1px solid #ccc; border-radius:4px; font-size:13px; background:#fff;">
+              <option value="1">1 - Subtle</option>
+              <option value="2">2 - Mild</option>
+              <option value="3" selected>3 - Moderate</option>
+              <option value="4">4 - Strong</option>
+              <option value="5">5 - Intense</option>
+            </select>
+          </div>
+
+          <!-- Apply Stats Checkbox (Actions Only) -->
+          <div id="group-apply-stats" style="display:none; align-items:center; gap:8px;">
+            <input type="checkbox" id="input-apply-stats" checked style="width:16px; height:16px; cursor:pointer;" />
+            <label for="input-apply-stats" style="font-size:12px; cursor:pointer; user-select:none;">Apply stat changes to player</label>
+          </div>
+
+          <!-- Note -->
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <label style="font-size:12px; font-weight:600;">Note (optional)</label>
+            <input type="text" id="input-item-note" placeholder="Add context or notes..." style="padding:6px; border:1px solid #ccc; border-radius:4px; font-size:13px;" />
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+            <button type="button" id="modal-cancel-btn" class="btn btn--ghost btn--sm">Cancel</button>
+            <button type="submit" id="modal-submit-btn" class="btn btn--sm" style="background:#10b981; color:#fff; border:none; padding:6px 16px; font-weight:600;">Save Entry</button>
+          </div>
+        </form>
+      </div>
+    </div>
   `;
 
   document.getElementById('btn-back')?.addEventListener('click', () => navigate('#admin'));
+
+  // Export dropdown toggling
+  const exportBtn = document.getElementById('btn-export-log-menu');
+  const exportDropdown = document.getElementById('export-menu-dropdown');
+  
+  exportBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isShown = exportDropdown.style.display === 'block';
+    exportDropdown.style.display = isShown ? 'none' : 'block';
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#export-dropdown-wrap')) {
+      if (exportDropdown) exportDropdown.style.display = 'none';
+    }
+  });
+
+  // Export option handlers
+  const handleExport = async (type = 'all', timeframe = 'all') => {
+    if (exportDropdown) exportDropdown.style.display = 'none';
+    showToast('Preparing JSON export...', 'info');
+    try {
+      const data = await actionsApi.exportLog({ type, timeframe });
+      const filename = `battalion_${type}_log_${timeframe}_${new Date().toISOString().slice(0,10)}.json`;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      downloadBlob(blob, filename);
+      const count = data?.summary?.total_timeline_events ?? (data?.timeline?.length || 0);
+      showToast(`Exported ${count} entries as JSON (logged to Auth)`, 'success');
+    } catch (err) {
+      showToast('Export failed: ' + err.message, 'error');
+    }
+  };
+
+  container.querySelectorAll('.export-opt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.getAttribute('data-type') || 'all';
+      const timeframe = btn.getAttribute('data-tf') || 'all';
+      handleExport(type, timeframe);
+    });
+  });
+
+  document.getElementById('btn-export-actions-quick')?.addEventListener('click', () => handleExport('actions', 'all'));
+  document.getElementById('btn-export-emotions-quick')?.addEventListener('click', () => handleExport('emotions', 'all'));
+
+  // ─── Create Log Modal Logic ─────────────────────────────────────
+  const modalBackdrop = document.getElementById('create-log-modal-backdrop');
+  let createMode = 'emotion'; // 'emotion' | 'action'
+
+  const openCreateModal = async () => {
+    modalBackdrop.style.display = 'flex';
+    // Default time to local ISO format for datetime-local
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(now.getTime() - tzOffset)).toISOString().slice(0, 16);
+    const timeInput = document.getElementById('input-item-time');
+    if (timeInput) timeInput.value = localISOTime;
+
+    // Load available items if not yet loaded
+    if (cachedActions.length === 0 || cachedEmotions.length === 0) {
+      try {
+        const [acts, emos] = await Promise.all([
+          actionsApi.getAll(),
+          emotionsApi.getAll()
+        ]);
+        cachedActions = acts || [];
+        cachedEmotions = emos || [];
+      } catch (_) {}
+    }
+
+    updateModalForm();
+  };
+
+  const closeCreateModal = () => {
+    modalBackdrop.style.display = 'none';
+  };
+
+  const updateModalForm = () => {
+    const lbl = document.getElementById('lbl-item-select');
+    const select = document.getElementById('input-item-select');
+    const tierGroup = document.getElementById('group-tier');
+    const applyStatsGroup = document.getElementById('group-apply-stats');
+    const btnEmo = document.getElementById('toggle-mode-emotion');
+    const btnAct = document.getElementById('toggle-mode-action');
+
+    if (createMode === 'emotion') {
+      btnEmo.style.background = '#7c3aed';
+      btnEmo.style.color = '#fff';
+      btnEmo.style.borderColor = '#7c3aed';
+      btnAct.style.background = '#f8fafc';
+      btnAct.style.color = '#444';
+      btnAct.style.borderColor = '#ddd';
+
+      lbl.textContent = 'Select Emotion';
+      tierGroup.style.display = 'flex';
+      applyStatsGroup.style.display = 'none';
+
+      // Group emotions by category
+      select.innerHTML = cachedEmotions.map(e => `
+        <option value="${e.name}" data-cat="${e.category_id}">
+          ${e.name} (${(e.category_id || '').replace(/_/g, ' ')})
+        </option>
+      `).join('');
+    } else {
+      btnAct.style.background = '#2563eb';
+      btnAct.style.color = '#fff';
+      btnAct.style.borderColor = '#2563eb';
+      btnEmo.style.background = '#f8fafc';
+      btnEmo.style.color = '#444';
+      btnEmo.style.borderColor = '#ddd';
+
+      lbl.textContent = 'Select Action';
+      tierGroup.style.display = 'none';
+      applyStatsGroup.style.display = 'flex';
+
+      // Group actions by category
+      select.innerHTML = cachedActions.map(a => `
+        <option value="${a.action_id}" data-label="${a.label}" data-cat="${a.category}">
+          ${a.label} (${(a.category || '').replace(/_/g, ' ')})
+        </option>
+      `).join('');
+    }
+  };
+
+  document.getElementById('btn-create-log')?.addEventListener('click', openCreateModal);
+  document.getElementById('modal-close-btn')?.addEventListener('click', closeCreateModal);
+  document.getElementById('modal-cancel-btn')?.addEventListener('click', closeCreateModal);
+  modalBackdrop?.addEventListener('click', (e) => {
+    if (e.target === modalBackdrop) closeCreateModal();
+  });
+
+  document.getElementById('toggle-mode-emotion')?.addEventListener('click', () => {
+    createMode = 'emotion';
+    updateModalForm();
+  });
+
+  document.getElementById('toggle-mode-action')?.addEventListener('click', () => {
+    createMode = 'action';
+    updateModalForm();
+  });
+
+  // Submit manual log entry
+  document.getElementById('create-log-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const select = document.getElementById('input-item-select');
+    const selectedOption = select?.selectedOptions[0];
+    const timeVal = document.getElementById('input-item-time')?.value;
+    const noteVal = document.getElementById('input-item-note')?.value.trim();
+    const isoTimestamp = timeVal ? new Date(timeVal).toISOString() : new Date().toISOString();
+
+    const submitBtn = document.getElementById('modal-submit-btn');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      if (createMode === 'emotion') {
+        const emotionName = select?.value;
+        const categoryId = selectedOption?.getAttribute('data-cat') || 'curious';
+        const tier = parseInt(document.getElementById('input-item-tier')?.value) || 3;
+
+        await emotionsApi.log(emotionName, categoryId, tier, noteVal, isoTimestamp);
+        showToast(`Logged emotion: ${emotionName}`, 'success');
+      } else {
+        const actionId = select?.value;
+        const actionLabel = selectedOption?.getAttribute('data-label') || actionId;
+        const category = selectedOption?.getAttribute('data-cat') || 'personal';
+        const applyStats = document.getElementById('input-apply-stats')?.checked || false;
+
+        await actionsApi.createLog({
+          action_id: actionId,
+          action_label: actionLabel,
+          category,
+          performed_at: isoTimestamp,
+          note: noteVal,
+          apply_stats: applyStats
+        });
+        showToast(`Logged action: ${actionLabel}`, 'success');
+      }
+
+      closeCreateModal();
+      await loadData();
+    } catch (err) {
+      showToast('Failed to create log: ' + err.message, 'error');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
 
   // Bind bulk clearance event listeners
   container.querySelectorAll('.btn-clear-emotions').forEach(btn => {

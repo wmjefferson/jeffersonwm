@@ -10,6 +10,7 @@ import { auth, player as playerApi } from './utils/api.js';
 
 const app = document.getElementById('app');
 const PUBLIC_PATTERN_PATH = `${import.meta.env.BASE_URL}images/backgrounds/battalion-public-pattern-20260627.jpeg`;
+const ADMIN_PATTERN_PATH = `${import.meta.env.BASE_URL}images/backgrounds/A_seamless_square_pattern_tile_2K_20260912193430.jpeg`;
 
 // ─── Toast System ───────────────────────────────────────────────────
 
@@ -115,8 +116,26 @@ async function route() {
   clearActiveIntervals();
 
   const hash = window.location.hash || '#dashboard';
+  const basePath = import.meta.env.BASE_URL || '/';
+  const normalizedBasePath = basePath.endsWith('/') ? basePath : `${basePath}/`;
+  const currentPath = window.location.pathname.endsWith('/')
+    ? window.location.pathname
+    : `${window.location.pathname}/`;
+  const validPaths = new Set([
+    normalizedBasePath,
+    `${normalizedBasePath}home/`,
+  ]);
+  const validHashes = new Set(['#dashboard', '#login', '#admin', '#editor', '#reports', '#settings']);
+
+  if (normalizedBasePath !== '/' && (!validPaths.has(currentPath) || !validHashes.has(hash))) {
+    window.location.assign('/404.html');
+    return;
+  }
+
   const isPatternRoute = hash === '#dashboard' || hash === '#login';
   document.body.classList.toggle('body--public-dashboard', isPatternRoute);
+  const isAdminRoute = ['#admin', '#editor', '#reports', '#settings'].includes(hash);
+  document.body.classList.toggle('body--admin', isAdminRoute);
 
   if (hash === '#login') {
     renderLogin(app);
@@ -252,6 +271,10 @@ window.addEventListener('DOMContentLoaded', () => {
   document.documentElement.style.setProperty(
     '--batt-public-pattern-url',
     `url("${PUBLIC_PATTERN_PATH}")`,
+  );
+  document.documentElement.style.setProperty(
+    '--batt-admin-pattern-url',
+    `url("${ADMIN_PATTERN_PATH}")`,
   );
 
   // Apply saved background color

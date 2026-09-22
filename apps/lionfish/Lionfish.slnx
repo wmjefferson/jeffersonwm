@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Lionfish.App/Lionfish.App.csproj" />
+  </Folder>
+</Solution>

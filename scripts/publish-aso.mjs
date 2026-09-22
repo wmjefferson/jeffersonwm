@@ -119,11 +119,15 @@ function publishDist(appConfig, deployConfig) {
 function isJeffersonwmRootSupportFile(relativePath) {
   return (
       relativePath === '.htaccess' ||
+      relativePath === '404.html' ||
       relativePath === 'versions.json' ||
+      relativePath === 'underconstruction.html' ||
       relativePath.startsWith('account/') ||
       relativePath.startsWith('project-activity/') ||
       relativePath.startsWith('status/') ||
       relativePath.startsWith('development/') ||
+      relativePath.startsWith('images/backgrounds/') ||
+      relativePath.startsWith('images/garbled-jefferson/') ||
       /^map\d+\.(?:png|jpe?g|webp)$/i.test(relativePath) ||
     /^bookmark-preview\.(?:png|jpe?g|webp)$/i.test(relativePath)
   );

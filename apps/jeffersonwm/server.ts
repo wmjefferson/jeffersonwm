@@ -22,7 +22,31 @@ const allowedOrigins = (process.env.JEFFERSONWM_ALLOWED_ORIGIN || 'http://localh
 const adminToken = process.env.JEFFERSONWM_WIDGET_ADMIN_TOKEN || '';
 const geoapifyApiKey = process.env.GEOAPIFY_API_KEY || '';
 const authBaseUrl = (process.env.JEFFERSONWM_AUTH_BASE_URL || 'https://auth.jeffersonwm.com').replace(/\/$/, '');
+const authInternalLogToken = (process.env.JEFFERSONWM_AUTH_INTERNAL_LOG_TOKEN || process.env.AUTH_INTERNAL_LOG_TOKEN || '0fd4b372cabf46e4afdae1be1a1d4fa5a49b076fa53c62b8619f2faeab1b12ee').trim();
 const projectActivityService = createProjectActivityService(process.env);
+
+async function logAuthHistory(user: AuthStatusUser | null, action: string, target: string | Record<string, unknown>) {
+  const targetStr = typeof target === 'string' ? target : JSON.stringify(target);
+  try {
+    await fetch(`${authBaseUrl}/api/history/log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authInternalLogToken ? { 'x-auth-internal-token': authInternalLogToken } : {}),
+      },
+      body: JSON.stringify({
+        action,
+        site: 'widget',
+        target: targetStr,
+        userId: user?.id || null,
+        username: user?.username || null,
+        internalToken: authInternalLogToken,
+      }),
+    });
+  } catch (error) {
+    console.warn('JeffersonWM widget could not log to Auth history:', error);
+  }
+}
 
 type WidgetFont = {
   id?: number;
@@ -1173,7 +1197,7 @@ async function hasAdminAccess(req: express.Request, user?: AuthStatusUser | null
   }
 
   const resolvedUser = user === undefined ? await getAuthUser(req) : user;
-  return Boolean(resolvedUser?.isAdmin);
+  return Boolean(resolvedUser?.isOwner);
 }
 
 async function requireWidgetAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -1184,7 +1208,7 @@ async function requireWidgetAdmin(req: express.Request, res: express.Response, n
 
   res.status(403).json({
     ok: false,
-    error: 'Widget admin access is not enabled for this request.',
+    error: 'You do not have permission to manage the widget.',
   });
 }
 
@@ -1869,6 +1893,57 @@ app.get('/api/widget/fonts', async (_req, res) => {
   }
 });
 
+app.post('/api/widget/fonts/reset-all', requireWidgetAdmin, async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  const weight = Number(req.body?.weight || 3);
+  const probability = Number(req.body?.probability || 3);
+
+  await db.execute('UPDATE widget_fonts SET weight = ?, probability = ?', [weight, probability]);
+  const authUser = await getAuthUser(req);
+  void logAuthHistory(authUser, 'widget.fonts_reset_all', { weight, probability });
+  res.json({ ok: true, weight, probability });
+});
+
+app.post('/api/widget/fonts', requireWidgetAdmin, async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  const name = String(req.body?.name || '').trim();
+  const round = req.body?.round !== undefined && req.body?.round !== null ? Number(req.body.round) : null;
+  const weight = Number(req.body?.weight || 3);
+  const probability = Number(req.body?.probability ?? 3);
+
+  if (!name) {
+    res.status(400).json({ ok: false, error: 'Font name is required.' });
+    return;
+  }
+
+  if (!Number.isFinite(weight) || weight < 1 || weight > 5 || !Number.isFinite(probability) || probability < 1 || probability > 5) {
+    res.status(400).json({ ok: false, error: 'Expected weight 1-5 and probability 1-5.' });
+    return;
+  }
+
+  await db.execute(
+    `INSERT INTO widget_fonts (name, round, weight, probability)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       round = VALUES(round),
+       weight = VALUES(weight),
+       probability = VALUES(probability)`,
+    [name, round, weight, probability],
+  );
+
+  const authUser = await getAuthUser(req);
+  void logAuthHistory(authUser, 'widget.font_created', { name, round, weight, probability });
+  res.json({ ok: true });
+});
+
 app.put('/api/widget/fonts/:name', requireWidgetAdmin, async (req, res) => {
   const db = requireDb(res);
   if (!db) {
@@ -1888,6 +1963,21 @@ app.put('/api/widget/fonts/:name', requireWidgetAdmin, async (req, res) => {
     probability,
     req.params.name,
   ]);
+
+  const authUser = await getAuthUser(req);
+  void logAuthHistory(authUser, 'widget.font_updated', { name: req.params.name, weight, probability });
+  res.json({ ok: true });
+});
+
+app.delete('/api/widget/fonts/:name', requireWidgetAdmin, async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  await db.execute('DELETE FROM widget_fonts WHERE name = ?', [req.params.name]);
+  const authUser = await getAuthUser(req);
+  void logAuthHistory(authUser, 'widget.font_deleted', { name: req.params.name });
   res.json({ ok: true });
 });
 
@@ -1930,6 +2020,9 @@ app.post('/api/widget/events', requireWidgetAdmin, async (req, res) => {
     'INSERT INTO widget_special_dates (name, description, date, end_date, is_public) VALUES (?, ?, ?, ?, 1)',
     [name, description || null, date, endDate || null],
   );
+
+  const authUser = await getAuthUser(req);
+  void logAuthHistory(authUser, 'widget.special_date_created', { name, date, end_date: endDate, description });
   res.json({ ok: true });
 });
 
@@ -1949,6 +2042,9 @@ app.put('/api/widget/events/:id', requireWidgetAdmin, async (req, res) => {
     'UPDATE widget_special_dates SET name = ?, description = ?, date = ?, end_date = ? WHERE id = ?',
     [name, description || null, date, endDate || null, req.params.id],
   );
+
+  const authUser = await getAuthUser(req);
+  void logAuthHistory(authUser, 'widget.special_date_updated', { id: req.params.id, name, date, end_date: endDate, description });
   res.json({ ok: true });
 });
 
@@ -1958,7 +2054,19 @@ app.delete('/api/widget/events/:id', requireWidgetAdmin, async (req, res) => {
     return;
   }
 
+  let eventName = `Event #${req.params.id}`;
+  try {
+    const [rows] = await db.query('SELECT name FROM widget_special_dates WHERE id = ? LIMIT 1', [req.params.id]);
+    if (Array.isArray(rows) && (rows as any)[0]?.name) {
+      eventName = (rows as any)[0].name;
+    }
+  } catch (_e) {
+    // Ignore lookup error and fall back to event ID
+  }
+
   await db.execute('DELETE FROM widget_special_dates WHERE id = ?', [req.params.id]);
+  const authUser = await getAuthUser(req);
+  void logAuthHistory(authUser, 'widget.special_date_deleted', { id: req.params.id, name: eventName });
   res.json({ ok: true });
 });
 

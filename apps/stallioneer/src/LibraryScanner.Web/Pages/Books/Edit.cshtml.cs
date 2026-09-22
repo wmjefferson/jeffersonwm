@@ -11,7 +11,10 @@ using Microsoft.EntityFrameworkCore;
 namespace LibraryScanner.Web.Pages.Books;
 
 [Authorize]
-public class EditModel(ApplicationDbContext dbContext) : PageModel
+public class EditModel(
+    ApplicationDbContext dbContext,
+    InventoryAccessService inventoryAccess,
+    AuthHistoryLogService authHistoryLog) : PageModel
 {
     [BindProperty]
     public BookInput Input { get; set; } = new();
@@ -35,7 +38,7 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
 
     public async Task<IActionResult> OnGetAsync(int id)
     {
-        var book = await dbContext.Books
+        var book = await inventoryAccess.ScopeBooks(dbContext.Books, User)
             .AsNoTracking()
             .Include(book => book.Location)
             .Include(book => book.AdditionalInfos)
@@ -67,7 +70,7 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
             return Page();
         }
 
-        var book = await dbContext.Books
+        var book = await inventoryAccess.ScopeBooks(dbContext.Books, User)
             .Include(book => book.BookTags)
             .ThenInclude(bookTag => bookTag.Tag)
             .Include(book => book.AdditionalInfos)
@@ -94,8 +97,9 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         book.InfoUrl = Input.InfoUrl;
         book.UpdatedAt = DateTimeOffset.UtcNow;
 
+        var account = new InventoryAccount(book.OwnerAuthId, book.OwnerUsername, inventoryAccess.GetAccount(User).IsPreferredAdmin);
         await SyncCopiesAsync(book);
-        await SyncBookTagsAsync(book, Input.TagNames);
+        await SyncBookTagsAsync(book, Input.TagNames, account);
         SyncAdditionalInfos(book);
         SyncCovers(book);
 
@@ -112,12 +116,19 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         }
 
         await dbContext.SaveChangesAsync();
+        await authHistoryLog.LogAsync(inventoryAccess.GetAccount(User), "stallioneer.book_updated", new
+        {
+            title = book.Title,
+            isbn13 = book.Isbn13,
+            owner = book.OwnerUsername,
+            copyCount = book.Copies.Count
+        });
         return RedirectToPage("/Books/Index");
     }
 
     public async Task<IActionResult> OnPostDeleteAsync()
     {
-        var book = await dbContext.Books.FirstOrDefaultAsync(book => book.Id == Input.Id);
+        var book = await inventoryAccess.ScopeBooks(dbContext.Books, User).FirstOrDefaultAsync(book => book.Id == Input.Id);
         if (book is null)
         {
             return NotFound();
@@ -125,27 +136,33 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
 
         dbContext.Books.Remove(book);
         await dbContext.SaveChangesAsync();
+        await authHistoryLog.LogAsync(inventoryAccess.GetAccount(User), "stallioneer.book_deleted", new
+        {
+            title = book.Title,
+            isbn13 = book.Isbn13,
+            owner = book.OwnerUsername
+        });
         StatusMessage = $"Deleted {book.Title}.";
         return RedirectToPage("/Books/Index");
     }
 
     private async Task LoadOptionsAsync()
     {
-        var locations = await dbContext.Locations.AsNoTracking().OrderBy(location => location.Name).ToListAsync();
+        var locations = await inventoryAccess.ScopeLocations(dbContext.Locations, User).AsNoTracking().OrderBy(location => location.Name).ToListAsync();
         LocationOptions = locations
             .Select(location => new SelectListItem(location.Name, location.Id.ToString()))
             .Prepend(new SelectListItem("No location", string.Empty))
             .ToList();
 
-        AvailableTags = await dbContext.Tags.AsNoTracking().OrderBy(tag => tag.Name).ToListAsync();
+        AvailableTags = await inventoryAccess.ScopeTags(dbContext.Tags, User).AsNoTracking().OrderBy(tag => tag.Name).ToListAsync();
         AdditionalInfoTypeOptions = BookAdditionalInfoType.Options
             .Select(option => new SelectListItem(option.Label, option.Value))
             .ToList();
     }
 
-    private async Task SyncBookTagsAsync(Book book, string? tagNames)
+    private async Task SyncBookTagsAsync(Book book, string? tagNames, InventoryAccount account)
     {
-        var tags = await ResolveTagsAsync(tagNames);
+        var tags = await ResolveTagsAsync(tagNames, account);
 
         book.BookTags.Clear();
         foreach (var tag in tags)
@@ -167,7 +184,7 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
             .Select(copy => copy.LocationId!.Value)
             .Distinct()
             .ToList();
-        var existingLocations = await dbContext.Locations
+        var existingLocations = await inventoryAccess.ScopeLocations(dbContext.Locations, User)
             .Where(location => locationIds.Contains(location.Id))
             .ToDictionaryAsync(location => location.Id);
 
@@ -190,7 +207,8 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
             copy.Status = inputCopy.Status;
             copy.Notes = string.IsNullOrWhiteSpace(inputCopy.Notes) ? null : inputCopy.Notes.Trim();
             copy.UpdatedAt = DateTimeOffset.UtcNow;
-            await SyncCopyTagsAsync(copy, inputCopy.TagNames);
+            var account = new InventoryAccount(book.OwnerAuthId, book.OwnerUsername, inventoryAccess.GetAccount(User).IsPreferredAdmin);
+            await SyncCopyTagsAsync(copy, inputCopy.TagNames, account);
         }
 
         foreach (var source in newCopyInputs)
@@ -210,7 +228,8 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
                 BookCopyTags = []
             };
             book.Copies.Add(newCopy);
-            await SyncCopyTagsAsync(newCopy, source.TagNames);
+            var account = new InventoryAccount(book.OwnerAuthId, book.OwnerUsername, inventoryAccess.GetAccount(User).IsPreferredAdmin);
+            await SyncCopyTagsAsync(newCopy, source.TagNames, account);
         }
 
         if (book.Copies.Count == 0)
@@ -237,9 +256,9 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         book.Notes = primaryCopy?.Notes;
     }
 
-    private async Task SyncCopyTagsAsync(BookCopy copy, string? tagNames)
+    private async Task SyncCopyTagsAsync(BookCopy copy, string? tagNames, InventoryAccount account)
     {
-        var tags = await ResolveTagsAsync(tagNames);
+        var tags = await ResolveTagsAsync(tagNames, account);
 
         copy.BookCopyTags.Clear();
         foreach (var tag in tags)
@@ -252,7 +271,7 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         }
     }
 
-    private async Task<List<Tag>> ResolveTagsAsync(string? tagNames)
+    private async Task<List<Tag>> ResolveTagsAsync(string? tagNames, InventoryAccount account)
     {
         var requestedTags = InventoryText.ParseTagDefinitions(tagNames);
         if (requestedTags.Count == 0)
@@ -263,7 +282,7 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
         var normalizedNames = requestedTags
             .Select(tag => InventoryText.NormalizeName(tag.Name))
             .ToList();
-        var existingTags = await dbContext.Tags
+        var existingTags = await inventoryAccess.ScopeTags(dbContext.Tags, User)
             .Where(tag => normalizedNames.Contains(tag.NormalizedName))
             .ToDictionaryAsync(tag => tag.NormalizedName);
 
@@ -281,7 +300,9 @@ public class EditModel(ApplicationDbContext dbContext) : PageModel
                     Name = tagName.Trim(),
                     NormalizedName = normalizedName,
                     Color = InventoryText.DefaultTagColor(tagName),
-                    Description = requestedTag.Description
+                    Description = requestedTag.Description,
+                    OwnerAuthId = account.AuthId,
+                    OwnerUsername = account.Username
                 };
                 dbContext.Tags.Add(tag);
                 existingTags[normalizedName] = tag;

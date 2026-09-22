@@ -41,7 +41,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<Book>(entity =>
         {
-            entity.HasIndex(book => book.Isbn13).IsUnique();
+            entity.HasIndex(book => new { book.OwnerAuthId, book.Isbn13 }).IsUnique();
+            entity.Property(book => book.OwnerAuthId).HasMaxLength(120);
+            entity.Property(book => book.OwnerUsername).HasMaxLength(80);
             entity.Property(book => book.Isbn13).HasMaxLength(13);
             entity.Property(book => book.Isbn10).HasMaxLength(10);
             entity.Property(book => book.Title).HasMaxLength(300);
@@ -64,7 +66,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<BookIdentifier>(entity =>
         {
-            entity.HasIndex(identifier => new { identifier.Type, identifier.NormalizedValue }).IsUnique();
+            entity.HasIndex(identifier => new { identifier.BookId, identifier.Type, identifier.NormalizedValue }).IsUnique();
             entity.Property(identifier => identifier.Type).HasMaxLength(20);
             entity.Property(identifier => identifier.Value).HasMaxLength(120);
             entity.Property(identifier => identifier.NormalizedValue).HasMaxLength(120);
@@ -123,7 +125,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<Tag>(entity =>
         {
-            entity.HasIndex(tag => tag.NormalizedName).IsUnique();
+            entity.HasIndex(tag => new { tag.OwnerAuthId, tag.NormalizedName }).IsUnique();
+            entity.Property(tag => tag.OwnerAuthId).HasMaxLength(120);
+            entity.Property(tag => tag.OwnerUsername).HasMaxLength(80);
             entity.Property(tag => tag.Name).HasMaxLength(80);
             entity.Property(tag => tag.NormalizedName).HasMaxLength(80);
             entity.Property(tag => tag.Color).HasMaxLength(20);
@@ -132,7 +136,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<Location>(entity =>
         {
-            entity.HasIndex(location => location.NormalizedName).IsUnique();
+            entity.HasIndex(location => new { location.OwnerAuthId, location.NormalizedName }).IsUnique();
+            entity.Property(location => location.OwnerAuthId).HasMaxLength(120);
+            entity.Property(location => location.OwnerUsername).HasMaxLength(80);
             entity.Property(location => location.Name).HasMaxLength(120);
             entity.Property(location => location.NormalizedName).HasMaxLength(120);
             entity.Property(location => location.Description).HasMaxLength(1000);
@@ -140,7 +146,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<Collection>(entity =>
         {
-            entity.HasIndex(collection => collection.NormalizedName).IsUnique();
+            entity.HasIndex(collection => new { collection.OwnerAuthId, collection.NormalizedName }).IsUnique();
+            entity.Property(collection => collection.OwnerAuthId).HasMaxLength(120);
+            entity.Property(collection => collection.OwnerUsername).HasMaxLength(80);
             entity.Property(collection => collection.Name).HasMaxLength(120);
             entity.Property(collection => collection.NormalizedName).HasMaxLength(120);
             entity.Property(collection => collection.Description).HasMaxLength(1000);

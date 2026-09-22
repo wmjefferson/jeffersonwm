@@ -19,7 +19,7 @@
 
 body {
   font-family: "Inter Tight", "Segoe UI", Arial, sans-serif;
-  background-color: #ededed;
+  background-color: #f2f2f2;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
@@ -37,12 +37,12 @@ body {
 }
 
 #root::before {
-  background-image: url("/images/backgrounds/peri-cameras-pattern.jpeg");
+  background-image: url("/images/backgrounds/peri-cameras-pattern.png");
   background-position: top left;
   background-repeat: repeat;
   content: "";
   inset: 0;
-  opacity: 0.08;
+  opacity: 0.028;
   pointer-events: none;
   position: fixed;
   z-index: 0;
@@ -50,7 +50,7 @@ body {
 
 [data-theme="dark"] #root::before,
 .dark #root::before {
-  opacity: 0.10;
+  opacity: 0.045;
   filter: invert(1);
 }
 
@@ -92,7 +92,7 @@ body {
   pointer-events: none;
   position: fixed;
   inset: var(--topbar-height) 0 var(--footer-height);
-  z-index: 900;
+  z-index: 5;
 }
 
 .shell-gutter {
@@ -114,6 +114,17 @@ body {
   width: calc(100% - (var(--frame) * 2));
   max-width: 100%;
   margin: 0 auto;
+}
+
+.shell-frame--body {
+  padding-top: var(--body-top-offset);
+  padding-bottom: calc(var(--footer-height) + 24px);
+  position: relative;
+  z-index: 20;
+}
+
+.quiet-home-stage {
+  min-height: calc(100vh - var(--body-top-offset) - var(--footer-height) - 24px);
 }
 
 .page-banner__inner {
@@ -170,9 +181,8 @@ body {
   line-height: 1;
   text-align: right;
   font-size: 0.875rem;
-  font-weight: 700;
   letter-spacing: 0;
-  color: #202522;
+  color: #6b7280;
 }
 
 .page-banner__copyright-link {
@@ -200,6 +210,8 @@ body {
   max-width: 100%;
   margin: 0 auto;
   padding: 6px 0 42px;
+  position: relative;
+  z-index: 20;
 }
 
 .peri-toolbar-divider {
@@ -234,7 +246,12 @@ body {
 }
 
 .peri-control-label.is-active {
-  color: #1d4ed8;
+  color: #1d4ed8 !important;
+}
+
+[data-theme="dark"] .peri-control-label.is-active,
+.dark .peri-control-label.is-active {
+  color: #60a5fa !important;
 }
 
 .peri-section-title {
@@ -313,6 +330,8 @@ body {
 .peri-card {
   background: #fff;
   border: 1px solid #d4d4d8;
+  position: relative;
+  z-index: 1;
   transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
 
@@ -381,10 +400,14 @@ body {
 }
 
 [data-theme="dark"] body,
-.dark body,
+.dark body {
+  background-color: #171a18;
+  color: #ededed;
+}
+
 [data-theme="dark"] .peri-shell,
 .dark .peri-shell {
-  background-color: #111214;
+  background: transparent;
   color: #ededed;
 }
 

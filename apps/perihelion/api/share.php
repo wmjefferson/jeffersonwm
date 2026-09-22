@@ -63,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     $files = $input['images'] ?? [];
     $title = isset($input['title']) ? trim($input['title']) : '';
+    $description = isset($input['description']) ? trim($input['description']) : '';
 
     if (!is_array($files) || count($files) === 0) {
         echo json_encode(['error' => 'No images provided']);
@@ -82,10 +83,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $payload = [
-        'id'     => $id,
-        'title'  => $title,
-        'images' => array_values($files),
-        'created_at' => date('c'),
+        'id'          => $id,
+        'title'       => $title,
+        'description' => $description,
+        'images'      => array_values($files),
+        'created_at'  => date('c'),
     ];
 
     file_put_contents($path, json_encode($payload));

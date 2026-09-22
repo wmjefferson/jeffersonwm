@@ -7,12 +7,19 @@ const BASE = `${API_DOMAIN}/api`;
 
 async function api(endpoint, options = {}) {
   const url = `${BASE}${endpoint}`;
+  const actingUserId = localStorage.getItem('battalion_acting_user_id');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+
+  if (actingUserId) {
+    headers['x-acting-user-id'] = actingUserId;
+  }
+
   const config = {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
-    },
+    headers,
     ...options
   };
 
@@ -54,11 +61,36 @@ export const auth = {
   },
 
   logout() {
+    localStorage.removeItem('battalion_acting_user_id');
     return api('/auth/logout', { method: 'POST' });
   },
 
-  check() {
-    return api('/auth/check');
+  async check() {
+    const data = await api('/auth/check');
+    if (!data || !data.authenticated || !data.isOwner) {
+      localStorage.removeItem('battalion_acting_user_id');
+    } else if (data.actingPlayer && data.actingPlayer.id !== data.player?.id) {
+      localStorage.setItem('battalion_acting_user_id', String(data.actingPlayer.id));
+    } else if (!data.isActing) {
+      localStorage.removeItem('battalion_acting_user_id');
+    }
+    return data;
+  },
+
+  getUsers() {
+    return api('/auth/users');
+  },
+
+  async switchUser(userId) {
+    if (userId) {
+      localStorage.setItem('battalion_acting_user_id', String(userId));
+    } else {
+      localStorage.removeItem('battalion_acting_user_id');
+    }
+    return api('/auth/switch-user', {
+      method: 'POST',
+      body: JSON.stringify({ userId: userId ? Number(userId) : null })
+    });
   }
 };
 
@@ -189,8 +221,27 @@ export const actions = {
     return api(`/actions/${actionId}/perform`, { method: 'POST' });
   },
 
-  getLog(limit = 50) {
-    return api(`/actions/log?limit=${limit}`);
+  getLog(limit = 50, options = {}) {
+    const params = new URLSearchParams();
+    if (limit) params.set('limit', limit);
+    if (options.startDate) params.set('startDate', options.startDate);
+    if (options.endDate) params.set('endDate', options.endDate);
+    const qs = params.toString();
+    return api(`/actions/log${qs ? '?' + qs : ''}`);
+  },
+
+  createLog(data) {
+    return api('/actions/log', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  exportLog(options = {}) {
+    const params = new URLSearchParams();
+    if (options.type) params.set('type', options.type);
+    if (options.timeframe) params.set('timeframe', options.timeframe);
+    if (options.startDate) params.set('startDate', options.startDate);
+    if (options.endDate) params.set('endDate', options.endDate);
+    const qs = params.toString();
+    return api(`/actions/log/export${qs ? '?' + qs : ''}`);
   },
 
   getCategories() {
@@ -226,15 +277,22 @@ export const emotions = {
     return api('/emotions/current');
   },
 
-  log(emotion_name, category_id, tier = 3, note = '') {
+  log(emotion_name, category_id, tier = 3, note = '', logged_at = null) {
+    const body = { emotion_name, category_id, tier, note };
+    if (logged_at) body.logged_at = logged_at;
     return api('/emotions/log', {
       method: 'POST',
-      body: JSON.stringify({ emotion_name, category_id, tier, note })
+      body: JSON.stringify(body)
     });
   },
 
-  history(limit = 50) {
-    return api(`/emotions/history?limit=${limit}`);
+  history(limit = 50, options = {}) {
+    const params = new URLSearchParams();
+    if (limit) params.set('limit', limit);
+    if (options.startDate) params.set('startDate', options.startDate);
+    if (options.endDate) params.set('endDate', options.endDate);
+    const qs = params.toString();
+    return api(`/emotions/history${qs ? '?' + qs : ''}`);
   },
 
   deleteLog(id) {
@@ -273,7 +331,47 @@ export const emotions = {
 // ─── Public Dashboard ───────────────────────────────────────────────
 
 export const publicDashboard = {
+  get(userSlug) {
+    const qs = userSlug ? `?user=${encodeURIComponent(userSlug)}` : '';
+    return api(`/public/dashboard${qs}`);
+  }
+};
+
+// ─── Master Startup Template ────────────────────────────────────────
+
+export const template = {
   get() {
-    return api('/public/dashboard');
+    return api('/template');
+  },
+
+  update(payload) {
+    return api('/template', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  getChangelog() {
+    return api('/template/changelog');
+  },
+
+  exportUrl() {
+    return `${BASE}/template/export`;
+  },
+
+  async export() {
+    const res = await fetch(`${BASE}/template/export`, {
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `battalion_template_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 };

@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Billionaire dynamic typeface randomization & hybrid vanity word matching",
+  "content": "<p>Billionaire received major feature upgrades expanding real-time typography interactivity and adding intelligent phone number vanity word analysis in the Owner Review console.</p><p>What changed:</p><ul><li><strong>Keystroke Typeface Randomization:</strong> Connected Billionaire to the MySQL widget font database (<code>widget_fonts</code>) filtering for active Round 1 and 2 fonts (41 approved typefaces). Every character typed, backspaced, deleted, or cleared dynamically switches the dialer typeface at random. Implemented batch preloading so all font assets are cached on load with zero typing latency.</li><li><strong>Hybrid Vanity Word & Correlate Matcher:</strong> Added an intelligent Trie-based graph search engine to the Owner Review admin dashboard (<code>#admin</code>). At each digit position, the engine simultaneously explores 1-digit DTMF (<code>2-9</code>), 1-digit A1Z26 (<code>1-9</code>), and 2-digit A1Z26 (<code>10-26</code>) combinations, allowing words to freely combine all three encoding systems (e.g. <code>12(L)-1(A)-23(W)</code> for <code>LAW</code>, <code>3(C)-1(A)-20(T)</code> for <code>CAT</code>, and <code>3569377</code> for <code>FLOWERS</code>).</li><li><strong>Interactive Admin Review Badges:</strong> Submissions in the admin review queue now display matched dictionary words (3+ letters) with color-coded method pills (<code>DTMF</code>, <code>A1Z26</code>, <code>HYBRID</code>), detailed hover breakdown tooltips, full-match highlights, and expandable word lists.</li></ul>",
+  "url": "https://jeffersonwm.com/billionaire/",
+  "source": "manual",
+  "external_id": "billionaire-typeface-randomization-vanity-word-matcher-2026-09-04",
+  "created_at": "2026-09-04 21:26:00"
+}

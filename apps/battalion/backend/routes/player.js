@@ -1,16 +1,17 @@
 const express = require('express');
 const { db } = require('../db/db');
-const requireAuth = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
+const { generateUniqueSlug } = require('../utils/accountProvisioner');
 
 const router = express.Router();
 
 // All routes require authentication
 router.use(requireAuth);
 
-// GET /api/player - Get full player object
+// GET /api/player - Get full player object for active user context
 router.get('/', async (req, res) => {
   try {
-    const [[player]] = await db.execute('SELECT * FROM player WHERE id = 1');
+    const [[player]] = await db.execute('SELECT * FROM player WHERE id = ?', [req.userId]);
     if (!player) {
       return res.status(404).json({ error: 'Player not found' });
     }
@@ -27,7 +28,16 @@ router.get('/', async (req, res) => {
 // PUT /api/player - Update player fields
 router.put('/', async (req, res) => {
   try {
-    const { username, avatar, notifications_enabled, notification_interval, notification_time } = req.body;
+    const {
+      username,
+      avatar,
+      notifications_enabled,
+      notification_interval,
+      notification_time,
+      is_public,
+      slug
+    } = req.body;
+
     const updates = [];
     const values = [];
 
@@ -51,16 +61,26 @@ router.put('/', async (req, res) => {
       updates.push('notification_time = ?');
       values.push(notification_time);
     }
+    if (is_public !== undefined) {
+      updates.push('is_public = ?');
+      values.push(is_public ? 1 : 0);
+    }
+    if (slug !== undefined) {
+      const cleanSlug = await generateUniqueSlug(slug);
+      updates.push('slug = ?');
+      values.push(cleanSlug);
+    }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
     updates.push('updated_at = NOW()');
-    const sql = `UPDATE player SET ${updates.join(', ')} WHERE id = 1`;
+    values.push(req.userId);
+    const sql = `UPDATE player SET ${updates.join(', ')} WHERE id = ?`;
     await db.execute(sql, values);
 
-    const [[player]] = await db.execute('SELECT * FROM player WHERE id = 1');
+    const [[player]] = await db.execute('SELECT * FROM player WHERE id = ?', [req.userId]);
     const { password_hash, ...playerData } = player;
     res.json(playerData);
   } catch (err) {

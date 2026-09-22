@@ -85,7 +85,7 @@ export const HoverPreviewCard: React.FC<HoverPreviewCardProps> = ({ hover, size 
           zIndex: 50,
           pointerEvents: 'none',
         }}
-        className="relative overflow-hidden border border-[#e5e5e5]"
+        className="relative overflow-hidden border border-[#b8b8b8]"
       >
         {previewSrc && !imgError ? (
           <img

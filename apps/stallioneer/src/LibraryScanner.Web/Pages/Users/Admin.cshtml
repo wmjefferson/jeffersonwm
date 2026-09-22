@@ -1,45 +1,22 @@
-@page "/Settings"
+@page "/Options"
 @model LibraryScanner.Web.Pages.Users.AdminModel
 @{
-    ViewData["Title"] = "Settings";
+    ViewData["Title"] = "Options";
 }
-
-<section class="page-heading">
-    <div>
-        <p class="eyebrow">Admin</p>
-        <h1>Settings</h1>
-        <p class="muted-block">Manage system-level settings, account permissions, and the current local app snapshot.</p>
-    </div>
-</section>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <div class="alert alert-success">@Model.StatusMessage</div>
 }
 
-<section class="stats-grid compact-stats-grid admin-settings-summary">
-    <div class="stat">
-        <span class="stat-label">Total users</span>
-        <strong>@Model.TotalUsers</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Confirmed emails</span>
-        <strong>@Model.ConfirmedUsers</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Display names</span>
-        <strong>@Model.NamedUsers</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Signed in as</span>
-        <strong>@(Model.CurrentUser?.UserName ?? "Unknown")</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Admin users</span>
-        <strong>@Model.AdminUsers</strong>
-    </div>
-</section>
+<p class="options-status-row" aria-label="Library status">
+    <span><strong>@Model.Snapshot.TotalBooks</strong> Books</span>
+    <span><strong>@Model.Snapshot.TotalItems</strong> Items</span>
+    <span><strong>@Model.Snapshot.TotalTags</strong> Tags</span>
+    <span><strong>@Model.Snapshot.TotalCollections</strong> Collections</span>
+</p>
 
+@* App snapshot is intentionally retained for a future Options pass.
 <section class="entry-grid">
     <section class="panel">
         <p class="eyebrow">App snapshot</p>
@@ -68,63 +45,244 @@
         </div>
     </section>
 </section>
+*@
 
-<section class="panel admin-settings-panel">
-    <p class="eyebrow">Admin tools</p>
-    <h2>Account permissions</h2>
-    <p class="muted-block">Use this section to decide which accounts can manage permissions and future system-wide settings. Stallioneer always keeps at least one admin account.</p>
+<section class="bulk-admin-grid">
+    <details class="details-accordion panel options-panel">
+        <summary class="details-accordion__summary">
+            <h2>Tags</h2>
+        </summary>
+        <div class="details-accordion__body">
+            <form method="post" class="tag-admin-form">
+                <input asp-for="NewTag.Name" class="form-control" placeholder="paper | paperback, hard | hardcover" autocomplete="off" />
+                <input asp-for="NewTag.Description" class="form-control" placeholder="Optional tag note or meaning" />
+                <input asp-for="NewTag.Color" class="form-control color-input" type="color" />
+                <button asp-page-handler="CreateTag" class="btn btn-primary">Create tags</button>
+            </form>
+            <span asp-validation-for="NewTag.Name" class="text-danger"></span>
 
-    <div class="table-wrap">
-        <table class="table inventory-table">
-            <thead>
-                <tr>
-                    <th>Username</th>
-                    <th>Display name</th>
-                    <th>Email</th>
-                    <th>Roles</th>
-                    <th>Admin access</th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var user in Model.Users)
-            {
-                <tr>
-                    <td><strong>@user.UserName</strong></td>
-                    <td>@(string.IsNullOrWhiteSpace(user.DisplayName) ? "-" : user.DisplayName)</td>
-                    <td>@(string.IsNullOrWhiteSpace(user.Email) ? "-" : user.Email)</td>
-                    <td>@string.Join(", ", user.Roles)</td>
-                    <td>
-                        <form method="post" asp-page-handler="UpdatePermissions" class="inline-form">
-                            <input type="hidden" name="userId" value="@user.Id" />
-                            <input type="hidden" name="isAdmin" value="@(user.IsAdmin ? "false" : "true")" />
-                            <span class="status-pill">@(user.IsAdmin ? "Admin" : "User")</span>
-                            <button type="submit" class="btn btn-outline-secondary">
-                                @(user.IsAdmin ? "Remove admin" : "Make admin")
-                            </button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
+            <div class="table-wrap">
+                <table class="table inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Tag</th>
+                            <th>Books</th>
+                            <th>Edit</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var tag in Model.Tags)
+                    {
+                        <tr>
+                            <td>
+                                <span class="tag-pill" style="--tag-color:@tag.Color" title="@tag.Description">@tag.Name</span>
+                                @if (!string.IsNullOrWhiteSpace(tag.Description))
+                                {
+                                    <span class="muted-block">@tag.Description</span>
+                                }
+                            </td>
+                            <td>@tag.BookCount</td>
+                            <td>
+                                <form method="post" asp-page-handler="UpdateTag" class="tag-edit-form">
+                                    <input name="id" type="hidden" value="@tag.Id" />
+                                    <input name="name" class="form-control" value="@tag.Name" />
+                                    <input name="description" class="form-control" value="@tag.Description" placeholder="Optional note" />
+                                    <input name="color" class="form-control color-input" type="color" value="@tag.Color" />
+                                    <button class="btn btn-sm btn-outline-secondary">Save</button>
+                                </form>
+                            </td>
+                            <td class="text-end">
+                                <form method="post" asp-page-handler="DeleteTag">
+                                    <input name="id" type="hidden" value="@tag.Id" />
+                                    <button class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </details>
+
+    <details class="details-accordion panel options-panel">
+        <summary class="details-accordion__summary">
+            <h2>Collections</h2>
+        </summary>
+        <div class="details-accordion__body">
+            <form method="post" asp-page-handler="CreateCollection" class="inline-form wide-inline-form">
+                <input asp-for="NewCollection.Name" class="form-control" placeholder="Collection name" />
+                <input asp-for="NewCollection.Description" class="form-control" placeholder="Optional note" />
+                <button class="btn btn-primary">Create</button>
+            </form>
+            <span asp-validation-for="NewCollection.Name" class="text-danger"></span>
+
+            <div class="table-wrap">
+                <table class="table inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Collection</th>
+                            <th>Books</th>
+                            <th>Edit</th>
+                            <th>View</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var collection in Model.Collections)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@collection.Name</strong>
+                                @if (!string.IsNullOrWhiteSpace(collection.Description))
+                                {
+                                    <span class="muted-block">@collection.Description</span>
+                                }
+                            </td>
+                            <td>@collection.BookCount</td>
+                            <td>
+                                <form method="post" asp-page-handler="UpdateCollection" class="inline-form wide-inline-form">
+                                    <input name="id" type="hidden" value="@collection.Id" />
+                                    <input name="name" class="form-control" value="@collection.Name" />
+                                    <input name="description" class="form-control" value="@collection.Description" placeholder="Optional note" />
+                                    <button class="btn btn-sm btn-outline-secondary">Save</button>
+                                </form>
+                            </td>
+                            <td>
+                                <a class="btn btn-sm btn-outline-secondary" asp-page="/Books/Index" asp-route-collectionIds="@collection.Id">Open</a>
+                            </td>
+                            <td class="text-end">
+                                <form method="post" asp-page-handler="DeleteCollection">
+                                    <input name="id" type="hidden" value="@collection.Id" />
+                                    <button class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </details>
+
+    <details class="details-accordion panel options-panel">
+        <summary class="details-accordion__summary">
+            <h2>Locations</h2>
+        </summary>
+        <div class="details-accordion__body">
+            <form method="post" asp-page-handler="CreateLocation" class="inline-form wide-inline-form">
+                <input asp-for="NewLocation.Name" class="form-control" placeholder="Location name" />
+                <input asp-for="NewLocation.Description" class="form-control" placeholder="Optional note" />
+                <button class="btn btn-primary">Create</button>
+            </form>
+            <span asp-validation-for="NewLocation.Name" class="text-danger"></span>
+
+            <div class="table-wrap">
+                <table class="table inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Location</th>
+                            <th>Books</th>
+                            <th>Edit</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var location in Model.Locations)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@location.Name</strong>
+                                @if (!string.IsNullOrWhiteSpace(location.Description))
+                                {
+                                    <span class="muted-block">@location.Description</span>
+                                }
+                            </td>
+                            <td>@location.BookCount</td>
+                            <td>
+                                <form method="post" asp-page-handler="UpdateLocation" class="inline-form wide-inline-form">
+                                    <input name="id" type="hidden" value="@location.Id" />
+                                    <input name="name" class="form-control" value="@location.Name" />
+                                    <input name="description" class="form-control" value="@location.Description" placeholder="Optional note" />
+                                    <button class="btn btn-sm btn-outline-secondary">Save</button>
+                                </form>
+                            </td>
+                            <td class="text-end">
+                                <form method="post" asp-page-handler="DeleteLocation">
+                                    <input name="id" type="hidden" value="@location.Id" />
+                                    <button class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </details>
 </section>
 
-<section class="stats-grid compact-stats-grid">
-    <div class="stat">
-        <span class="stat-label">Books</span>
-        <strong>@Model.Snapshot.TotalBooks</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Items</span>
-        <strong>@Model.Snapshot.TotalItems</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Tags</span>
-        <strong>@Model.Snapshot.TotalTags</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Collections</span>
-        <strong>@Model.Snapshot.TotalCollections</strong>
-    </div>
+<section class="bulk-admin-grid">
+    <details class="details-accordion panel options-panel" open>
+        <summary class="details-accordion__summary">
+            <h2>Export</h2>
+        </summary>
+        <div class="details-accordion__body">
+            <div class="options-export-grid">
+                <form method="post" asp-page-handler="Export" class="inline-form export-form export-form--simple">
+                    <div class="field-stack">
+                        <label>Full export</label>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary">Export CSV</button>
+                </form>
+
+                <form method="post" asp-page-handler="ExportPdf" class="pdf-export-form export-form options-export-grid__pdf">
+                    <div class="field-stack">
+                        <label>Export PDF</label>
+                        <div class="export-field-list">
+                            @foreach (var field in Model.ExportFields)
+                            {
+                                var isChecked = LibraryScanner.Web.Services.InventoryExportField.DefaultPdfKeys.Contains(field.Key);
+                                <label class="checkbox-pill checkbox-pill--toggle">
+                                    <input type="checkbox" name="PdfFieldKeys" value="@field.Key" checked="@isChecked" />
+                                    <span>@field.Label</span>
+                                </label>
+                            }
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary">Export PDF</button>
+                </form>
+
+                @*
+                <form method="post" asp-page-handler="ExportLog" class="export-log-form export-form">
+                    <div class="field-stack">
+                        <label>Export log</label>
+                        <span class="form-hint">Downloads inventory actions over a custom date range.</span>
+                        <div class="field-grid export-log-range">
+                            <div>
+                                <label asp-for="LogStartDate">From</label>
+                                <input asp-for="LogStartDate" type="date" class="form-control" />
+                            </div>
+                            <div>
+                                <label asp-for="LogEndDate">To</label>
+                                <input asp-for="LogEndDate" type="date" class="form-control" />
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary">Export log CSV</button>
+                </form>
+                *@
+
+                @*
+                Import is paused while account-level inventory separation is settling.
+                Keep this form here so it can be restored without rebuilding the import handler.
+                *@
+            </div>
+        </div>
+    </details>
 </section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

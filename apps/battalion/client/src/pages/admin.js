@@ -144,6 +144,9 @@ export async function renderAdmin(container) {
           <span class="status-bar__level" id="sb-level">Lv 1</span>
         </div>
 
+        <!-- Account Switcher & Central Auth Badge (Left of Stats) -->
+        <div id="sb-user-switcher-container" style="display:inline-flex; align-items:center; gap:6px;"></div>
+
         <div class="status-bar__bars">
           <div class="status-bar__bar-group">
             <div class="status-bar__bar-label">
@@ -193,6 +196,9 @@ export async function renderAdmin(container) {
         </div>
       </div>
     </div>
+
+    <!-- Active User Switcher Notice Banner -->
+    <div id="acting-user-banner-container"></div>
 
     <!-- Main Content -->
     <div class="admin-content">
@@ -404,9 +410,12 @@ export async function renderAdmin(container) {
 
       <!-- Activity Log (Admin) -->
       <div class="section" id="admin-log-section">
-        <div class="section__header">
-          <h2 class="section__title">📋 Activity Log</h2>
-          <span id="log-count" style="font-size:12px; opacity:0.6"></span>
+        <div class="section__header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <h2 class="section__title">📋 Activity Log</h2>
+            <span id="log-count" style="font-size:12px; opacity:0.6"></span>
+          </div>
+          <button class="btn btn--ghost btn--sm" id="btn-export-log-admin" title="Export Activity Log to JSON">⬇ Export JSON</button>
         </div>
         <div id="admin-log-list" style="max-height:400px; overflow-y:auto;">
           <span style="opacity:0.5">Loading log...</span>
@@ -421,6 +430,79 @@ export async function renderAdmin(container) {
 
   setupAccordionShell();
   attachEventListeners();
+  
+  // ─── Setup User Switcher for Preferred Admin & Central Auth Status ───
+  try {
+    const authCheck = await auth.check().catch(() => ({ authenticated: false }));
+    const switcherContainer = document.getElementById('sb-user-switcher-container');
+    if (switcherContainer && authCheck.authenticated) {
+      let switcherHtml = '';
+      if (authCheck.isOwner) {
+        const users = await auth.getUsers().catch(() => []);
+        const activeId = authCheck.actingPlayer?.id || authCheck.player?.id;
+        if (users.length > 0) {
+          switcherHtml = `
+            <select id="sb-user-switcher" title="Switch User Context (Preferred Admin)" style="font-size:12px; padding:3px 8px; cursor:pointer; border:1px solid #a855f7; background:#faf5ff; color:#6b21a8; font-weight:600; border-radius:4px; max-width:210px;">
+              <option value="">👤 My Account (${authCheck.player.username})</option>
+              <optgroup label="Accounts & Templates">
+                ${users.filter(u => u.id !== authCheck.player.id).map(u => `
+                  <option value="${u.id}" ${activeId === u.id ? 'selected' : ''}>
+                    ${u.is_master_template ? '⚙️ [Template] ' : '👤 '}${u.username} (${u.role})
+                  </option>
+                `).join('')}
+              </optgroup>
+            </select>
+          `;
+        }
+      }
+
+      // Central Auth status pill
+      const isCentralAuth = authCheck.authSource === 'central_auth';
+      const authPill = isCentralAuth
+        ? `<a href="https://auth.jeffersonwm.com/home" target="_blank" title="Authenticated via Central Auth (Click to open Auth Home)" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 7px; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; border-radius:12px; text-decoration:none; font-weight:600; white-space:nowrap;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#10b981;"></span> Central Auth</a>`
+        : `<span title="Local account session" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 7px; background:#f3f4f6; color:#4b5563; border:1px solid #e5e7eb; border-radius:12px; font-weight:500; white-space:nowrap;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#9ca3af;"></span> Local</span>`;
+
+      switcherContainer.innerHTML = `${switcherHtml}${authPill}`;
+
+      document.getElementById('sb-user-switcher')?.addEventListener('change', async (e) => {
+        const val = e.target.value;
+        showLoading();
+        try {
+          await auth.switchUser(val ? Number(val) : null);
+          showToast('Switching active account context...', 'info');
+          window.location.reload();
+        } catch (err) {
+          hideLoading();
+          showToast('Failed to switch user: ' + err.message, 'error');
+        }
+      });
+    }
+
+    if (authCheck.isActing) {
+      const bannerContainer = document.getElementById('acting-user-banner-container');
+      if (bannerContainer) {
+        bannerContainer.innerHTML = `
+          <div class="acting-banner" style="background:#fef3c7; color:#92400e; padding:10px 20px; border-bottom:2px solid #f59e0b; display:flex; justify-content:space-between; align-items:center; font-size:13px; font-weight:500;">
+            <span>👁️ <strong>Active Switcher Context:</strong> Currently inspecting <strong>${authCheck.actingPlayer.username}</strong> ${authCheck.actingPlayer.is_master_template ? '<em>(Master Startup Template)</em>' : `<em>(${authCheck.actingPlayer.role})</em>`}</span>
+            <button class="btn btn--primary btn--sm" id="btn-return-my-account" style="background:#b45309; border-color:#b45309; cursor:pointer;">Return to My Account (${authCheck.player.username})</button>
+          </div>
+        `;
+
+        document.getElementById('btn-return-my-account')?.addEventListener('click', async () => {
+          showLoading();
+          try {
+            await auth.switchUser(null);
+            showToast('Returned to your personal account', 'success');
+            window.location.reload();
+          } catch (err) {
+            hideLoading();
+            showToast('Failed to return to personal account: ' + err.message, 'error');
+          }
+        });
+      }
+    }
+  } catch (_) {}
+
   await loadAllData();
 
   const refreshId = setInterval(loadAllData, 30000);
@@ -1321,6 +1403,25 @@ function attachEventListeners() {
   document.getElementById('btn-refresh')?.addEventListener('click', () => {
     loadAllData();
     showToast('Data refreshed', 'info');
+  });
+
+  // ─── Export Activity Log ────────────────────────────────────
+  document.getElementById('btn-export-log-admin')?.addEventListener('click', async () => {
+    try {
+      showToast('Exporting log...', 'info');
+      const data = await actionsApi.exportLog({ type: 'all', timeframe: 'all' });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `battalion_log_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+      showToast('Exported JSON log (logged to Auth)', 'success');
+    } catch (err) {
+      showToast('Export failed: ' + err.message, 'error');
+    }
   });
 
   // ─── Reset Dropdown ──────────────────────────────────────────

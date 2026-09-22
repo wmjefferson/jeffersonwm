@@ -277,6 +277,7 @@
         width: 100%;
         text-align: right;
         color: #1a1a1a;
+        font-palette: --widget-default;
       }
 
       .widget-time {
@@ -286,8 +287,8 @@
         padding: 0;
         border: 0;
         background: transparent;
-        color: inherit;
-        font-family: inherit;
+        color: #000;
+        font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-size: clamp(3rem, 8vw, 4.5rem);
         font-weight: 300;
         line-height: 0.92;
@@ -350,6 +351,17 @@
         opacity: 0.9;
       }
 
+      /* Neutralize Cairo Play's built-in accents so only today's event is green. */
+      @font-palette-values --widget-default {
+        font-family: "Cairo Play";
+        override-colors: 0 #1a1a1a, 1 #1a1a1a, 2 #1a1a1a, 3 #1a1a1a, 4 #1a1a1a;
+      }
+
+      @font-palette-values --event-today {
+        font-family: "Cairo Play";
+        override-colors: 0 #16823a, 1 #16823a, 2 #16823a, 3 #16823a, 4 #16823a;
+      }
+
       .widget-event {
         display: block;
         width: 100%;
@@ -357,6 +369,7 @@
         text-decoration: none;
         color: inherit;
         font-family: inherit;
+        font-palette: --widget-default;
         font-size: 0.92rem;
         font-weight: 600;
         letter-spacing: 0.04em;
@@ -364,6 +377,11 @@
         border: 0;
         padding: 0;
         background: transparent;
+      }
+
+      .widget-event--today {
+        color: #16823a;
+        font-palette: --event-today;
       }
 
       .widget-weather {
@@ -377,7 +395,7 @@
         border: 0;
         background: transparent;
         color: inherit;
-        font-family: inherit;
+        font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         cursor: pointer;
         transition: color 0.15s ease-out;
       }
@@ -619,6 +637,9 @@
       }
 
       .widget-events-item {
+        color: inherit;
+        font-family: inherit;
+        font-palette: --widget-default;
         font-size: 0.82rem;
         font-weight: 600;
         letter-spacing: 0.04em;
@@ -638,6 +659,12 @@
         line-height: 1.45;
         max-width: 18rem;
         opacity: 0.54;
+      }
+
+      .widget-events-item-text--today .widget-events-item {
+        color: #16823a;
+        font-palette: --event-today;
+        opacity: 1;
       }
 
       .widget-events-item--row {
@@ -1220,6 +1247,9 @@
           const day = parts.find(part => part.type === 'day')?.value || '00';
           return `${year}-${month}-${day}`;
         };
+        // Special dates follow the same local calendar as the displayed clock.
+        const getWidgetDateKey = (date = new Date()) =>
+          `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         const buildFallbackWordsPayload = () => ({
           pacificDateKey: getPacificDateKey(),
           generatedAt: new Date().toISOString(),
@@ -1311,6 +1341,7 @@
         let widgetEvents = [];
         let widgetFonts = [];
         let widgetState = null;
+        let currentEventDateKey = getWidgetDateKey();
         let currentWidgetFont = null;
         let eventsLoaded = false;
         let editingEventId = null;
@@ -1352,6 +1383,14 @@
           });
           elements.time.textContent = timeFormatter.format(now);
           elements.date.textContent = dateFormatter.format(now);
+          const dateKey = getWidgetDateKey(now);
+          if (dateKey !== currentEventDateKey) {
+            currentEventDateKey = dateKey;
+            if (widgetState) {
+              applyResolvedWidgetState(widgetState);
+              if (!elements.eventsPopup.hidden) renderEventsPopup();
+            }
+          }
         };
 
         const renderWeather = () => {
@@ -1507,7 +1546,7 @@
         };
 
         const formatEventDate = dateStr => {
-          const date = new Date(dateStr);
+          const date = new Date(`${getEventDateKey(dateStr)}T00:00:00Z`);
           const weekday = date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
           const month = date.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
           const day = date.getUTCDate();
@@ -1516,10 +1555,8 @@
         };
 
         const getDaysSince = (dateStr, endDateStr) => {
-          const targetDate = new Date(endDateStr || dateStr);
-          const now = new Date();
-          const d1 = Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate());
-          const d2 = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+          const d1 = Date.parse(`${getEventDateKey(endDateStr || dateStr)}T00:00:00Z`);
+          const d2 = Date.parse(`${getWidgetDateKey()}T00:00:00Z`);
           const diff = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
           return diff >= 0 ? ` (${diff})` : '';
         };
@@ -1528,12 +1565,14 @@
           const eventTitle = getEventTitle(event);
           if (!event || !eventTitle || !event.date) {
             elements.event.hidden = true;
+            elements.event.classList.remove('widget-event--today');
             return;
           }
 
           elements.event.hidden = false;
           elements.event.textContent = `${formatEventDate(event.date)}${getDaysSince(event.date, event.end_date)} - ${eventTitle}`;
           elements.event.title = 'Show all special dates.';
+          elements.event.classList.toggle('widget-event--today', isExactSpecialDay(event.date));
         };
 
         const escapeHtml = value => String(value ?? '')
@@ -1543,10 +1582,25 @@
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
 
-        const normaliseDateInputValue = value => {
+        const getEventDateKey = value => {
           if (!value) return '';
-          return new Date(value).toISOString().split('T')[0];
+          const rawValue = String(value).trim();
+          const directDate = rawValue.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+          if (directDate) return directDate;
+          const date = new Date(value);
+          return Number.isNaN(date.getTime()) ? '' : getWidgetDateKey(date);
         };
+
+        const normaliseDateInputValue = value => getEventDateKey(value);
+
+        const isExactSpecialDay = dateStr => {
+          const eventDateKey = getEventDateKey(dateStr);
+          if (!eventDateKey) return false;
+          return eventDateKey === getWidgetDateKey();
+        };
+
+        const getTodaySpecialDate = events =>
+          Array.isArray(events) ? events.find(event => isExactSpecialDay(event?.date)) || null : null;
 
         const closeEventEditor = () => {
           editingEventId = null;
@@ -1564,7 +1618,7 @@
           elements.eventsEditorTitle.textContent = editingEventId === null ? 'New Event' : 'Edit Event';
           elements.eventNameInput.value = sourceEvent?.name ?? '';
           elements.eventDescriptionInput.value = sourceEvent?.description ?? '';
-          elements.eventDateInput.value = normaliseDateInputValue(sourceEvent?.date) || new Date().toISOString().split('T')[0];
+          elements.eventDateInput.value = normaliseDateInputValue(sourceEvent?.date) || getWidgetDateKey();
           elements.eventEndDateInput.value = normaliseDateInputValue(sourceEvent?.end_date);
           elements.eventsDelete.hidden = editingEventId === null;
           elements.eventsEditor.hidden = false;
@@ -1573,8 +1627,9 @@
         const renderEventItemMarkup = event => {
           const dateLabel = `${formatEventDate(event.date)}${getDaysSince(event.date, event.end_date)} - ${getEventTitle(event)}`;
           const description = event.description?.trim();
+          const todayClass = isExactSpecialDay(event.date) ? ' widget-events-item-text--today' : '';
           return `
-            <div class="widget-events-item-text">
+            <div class="widget-events-item-text${todayClass}">
               <div class="widget-events-item">${escapeHtml(dateLabel)}</div>
               ${description ? `<div class="widget-events-item-description">${escapeHtml(description)}</div>` : ''}
             </div>
@@ -1838,7 +1893,7 @@
 
           widgetEvents = Array.isArray(resolved.specialDates) ? resolved.specialDates : [];
           eventsLoaded = true;
-          renderEvent(resolved.nextSpecialDate || null);
+          renderEvent(getTodaySpecialDate(widgetEvents) || resolved.nextSpecialDate || null);
           elements.eventsAdd.hidden = !Boolean(resolvedPayload?.auth?.canEditDefaults);
         };
 

@@ -8,6 +8,14 @@ public class Collection
 
     [Required]
     [StringLength(120)]
+    public string OwnerAuthId { get; set; } = "wm";
+
+    [Required]
+    [StringLength(80)]
+    public string OwnerUsername { get; set; } = "wm";
+
+    [Required]
+    [StringLength(120)]
     public string Name { get; set; } = string.Empty;
 
     [Required]

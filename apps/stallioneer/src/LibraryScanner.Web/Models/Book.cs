@@ -7,6 +7,14 @@ public class Book
     public int Id { get; set; }
 
     [Required]
+    [StringLength(120)]
+    public string OwnerAuthId { get; set; } = "wm";
+
+    [Required]
+    [StringLength(80)]
+    public string OwnerUsername { get; set; } = "wm";
+
+    [Required]
     [Display(Name = "ISBN-13")]
     public string Isbn13 { get; set; } = string.Empty;
 

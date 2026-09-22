@@ -49,6 +49,18 @@ const App: React.FC = () => {
   const authPopupPollRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const basePath = import.meta.env.BASE_URL || '/lionship/';
+    const normalizedBasePath = basePath.endsWith('/') ? basePath : `${basePath}/`;
+    const currentPath = window.location.pathname.endsWith('/')
+      ? window.location.pathname
+      : `${window.location.pathname}/`;
+
+    if (normalizedBasePath !== '/' && currentPath !== normalizedBasePath) {
+      window.location.assign('/404.html');
+    }
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     const loadLinks = async () => {
@@ -501,6 +513,13 @@ const App: React.FC = () => {
     window.open(finalUrl, '_blank');
   };
 
+  const getSearchTerms = (query: string) => {
+    return query
+      .split(',')
+      .map(term => term.trim())
+      .filter(Boolean);
+  };
+
   const toggleSelect = (link: LinkItem) => {
     const next = new Set(selectedIds);
     if (next.has(link.id)) {
@@ -527,18 +546,20 @@ const App: React.FC = () => {
   const handleSubmit = (overrideQuery?: string) => {
     const query = (overrideQuery || universalQuery).trim();
     if (!query) return;
+    const searchTerms = getSearchTerms(query);
+    if (searchTerms.length === 0) return;
 
     if (selectedIds.size > 0) {
       links.forEach(link => {
         if (selectedIds.has(link.id)) {
-          openLinkWithQuery(link, query);
+          searchTerms.forEach(term => openLinkWithQuery(link, term));
         }
       });
     } else {
       const baseUrl = searchEngine === 'GOOGLE' 
         ? 'https://www.google.com/search?q=' 
         : 'https://www.bing.com/search?q=';
-      window.open(`${baseUrl}${encodeURIComponent(query)}`, '_blank');
+      searchTerms.forEach(term => window.open(`${baseUrl}${encodeURIComponent(term)}`, '_blank'));
     }
 
     addToHistory(query);
@@ -591,7 +612,7 @@ const App: React.FC = () => {
     const query = universalQuery.trim();
 
     if (query) {
-      openLinkWithQuery(link, query);
+      getSearchTerms(query).forEach(term => openLinkWithQuery(link, term));
       addToHistory(query);
       setUniversalQuery('');
     } else {

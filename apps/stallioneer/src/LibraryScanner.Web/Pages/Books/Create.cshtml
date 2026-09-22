@@ -33,349 +33,197 @@
     <div class="alert alert-success">@Model.StatusMessage</div>
 }
 
-<form method="post" class="entry-grid @(Model.SpeedMode ? "entry-grid--speed" : string.Empty)">
+<form method="post" class="entry-grid create-layout @(Model.SpeedMode ? "entry-grid--speed" : string.Empty)">
     <input asp-for="IsManualEntry" type="hidden" />
     <input asp-for="SpeedMode" type="hidden" />
 
-    <section class="panel entry-panel--lookup @(Model.SpeedMode ? "speed-panel speed-panel--lookup" : string.Empty)">
-        <div class="scanner-header">
-            <div>
-                <h2>Lookup</h2>
-                <p class="form-hint">
-                    @(Model.SpeedMode
-                        ? "Scan, choose a match, tag it, then save and return to the next scan."
-                        : "USB and Bluetooth barcode scanners can use this field like a keyboard.")
-                </p>
-            </div>
-            <span class="status-pill">@(Model.IsManualEntry ? "Manual entry" : Model.SpeedMode ? "Speed mode" : "Scanner ready")</span>
-        </div>
-        <div class="lookup-stack">
-            @if (Model.IsManualEntry)
-            {
-                <input class="form-control lookup-code-input" value="No code required" disabled />
-            }
-            else
-            {
-                <input asp-for="Input.Isbn" class="form-control lookup-code-input" autocomplete="off" placeholder="Scan or enter ISBN / UPC" data-scan-code data-scan-focus="@(!Model.HasSelectedBook).ToString().ToLowerInvariant()" autofocus />
-                <div class="lookup-provider-picker">
-                    <label asp-for="PreferredLookupProvider">Lookup provider</label>
-                    <select asp-for="PreferredLookupProvider" asp-items="Model.LookupProviderOptions" class="form-select"></select>
+    <div class="create-layout__column create-layout__column--left">
+        <section class="panel entry-panel--lookup @(Model.SpeedMode ? "speed-panel speed-panel--lookup" : string.Empty)">
+            <div class="scanner-header">
+                <div>
+                    <h2>Lookup</h2>
+                    <p class="form-hint">
+                        @(Model.SpeedMode
+                            ? "Scan, choose a match, tag it, then save and return to the next scan."
+                            : "USB and Bluetooth barcode scanners can use this field like a keyboard.")
+                    </p>
                 </div>
-            }
-            <div class="lookup-actions">
-                <button asp-page-handler="Lookup" class="btn btn-primary" data-scan-submit formnovalidate>Find matches</button>
-                <button asp-page-handler="Manual" class="btn btn-outline-secondary" formnovalidate>Manual entry</button>
-                <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear</button>
+                <span class="status-pill">@(Model.IsManualEntry ? "Manual entry" : Model.SpeedMode ? "Speed mode" : "Scanner ready")</span>
             </div>
-        </div>
-        <span asp-validation-for="Input.Isbn" class="text-danger"></span>
-        <p class="form-hint">
-            @if (Model.IsManualEntry)
-            {
-                <span>No code is needed for this entry. Add the book details and save when ready.</span>
-            }
-            else
-            {
-                <span>Scan or type the code and press Enter. Then choose the matching cover or title to load the book details.</span>
-            }
-        </p>
-
-        @if (!Model.IsManualEntry)
-        {
-            <p class="form-hint">Open Library and Google Books work without setup. ISBNdb needs an API key before it can be used first.</p>
-        }
-
-        @if (!Model.IsManualEntry)
-        {
-            <div class="camera-scanner" data-camera-panel hidden>
-                <div class="scanner-header">
-                    <div>
-                        <h3>Camera scanner</h3>
-                        <p class="form-hint" data-camera-status>Point the camera at an ISBN or UPC barcode.</p>
+            <div class="lookup-stack">
+                @if (Model.IsManualEntry)
+                {
+                    <input class="form-control lookup-code-input" value="No code required" disabled />
+                }
+                else
+                {
+                    <input asp-for="Input.Isbn" class="form-control lookup-code-input" autocomplete="off" placeholder="Scan or enter ISBN / UPC" data-scan-code data-scan-focus="@(!Model.HasSelectedBook).ToString().ToLowerInvariant()" autofocus />
+                    <div class="lookup-provider-picker">
+                        <label asp-for="PreferredLookupProvider">Lookup provider</label>
+                        <select asp-for="PreferredLookupProvider" asp-items="Model.LookupProviderOptions" class="form-select"></select>
                     </div>
-                    <button type="button" class="btn btn-outline-secondary" data-camera-stop hidden>Stop</button>
+                }
+                <div class="lookup-actions">
+                    <button asp-page-handler="Lookup" class="btn btn-primary" data-scan-submit formnovalidate>Find matches</button>
+                    <button asp-page-handler="Manual" class="btn btn-outline-secondary" formnovalidate>Manual entry</button>
+                    <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear</button>
                 </div>
-                <video data-camera-video muted playsinline hidden></video>
             </div>
-        }
-
-        @if (Model.CandidateMatches.Count > 0)
-        {
-            <div class="candidate-list">
-                @foreach (var candidate in Model.CandidateMatches)
+            <span asp-validation-for="Input.Isbn" class="text-danger"></span>
+            <p class="form-hint">
+                @if (Model.IsManualEntry)
                 {
-                    <button type="submit" asp-page-handler="ChooseCandidate" asp-route-candidateIsbn="@candidate.Isbn13" class="candidate-card" formnovalidate>
-                        @if (!string.IsNullOrWhiteSpace(candidate.CoverImageUrl))
-                        {
-                            <img class="candidate-cover" src="@candidate.CoverImageUrl" alt="" />
-                        }
-                        else
-                        {
-                            <div class="candidate-cover candidate-cover-placeholder" aria-hidden="true"></div>
-                        }
-                        <div class="candidate-copy">
-                            <h3>@candidate.Title</h3>
-                            @if (!string.IsNullOrWhiteSpace(candidate.Authors))
-                            {
-                                <p>@candidate.Authors</p>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(candidate.Publisher) || !string.IsNullOrWhiteSpace(candidate.PublishedDate))
-                            {
-                                <p>@candidate.Publisher @candidate.PublishedDate</p>
-                            }
-                            <p class="source-note">@candidate.Source - ISBN @candidate.Isbn13</p>
+                    <span>No code is needed for this entry. Add the book details and save when ready.</span>
+                }
+                else
+                {
+                    <span>Scan or type the code and press Enter. Then choose the matching cover or title to load the book details.</span>
+                }
+            </p>
+
+            @if (!Model.IsManualEntry)
+            {
+                <p class="form-hint">Open Library and Google Books work without setup. ISBNdb needs an API key before it can be used first.</p>
+            }
+
+            @if (!Model.IsManualEntry)
+            {
+                <div class="camera-scanner" data-camera-panel hidden>
+                    <div class="scanner-header">
+                        <div>
+                            <h3>Camera scanner</h3>
+                            <p class="form-hint" data-camera-status>Point the camera at an ISBN or UPC barcode.</p>
                         </div>
-                    </button>
-                }
-            </div>
-        }
-
-        @if (!string.IsNullOrWhiteSpace(Model.Input.CoverImageUrl))
-        {
-            <img class="cover-preview" src="@Model.Input.CoverImageUrl" alt="" />
-        }
-
-        @if (!string.IsNullOrWhiteSpace(Model.Input.MetadataSource))
-        {
-            <p class="source-note">Source: @Model.Input.MetadataSource</p>
-        }
-
-        @if (!Model.SpeedMode && Model.AvailableTags.Count > 0)
-        {
-            <div class="tag-suggestions">
-                @foreach (var tag in Model.AvailableTags.Take(Model.SpeedMode ? 30 : 18))
-                {
-                    <button type="button" class="tag-pill tag-button" style="--tag-color:@tag.Color" data-tag-suggestion="@tag.Name" data-tag-target="#Input_TagNames" title="@tag.Description">@tag.Name</button>
-                }
-            </div>
-        }
-
-        @if (!Model.SpeedMode && Model.RecentScans.Count > 0)
-        {
-            <div class="recent-scan-list">
-                <div class="scanner-header">
-                    <h3>Recent scans</h3>
-                    <a asp-page="/Books/Index" class="source-note">Inventory</a>
+                        <button type="button" class="btn btn-outline-secondary" data-camera-stop hidden>Stop</button>
+                    </div>
+                    <video data-camera-video muted playsinline hidden></video>
                 </div>
-                @foreach (var scan in Model.RecentScans)
-                {
-                    <a class="recent-scan-item" asp-page="/Books/Edit" asp-route-id="@scan.BookId">
-                        <span>
-                            <strong>@scan.Title</strong>
-                            <small>@scan.EventType - @scan.Isbn13</small>
-                        </span>
-                        <span class="status-pill">+@scan.QuantityDelta</span>
-                    </a>
-                }
-            </div>
-        }
-    </section>
-
-    <section class="panel entry-panel--details @(Model.SpeedMode ? "speed-panel speed-panel--details" : string.Empty)">
-        <h2>Book details</h2>
-        @if (Model.IsManualEntry)
-        {
-            <p class="form-hint">Manual mode is active. A private internal code will be created when you save.</p>
-        }
-        else if (!Model.HasSelectedBook)
-        {
-            <p class="form-hint">Choose a search result to populate the main details first.</p>
-        }
-        <div class="field-stack">
-            <label asp-for="Input.Title"></label>
-            <input asp-for="Input.Title" class="form-control" />
-            <span asp-validation-for="Input.Title" class="text-danger"></span>
-
-            <label asp-for="Input.Authors"></label>
-            <input asp-for="Input.Authors" class="form-control" />
-
-            <label asp-for="Input.Publisher"></label>
-            <input asp-for="Input.Publisher" class="form-control" />
-
-            <div class="field-grid">
-                <div>
-                    <label asp-for="Input.PublishedDate"></label>
-                    <input asp-for="Input.PublishedDate" class="form-control" />
-                </div>
-                <div>
-                    <label asp-for="Input.PageCount"></label>
-                    <input asp-for="Input.PageCount" class="form-control" />
-                </div>
-            </div>
-
-            <label asp-for="Input.Categories"></label>
-            <input asp-for="Input.Categories" class="form-control" />
-
-            <div class="field-grid">
-                <div>
-                    <label asp-for="Input.Language"></label>
-                    <input asp-for="Input.Language" class="form-control" />
-                </div>
-                <div>
-                    <label asp-for="Input.Isbn10"></label>
-                    <input asp-for="Input.Isbn10" class="form-control" />
-                </div>
-            </div>
-
-            <label asp-for="Input.CoverImageUrl"></label>
-            <input asp-for="Input.CoverImageUrl" class="form-control" />
-
-            <label asp-for="Input.InfoUrl"></label>
-            <input asp-for="Input.InfoUrl" class="form-control" />
-
-            <label asp-for="Input.Description"></label>
-            <textarea asp-for="Input.Description" class="form-control" rows="5"></textarea>
-
-            <input asp-for="Input.MetadataSource" type="hidden" />
-        </div>
-    </section>
-
-    <section class="panel entry-panel--actions @(Model.SpeedMode ? "speed-panel speed-panel--actions" : string.Empty)">
-        <h2>Actions</h2>
-        <div class="form-actions form-actions--details">
-            @if (Model.SpeedMode)
-            {
-                <button asp-page-handler="SaveAndScanNext" class="btn btn-primary">Save + next scan</button>
-                <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear for next scan</button>
-                <button asp-page-handler="Save" class="btn btn-outline-secondary">Save and view inventory</button>
             }
-            else
+
+            @if (Model.CandidateMatches.Count > 0)
             {
-                <button asp-page-handler="Save" class="btn btn-primary">Save book</button>
-                <button asp-page-handler="SaveAndScanNext" class="btn btn-outline-secondary">Save and scan next</button>
-                <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear</button>
+                <div class="candidate-list">
+                    @foreach (var candidate in Model.CandidateMatches)
+                    {
+                        <button type="submit" asp-page-handler="ChooseCandidate" asp-route-candidateIsbn="@candidate.Isbn13" class="candidate-card" formnovalidate>
+                            @if (!string.IsNullOrWhiteSpace(candidate.CoverImageUrl))
+                            {
+                                <img class="candidate-cover" src="@candidate.CoverImageUrl" alt="" />
+                            }
+                            else
+                            {
+                                <div class="candidate-cover candidate-cover-placeholder" aria-hidden="true"></div>
+                            }
+                            <div class="candidate-copy">
+                                <h3>@candidate.Title</h3>
+                                @if (!string.IsNullOrWhiteSpace(candidate.Authors))
+                                {
+                                    <p>@candidate.Authors</p>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(candidate.Publisher) || !string.IsNullOrWhiteSpace(candidate.PublishedDate))
+                                {
+                                    <p>@candidate.Publisher @candidate.PublishedDate</p>
+                                }
+                                <p class="source-note">@candidate.Source - ISBN @candidate.Isbn13</p>
+                            </div>
+                        </button>
+                    }
+                </div>
             }
-        </div>
-    </section>
 
-    <section class="panel entry-panel--inventory @(Model.SpeedMode ? "speed-panel speed-panel--inventory" : string.Empty)">
-        <div class="scanner-header">
-            <div>
-                <h2>Inventory</h2>
-                <p class="form-hint">These values can stay active while you scan a stack of books.</p>
-            </div>
-        </div>
-        <div class="field-grid">
-            <div>
-                <label asp-for="Input.Quantity"></label>
-                <input asp-for="Input.Quantity" class="form-control" min="1" />
-            </div>
-            <div>
-                <label asp-for="Input.LocationId"></label>
-                <select asp-for="Input.LocationId" asp-items="Model.LocationOptions" class="form-select"></select>
-            </div>
-        </div>
+            @if (!string.IsNullOrWhiteSpace(Model.Input.CoverImageUrl))
+            {
+                <img class="cover-preview" src="@Model.Input.CoverImageUrl" alt="" />
+            }
 
-        <label asp-for="Input.NewLocationName"></label>
-        <input asp-for="Input.NewLocationName" class="form-control" placeholder="Create a location while saving" />
+            @if (!string.IsNullOrWhiteSpace(Model.Input.MetadataSource))
+            {
+                <p class="source-note">Source: @Model.Input.MetadataSource</p>
+            }
+
+            @if (!Model.SpeedMode && Model.AvailableTags.Count > 0)
+            {
+                <div class="tag-suggestions">
+                    @foreach (var tag in Model.AvailableTags.Take(Model.SpeedMode ? 30 : 18))
+                    {
+                        <button type="button" class="tag-pill tag-button" style="--tag-color:@tag.Color" data-tag-suggestion="@tag.Name" data-tag-target="#Input_TagNames" title="@tag.Description">@tag.Name</button>
+                    }
+                </div>
+            }
+        </section>
 
         @if (Model.SpeedMode)
         {
-            <input asp-for="Input.TagNames" type="hidden" />
-            <p class="form-hint">Tags and collections are applied from the toggle bank below.</p>
+            <section class="panel speed-panel speed-panel--toggles">
+                <div class="scanner-header">
+                    <div>
+                        <h2>Tag + collection toggles</h2>
+                        <p class="form-hint">Tap or click the presets you want to keep active while you scan this batch.</p>
+                    </div>
+                    <span class="status-pill">@Model.SelectedTagIds.Count tag(s) / @Model.SelectedCollectionIds.Count collection(s)</span>
+                </div>
+
+                <div class="toggle-bank">
+                    <div class="toggle-group">
+                        <h3>Tags</h3>
+                        @if (Model.AvailableTags.Count == 0)
+                        {
+                            <p class="form-hint">No tags exist yet.</p>
+                        }
+                        else
+                        {
+                            <div class="toggle-pills">
+                                @foreach (var tag in Model.AvailableTags)
+                                {
+                                    var isChecked = Model.SelectedTagIds.Contains(tag.Id);
+                                    <label class="toggle-pill" style="--toggle-color:@tag.Color">
+                                        <input type="checkbox" name="SelectedTagIds" value="@tag.Id" checked="@isChecked" />
+                                        <span>@tag.Name</span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="toggle-group">
+                        <h3>Collections</h3>
+                        @if (Model.AvailableCollections.Count == 0)
+                        {
+                            <p class="form-hint">No collections exist yet.</p>
+                        }
+                        else
+                        {
+                            <div class="toggle-pills toggle-pills--collections">
+                                @foreach (var collection in Model.AvailableCollections)
+                                {
+                                    var isChecked = Model.SelectedCollectionIds.Contains(collection.Id);
+                                    <label class="toggle-pill toggle-pill--collection">
+                                        <input type="checkbox" name="SelectedCollectionIds" value="@collection.Id" checked="@isChecked" />
+                                        <span>@collection.Name</span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </section>
         }
         else
         {
-            <label asp-for="Input.TagNames"></label>
-            <div class="tag-input-stack" data-live-tag-editor>
-                <input asp-for="Input.TagNames" class="form-control" placeholder="signed, hardcover, paper | paperback" data-live-tag-input />
-                <div class="tag-search-results" data-live-tag-results hidden></div>
-            </div>
-            <span class="form-hint">Separate tags with commas. Optional format: <code>tag | note</code>. New tags are created when you save.</span>
+            <section class="panel entry-panel--actions">
+                <h2>Actions</h2>
+                <div class="form-actions form-actions--details">
+                    <button asp-page-handler="Save" class="btn btn-primary">Save book</button>
+                    <button asp-page-handler="SaveAndScanNext" class="btn btn-outline-secondary">Save and scan next</button>
+                    <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear</button>
+                </div>
+            </section>
         }
 
-        <div class="field-grid">
-            <div>
-                <label asp-for="Input.Condition"></label>
-                <select asp-for="Input.Condition" class="form-select">
-                    <option>Unspecified</option>
-                    <option>New</option>
-                    <option>Like new</option>
-                    <option>Good</option>
-                    <option>Fair</option>
-                    <option>Poor</option>
-                </select>
-            </div>
-            <div>
-                <label asp-for="Input.Status"></label>
-                <select asp-for="Input.Status" class="form-select">
-                    <option>Owned</option>
-                    <option>Reading</option>
-                    <option>Loaned</option>
-                    <option>Wishlist</option>
-                    <option>Archived</option>
-                </select>
-            </div>
-        </div>
-        <label asp-for="Input.Notes"></label>
-        <textarea asp-for="Input.Notes" class="form-control" rows="4"></textarea>
-
-        <label class="checkbox-line scan-default-toggle">
-            <input asp-for="KeepScanDefaults" />
-            <span>Keep these inventory values for the next scan</span>
-        </label>
-    </section>
-
-    @if (Model.SpeedMode)
-    {
-        <section class="panel speed-panel speed-panel--toggles">
+        <section class="panel entry-panel--recent @(Model.SpeedMode ? "speed-panel speed-panel--recent" : string.Empty)">
             <div class="scanner-header">
                 <div>
-                    <h2>Tag + collection toggles</h2>
-                    <p class="form-hint">Tap or click the presets you want to keep active while you scan this batch.</p>
-                </div>
-                <span class="status-pill">@Model.SelectedTagIds.Count tag(s) / @Model.SelectedCollectionIds.Count collection(s)</span>
-            </div>
-
-            <div class="toggle-bank">
-                <div class="toggle-group">
-                    <h3>Tags</h3>
-                    @if (Model.AvailableTags.Count == 0)
-                    {
-                        <p class="form-hint">No tags exist yet.</p>
-                    }
-                    else
-                    {
-                        <div class="toggle-pills">
-                            @foreach (var tag in Model.AvailableTags)
-                            {
-                                var isChecked = Model.SelectedTagIds.Contains(tag.Id);
-                                <label class="toggle-pill" style="--toggle-color:@tag.Color">
-                                    <input type="checkbox" name="SelectedTagIds" value="@tag.Id" checked="@isChecked" />
-                                    <span>@tag.Name</span>
-                                </label>
-                            }
-                        </div>
-                    }
-                </div>
-
-                <div class="toggle-group">
-                    <h3>Collections</h3>
-                    @if (Model.AvailableCollections.Count == 0)
-                    {
-                        <p class="form-hint">No collections exist yet.</p>
-                    }
-                    else
-                    {
-                        <div class="toggle-pills toggle-pills--collections">
-                            @foreach (var collection in Model.AvailableCollections)
-                            {
-                                var isChecked = Model.SelectedCollectionIds.Contains(collection.Id);
-                                <label class="toggle-pill toggle-pill--collection">
-                                    <input type="checkbox" name="SelectedCollectionIds" value="@collection.Id" checked="@isChecked" />
-                                    <span>@collection.Name</span>
-                                </label>
-                            }
-                        </div>
-                    }
-                </div>
-            </div>
-        </section>
-
-        <section class="panel speed-panel speed-panel--recent">
-            <div class="scanner-header">
-                <div>
-                    <h2>Recent entries</h2>
+                    <h2>@(Model.SpeedMode ? "Recent entries" : "Recent scans")</h2>
                     <p class="form-hint">The latest saved books stay visible here while you keep scanning.</p>
                 </div>
                 <a asp-page="/Books/Index" class="source-note">Inventory</a>
@@ -383,7 +231,7 @@
 
             @if (Model.RecentScans.Count > 0)
             {
-                <div class="recent-scan-list recent-scan-list--speed">
+                <div class="recent-scan-list @(Model.SpeedMode ? "recent-scan-list--speed" : string.Empty)">
                     @foreach (var scan in Model.RecentScans)
                     {
                         <a class="recent-scan-item" asp-page="/Books/Edit" asp-route-id="@scan.BookId">
@@ -401,7 +249,148 @@
                 <p class="form-hint">No recent entries yet.</p>
             }
         </section>
-    }
+    </div>
+
+    <div class="create-layout__column create-layout__column--right">
+        @if (Model.SpeedMode)
+        {
+            <section class="panel entry-panel--actions speed-panel speed-panel--actions">
+                <h2>Actions</h2>
+                <div class="form-actions form-actions--details">
+                    <button asp-page-handler="SaveAndScanNext" class="btn btn-primary">Save + next scan</button>
+                    <button asp-page-handler="Clear" class="btn btn-outline-secondary" formnovalidate>Clear for next scan</button>
+                    <button asp-page-handler="Save" class="btn btn-outline-secondary">Save and view inventory</button>
+                </div>
+            </section>
+        }
+
+        <section class="panel entry-panel--details @(Model.SpeedMode ? "speed-panel speed-panel--details" : string.Empty)">
+            <h2>Book details</h2>
+            @if (Model.IsManualEntry)
+            {
+                <p class="form-hint">Manual mode is active. A private internal code will be created when you save.</p>
+            }
+            else if (!Model.HasSelectedBook)
+            {
+                <p class="form-hint">Choose a search result to populate the main details first.</p>
+            }
+            <div class="field-stack">
+                <label asp-for="Input.Title"></label>
+                <input asp-for="Input.Title" class="form-control" />
+                <span asp-validation-for="Input.Title" class="text-danger"></span>
+
+                <label asp-for="Input.Authors"></label>
+                <input asp-for="Input.Authors" class="form-control" />
+
+                <label asp-for="Input.Publisher"></label>
+                <input asp-for="Input.Publisher" class="form-control" />
+
+                <div class="field-grid">
+                    <div>
+                        <label asp-for="Input.PublishedDate"></label>
+                        <input asp-for="Input.PublishedDate" class="form-control" />
+                    </div>
+                    <div>
+                        <label asp-for="Input.PageCount"></label>
+                        <input asp-for="Input.PageCount" class="form-control" />
+                    </div>
+                </div>
+
+                <label asp-for="Input.Categories"></label>
+                <input asp-for="Input.Categories" class="form-control" />
+
+                <div class="field-grid">
+                    <div>
+                        <label asp-for="Input.Language"></label>
+                        <input asp-for="Input.Language" class="form-control" />
+                    </div>
+                    <div>
+                        <label asp-for="Input.Isbn10"></label>
+                        <input asp-for="Input.Isbn10" class="form-control" />
+                    </div>
+                </div>
+
+                <label asp-for="Input.CoverImageUrl"></label>
+                <input asp-for="Input.CoverImageUrl" class="form-control" />
+
+                <label asp-for="Input.InfoUrl"></label>
+                <input asp-for="Input.InfoUrl" class="form-control" />
+
+                <label asp-for="Input.Description"></label>
+                <textarea asp-for="Input.Description" class="form-control" rows="5"></textarea>
+
+                <input asp-for="Input.MetadataSource" type="hidden" />
+            </div>
+        </section>
+
+        <section class="panel entry-panel--inventory @(Model.SpeedMode ? "speed-panel speed-panel--inventory" : string.Empty)">
+            <div class="scanner-header">
+                <div>
+                    <h2>Inventory</h2>
+                    <p class="form-hint">These values can stay active while you scan a stack of books.</p>
+                </div>
+            </div>
+            <div class="field-grid">
+                <div>
+                    <label asp-for="Input.Quantity"></label>
+                    <input asp-for="Input.Quantity" class="form-control" min="1" />
+                </div>
+                <div>
+                    <label asp-for="Input.LocationId"></label>
+                    <select asp-for="Input.LocationId" asp-items="Model.LocationOptions" class="form-select"></select>
+                </div>
+            </div>
+
+            <label asp-for="Input.NewLocationName"></label>
+            <input asp-for="Input.NewLocationName" class="form-control" placeholder="Create a location while saving" />
+
+            @if (Model.SpeedMode)
+            {
+                <input asp-for="Input.TagNames" type="hidden" />
+                <p class="form-hint">Tags and collections are applied from the toggle bank below.</p>
+            }
+            else
+            {
+                <label asp-for="Input.TagNames"></label>
+                <div class="tag-input-stack" data-live-tag-editor>
+                    <input asp-for="Input.TagNames" class="form-control" placeholder="signed, hardcover, paper | paperback" data-live-tag-input />
+                    <div class="tag-search-results" data-live-tag-results hidden></div>
+                </div>
+                <span class="form-hint">Separate tags with commas. Optional format: <code>tag | note</code>. New tags are created when you save.</span>
+            }
+
+            <div class="field-grid">
+                <div>
+                    <label asp-for="Input.Condition"></label>
+                    <select asp-for="Input.Condition" class="form-select">
+                        <option>Unspecified</option>
+                        <option>New</option>
+                        <option>Like new</option>
+                        <option>Good</option>
+                        <option>Fair</option>
+                        <option>Poor</option>
+                    </select>
+                </div>
+                <div>
+                    <label asp-for="Input.Status"></label>
+                    <select asp-for="Input.Status" class="form-select">
+                        <option>Owned</option>
+                        <option>Reading</option>
+                        <option>Loaned</option>
+                        <option>Wishlist</option>
+                        <option>Archived</option>
+                    </select>
+                </div>
+            </div>
+            <label asp-for="Input.Notes"></label>
+            <textarea asp-for="Input.Notes" class="form-control" rows="4"></textarea>
+
+            <label class="checkbox-line scan-default-toggle">
+                <input asp-for="KeepScanDefaults" />
+                <span>Keep these inventory values for the next scan</span>
+            </label>
+        </section>
+    </div>
 </form>
 
 <script id="tag-data" type="application/json">

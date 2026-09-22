@@ -4,24 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Perihelion</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link rel="apple-touch-icon" href="./favicon.svg" />
+  <link rel="shortcut icon" href="./favicon.svg" />
+  <meta name="robots" content="noindex" />
   
-  <!-- Google Fonts: Young Serif, IBM Plex Sans Condensed, Viga -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=IBM+Plex+Sans+Condensed:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Viga&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <style>
     :root {
-      --bg-color: #fafaf9; /* Warm off-white */
-      --text-main: #000000; /* Black */
-      --text-body: #374151; /* Dark charcoal grey for readability */
-      --accent-color: #df5c13; /* Warm solar gold/amber accent */
-      --banner-bg: #ffffff; /* White banners */
-      --border-color: #e5e7eb; /* Light grey border */
-      
-      --font-title: 'Young Serif', Georgia, serif;
-      --font-body: 'IBM Plex Sans Condensed', -apple-system, sans-serif;
-      --font-accent: 'Viga', sans-serif;
+      --frame: 36px;
+      --topbar-height: 36px;
+      --top-gap: 6px;
+      --footer-height: 36px;
+      --body-top-offset: calc(var(--topbar-height) + var(--top-gap));
     }
 
     * {
@@ -31,185 +29,178 @@
     }
 
     body {
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      font-family: var(--font-body);
+      font-family: "Inter Tight", "Segoe UI", Arial, sans-serif;
+      background-color: #f2f2f2;
+      color: #202522;
       min-height: 100vh;
       position: relative;
+      overflow-x: hidden;
     }
 
-    /* 36px top and bottom banners */
-    .banner {
+    body::before {
+      background-image: url("./images/backgrounds/peri-cameras-pattern.png");
+      background-position: top left;
+      background-repeat: repeat;
+      content: "";
+      inset: 0;
+      opacity: 0.028;
+      pointer-events: none;
       position: fixed;
-      left: 0;
-      width: 100%;
-      height: 36px;
-      background-color: var(--banner-bg);
-      z-index: 100;
+      z-index: 0;
     }
 
-    .banner-top {
-      top: 0;
-      border-bottom: 1px solid var(--border-color);
+    .shell-frame {
+      width: calc(100% - (var(--frame) * 2));
+      max-width: 100%;
+      margin: 0 auto;
     }
 
-    .banner-bottom {
+    .shell-frame--body {
+      padding-top: var(--body-top-offset);
+      padding-bottom: calc(var(--footer-height) + 24px);
+      position: relative;
+      z-index: 20;
+    }
+
+    .shell-gutters {
+      pointer-events: none;
+      position: fixed;
+      inset: var(--topbar-height) 0 var(--footer-height);
+      z-index: 5;
+    }
+
+    .shell-gutter {
+      border-left: 1px solid #e5e5e5;
       bottom: 0;
-      border-top: 1px solid var(--border-color);
+      position: absolute;
+      top: 0;
     }
 
-    /* Content Area with 42px margins */
-    .content-container {
-      margin-left: 42px;
-      margin-right: 42px;
-      padding-top: 60px; /* 60px from the top of the viewport */
-      max-width: 680px; /* Constrain text width for premium editorial look */
-      text-align: left;
-      transition: opacity 400ms ease;
+    .shell-gutter--left {
+      left: var(--frame);
     }
 
-    .fade-out-active {
-      opacity: 0 !important;
+    .shell-gutter--right {
+      right: var(--frame);
     }
 
-    /* Accent Eyebrow Text */
-    .eyebrow {
-      font-family: var(--font-accent);
-      font-size: 13px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--accent-color);
-      margin-bottom: 6px;
-      display: inline-block;
-      
-      /* Initial load fade-in */
-      opacity: 0;
-      animation: fadeIn 200ms ease-out forwards;
+    .page-banner {
+      background: rgba(250, 250, 250, 0.93);
+      border-bottom: 1px solid #e5e5e5;
+      left: 0;
+      min-height: var(--topbar-height);
+      padding: 0;
+      position: fixed;
+      right: 0;
+      z-index: 1000;
     }
 
-    /* Brand Name */
-    .brand-title {
-      font-family: var(--font-title);
-      font-size: 38px;
-      font-weight: 400;
-      letter-spacing: -0.02em;
-      line-height: 1.1;
-      margin: 0 0 24px 0;
-      color: var(--text-main);
-      display: block;
-      cursor: default;
-      
-      /* Initial load fade-in */
-      opacity: 0;
-      animation: fadeIn 250ms ease-out forwards;
-      
-      /* Fade back to black transition (1000ms) */
+    .page-banner--top {
+      top: 0;
+    }
+
+    .page-banner--bottom {
+      bottom: 0;
+      top: auto;
+      border-top: 1px solid #e5e5e5;
+      border-bottom: 0;
+    }
+
+    .page-banner__inner {
+      min-height: var(--topbar-height);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .page-banner__brand,
+    .page-banner__link,
+    .page-banner__button {
+      color: #202522;
+      font-family: "Inter Tight", "Segoe UI", Arial, sans-serif;
+      font-size: 0.875rem;
+      font-weight: 700;
+      letter-spacing: 0;
+      line-height: 1;
+      text-decoration: none;
+      transition: color 150ms ease;
+    }
+
+    .page-banner__brand:hover,
+    .page-banner__link:hover,
+    .page-banner__button:hover {
+      color: #de8bf7;
+    }
+
+    .page-banner__nav {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .page-banner__copyright {
+      margin: 0;
+      line-height: 1;
+      text-align: right;
+      font-size: 0.875rem;
+      letter-spacing: 0;
+      color: #6b7280;
+    }
+
+    .page-banner__copyright-link {
+      color: #111827;
+      text-decoration: none;
       transition: color 1000ms ease;
     }
 
-    /* Hover transition (250ms to solar gold/amber #df5c13) */
-    .brand-title:hover {
-      color: var(--accent-color);
-      transition: color 250ms ease;
+    .page-banner__copyright-link--primary {
+      font-weight: 600;
     }
 
-    /* Body Text */
-    .body-text {
-      font-family: var(--font-body);
-      font-size: 19px;
-      font-weight: 300;
-      line-height: 1.6;
-      color: var(--text-body);
-      margin-bottom: 24px;
-      opacity: 0;
-      animation: fadeIn 350ms ease-out forwards;
+    .page-banner__copyright-link:hover {
+      color: #de8bf7;
+      transition-duration: 150ms;
     }
 
-    .body-text:nth-of-type(1) {
-      animation-delay: 100ms;
-    }
-    .body-text:nth-of-type(2) {
-      animation-delay: 200ms;
-    }
-    .body-text:nth-of-type(3) {
-      animation-delay: 300ms;
-    }
-
-    /* Enter Link */
-    .enter-link {
-      display: inline-block;
-      font-family: var(--font-accent);
-      font-size: 16px;
-      color: var(--text-main);
-      text-decoration: none;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      border-bottom: 2px solid var(--text-main);
-      padding-bottom: 4px;
-      margin-top: 8px;
-      margin-bottom: 60px; /* Padding space above the bottom banner */
-      opacity: 0;
-      animation: fadeIn 450ms ease-out forwards;
-      animation-delay: 400ms;
-      transition: color 250ms ease, border-color 250ms ease;
-    }
-
-    .enter-link:hover {
-      color: var(--accent-color);
-      border-color: var(--accent-color);
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-      }
-      to {
-        opacity: 1;
-      }
+    .quiet-home-stage {
+      min-height: calc(100vh - var(--body-top-offset) - var(--footer-height) - 24px);
     }
   </style>
 </head>
 <body>
+  <div class="shell-gutters" aria-hidden="true">
+    <div class="shell-gutter shell-gutter--left"></div>
+    <div class="shell-gutter shell-gutter--right"></div>
+  </div>
 
-  <!-- Top and Bottom Banners -->
-  <div class="banner banner-top"></div>
-  <div class="banner banner-bottom"></div>
+  <header class="page-banner page-banner--top">
+    <div class="page-banner__inner shell-frame">
+      <a class="page-banner__brand" href="./home">Perihelion</a>
+      <nav class="page-banner__nav" aria-label="Perihelion pages">
+        <a class="page-banner__link" href="./home?view=gallery">Gallery</a>
+        <a class="page-banner__link" href="https://auth.jeffersonwm.com/home">Sign in</a>
+      </nav>
+    </div>
+  </header>
 
-  <!-- Content Container -->
-  <main class="content-container">
-    <span class="eyebrow">Image Browser</span>
-    <h1 class="brand-title">Perihelion</h1>
-    
-    <p class="body-text">
-      Perihelion is an image/archive browser. It is built for my large personal collection, with staging, export/download/sharing, inspecting metadata, and managing tags/lists. Peri is a React 19 + Vite app with Tailwind CSS, lucide-react icons, and Motion, with a repo containing a TypeScript/Express local development server and live media python API.
-    </p>
-    
-    <p class="body-text">
-      The Python backend is located on a home server and serves media from a share location. It exposes auth status and admin/history endpoints, and uses Pillow when available for richer image metadata. It stores operational data in SQLite for local users, sessions, download history, and image details.
-    </p>
-    
-    <p class="body-text">
-      I wanted access to my image collection away from the desk so I could draw or paint with references. I wanted to move through pages easily, come back to specific shares without having to remember every one. This evolved into APIs and Cloudflare, metadata, large and non-image file handling and learning how to manage a home server. Securing Peri became the need for Auth/Multi, and organizing the files became the need for Vermilion. And it has the same file processing/download functions as Bullion, except items must be staged first.
-    </p>
-    
-    <a href="./home" class="enter-link">Enter</a>
-  </main>
+  <div class="shell-frame shell-frame--body">
+    <main role="main">
+      <section class="quiet-home-stage" aria-label="Perihelion home"></section>
+    </main>
+  </div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const enterLink = document.querySelector('.enter-link');
-      const container = document.querySelector('.content-container');
-      
-      if (enterLink && container) {
-        enterLink.addEventListener('click', (e) => {
-          e.preventDefault();
-          container.classList.add('fade-out-active');
-          setTimeout(() => {
-            window.location.href = enterLink.getAttribute('href');
-          }, 400);
-        });
-      }
-    });
-  </script>
+  <footer class="page-banner page-banner--bottom">
+    <div class="page-banner__inner shell-frame">
+      <span aria-hidden="true"></span>
+      <p class="page-banner__copyright">
+        &copy; 2026
+        <a href="https://jeffersonwm.com" class="page-banner__copyright-link page-banner__copyright-link--primary">Jefferson Williams</a>.
+        All rights reserved.
+        <a href="https://github.com/wmjefferson/jeffersonwm" class="page-banner__copyright-link">GitHub</a>.
+      </p>
+    </div>
+  </footer>
 </body>
 </html>

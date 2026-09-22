@@ -1,0 +1,120 @@
+<UserControl x:Class="Lionfish.App.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="650" d:DesignWidth="800">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,10,0">
+            <!-- Appearance / Theme Settings -->
+            <GroupBox Header="Appearance">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="App Theme:" VerticalAlignment="Center" Margin="0,0,16,10" FontWeight="SemiBold"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding ThemeModes}" SelectedItem="{Binding SelectedThemeMode}" Width="200" HorizontalAlignment="Left" Margin="0,0,0,10"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" 
+                               Text="System follows your Windows dark/light color mode in real time. Light mode uses clean light gray cards and crisp off-white surfaces." 
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                </Grid>
+            </GroupBox>
+
+            <!-- General Settings -->
+            <GroupBox Header="General">
+                <StackPanel>
+                    <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows}"/>
+                    <CheckBox Content="Start Minimized" IsChecked="{Binding StartMinimized}"/>
+                    <CheckBox Content="Minimize to tray when window is closed" IsChecked="{Binding MinimizeToTrayOnClose}"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Safety Settings -->
+            <GroupBox Header="Safety">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Emergency Kill Switch:" VerticalAlignment="Center" Margin="0,0,10,10"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding KillSwitchCombo}" IsReadOnly="True" Margin="0,0,10,10"/>
+                    <Button Grid.Row="0" Grid.Column="2" Content="Change" Command="{Binding ChangeKillSwitchCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,0,10"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Startup Delay:" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal">
+                        <Slider Minimum="0" Maximum="10" Value="{Binding StartupDelaySeconds}" Width="200" VerticalAlignment="Center" Margin="0,0,10,0" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                        <TextBlock Text="{Binding StartupDelaySeconds, StringFormat='{}{0} seconds'}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <!-- Driver Status -->
+            <GroupBox Header="Interception Driver">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                            <TextBlock Text="Status: " FontWeight="Bold"/>
+                            <TextBlock Text="Installed" Foreground="{DynamicResource SuccessBrush}" FontWeight="Bold" Visibility="{Binding IsDriverInstalled, Converter={StaticResource BoolToVis}}"/>
+                            <TextBlock Text="Not Installed" Foreground="{DynamicResource ErrorBrush}" FontWeight="Bold" Visibility="{Binding IsDriverInstalled, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
+                        </StackPanel>
+                        <TextBlock Text="The Interception driver is required for Lionfish to capture raw keyboard input before it reaches Windows." TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <TextBlock Text="Note: Installing or uninstalling the driver requires administrator privileges and a reboot." TextWrapping="Wrap" Foreground="{DynamicResource WarningBrush}" Margin="0,5,0,0" FontStyle="Italic"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+                        <Button Content="Install Driver" Command="{Binding InstallDriverCommand}" Visibility="{Binding IsDriverInstalled, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
+                        <Button Content="Uninstall Driver" Command="{Binding UninstallDriverCommand}" Style="{StaticResource DangerButton}" Visibility="{Binding IsDriverInstalled, Converter={StaticResource BoolToVis}}"/>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <!-- Data Management -->
+            <GroupBox Header="Data">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Configuration File:" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <TextBlock Text="{Binding ConfigLocation}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    
+                    <Button Grid.Column="1" Content="Open Folder" Command="{Binding OpenConfigFolderCommand}" Style="{StaticResource SecondaryButton}" Margin="10,0,0,0"/>
+                    <Button Grid.Column="2" Content="Export..." Command="{Binding ExportSettingsCommand}" Style="{StaticResource SecondaryButton}" Margin="5,0,0,0"/>
+                    <Button Grid.Column="3" Content="Import..." Command="{Binding ImportSettingsCommand}" Style="{StaticResource SecondaryButton}" Margin="5,0,0,0"/>
+                </Grid>
+            </GroupBox>
+
+            <!-- About -->
+            <GroupBox Header="About">
+                <StackPanel>
+                    <TextBlock Text="{Binding AppVersion, StringFormat='Lionfish version {0}'}" FontWeight="Bold"/>
+                    <TextBlock Text="Created by jeffersonwm" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,5,0,0"/>
+                </StackPanel>
+            </GroupBox>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { FolderOpen, X, Check, Download, ArrowLeft, FileImage, Tag, List, Plus, Search, Minus, Copy, BookImage, PencilLine } from 'lucide-react';
+import { FolderOpen, X, Check, Download, ArrowLeft, FileImage, Tag, List, Plus, Search, Minus, Copy, BookImage, PencilLine, ChevronLeft, ChevronRight } from 'lucide-react';
 import StagingView, { DownloadOptions } from './components/StagingView';
 
 const renderableExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg', '.bmp'];
@@ -17,6 +17,8 @@ interface MediaEntry {
   tags?: string[];
   is_large?: boolean;
   size?: number;
+  width?: number | null;
+  height?: number | null;
   isMissing?: boolean;
 }
 
@@ -354,14 +356,17 @@ const buildSharePageUrl = (shareId: string) => {
   return appUrl.toString();
 };
 
+type ViewMode = 'home' | 'gallery' | 'staging' | 'options';
 type GalleryMode = 'gallery' | 'selected' | 'staging';
 
 interface GalleryLocationState {
+  view: ViewMode;
   path: string;
   page: number;
   rowHeight: number;
   limit: number;
   includeOtherFiles: boolean;
+  includeVideo: boolean;
   showFolderThumbnails: boolean;
   selectedTag: string;
   selectedList: string;
@@ -421,6 +426,7 @@ const deleteSelectionDraft = (id: string) => {
 
 const parseGalleryLocationState = (): GalleryLocationState => {
   const params = new URLSearchParams(window.location.search);
+  const viewParam = params.get('view');
   const path = params.get('path') || '';
   const searchQuery = params.get('search') || '';
   const selectedTag = searchQuery ? '' : (params.get('tag') || '');
@@ -442,12 +448,36 @@ const parseGalleryLocationState = (): GalleryLocationState => {
     else rowHeight = 250;
   }
 
+  let view: ViewMode = 'home';
+  if (viewParam === 'options') {
+    view = 'options';
+  } else if (mode === 'staging') {
+    view = 'staging';
+  } else if (
+    viewParam === 'gallery' ||
+    path ||
+    searchQuery ||
+    selectedTag ||
+    selectedList ||
+    params.get('item') ||
+    selectionId ||
+    mode === 'selected'
+  ) {
+    view = 'gallery';
+  } else if (viewParam === 'home') {
+    view = 'home';
+  } else {
+    view = 'home';
+  }
+
   return {
+    view,
     path,
     page: parsePositiveInt(params.get('page'), 1),
     rowHeight,
     limit: parsePositiveInt(params.get('limit'), 25),
     includeOtherFiles: params.get('includeOther') === '1' || params.get('includeOther') === 'true',
+    includeVideo: !(params.get('includeVideo') === '0' || params.get('includeVideo') === 'false'),
     showFolderThumbnails: !(params.get('folderThumbs') === '0' || params.get('folderThumbs') === 'false'),
     selectedTag,
     selectedList,
@@ -461,11 +491,21 @@ const parseGalleryLocationState = (): GalleryLocationState => {
 const buildGalleryStateUrl = (state: GalleryLocationState) => {
   const params = new URLSearchParams();
 
+  if (state.view === 'home') {
+    return getPerihelionAppPath();
+  }
+
+  if (state.view === 'options') {
+    params.set('view', 'options');
+    return `${getPerihelionAppPath()}?${params.toString()}`;
+  }
+
   if (state.path) params.set('path', state.path);
   if (state.page > 1) params.set('page', String(state.page));
   if (state.rowHeight !== 250) params.set('height', String(state.rowHeight));
   if (state.limit !== 25) params.set('limit', String(state.limit));
   if (state.includeOtherFiles) params.set('includeOther', '1');
+  if (!state.includeVideo) params.set('includeVideo', '0');
   if (!state.showFolderThumbnails) params.set('folderThumbs', '0');
   if (state.selectedTag) params.set('tag', state.selectedTag);
   if (state.selectedList) params.set('list', state.selectedList);
@@ -473,6 +513,10 @@ const buildGalleryStateUrl = (state: GalleryLocationState) => {
   if (state.selectedImage) params.set('item', state.selectedImage);
   if (state.selectionId) params.set('selection', state.selectionId);
   if (state.mode !== 'gallery') params.set('mode', state.mode);
+
+  if (state.view === 'gallery' && Array.from(params.keys()).length === 0) {
+    params.set('view', 'gallery');
+  }
 
   const query = params.toString();
   return `${getPerihelionAppPath()}${query ? `?${query}` : ''}`;
@@ -531,6 +575,7 @@ interface ImageDetail {
 }
 
 type PeriSourceMode = 'server' | 'local';
+type GallerySortMode = 'alpha' | 'tags' | 'size' | 'dimensions' | 'type';
 
 type LocalObjectUrlMap = Record<string, string>;
 
@@ -551,6 +596,44 @@ const normalizeRelativePath = (value: string) =>
     .replace(/\\/g, '/')
     .replace(/^\/+/, '')
     .replace(/\/+$/, '');
+
+const gallerySortOptions: { value: GallerySortMode; label: string }[] = [
+  { value: 'alpha', label: 'Alpha' },
+  { value: 'tags', label: 'Tags' },
+  { value: 'size', label: 'File Size' },
+  { value: 'dimensions', label: 'Dimensions' },
+  { value: 'type', label: 'Type' },
+];
+
+const compareText = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+
+const dimensionArea = (entry: MediaEntry) => {
+  const width = Number(entry.width) || 0;
+  const height = Number(entry.height) || 0;
+  return width * height;
+};
+
+const sortMediaEntries = (items: MediaEntry[], sortMode: GallerySortMode) => {
+  const nextItems = [...items];
+  nextItems.sort((a, b) => {
+    if (sortMode === 'tags') {
+      const tagsA = (a.tags || []).join(' ');
+      const tagsB = (b.tags || []).join(' ');
+      return compareText(tagsA || a.name || a.path, tagsB || b.name || b.path) || compareText(a.path, b.path);
+    }
+    if (sortMode === 'size') {
+      return ((b.size || 0) - (a.size || 0)) || compareText(a.path, b.path);
+    }
+    if (sortMode === 'dimensions') {
+      return (dimensionArea(b) - dimensionArea(a)) || compareText(a.path, b.path);
+    }
+    if (sortMode === 'type') {
+      return compareText(a.ext || a.kind || '', b.ext || b.kind || '') || compareText(a.path, b.path);
+    }
+    return compareText(a.name || a.path, b.name || b.path) || compareText(a.path, b.path);
+  });
+  return nextItems;
+};
 
 const getImmediateChildFolderPath = (entryPath: string, parentPath: string) => {
   const normalizedEntryPath = normalizeRelativePath(entryPath);
@@ -751,6 +834,8 @@ export default function App() {
   const [limit, setLimit] = useState(10);
   const isMaxMode = rowHeight === MAX_MODE_ROW_HEIGHT && limit === MAX_MODE_LIMIT;
   const [includeOtherFiles, setIncludeOtherFiles] = useState(false);
+  const [includeVideo, setIncludeVideo] = useState(true);
+  const [gallerySort, setGallerySort] = useState<GallerySortMode>('alpha');
   const [showFolderThumbnails, setShowFolderThumbnails] = useState(true);
   const [locationReady, setLocationReady] = useState(false);
   const [selectionDraftId, setSelectionDraftId] = useState<string | null>(null);
@@ -758,7 +843,8 @@ export default function App() {
 
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [isDownloading, setIsDownloading] = useState(false);
-  const [view, setView] = useState<'gallery' | 'staging' | 'options'>('gallery');
+  const [isLightboxLoading, setIsLightboxLoading] = useState(true);
+  const [view, setView] = useState<ViewMode>('home');
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -800,8 +886,8 @@ export default function App() {
   const holdInitialShellForAuth = Boolean(!isSharedView && authStatus === null && authLoading);
 
   useEffect(() => {
-    if (!authLoading && !authStatus?.user && view === 'options') {
-      setView('gallery');
+    if (!authLoading && !authStatus?.user && (view === 'options' || view === 'staging')) {
+      setView('home');
     }
   }, [authLoading, authStatus?.user, view]);
 
@@ -1122,10 +1208,17 @@ export default function App() {
     });
   }, [selectedImages, selectedMetadata]);
 
+  const isEntryIncluded = (entry: { kind?: MediaKind; path?: string }) => {
+    const kind = entry.kind || getMediaKind(entry.path || '');
+    if (kind === 'image') return true;
+    if (kind === 'video') return includeVideo;
+    return includeOtherFiles;
+  };
+
   const visibleEntries = useMemo(() => {
     const list = showSelectedOnly ? computedStagedEntries : entries;
-    return list.filter(entry => includeOtherFiles || entry.kind === 'image');
-  }, [showSelectedOnly, computedStagedEntries, entries, includeOtherFiles]);
+    return list.filter(entry => isEntryIncluded(entry));
+  }, [showSelectedOnly, computedStagedEntries, entries, includeOtherFiles, includeVideo]);
 
   const displayFolders = showSelectedOnly || Boolean(selectedTag) || isGlobalSearch ? [] : folders;
   const siblingFolderIndex = useMemo(
@@ -1220,6 +1313,35 @@ export default function App() {
     if (!selectedImage) return;
     queueHistoryUpdate('push');
     setSelectedImage(null);
+  };
+
+  const lightboxItems = useMemo(() => {
+    if (view === 'staging') {
+      return stagedImages;
+    }
+    if (isSharedView) {
+      if (sharedFiles && sharedFiles.length > 0) {
+        return sharedFiles.map(f => f.path);
+      }
+      if (sharedImages && sharedImages.length > 0) {
+        return sharedImages;
+      }
+    }
+    return pagedEntries.map(e => e.path);
+  }, [view, stagedImages, isSharedView, sharedFiles, sharedImages, pagedEntries]);
+
+  const lightboxIndex = selectedImage ? lightboxItems.indexOf(selectedImage) : -1;
+  const hasPrevImage = lightboxIndex > 0;
+  const hasNextImage = lightboxIndex >= 0 && lightboxIndex < lightboxItems.length - 1;
+  const prevImagePath = hasPrevImage ? lightboxItems[lightboxIndex - 1] : null;
+  const nextImagePath = hasNextImage ? lightboxItems[lightboxIndex + 1] : null;
+
+  const navigateLightbox = (direction: 'prev' | 'next') => {
+    if (direction === 'prev' && prevImagePath) {
+      setSelectedImage(prevImagePath);
+    } else if (direction === 'next' && nextImagePath) {
+      setSelectedImage(nextImagePath);
+    }
   };
 
   const saveFolderCoverSlot = async (slot: 1 | 2, imagePath: string | null) => {
@@ -1664,6 +1786,7 @@ export default function App() {
       setRowHeight(nextState.rowHeight);
       setLimit(nextState.limit);
       setIncludeOtherFiles(nextState.includeOtherFiles);
+      setIncludeVideo(nextState.includeVideo);
       setShowFolderThumbnails(nextState.showFolderThumbnails);
       setSelectedTag(nextState.selectedTag);
       setSelectedList(nextState.selectedList);
@@ -1675,7 +1798,7 @@ export default function App() {
       setLocationNotice(nextNotice);
       const hasSelection = nextSelected.size > 0;
       setShowSelectedOnly(hasSelection && (nextState.mode === 'selected' || nextState.mode === 'staging'));
-      setView(hasSelection && nextState.mode === 'staging' ? 'staging' : 'gallery');
+      setView(nextState.view);
     };
 
     applyLocationState();
@@ -1744,7 +1867,7 @@ export default function App() {
       void fetchTags();
       void fetchShares();
     }
-  }, [locationReady, isSharedView, authLoading, canUseLocalLibrary, canUseServerLibrary, sourceMode]);
+  }, [locationReady, isSharedView, authLoading, canUseLocalLibrary, canUseServerLibrary, sourceMode, authStatus?.user?.id]);
 
   useEffect(() => {
     if (!locationReady || isSharedView) {
@@ -1771,7 +1894,7 @@ export default function App() {
       setLoading(true);
       const nextSearch = debouncedSearch.trim().toLowerCase();
       const selectedLocalShare = selectedList ? allShares.find(share => share.id === selectedList) : null;
-      const includePredicate = (entry: MediaEntry) => includeOtherFiles || entry.kind === 'image';
+      const includePredicate = (entry: MediaEntry) => isEntryIncluded(entry);
       const filteredEntries = localLibraryEntries.filter(entry => {
         if (!includePredicate(entry)) {
           return false;
@@ -1793,11 +1916,12 @@ export default function App() {
         return currentPath ? entry.folderPath === currentPath : entry.folderPath === 'root';
       });
 
-      const nextTotalItems = filteredEntries.length;
+      const sortedEntries = sortMediaEntries(filteredEntries, gallerySort);
+      const nextTotalItems = sortedEntries.length;
       const nextTotalPages = Math.max(1, Math.ceil(nextTotalItems / Math.max(1, limit)));
       const safePage = Math.min(page, nextTotalPages);
       const startIndex = (safePage - 1) * limit;
-      const nextPageEntries = filteredEntries.slice(startIndex, startIndex + limit);
+      const nextPageEntries = sortedEntries.slice(startIndex, startIndex + limit);
       const nextFolders = isGlobalSearch ? [] : buildLocalFolderEntries(localLibraryEntries, currentPath);
 
       setEntries(nextPageEntries);
@@ -1811,7 +1935,7 @@ export default function App() {
 
     const searchPath = isGlobalSearch ? '' : currentPath;
     const searchText = isGlobalSearch ? debouncedSearch : '';
-    fetchImages(page, limit, searchPath, selectedTag, selectedList, searchText);
+    fetchImages(page, limit, searchPath, selectedTag, selectedList, searchText, gallerySort);
   }, [
     locationReady,
     isSharedView,
@@ -1826,6 +1950,8 @@ export default function App() {
     debouncedSearch,
     isGlobalSearch,
     includeOtherFiles,
+    includeVideo,
+    gallerySort,
     localLibraryEntries,
     authLoading,
     canUseServerLibrary,
@@ -1862,6 +1988,7 @@ export default function App() {
       list: selectedList,
       search: searchText,
       includeOtherFiles,
+      sort: gallerySort,
     });
 
     if (prewarmedPageKeysRef.current.has(prewarmKey)) {
@@ -1879,6 +2006,7 @@ export default function App() {
       if (selectedTag) params.append('tag', selectedTag);
       if (selectedList) params.append('list', selectedList);
       if (searchText) params.append('search', searchText);
+      params.append('sort', gallerySort);
 
       fetch(`${API_PATH}/images?${params.toString()}`, {
         credentials: 'include',
@@ -1891,7 +2019,7 @@ export default function App() {
                 .filter((file: { type?: string; path?: string; kind?: MediaKind }) => (
                   file.type === 'file' &&
                   typeof file.path === 'string' &&
-                  (includeOtherFiles || (file.kind || getMediaKind(file.path)) === 'image') &&
+                  isEntryIncluded(file) &&
                   isRenderable(file.path)
                 ))
                 .map((file: { path: string }) => file.path)
@@ -1934,6 +2062,7 @@ export default function App() {
     selectedTag,
     selectedList,
     includeOtherFiles,
+    gallerySort,
   ]);
 
   // Load the manual cover and metadata for the current folder whenever the path changes
@@ -2058,6 +2187,7 @@ export default function App() {
       rowHeight,
       limit,
       includeOtherFiles,
+      includeVideo,
       showFolderThumbnails,
       selectedTag,
       selectedList,
@@ -2088,6 +2218,7 @@ export default function App() {
     rowHeight,
     limit,
     includeOtherFiles,
+    includeVideo,
     showFolderThumbnails,
     selectedTag,
     selectedList,
@@ -2122,7 +2253,7 @@ export default function App() {
     }
   }, [accountPanel, authStatus?.provider, authStatus?.user?.id, authStatus?.user?.isAdmin]);
 
-  const fetchImages = async (p: number, l: number, path: string, tag: string = '', list: string = '', search: string = '') => {
+  const fetchImages = async (p: number, l: number, path: string, tag: string = '', list: string = '', search: string = '', sort: GallerySortMode = 'alpha') => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -2139,6 +2270,7 @@ export default function App() {
       if (search) {
         params.append('search', search);
       }
+      params.append('sort', sort);
       const res = await fetch(`${API_PATH}/images?${params.toString()}`, {
         credentials: 'include',
       });
@@ -2149,7 +2281,7 @@ export default function App() {
       const nextEntries: MediaEntry[] = Array.isArray(data.files)
         ? data.files
             .filter((file: { type?: string }) => file.type === 'file')
-            .map((file: { path: string; name?: string; folderPath?: string; kind?: MediaKind; ext?: string; title?: string; description?: string; tags?: string[]; is_large?: boolean; size?: number }) => ({
+            .map((file: { path: string; name?: string; folderPath?: string; kind?: MediaKind; ext?: string; title?: string; description?: string; tags?: string[]; is_large?: boolean; size?: number; width?: number | null; height?: number | null }) => ({
               path: file.path,
               name: file.name || basename(file.path),
               folderPath: file.folderPath || dirname(file.path),
@@ -2160,6 +2292,8 @@ export default function App() {
               tags: file.tags || [],
               is_large: file.is_large || false,
               size: file.size || 0,
+              width: file.width ?? null,
+              height: file.height ?? null,
             }))
         : (data.images || []).map((value: string) => toMediaEntry(value));
 
@@ -2210,13 +2344,21 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeLightbox();
+      if (!selectedImage) return;
+      if (e.key === 'Escape') {
+        closeLightbox();
+      } else if (e.key === 'ArrowLeft' && prevImagePath) {
+        setSelectedImage(prevImagePath);
+      } else if (e.key === 'ArrowRight' && nextImagePath) {
+        setSelectedImage(nextImagePath);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedImage]);
+  }, [selectedImage, prevImagePath, nextImagePath]);
 
   useEffect(() => {
+    setIsLightboxLoading(true);
     if (!selectedImage) {
       setImageMeta(null);
       setImageMetaState('idle');
@@ -2540,7 +2682,7 @@ export default function App() {
   };
 
   const handleDeleteTag = async (tag: string) => {
-    if (!window.confirm(`Are you sure you want to delete tag #${tag} globally?`)) return;
+    if (!window.confirm(`Are you sure you want to delete tag #${tag}?`)) return;
     
     try {
       const res = await fetch(`${API_PATH}/tags/delete`, {
@@ -2920,6 +3062,7 @@ export default function App() {
       setSelectedMetadata({});
       setSourceMode('server');
       setLocalFolderLabel('');
+      setView('home');
       setAuthStatus(prev => (prev ? { ...prev, user: null } : prev));
       setAccessError('');
       setAuthMessage(usesCentralAuth ? 'Signed out of Multimillion.' : '');
@@ -3218,36 +3361,20 @@ export default function App() {
     holdInitialShellForAuth ? (
       <div className="min-h-screen bg-[#fafafa]" aria-label="Loading account access" />
     ) : (
-    <div className={`min-h-screen text-black flex flex-col selection:bg-black selection:text-white bg-[#fafafa] ${view === 'staging' ? '' : 'peri-shell'}`}>
-      {view === 'staging' ? (
-        <StagingView
-          selectedImages={stagedImages}
-          selectedMetadata={selectedMetadata}
-          onBack={() => leaveSelectionModes('push')}
-          onDownload={handleDownload}
-          isDownloading={isDownloading}
-          onOpenLightbox={openLightbox}
-          isLargeMap={isLargeMap}
-          isLocalMode={sourceMode === 'local'}
-          getPreviewUrl={getResolvedThumbUrl}
-          getOriginalUrl={getResolvedImageUrl}
-        />
-      ) : (
-        <>
-          <header className="page-banner page-banner--top">
-            <div className="page-banner__inner shell-frame">
-              <a
-                href={getPerihelionAppUrl()}
-                className="page-banner__brand"
-                onClick={e => {
-                  if (view === 'options') {
-                    e.preventDefault();
-                    setView('gallery');
-                  }
-                }}
-              >
-                Perihelion
-              </a>
+    <div className="min-h-screen text-black flex flex-col selection:bg-black selection:text-white bg-[#fafafa] peri-shell">
+      <header className="page-banner page-banner--top">
+        <div className="page-banner__inner shell-frame">
+          <a
+            href={getPerihelionAppUrl()}
+            className="page-banner__brand"
+            onClick={e => {
+              e.preventDefault();
+              setView('home');
+              queueHistoryUpdate('push');
+            }}
+          >
+            Perihelion
+          </a>
               <nav className="page-banner__nav" aria-label="Perihelion pages">
                 {authLoading && !authStatus ? (
                   <span className="page-banner__button opacity-60">Checking Account...</span>
@@ -3256,12 +3383,33 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setView(v => (v === 'options' ? 'gallery' : 'options'));
-                        setManageTab('options');
+                        setView('gallery');
+                        queueHistoryUpdate('push');
                       }}
-                      className="page-banner__button"
+                      className={`page-banner__button ${view === 'gallery' ? 'active' : ''}`}
                     >
-                      {view === 'options' ? 'Return' : 'Options'}
+                      Gallery
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView('staging');
+                        queueHistoryUpdate('push');
+                      }}
+                      className={`page-banner__button ${view === 'staging' ? 'active' : ''}`}
+                    >
+                      Staging
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView('options');
+                        setManageTab('options');
+                        queueHistoryUpdate('push');
+                      }}
+                      className={`page-banner__button ${view === 'options' ? 'active' : ''}`}
+                    >
+                      Options
                     </button>
                     <a
                       href={accountLink || jeffwmAccountUrl}
@@ -3315,7 +3463,11 @@ export default function App() {
         className="hidden"
       />
 
-      {view === 'options' ? (
+      {view === 'home' ? (
+        <main className="shell-frame shell-frame--body">
+          <section className="quiet-home-stage" aria-label="Perihelion home" />
+        </main>
+      ) : view === 'options' ? (
         <main className="peri-shell__body max-w-4xl pt-4 pb-20">
           <div className="peri-options-page flex flex-col gap-6 font-sans">
             {/* Page Header */}
@@ -3548,9 +3700,27 @@ export default function App() {
             )}
           </div>
         </main>
+      ) : view === 'staging' ? (
+        <main className="peri-shell__body pt-4 pb-20">
+          <StagingView
+            selectedImages={stagedImages}
+            selectedMetadata={selectedMetadata}
+            onDownload={handleDownload}
+            isDownloading={isDownloading}
+            onOpenLightbox={openLightbox}
+            isLargeMap={isLargeMap}
+            isLocalMode={sourceMode === 'local'}
+            getPreviewUrl={getResolvedThumbUrl}
+            getOriginalUrl={getResolvedImageUrl}
+          />
+        </main>
       ) : (
-        <main className="peri-shell__body text-[15px]">
-        {!showForcedAuthGate && <h2 className="peri-section-title mb-4">{includeOtherFiles ? 'Files' : 'Images'}</h2>}
+        <main className="peri-shell__body text-[15px] pt-4">
+        {!showForcedAuthGate && (
+          <h1 className="peri-options-title font-title text-2xl font-bold uppercase tracking-tight text-[#202522] dark:text-[#fafafa] mb-4">
+            {includeOtherFiles ? 'Files' : 'Images'}
+          </h1>
+        )}
         {!showPrivateGate && (
           <div className="peri-toolbar-divider mb-6 flex flex-col gap-1 pb-2">
             <div className="flex w-full items-center gap-x-5 overflow-x-auto pb-1">
@@ -3630,7 +3800,7 @@ export default function App() {
                     }
                     setPage(1);
                   }}
-                  className={`peri-control-label ml-3 ${isMaxMode ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] dark:text-[#9da69e] hover:text-black dark:hover:text-white'}`}
+                  className={`peri-control-label ml-3 cursor-pointer ${isMaxMode ? 'is-active !text-[#1d4ed8] dark:!text-[#60a5fa] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] dark:text-[#9da69e] hover:text-black dark:hover:text-white'}`}
                 >
                   MAX MODE
                 </button>
@@ -3640,58 +3810,20 @@ export default function App() {
                     setIncludeOtherFiles(prev => !prev);
                     setPage(1);
                   }}
-                  className={`peri-control-label ml-5 ${includeOtherFiles ? 'text-[#1d4ed8] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] dark:text-[#9da69e] hover:text-black dark:hover:text-white'}`}
+                  className={`peri-control-label ml-5 cursor-pointer ${includeOtherFiles ? 'is-active !text-[#1d4ed8] dark:!text-[#60a5fa] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] dark:text-[#9da69e] hover:text-black dark:hover:text-white'}`}
                 >
                   INCLUDE OTHER FILES
                 </button>
-              </div>
-
-              <div className="peri-toolbar-group shrink-0">
-                {sourceMode === 'server' ? (
-                  <>
-                    <span className="peri-control-label">Share Code</span>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        maxLength={4}
-                        placeholder="CODE"
-                        value={shareCodeInput}
-                        onChange={e => {
-                          setShareCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
-                          if (shareCodeError) setShareCodeError('');
-                          if (shareCodeNotice) setShareCodeNotice('');
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && shareCodeInput.length === 4 && !isValidatingCode) {
-                            handleOpenShareCode();
-                          }
-                        }}
-                        className="peri-input px-2 py-0.5 text-[11px] uppercase w-16 text-center font-sans placeholder:text-gray-300"
-                      />
-                      <button
-                        onClick={handleOpenShareCode}
-                        disabled={shareCodeInput.length !== 4 || isValidatingCode}
-                        className="peri-button px-2 py-0.5 text-[11px] uppercase disabled:opacity-50 min-w-[32px] text-center"
-                      >
-                        {isValidatingCode ? '...' : 'Go'}
-                      </button>
-                      <button
-                        onClick={handleLoadShareCode}
-                        disabled={shareCodeInput.length !== 4 || isValidatingCode}
-                        className="peri-button--secondary px-2 py-0.5 text-[11px] uppercase disabled:opacity-50 min-w-[52px] text-center"
-                      >
-                        Load
-                      </button>
-                    </div>
-                    {shareCodeError && (
-                      <span className="text-red-600 font-bold text-[11px] uppercase ml-1 animate-pulse">
-                        {shareCodeError}
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <span className="peri-control-label text-transparent select-none">Share Code</span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIncludeVideo(prev => !prev);
+                    setPage(1);
+                  }}
+                  className={`peri-control-label ml-3 cursor-pointer ${includeVideo ? 'is-active !text-[#1d4ed8] dark:!text-[#60a5fa] font-black underline decoration-[1.5px] underline-offset-[3px]' : 'text-[#6a716b] dark:text-[#9da69e] hover:text-black dark:hover:text-white'}`}
+                >
+                  INCLUDE VIDEO
+                </button>
               </div>
             </div>
               <div className="peri-inline-actions gap-4">
@@ -3947,6 +4079,48 @@ export default function App() {
                 </div>
               )}
 
+              {sourceMode === 'server' && (
+                <div className="flex items-center gap-1.5 ml-2">
+                  <span className="peri-control-label">Share Code</span>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    placeholder="CODE"
+                    value={shareCodeInput}
+                    onChange={e => {
+                      setShareCodeInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                      if (shareCodeError) setShareCodeError('');
+                      if (shareCodeNotice) setShareCodeNotice('');
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && shareCodeInput.length === 4 && !isValidatingCode) {
+                        handleOpenShareCode();
+                      }
+                    }}
+                    className="peri-input px-2 py-0.5 text-[11px] uppercase w-16 text-center font-sans placeholder:text-gray-300"
+                  />
+                  <button
+                    onClick={handleOpenShareCode}
+                    disabled={shareCodeInput.length !== 4 || isValidatingCode}
+                    className="peri-button px-2 py-0.5 text-[11px] uppercase disabled:opacity-50 min-w-[32px] text-center"
+                  >
+                    {isValidatingCode ? '...' : 'Go'}
+                  </button>
+                  <button
+                    onClick={handleLoadShareCode}
+                    disabled={shareCodeInput.length !== 4 || isValidatingCode}
+                    className="peri-button--secondary px-2 py-0.5 text-[11px] uppercase disabled:opacity-50 min-w-[52px] text-center"
+                  >
+                    Load
+                  </button>
+                  {shareCodeError && (
+                    <span className="text-red-600 font-bold text-[11px] uppercase ml-1 animate-pulse">
+                      {shareCodeError}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {visibleEntries.length > 0 && (
                 <button
                   onClick={() => {
@@ -3998,55 +4172,74 @@ export default function App() {
                 </>
               )}
             </div>
-            <div className="font-sans text-xs font-bold uppercase tracking-wider text-[#6a716b] dark:text-[#9da69e] flex flex-wrap items-center gap-y-1">
-              {selectedTag ? (
-                <>
-                  <span>Global Tag:&nbsp;</span>
-                  <span className="text-[#202522] dark:text-[#fafafa]">#{selectedTag}</span>
-                  <span className="ml-2 text-[#8A5A44] dark:text-[#d97706]">across all folders</span>
-                  <button
-                    onClick={() => {
-                      setSelectedTag('');
-                      setPage(1);
-                    }}
-                    className="ml-2 text-[#888] dark:text-[#9da69e] transition-colors hover:text-black dark:hover:text-white"
-                  >
-                    Clear Tag
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span>Location:&nbsp;</span>
-                  <span className="text-[#202522] dark:text-[#fafafa]">
+            <div className="font-sans text-xs font-bold uppercase tracking-wider text-[#6a716b] dark:text-[#9da69e] flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-y-1">
+                {selectedTag ? (
+                  <>
+                    <span>Global Tag:&nbsp;</span>
+                    <span className="text-[#202522] dark:text-[#fafafa]">#{selectedTag}</span>
+                    <span className="ml-2 text-[#8A5A44] dark:text-[#d97706]">across all folders</span>
                     <button
-                      onClick={() => navigateToPath('')}
-                      className="text-[#202522] dark:text-[#fafafa] hover:text-[#de8bf7] dark:hover:text-[#de8bf7] transition-colors font-bold"
+                      onClick={() => {
+                        setSelectedTag('');
+                        setPage(1);
+                      }}
+                      className="ml-2 text-[#888] dark:text-[#9da69e] transition-colors hover:text-black dark:hover:text-white"
                     >
-                      root
+                      Clear Tag
                     </button>
-                    {currentPath &&
-                      currentPath.split('/').map((part, index, parts) => {
-                        const path = parts.slice(0, index + 1).join('/');
-                        return (
-                          <React.Fragment key={path}>
-                            <span className="text-[#6a716b] dark:text-[#9da69e]"> / </span>
-                            <button
-                              onClick={() => navigateToPath(path)}
-                              className="text-[#202522] dark:text-[#fafafa] hover:text-[#de8bf7] dark:hover:text-[#de8bf7] transition-colors font-bold"
-                            >
-                              {part}
-                            </button>
-                          </React.Fragment>
-                        );
-                      })}
+                  </>
+                ) : (
+                  <>
+                    <span>Location:&nbsp;</span>
+                    <span className="text-[#202522] dark:text-[#fafafa]">
+                      <button
+                        onClick={() => navigateToPath('')}
+                        className="text-[#202522] dark:text-[#fafafa] hover:text-[#de8bf7] dark:hover:text-[#de8bf7] transition-colors font-bold"
+                      >
+                        root
+                      </button>
+                      {currentPath &&
+                        currentPath.split('/').map((part, index, parts) => {
+                          const path = parts.slice(0, index + 1).join('/');
+                          return (
+                            <React.Fragment key={path}>
+                              <span className="text-[#6a716b] dark:text-[#9da69e]"> / </span>
+                              <button
+                                onClick={() => navigateToPath(path)}
+                                className="text-[#202522] dark:text-[#fafafa] hover:text-[#de8bf7] dark:hover:text-[#de8bf7] transition-colors font-bold"
+                              >
+                                {part}
+                              </button>
+                            </React.Fragment>
+                          );
+                        })}
+                    </span>
+                  </>
+                )}
+                {debouncedSearch && (
+                  <span className="text-[#8A5A44] ml-2">
+                    {isGlobalSearch ? `(Global search: "${debouncedSearch}")` : `(Searching: "${debouncedSearch}")`}
                   </span>
-                </>
-              )}
-              {debouncedSearch && (
-                <span className="text-[#8A5A44] ml-2">
-                  {isGlobalSearch ? `(Global search: "${debouncedSearch}")` : `(Searching: "${debouncedSearch}")`}
-                </span>
-              )}
+                )}
+              </div>
+              <label className="inline-flex items-center gap-1.5 ml-auto">
+                <span className="peri-control-label">Sort</span>
+                <select
+                  value={gallerySort}
+                  onChange={e => {
+                    setGallerySort(e.target.value as GallerySortMode);
+                    setPage(1);
+                  }}
+                  className="peri-select px-2 py-0.5 text-[11px] cursor-pointer"
+                >
+                  {gallerySortOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             {(shareCodeNotice || locationNotice) && (
               <div className={`text-[10px] font-bold uppercase tracking-widest ${locationNotice ? 'text-[#8A5A44]' : 'text-[#666]'}`}>
@@ -4358,6 +4551,27 @@ export default function App() {
                         This file was part of the share but is no longer available on the server.
                       </div>
                     </div>
+                  ) : entry.kind === 'video' || getMediaKind(entry.path) === 'video' ? (
+                    <>
+                      <video
+                        src={getResolvedImageUrl(entry.path, retryToken)}
+                        className={`h-full w-auto object-contain ${rowHeight <= 150 ? 'p-0' : 'p-2'}`}
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                        onMouseEnter={e => {
+                          e.currentTarget.play().catch(() => {});
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.pause();
+                          e.currentTarget.currentTime = 0;
+                        }}
+                      />
+                      <div className="absolute top-2 right-2 z-20 bg-yellow-400 text-black border-[2px] border-black px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                        VID
+                      </div>
+                    </>
                   ) : entry.kind === 'image' && isRenderable(entry.path) ? (
                     <>
                       <img
@@ -4365,7 +4579,7 @@ export default function App() {
                         alt={entry.path}
                         loading="lazy"
                         referrerPolicy="no-referrer"
-                        className="h-full w-auto object-contain p-2"
+                        className={`h-full w-auto object-contain ${rowHeight <= 150 ? 'p-0' : 'p-2'}`}
                         onLoad={handleImageLoad}
                         onError={(event) => handleThumbImageError(event, getResolvedImageUrl(entry.path, retryToken))}
                       />
@@ -4717,22 +4931,33 @@ export default function App() {
         </div>
       )}
 
-      {(showForcedAuthGate || !showPrivateGate) && (
+      {(showForcedAuthGate || !showPrivateGate || view === 'home' || view === 'options' || view === 'staging') && (
         <footer className="page-banner page-banner--bottom">
           <div className="page-banner__inner shell-frame">
-          {view === 'options' ? (
+          {view === 'home' || view === 'options' || view === 'staging' || showForcedAuthGate ? (
             <>
               <div />
               <p className="page-banner__copyright">
-                &copy; 2026 Jefferson Williams. All rights reserved.
+                &copy; {new Date().getFullYear()}{' '}
+                <a
+                  className="page-banner__link page-banner__link--inline"
+                  href="https://jeffersonwm.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Jefferson Williams
+                </a>
+                . All rights reserved.{` `}
+                <a
+                  href="https://github.com/wmjefferson/jeffersonwm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="page-banner__link page-banner__link--inline"
+                >
+                  GitHub
+                </a>
+                .
               </p>
-            </>
-          ) : showForcedAuthGate ? (
-            <>
-              <div />
-              <div className="font-sans text-[13px] font-bold uppercase tracking-wider whitespace-nowrap text-[#202522]">
-                © 2026 Jefferson Williams. All rights reserved.
-              </div>
             </>
           ) : (
             <>
@@ -4763,7 +4988,7 @@ export default function App() {
                         setPage(1);
                       }}
                       disabled={page === 1}
-                      className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                      className="text-[#666] hover:text-black disabled:opacity-30 transition-colors uppercase cursor-pointer"
                     >
                       First
                     </button>
@@ -4773,17 +4998,20 @@ export default function App() {
                         setPage(p => Math.max(1, p - 1));
                       }}
                       disabled={page === 1}
-                      className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                      className="text-[#666] hover:text-black disabled:opacity-30 transition-colors uppercase cursor-pointer"
                     >
                       Prev
                     </button>
+                    <span className="text-black font-mono">
+                      {page} / {computedTotalPages}
+                    </span>
                     <button
                       onClick={() => {
                         queueHistoryUpdate('push');
                         setPage(p => Math.min(computedTotalPages, p + 1));
                       }}
                       disabled={page === computedTotalPages}
-                      className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                      className="text-[#666] hover:text-black disabled:opacity-30 transition-colors uppercase cursor-pointer"
                     >
                       Next
                     </button>
@@ -4793,7 +5021,7 @@ export default function App() {
                         setPage(computedTotalPages);
                       }}
                       disabled={page === computedTotalPages}
-                      className="hover:underline disabled:text-[#888] disabled:hover:no-underline"
+                      className="text-[#666] hover:text-black disabled:opacity-30 transition-colors uppercase cursor-pointer"
                     >
                       Last
                     </button>
@@ -4824,16 +5052,18 @@ export default function App() {
           </div>
         </footer>
       )}
-        </>
-      )}
 
       {selectedImage && (
         <div
-          className="fixed inset-0 z-50 bg-[#F0F0F0]/95 backdrop-blur-sm overflow-y-auto p-4 md:p-8 animate-in fade-in duration-200"
+          className={`fixed inset-0 z-[2000] ${
+            getMediaKind(selectedImage) === 'video'
+              ? 'bg-[#484d4a]/94 dark:bg-[#040504]/96'
+              : 'bg-[#717673]/88 dark:bg-[#0c0e0d]/92'
+          } backdrop-blur-sm overflow-y-auto p-4 md:p-8 transition-opacity duration-200 ease-in-out animate-in fade-in`}
           onClick={closeLightbox}
         >
           {/* Top fixed bar for close and download options to ensure they always stay visible and touch-accessible */}
-          <div className="fixed top-4 right-4 flex items-center gap-2 z-50">
+          <div className="fixed top-4 right-4 flex items-center gap-2 z-[2010]">
             <a
               href={sourceMode === 'local' ? (localObjectUrls[selectedImage] || '#') : `${API_PATH}/download/${encodeURI(selectedImage)}`}
               download={basename(selectedImage)}
@@ -4855,13 +5085,66 @@ export default function App() {
             </button>
           </div>
 
+          {/* Left Arrow: Previous Image */}
+          {hasPrevImage && (
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                navigateLightbox('prev');
+              }}
+              className="fixed left-3 sm:left-6 top-1/2 -translate-y-1/2 z-[2010] p-2.5 sm:p-3.5 bg-white/90 dark:bg-[#191d1a]/90 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-[#d4d4d8] dark:border-[#333a35] hover:bg-white dark:hover:bg-[#202522] text-[#202522] dark:text-[#fafafa] transition-all cursor-pointer flex items-center justify-center group"
+              title="Previous image"
+              aria-label="Previous image"
+            >
+              <ChevronLeft size={24} strokeWidth={2.5} className="group-hover:-translate-x-0.5 transition-transform" />
+            </button>
+          )}
+
+          {/* Right Arrow: Next Image */}
+          {hasNextImage && (
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                navigateLightbox('next');
+              }}
+              className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[2010] p-2.5 sm:p-3.5 bg-white/90 dark:bg-[#191d1a]/90 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-[#d4d4d8] dark:border-[#333a35] hover:bg-white dark:hover:bg-[#202522] text-[#202522] dark:text-[#fafafa] transition-all cursor-pointer flex items-center justify-center group"
+              title="Next image"
+              aria-label="Next image"
+            >
+              <ChevronRight size={24} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          )}
+
           <div 
             className="w-full max-w-4xl mx-auto flex flex-col items-center gap-4 py-8"
             onClick={e => e.stopPropagation()}
           >
             {/* Centered Preview */}
-            <div className="w-full flex items-center justify-center min-h-0">
-              {isRenderable(selectedImage) ? (
+            <div className="w-full flex items-center justify-center min-h-[300px] sm:min-h-[420px] relative">
+              {isLightboxLoading && (
+                <div className="flex flex-col items-center justify-center gap-3 w-[min(90vw,560px)] h-[300px] sm:h-[400px] bg-white/80 dark:bg-[#191d1a]/85 backdrop-blur-sm border border-[#d4d4d8] dark:border-[#333a35] shadow-[0_18px_40px_rgba(15,23,42,0.12)]">
+                  <div className="w-10 h-10 rounded-full border-[3px] border-[#202522] dark:border-[#fafafa] border-t-transparent animate-spin" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#202522] dark:text-[#fafafa]">
+                    Loading...
+                  </span>
+                </div>
+              )}
+
+              {getMediaKind(selectedImage || '') === 'video' ? (
+                <div className={`flex flex-col items-center gap-3 max-w-full ${isLightboxLoading ? 'hidden' : 'flex'}`}>
+                  <video
+                    key={selectedImage}
+                    src={getResolvedImageUrl(selectedImage || '')}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    onLoadedData={() => setIsLightboxLoading(false)}
+                    className="max-w-full max-h-[60vh] object-contain border border-[#d4d4d8] bg-black shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
+                  />
+                </div>
+              ) : isRenderable(selectedImage) ? (
                 (() => {
                   const selectedEntry = entries.find(e => e.path === selectedImage);
                   const selectedSharedFile = sharedFiles?.find(f => f.path === selectedImage);
@@ -4874,12 +5157,15 @@ export default function App() {
                     : getResolvedMediaUrl(selectedImage || '');
 
                   return (
-                    <div className="flex flex-col items-center gap-3 max-w-full">
+                    <div className={`flex flex-col items-center gap-3 max-w-full ${isLightboxLoading ? 'hidden' : 'flex'}`}>
                       <img
+                        key={imageUrl}
                         src={imageUrl}
                         alt={selectedImage || ''}
                         referrerPolicy="no-referrer"
                         className="max-w-full max-h-[60vh] object-contain border border-[#d4d4d8] bg-white shadow-[0_18px_40px_rgba(15,23,42,0.12)] cursor-pointer"
+                        onLoad={() => setIsLightboxLoading(false)}
+                        onError={() => setIsLightboxLoading(false)}
                         onClick={closeLightbox}
                       />
                       {isSelectedImageLarge && !showFullImage && (
@@ -5077,7 +5363,7 @@ export default function App() {
                     
                     <div className="flex items-center gap-1">
                       <span className="text-[#888]">Resolution:</span>
-                      <span className="text-black font-bold">{imageDetail.exif.width} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {imageDetail.exif.height} px</span>
+                      <span className="text-black font-bold">{imageDetail.exif.width} × {imageDetail.exif.height} px</span>
                     </div>
                   </>
                 )}
@@ -5140,7 +5426,7 @@ export default function App() {
                               className="hover:text-red-600 font-bold ml-0.5 text-xs text-[#888] transition-colors"
                               title="Remove tag"
                             >
-                              ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+                              &times;
                             </button>
                           </span>
                         ))
@@ -5259,7 +5545,7 @@ export default function App() {
                       <div className="text-[11px] font-bold uppercase tracking-widest text-black">Multimillion</div>
                       <p className="text-xs font-sans text-[#666] leading-relaxed">
                         Perihelion now uses the central account system at <span className="font-bold">{authBaseUrl}</span>.
-                        Sign in there, request access there, and make sure your account has Perihelion access. After sign-in, youÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ll come right back here.
+                        Sign in there, request access there, and make sure you'll come right back here.
                       </p>
                     </div>
                     <div className="flex items-center gap-3 justify-end">
@@ -5343,7 +5629,7 @@ export default function App() {
                       </label>
 
                       <label className="flex flex-col gap-2">
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-[#888]">Who You Are / Why YouÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢re Requesting Access</span>
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-[#888]">Who You Are / Why You're Requesting Access</span>
                         <textarea
                           value={requestNoteInput}
                           onChange={event => setRequestNoteInput(event.target.value)}
@@ -5397,7 +5683,7 @@ export default function App() {
                   <>
                     <div className="border-[2px] border-[#666] bg-[#F7F7F7] px-4 py-4 flex flex-col gap-3">
                       <div className="text-[11px] font-bold uppercase tracking-widest text-black">
-                        Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Admin' : ''}
+                        Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' • Admin' : ''}
                       </div>
                       <p className="text-xs font-sans text-[#666] leading-relaxed">
                         Your settings, history, approvals, and password changes now live in Multimillion. Sign out here if you want to switch to a different account. If this archive still stays locked, ask for Perihelion access in the central dashboard.
@@ -5422,7 +5708,7 @@ export default function App() {
                 <>
                   <div className="border-[2px] border-[#666] bg-[#F7F7F7] px-4 py-4 flex flex-col gap-2">
                     <div className="text-[11px] font-bold uppercase tracking-widest text-black">
-                      Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Admin' : ''}
+                      Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' • Admin' : ''}
                     </div>
                     <div className="text-xs font-sans text-[#666] leading-relaxed">
                       Sign out completely before moving into another account. Downloads tied to this account will appear below.
@@ -5520,7 +5806,7 @@ export default function App() {
                       <div className="text-[11px] font-bold uppercase tracking-widest text-black">Download History</div>
                     </div>
                     {historyLoading ? (
-                      <div className="px-4 py-6 text-xs font-bold uppercase tracking-widest text-[#888] animate-pulse">Loading HistoryÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦</div>
+                      <div className="px-4 py-6 text-xs font-bold uppercase tracking-widest text-[#888] animate-pulse">Loading History...</div>
                     ) : historyEntries.length === 0 ? (
                       <div className="px-4 py-6 text-center text-xs font-bold uppercase tracking-widest text-[#888]">
                         No tracked downloads yet.
@@ -5533,7 +5819,7 @@ export default function App() {
                               <span className="text-[11px] font-bold uppercase tracking-widest text-black">{basename(entry.output_name || entry.file_path)}</span>
                               <span className="text-[10px] font-bold uppercase tracking-widest text-[#888]">{new Date(entry.created_at).toLocaleString()}</span>
                             </div>
-                            <span className="text-[11px] font-bold uppercase tracking-widest text-[#888]">{entry.action} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {entry.output_name || entry.file_path}</span>
+                            <span className="text-[11px] font-bold uppercase tracking-widest text-[#888]">{entry.action} • {entry.output_name || entry.file_path}</span>
                           </div>
                         ))}
                       </div>
@@ -5573,7 +5859,7 @@ export default function App() {
                     This dashboard keeps the whole approval flow in one place: review incoming requests, approve or block them, and remove accounts that should no longer exist.
                   </p>
                   {adminLoading ? (
-                    <div className="text-xs font-bold uppercase tracking-widest text-[#888] animate-pulse">Loading AccountsÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦</div>
+                    <div className="text-xs font-bold uppercase tracking-widest text-[#888] animate-pulse">Loading Accounts...</div>
                   ) : (
                     <div className="flex flex-col gap-4">
                       <div className="border-[2px] border-[#666]">
@@ -5597,7 +5883,7 @@ export default function App() {
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="min-w-0">
                                     <div className="text-[11px] font-bold uppercase tracking-widest text-black truncate">
-                                      {user.username} {user.isAdmin ? 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Admin' : ''}
+                                      {user.username} {user.isAdmin ? ' • Admin' : ''}
                                     </div>
                                     <div className="text-[10px] font-bold uppercase tracking-widest text-[#888]">
                                       Requested {new Date(user.createdAt).toLocaleString()}
@@ -5653,7 +5939,7 @@ export default function App() {
                               <div key={user.id} className="px-4 py-3 flex items-center justify-between gap-4">
                                 <div className="min-w-0">
                                   <div className="text-[11px] font-bold uppercase tracking-widest text-black truncate">
-                                    {user.username} {user.isAdmin ? 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Admin' : ''}
+                                    {user.username} {user.isAdmin ? ' • Admin' : ''}
                                   </div>
                                   <div className="text-[10px] font-bold uppercase tracking-widest text-[#888]">
                                     Approved {user.approvedAt ? new Date(user.approvedAt).toLocaleString() : 'Recently'}
@@ -5705,7 +5991,7 @@ export default function App() {
                               <div key={user.id} className="px-4 py-3 flex items-center justify-between gap-4">
                                 <div className="min-w-0">
                                   <div className="text-[11px] font-bold uppercase tracking-widest text-black truncate">
-                                    {user.username} {user.isAdmin ? 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Admin' : ''}
+                                    {user.username} {user.isAdmin ? ' • Admin' : ''}
                                   </div>
                                   <div className="text-[10px] font-bold uppercase tracking-widest text-[#888]">
                                     Blocked {user.blockedAt ? new Date(user.blockedAt).toLocaleString() : 'Recently'}
@@ -5749,4 +6035,3 @@ export default function App() {
     )
   );
 }
-

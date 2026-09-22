@@ -9,14 +9,19 @@
     <div>
         <p class="eyebrow">
             @Model.Input.Isbn13
-            <button type="button" class="copy-button text-copy-button" data-copy-text="@Model.Input.Isbn13" title="Copy ISBN" aria-label="Copy ISBN">Copy</button>
+            <button type="button" class="copy-button" data-copy-text="@Model.Input.Isbn13" title="Copy ISBN" aria-label="Copy ISBN"><span class="copy-icon" aria-hidden="true"></span></button>
         </p>
         <h1>Edit book</h1>
     </div>
-    <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
+    <div class="header-actions edit-header-actions">
+        <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
+        <button class="btn btn-primary" form="edit-book-form">Save changes</button>
+        <a class="btn btn-outline-secondary" asp-page="/Books/Edit" asp-route-id="@Model.Input.Id">Clear changes</a>
+        <button asp-page-handler="Delete" class="btn btn-outline-danger" form="edit-book-form" onclick="return confirm('Delete this book and all of its copies? This cannot be undone.');">Delete book</button>
+    </div>
 </section>
 
-<form method="post" class="entry-grid edit-layout" data-unsaved-changes-form>
+<form method="post" id="edit-book-form" class="entry-grid edit-layout" data-unsaved-changes-form>
     <input asp-for="Input.Id" type="hidden" />
     <input asp-for="Input.Isbn13" type="hidden" />
 
@@ -33,13 +38,13 @@
                 <label asp-for="Input.Isbn13"></label>
                 <div class="copy-field">
                     <input asp-for="Input.Isbn13" class="form-control" readonly />
-                    <button type="button" class="copy-button text-copy-button" data-copy-text="@Model.Input.Isbn13" title="Copy ISBN" aria-label="Copy ISBN">Copy</button>
+                    <button type="button" class="copy-button" data-copy-text="@Model.Input.Isbn13" title="Copy ISBN" aria-label="Copy ISBN"><span class="copy-icon" aria-hidden="true"></span></button>
                 </div>
 
                 <label asp-for="Input.Title"></label>
                 <div class="copy-field">
                     <input asp-for="Input.Title" class="form-control" />
-                    <button type="button" class="copy-button text-copy-button" data-copy-source="#Input_Title" data-copy-secondary-source="#Input_Authors" title="Copy title and author" aria-label="Copy title and author">Copy</button>
+                    <button type="button" class="copy-button" data-copy-source="#Input_Title" data-copy-secondary-source="#Input_Authors" title="Copy title and author" aria-label="Copy title and author"><span class="copy-icon" aria-hidden="true"></span></button>
                 </div>
                 <span asp-validation-for="Input.Title" class="text-danger"></span>
 
@@ -59,12 +64,49 @@
                 </div>
                 <span class="form-hint">Type to search tags live. Use commas between tags. Optional format: <code>tag | note</code>.</span>
 
-                <div class="form-actions form-actions--local">
-                    <button class="btn btn-primary">Save changes</button>
-                    <a class="btn btn-outline-secondary" asp-page="/Books/Edit" asp-route-id="@Model.Input.Id">Clear changes</a>
-                    <button asp-page-handler="Delete" class="btn btn-outline-danger" onclick="return confirm('Delete this book and all of its copies? This cannot be undone.');">Delete book</button>
-                </div>
             </div>
+        </section>
+
+        <section class="panel edit-panel edit-panel--covers">
+            <div class="cover-list" data-cover-list>
+                <div class="copy-editor-heading">
+                    <div>
+                        <h2>Covers</h2>
+                        <p class="form-hint">Store multiple cover options, mark one as the main image, and keep source notes with each one.</p>
+                    </div>
+                </div>
+
+                @for (var index = 0; index < Model.Input.Covers.Count; index++)
+                {
+                    <article class="additional-info-card cover-card" data-cover-row>
+                        <input asp-for="Input.Covers[index].Id" type="hidden" data-cover-field="id" />
+                        <div class="field-grid">
+                            <div>
+                                <label asp-for="Input.Covers[index].Label"></label>
+                                <input asp-for="Input.Covers[index].Label" class="form-control" placeholder="Front cover, alternate art, paperback..." data-cover-field="label" />
+                            </div>
+                            <div>
+                                <label asp-for="Input.Covers[index].Source"></label>
+                                <input asp-for="Input.Covers[index].Source" class="form-control" placeholder="Open Library, Google Books, manual..." data-cover-field="source" />
+                            </div>
+                        </div>
+
+                        <label asp-for="Input.Covers[index].Url"></label>
+                        <input asp-for="Input.Covers[index].Url" class="form-control" placeholder="https://..." data-cover-field="url" />
+
+                        <div class="additional-info-actions">
+                            <label class="checkbox-line">
+                                <input type="hidden" name="Input.Covers[@index].IsPrimary" value="false" data-cover-field="primary-hidden" />
+                                <input type="checkbox" name="Input.Covers[@index].IsPrimary" value="true" checked="@Model.Input.Covers[index].IsPrimary" data-cover-field="primary" />
+                                <span>Use as main cover</span>
+                            </label>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-remove-cover>Remove cover</button>
+                        </div>
+                    </article>
+                }
+            </div>
+
+            <button type="button" class="btn btn-outline-secondary" data-add-cover>Add cover</button>
         </section>
 
         <section class="panel edit-panel edit-panel--extended">
@@ -87,84 +129,12 @@
                     <label asp-for="Input.Categories"></label>
                     <input asp-for="Input.Categories" class="form-control" />
 
-                    <div class="cover-list" data-cover-list>
-                        <div class="copy-editor-heading">
-                            <div>
-                                <h3>Covers</h3>
-                                <p class="form-hint">Store multiple cover options, mark one as the main image, and keep source notes with each one.</p>
-                            </div>
-                        </div>
-
-                        @for (var index = 0; index < Model.Input.Covers.Count; index++)
-                        {
-                            <article class="additional-info-card cover-card" data-cover-row>
-                                <input asp-for="Input.Covers[index].Id" type="hidden" data-cover-field="id" />
-                                <div class="field-grid">
-                                    <div>
-                                        <label asp-for="Input.Covers[index].Label"></label>
-                                        <input asp-for="Input.Covers[index].Label" class="form-control" placeholder="Front cover, alternate art, paperback..." data-cover-field="label" />
-                                    </div>
-                                    <div>
-                                        <label asp-for="Input.Covers[index].Source"></label>
-                                        <input asp-for="Input.Covers[index].Source" class="form-control" placeholder="Open Library, Google Books, manual..." data-cover-field="source" />
-                                    </div>
-                                </div>
-
-                                <label asp-for="Input.Covers[index].Url"></label>
-                                <input asp-for="Input.Covers[index].Url" class="form-control" placeholder="https://..." data-cover-field="url" />
-
-                                <div class="additional-info-actions">
-                                    <label class="checkbox-line">
-                                        <input type="hidden" name="Input.Covers[@index].IsPrimary" value="false" data-cover-field="primary-hidden" />
-                                        <input type="checkbox" name="Input.Covers[@index].IsPrimary" value="true" checked="@Model.Input.Covers[index].IsPrimary" data-cover-field="primary" />
-                                        <span>Use as main cover</span>
-                                    </label>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-remove-cover>Remove cover</button>
-                                </div>
-                            </article>
-                        }
-                    </div>
-
-                    <button type="button" class="btn btn-outline-secondary" data-add-cover>Add cover</button>
-
                     <label asp-for="Input.InfoUrl"></label>
                     <input asp-for="Input.InfoUrl" class="form-control" />
-
-                    <div class="additional-info-list" data-additional-info-list>
-                        <div class="copy-editor-heading">
-                            <h3>Additional info</h3>
-                            <p class="form-hint">Use typed rows for description, synopsis, quotes, links, provenance, loan notes, sale notes, disposal notes, and other structured text.</p>
-                        </div>
-
-                        @for (var index = 0; index < Model.Input.AdditionalInfos.Count; index++)
-                        {
-                            <article class="additional-info-card" data-additional-info-row>
-                                <input asp-for="Input.AdditionalInfos[index].Id" type="hidden" data-additional-info-field="id" />
-                                <div class="field-grid">
-                                    <div>
-                                        <label asp-for="Input.AdditionalInfos[index].Type"></label>
-                                        <select asp-for="Input.AdditionalInfos[index].Type" asp-items="Model.AdditionalInfoTypeOptions" class="form-select" data-additional-info-field="type"></select>
-                                    </div>
-                                    <div>
-                                        <label asp-for="Input.AdditionalInfos[index].Label"></label>
-                                        <input asp-for="Input.AdditionalInfos[index].Label" class="form-control" placeholder="Source, person, exhibition, site..." data-additional-info-field="label" />
-                                    </div>
-                                </div>
-
-                                <label asp-for="Input.AdditionalInfos[index].Value"></label>
-                                <textarea asp-for="Input.AdditionalInfos[index].Value" class="form-control" rows="3" placeholder="URL, related title, or note text" data-additional-info-field="value"></textarea>
-
-                                <div class="additional-info-actions">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-remove-additional-info>Remove row</button>
-                                </div>
-                            </article>
-                        }
-                    </div>
-
-                    <button type="button" class="btn btn-outline-secondary" data-add-additional-info>Add additional info</button>
                 </div>
             </details>
         </section>
+
     </div>
 
     <div class="edit-layout__column edit-layout__column--right">
@@ -180,8 +150,19 @@
                         <span class="status-pill" data-copy-count>@Model.Input.Copies.Count copy(s)</span>
                         <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-add>Add copy</button>
                         <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-duplicate>Duplicate copy</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" data-copy-remove-active>Remove copy</button>
                     </div>
                 </div>
+
+                <label class="copy-selector-row">
+                    <span>Editing copy</span>
+                    <select class="form-select" data-copy-selector aria-label="Choose copy to edit">
+                        @for (var index = 0; index < Model.Input.Copies.Count; index++)
+                        {
+                            <option value="@index">Copy @(index + 1)</option>
+                        }
+                    </select>
+                </label>
 
                 @for (var index = 0; index < Model.Input.Copies.Count; index++)
                 {
@@ -189,9 +170,9 @@
                         <input asp-for="Input.Copies[index].Id" type="hidden" data-copy-field="id" />
                         <div class="copy-editor-card__header">
                             <strong data-copy-title>Copy @(index + 1)</strong>
-                            <label class="checkbox-line" data-copy-remove @(Model.Input.Copies.Count > 1 ? null : "hidden")>
-                                <input type="hidden" name="Input.Copies[@index].Remove" value="false" data-copy-field="remove-hidden" />
+                            <label class="checkbox-line" data-copy-remove hidden>
                                 <input type="checkbox" name="Input.Copies[@index].Remove" value="true" checked="@Model.Input.Copies[index].Remove" data-copy-field="remove" />
+                                <input type="hidden" name="Input.Copies[@index].Remove" value="false" data-copy-field="remove-hidden" />
                                 <span>Remove this copy</span>
                             </label>
                         </div>
@@ -240,6 +221,41 @@
                 }
             </div>
         </section>
+
+        <section class="panel edit-panel edit-panel--additional">
+            <div class="additional-info-list" data-additional-info-list>
+                <div class="copy-editor-heading">
+                    <h2>Additional info</h2>
+                    <p class="form-hint">Use typed rows for description, synopsis, quotes, links, provenance, loan notes, sale notes, disposal notes, and other structured text.</p>
+                </div>
+
+                @for (var index = 0; index < Model.Input.AdditionalInfos.Count; index++)
+                {
+                    <article class="additional-info-card" data-additional-info-row>
+                        <input asp-for="Input.AdditionalInfos[index].Id" type="hidden" data-additional-info-field="id" />
+                        <div class="field-grid">
+                            <div>
+                                <label asp-for="Input.AdditionalInfos[index].Type"></label>
+                                <select asp-for="Input.AdditionalInfos[index].Type" asp-items="Model.AdditionalInfoTypeOptions" class="form-select" data-additional-info-field="type"></select>
+                            </div>
+                            <div>
+                                <label asp-for="Input.AdditionalInfos[index].Label"></label>
+                                <input asp-for="Input.AdditionalInfos[index].Label" class="form-control" placeholder="Source, person, exhibition, site..." data-additional-info-field="label" />
+                            </div>
+                        </div>
+
+                        <label asp-for="Input.AdditionalInfos[index].Value"></label>
+                        <textarea asp-for="Input.AdditionalInfos[index].Value" class="form-control" rows="3" placeholder="URL, related title, or note text" data-additional-info-field="value"></textarea>
+
+                        <div class="additional-info-actions">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-remove-additional-info>Remove row</button>
+                        </div>
+                    </article>
+                }
+            </div>
+
+            <button type="button" class="btn btn-outline-secondary" data-add-additional-info>Add additional info</button>
+        </section>
     </div>
 </form>
 
@@ -249,8 +265,8 @@
         <div class="copy-editor-card__header">
             <strong data-copy-title>Copy</strong>
             <label class="checkbox-line" data-copy-remove hidden>
-                <input type="hidden" value="false" data-copy-field="remove-hidden" />
                 <input type="checkbox" data-copy-field="remove" />
+                <input type="hidden" value="false" data-copy-field="remove-hidden" />
                 <span>Remove this copy</span>
             </label>
         </div>

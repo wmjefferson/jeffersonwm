@@ -1,4 +1,121 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const authBaseUrl = document.body?.getAttribute("data-stallioneer-auth-base-url")?.replace(/\/$/, "") || "https://auth.jeffersonwm.com";
+    const brandLink = document.querySelector(".page-banner__brand");
+    const appHomeUrl = brandLink instanceof HTMLAnchorElement ? brandLink.href : `${window.location.origin}/`;
+    const localAuthStatusUrl = new URL("api/auth/status", appHomeUrl).toString();
+    const returnTo = `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
+    let authPopupPoll = null;
+
+    const stopAuthPopupPoll = () => {
+        if (authPopupPoll !== null) {
+            window.clearInterval(authPopupPoll);
+            authPopupPoll = null;
+        }
+    };
+
+    const showAuthNotice = (message) => {
+        let notice = document.querySelector("[data-stallioneer-auth-notice]");
+        if (!(notice instanceof HTMLElement)) {
+            notice = document.createElement("div");
+            notice.className = "auth-notice shell-frame";
+            notice.setAttribute("data-stallioneer-auth-notice", "");
+            const bodyShell = document.querySelector(".shell-frame--body");
+            if (bodyShell?.parentNode) {
+                bodyShell.parentNode.insertBefore(notice, bodyShell);
+            } else {
+                document.body.prepend(notice);
+            }
+        }
+
+        notice.textContent = message;
+    };
+
+    const readLocalAuthStatus = async () => {
+        const response = await fetch(localAuthStatusUrl, {
+            credentials: "include",
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        return response.json();
+    };
+
+    const refreshAfterAuth = async () => {
+        stopAuthPopupPoll();
+        try {
+            const status = await readLocalAuthStatus();
+            if (status?.hasAccess) {
+                window.location.reload();
+                return;
+            }
+        } catch {
+            // The notice below explains the likely host/cookie mismatch.
+        }
+
+        showAuthNotice("Signed in on Auth, but this Stallioneer host cannot read the shared Auth cookie yet. Open Stallioneer through its JeffersonWM domain or local tunnel, and make sure Auth uses SESSION_COOKIE_DOMAIN=.jeffersonwm.com.");
+    };
+
+    const openCentralAuth = () => {
+        const url = new URL(`${authBaseUrl}/home`);
+        url.searchParams.set("returnTo", returnTo);
+        url.searchParams.set("popup", "1");
+
+        const width = 440;
+        const height = 620;
+        const left = Math.max(0, Math.round(window.screenX + ((window.outerWidth - width) / 2)));
+        const top = Math.max(0, Math.round(window.screenY + ((window.outerHeight - height) / 2)));
+        const popup = window.open(
+            url.toString(),
+            "stallioneer-auth-popup",
+            `width=${width},height=${height},left=${left},top=${top}`
+        );
+
+        if (!popup) {
+            window.location.assign(url.toString());
+            return;
+        }
+
+        popup.focus();
+        stopAuthPopupPoll();
+        authPopupPoll = window.setInterval(() => {
+            if (popup.closed) {
+                void refreshAfterAuth();
+            }
+        }, 700);
+    };
+
+    document.querySelectorAll("[data-stallioneer-auth-open]").forEach((button) => {
+        button.addEventListener("click", openCentralAuth);
+    });
+
+    document.querySelectorAll("[data-stallioneer-auth-sign-out]").forEach((button) => {
+        button.addEventListener("click", async () => {
+            try {
+                await fetch(`${authBaseUrl}/api/auth/logout`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ siteContext: window.location.href })
+                });
+            } finally {
+                window.location.assign(appHomeUrl);
+            }
+        });
+    });
+
+    window.addEventListener("message", (event) => {
+        if (event.origin !== authBaseUrl) {
+            return;
+        }
+
+        if (event.data?.type === "auth:success" || event.data?.type === "auth:logout") {
+            void refreshAfterAuth();
+        }
+    });
+
     const unsavedChangesForm = document.querySelector("[data-unsaved-changes-form]");
     if (unsavedChangesForm instanceof HTMLFormElement) {
         let allowNavigation = false;
@@ -277,52 +394,322 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    document.querySelectorAll("[data-copy-text], [data-copy-source]").forEach((button) => {
-        button.addEventListener("click", async () => {
-            const directText = button.getAttribute("data-copy-text") ?? "";
-            const primarySelector = button.getAttribute("data-copy-source");
-            const secondarySelector = button.getAttribute("data-copy-secondary-source");
-            const primaryInput = primarySelector ? document.querySelector(primarySelector) : null;
-            const secondaryInput = secondarySelector ? document.querySelector(secondarySelector) : null;
-            const primaryValue = primaryInput instanceof HTMLInputElement ? primaryInput.value.trim() : "";
-            const secondaryValue = secondaryInput instanceof HTMLInputElement ? secondaryInput.value.trim() : "";
-            const text = primaryValue
-                ? (secondaryValue ? `${primaryValue} — ${secondaryValue}` : primaryValue)
-                : directText;
-            if (!text) {
-                return;
-            }
+    document.addEventListener("click", async (event) => {
+        const target = event.target;
+        const button = target instanceof HTMLElement ? target.closest("[data-copy-text], [data-copy-source]") : null;
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
 
-            try {
-                await navigator.clipboard.writeText(text);
-                button.classList.add("copied");
-                window.setTimeout(() => {
-                    button.classList.remove("copied");
-                }, 900);
-            } catch {
-                // Ignore clipboard failures for now.
-            }
-        });
+        const directText = button.getAttribute("data-copy-text") ?? "";
+        const primarySelector = button.getAttribute("data-copy-source");
+        const secondarySelector = button.getAttribute("data-copy-secondary-source");
+        const primaryInput = primarySelector ? document.querySelector(primarySelector) : null;
+        const secondaryInput = secondarySelector ? document.querySelector(secondarySelector) : null;
+        const primaryValue = primaryInput instanceof HTMLInputElement ? primaryInput.value.trim() : "";
+        const secondaryValue = secondaryInput instanceof HTMLInputElement ? secondaryInput.value.trim() : "";
+        const text = primaryValue
+            ? (secondaryValue ? `${primaryValue} — ${secondaryValue}` : primaryValue)
+            : directText;
+        if (!text) {
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            button.classList.add("copied");
+            window.setTimeout(() => {
+                button.classList.remove("copied");
+            }, 900);
+        } catch {
+            // Ignore clipboard failures for now.
+        }
     });
 
     const selectAll = document.querySelector("[data-select-all]");
     if (selectAll instanceof HTMLInputElement) {
-        const items = Array.from(document.querySelectorAll("[data-select-item]"))
+        const getItems = () => Array.from(document.querySelectorAll("[data-select-item]"))
             .filter((item) => item instanceof HTMLInputElement);
 
+        const syncSelectAllState = () => {
+            const items = getItems();
+            selectAll.checked = items.length > 0 && items.every((checkbox) => checkbox.checked);
+            selectAll.indeterminate = items.some((checkbox) => checkbox.checked) && !selectAll.checked;
+        };
+
         selectAll.addEventListener("change", () => {
+            const items = getItems();
             items.forEach((item) => {
                 item.checked = selectAll.checked;
                 item.dispatchEvent(new Event("change"));
             });
         });
 
-        items.forEach((item) => {
-            item.addEventListener("change", () => {
-                selectAll.checked = items.length > 0 && items.every((checkbox) => checkbox.checked);
-                selectAll.indeterminate = items.some((checkbox) => checkbox.checked) && !selectAll.checked;
+        document.addEventListener("change", (event) => {
+            if (event.target instanceof HTMLInputElement && event.target.matches("[data-select-item]")) {
+                syncSelectAllState();
+            }
+        });
+    }
+
+    const inventoryFilterForm = document.querySelector("[data-inventory-filter-form]");
+    if (inventoryFilterForm instanceof HTMLFormElement) {
+        const tableBody = document.querySelector("[data-inventory-table-body]");
+        const filterMenu = document.querySelector("[data-inventory-filter-menu]");
+        const filterToggle = document.querySelector("[data-inventory-filter-toggle]");
+        const filterPopover = document.querySelector("[data-inventory-filter-popover]");
+        const sortInput = document.querySelector("[data-inventory-sort-value]");
+        const pageNumberInput = document.querySelector("[data-inventory-page-number]");
+        const pageSizeInput = document.querySelector("[data-inventory-page-size]");
+        const queryInput = document.querySelector("[data-inventory-query]");
+        const clearButton = document.querySelector("[data-inventory-filter-clear]");
+        const pager = document.querySelector("[data-inventory-pager]");
+        const pageSummary = document.querySelector("[data-inventory-page-summary]");
+        const previousPageButton = document.querySelector("[data-inventory-page-previous]");
+        const nextPageButton = document.querySelector("[data-inventory-page-next]");
+        const filterCount = document.querySelector("[data-inventory-filter-count]");
+        let currentPage = pageNumberInput instanceof HTMLInputElement ? Number(pageNumberInput.value) || 1 : 1;
+        let isLoading = false;
+
+        const escapeHtml = (value) => String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll("\"", "&quot;")
+            .replaceAll("'", "&#39;");
+
+        const selectedValues = (name) => Array.from(inventoryFilterForm.querySelectorAll(`input[name="${name}"]:checked`))
+            .filter((input) => input instanceof HTMLInputElement)
+            .map((input) => input.value);
+
+        const getBaseSort = () => sortInput instanceof HTMLInputElement
+            ? sortInput.value.replace(/_desc$/, "") || "title"
+            : "title";
+
+        const getQueryParams = (pageNumber, includeHandler = false) => {
+            const params = new URLSearchParams();
+            const query = queryInput instanceof HTMLInputElement ? queryInput.value.trim() : "";
+            const sort = sortInput instanceof HTMLInputElement ? sortInput.value || "title" : "title";
+            const pageSize = pageSizeInput instanceof HTMLSelectElement ? pageSizeInput.value : "50";
+
+            if (includeHandler) {
+                params.set("handler", "InventoryData");
+            }
+            if (query) {
+                params.set("query", query);
+            }
+            params.set("sort", sort);
+            params.set("pageSize", pageSize);
+            params.set("pageNumber", String(pageNumber));
+            selectedValues("TagIds").forEach((value) => params.append("tagIds", value));
+            selectedValues("CollectionIds").forEach((value) => params.append("collectionIds", value));
+            selectedValues("LocationIds").forEach((value) => params.append("locationIds", value));
+            selectedValues("Statuses").forEach((value) => params.append("statuses", value));
+            return params;
+        };
+
+        const updateFilterLabel = () => {
+            const baseSort = getBaseSort();
+            const isDescending = sortInput instanceof HTMLInputElement && sortInput.value.endsWith("_desc");
+            document.querySelectorAll("[data-inventory-sort-option]").forEach((option) => {
+                if (!(option instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                const active = option.dataset.sort === baseSort;
+                option.classList.toggle("is-active", active);
+                option.setAttribute("aria-pressed", String(active));
+                option.textContent = `${option.dataset.sortLabel ?? option.dataset.sort ?? ""}${active ? (isDescending ? " ↓" : " ↑") : ""}`;
+            });
+
+            document.querySelectorAll("[data-inventory-toggle-label]").forEach((label) => {
+                if (!(label instanceof HTMLElement)) {
+                    return;
+                }
+
+                const checkbox = label.querySelector('input[type="checkbox"]');
+                const active = checkbox instanceof HTMLInputElement && checkbox.checked;
+                label.classList.toggle("is-active", active);
+                label.setAttribute("aria-pressed", String(active));
+            });
+        };
+
+        const renderBooks = (books) => {
+            if (!(tableBody instanceof HTMLElement)) {
+                return;
+            }
+
+            if (!Array.isArray(books) || books.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" class="form-hint">No books match these filters.</td></tr>';
+                if (selectAll instanceof HTMLInputElement) {
+                    selectAll.checked = false;
+                    selectAll.indeterminate = false;
+                }
+                return;
+            }
+
+            tableBody.innerHTML = books.map((book) => {
+                const title = escapeHtml(book.title);
+                const authors = escapeHtml(book.authors);
+                const publisherLine = book.publisher
+                    ? `<small>${escapeHtml(book.publisher)} ${escapeHtml(book.publishedDate)}</small>`
+                    : "";
+                const titleAuthor = book.authors ? `${book.title} - ${book.authors}` : book.title;
+                const cover = book.coverImageUrl
+                    ? `<img src="${escapeHtml(book.coverImageUrl)}" alt="" />`
+                    : '<div class="cover-placeholder"></div>';
+                const collections = (book.collections ?? [])
+                    .map((collection) => `<span class="collection-pill">${escapeHtml(collection)}</span>`)
+                    .join("");
+                const tags = (book.tags ?? [])
+                    .map((tag) => {
+                        const color = /^#[0-9a-f]{3,8}$/i.test(tag.color ?? "") ? tag.color : "#60708b";
+                        return `<span class="tag-pill" style="--tag-color:${color}">${escapeHtml(tag.name)}</span>`;
+                    })
+                    .join("");
+
+                return `<tr>
+                    <td class="selection-column"><input type="checkbox" name="SelectedBookIds" value="${book.id}" data-select-item aria-label="Select ${title}" /></td>
+                    <td><div class="book-cell">${cover}<div><div class="copy-line"><a class="book-title-link" href="/Books/Edit?id=${book.id}"><strong>${title}</strong></a><button type="button" class="copy-button" data-copy-text="${escapeHtml(titleAuthor)}" title="Copy title and author" aria-label="Copy title and author"><span class="copy-icon" aria-hidden="true"></span></button></div><span>${authors}</span>${publisherLine}</div></div></td>
+                    <td><div class="copy-line"><span>${escapeHtml(book.isbn13)}</span><button type="button" class="copy-button" data-copy-text="${escapeHtml(book.isbn13)}" title="Copy ISBN" aria-label="Copy ISBN"><span class="copy-icon" aria-hidden="true"></span></button></div></td>
+                    <td>${escapeHtml(book.quantity)}</td>
+                    <td><div class="tag-list tag-list--metadata">${collections}${tags}</div></td>
+                    <td><span class="status-pill">${escapeHtml(book.status)}</span></td>
+                </tr>`;
+            }).join("");
+
+            if (selectAll instanceof HTMLInputElement) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            }
+        };
+
+        const renderPager = (data) => {
+            currentPage = Number(data.pageNumber) || 1;
+            if (pageNumberInput instanceof HTMLInputElement) {
+                pageNumberInput.value = String(currentPage);
+            }
+            if (pageSummary instanceof HTMLElement) {
+                pageSummary.textContent = `Page ${currentPage} of ${data.totalPages} · ${data.filteredCount} books`;
+            }
+            if (filterCount instanceof HTMLElement) {
+                filterCount.textContent = `${data.filteredCount} shown`;
+            }
+            if (pager instanceof HTMLElement) {
+                pager.classList.toggle("is-hidden", Number(data.totalPages) <= 1);
+            }
+            if (previousPageButton instanceof HTMLButtonElement) {
+                previousPageButton.disabled = currentPage <= 1;
+            }
+            if (nextPageButton instanceof HTMLButtonElement) {
+                nextPageButton.disabled = currentPage >= Number(data.totalPages);
+            }
+        };
+
+        const updateBrowserUrl = () => {
+            const query = getQueryParams(currentPage).toString();
+            window.history.replaceState({}, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+        };
+
+        const loadInventory = async (pageNumber = 1) => {
+            if (isLoading) {
+                return;
+            }
+
+            isLoading = true;
+            const params = getQueryParams(pageNumber, true);
+            try {
+                const response = await fetch(`${window.location.pathname}?${params.toString()}`, {
+                    credentials: "same-origin",
+                    headers: { Accept: "application/json" }
+                });
+                if (!response.ok) {
+                    throw new Error(`Inventory request failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+                renderBooks(data.books);
+                renderPager(data);
+                updateFilterLabel();
+                updateBrowserUrl();
+            } catch {
+                window.location.assign(`${window.location.pathname}?${getQueryParams(pageNumber).toString()}`);
+            } finally {
+                isLoading = false;
+            }
+        };
+
+        const closeFilters = () => {
+            if (filterPopover instanceof HTMLElement) {
+                filterPopover.hidden = true;
+            }
+            if (filterToggle instanceof HTMLButtonElement) {
+                filterToggle.setAttribute("aria-expanded", "false");
+            }
+        };
+
+        filterToggle?.addEventListener("click", () => {
+            if (!(filterPopover instanceof HTMLElement) || !(filterToggle instanceof HTMLButtonElement)) {
+                return;
+            }
+            const willOpen = filterPopover.hidden;
+            filterPopover.hidden = !willOpen;
+            filterToggle.setAttribute("aria-expanded", String(willOpen));
+        });
+
+        document.addEventListener("click", (event) => {
+            if (filterMenu instanceof HTMLElement && event.target instanceof Node && !filterMenu.contains(event.target)) {
+                closeFilters();
+            }
+        });
+
+        inventoryFilterForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            closeFilters();
+            void loadInventory(1);
+        });
+
+        document.querySelectorAll("[data-inventory-sort-option]").forEach((option) => {
+            option.addEventListener("click", () => {
+                if (!(option instanceof HTMLButtonElement) || !(sortInput instanceof HTMLInputElement)) {
+                    return;
+                }
+                const requestedSort = option.dataset.sort;
+                if (!requestedSort) {
+                    return;
+                }
+                sortInput.value = getBaseSort() === requestedSort && !sortInput.value.endsWith("_desc")
+                    ? `${requestedSort}_desc`
+                    : requestedSort;
+                void loadInventory(1);
             });
         });
+
+        pageSizeInput?.addEventListener("change", () => void loadInventory(1));
+        inventoryFilterForm.querySelectorAll('input[name="TagIds"], input[name="CollectionIds"], input[name="LocationIds"], input[name="Statuses"]').forEach((input) => {
+            input.addEventListener("change", () => {
+                updateFilterLabel();
+                void loadInventory(1);
+            });
+        });
+        clearButton?.addEventListener("click", () => {
+            if (queryInput instanceof HTMLInputElement) {
+                queryInput.value = "";
+            }
+            if (sortInput instanceof HTMLInputElement) {
+                sortInput.value = "title";
+            }
+            inventoryFilterForm.querySelectorAll('input[name="TagIds"], input[name="CollectionIds"], input[name="LocationIds"], input[name="Statuses"]').forEach((input) => {
+                if (input instanceof HTMLInputElement) {
+                    input.checked = false;
+                }
+            });
+            closeFilters();
+            void loadInventory(1);
+        });
+        previousPageButton?.addEventListener("click", () => void loadInventory(Math.max(1, currentPage - 1)));
+        nextPageButton?.addEventListener("click", () => void loadInventory(currentPage + 1));
+        updateFilterLabel();
     }
 
     const rawTagData = document.getElementById("tag-data")?.textContent
@@ -623,16 +1010,96 @@ document.addEventListener("DOMContentLoaded", () => {
     if (editInventory instanceof HTMLElement) {
         const addCopyButton = editInventory.querySelector("[data-copy-add]");
         const duplicateCopyButton = editInventory.querySelector("[data-copy-duplicate]");
+        const removeCopyButton = editInventory.querySelector("[data-copy-remove-active]");
         const copyList = editInventory.querySelector("[data-copy-list]");
         const copyTemplate = document.querySelector("#copy-card-template");
         const copyCount = editInventory.querySelector("[data-copy-count]");
+        const copySelector = editInventory.querySelector("[data-copy-selector]");
+        let activeCopyIndex = copySelector instanceof HTMLSelectElement ? Number(copySelector.value) || 0 : 0;
+
+        const getCopyCards = () => copyList instanceof HTMLElement
+            ? Array.from(copyList.querySelectorAll("[data-copy-card]"))
+            : [];
+
+        const isCopyRemoved = (card) => {
+            const removeField = card.querySelector("[data-copy-field='remove']");
+            return removeField instanceof HTMLInputElement && removeField.checked;
+        };
+
+        const getVisibleCopyCards = () => getCopyCards().filter((card) => !isCopyRemoved(card));
+
+        const getCopyOptionText = (card, index) => {
+            const locationField = card.querySelector("[data-copy-field='location']");
+            const statusField = card.querySelector("[data-copy-field='status']");
+            const removeField = card.querySelector("[data-copy-field='remove']");
+            const locationText = locationField instanceof HTMLSelectElement
+                ? locationField.selectedOptions[0]?.textContent?.trim()
+                : "";
+            const statusText = statusField instanceof HTMLSelectElement ? statusField.value.trim() : "";
+            const suffix = [statusText, locationText && locationText !== "No location" ? locationText : ""]
+                .filter(Boolean)
+                .join(" / ");
+            const removed = removeField instanceof HTMLInputElement && removeField.checked;
+            return `Copy ${index + 1}${suffix ? ` - ${suffix}` : ""}${removed ? " - remove" : ""}`;
+        };
+
+        const syncCopySelector = (cards) => {
+            if (!(copySelector instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            copySelector.innerHTML = "";
+            const visibleCards = cards.filter((card) => !isCopyRemoved(card));
+            visibleCards.forEach((card, visibleIndex) => {
+                const cardIndex = cards.indexOf(card);
+                const option = document.createElement("option");
+                option.value = String(cardIndex);
+                option.textContent = getCopyOptionText(card, visibleIndex);
+                copySelector.appendChild(option);
+            });
+
+            if (visibleCards.length === 0) {
+                activeCopyIndex = 0;
+                return;
+            }
+
+            if (isCopyRemoved(cards[activeCopyIndex])) {
+                activeCopyIndex = cards.indexOf(visibleCards[Math.min(activeCopyIndex, visibleCards.length - 1)]);
+            }
+            copySelector.value = String(activeCopyIndex);
+        };
+
+        const showActiveCopyCard = (cards = getCopyCards()) => {
+            const visibleCards = cards.filter((card) => !isCopyRemoved(card));
+            if (visibleCards.length === 0) {
+                return;
+            }
+
+            if (!cards[activeCopyIndex] || isCopyRemoved(cards[activeCopyIndex])) {
+                activeCopyIndex = cards.indexOf(visibleCards[0]);
+            }
+            cards.forEach((card, index) => {
+                if (card instanceof HTMLElement) {
+                    card.hidden = index !== activeCopyIndex || isCopyRemoved(card);
+                }
+            });
+
+            if (copySelector instanceof HTMLSelectElement) {
+                copySelector.value = String(activeCopyIndex);
+            }
+
+            if (removeCopyButton instanceof HTMLButtonElement) {
+                removeCopyButton.hidden = visibleCards.length <= 1;
+                removeCopyButton.disabled = visibleCards.length <= 1;
+            }
+        };
 
         const renumberCopyCards = () => {
             if (!(copyList instanceof HTMLElement)) {
                 return;
             }
 
-            const cards = Array.from(copyList.querySelectorAll("[data-copy-card]"));
+            const cards = getCopyCards();
             cards.forEach((card, index) => {
                 const title = card.querySelector("[data-copy-title]");
                 if (title instanceof HTMLElement) {
@@ -643,11 +1110,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (idField instanceof HTMLInputElement) {
                     idField.name = `Input.Copies[${index}].Id`;
                     idField.id = `Input_Copies_${index}__Id`;
-                }
-
-                const removeToggle = card.querySelector("[data-copy-remove]");
-                if (removeToggle instanceof HTMLElement) {
-                    removeToggle.hidden = cards.length <= 1;
                 }
 
                 const removeField = card.querySelector("[data-copy-field='remove']");
@@ -693,8 +1155,12 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             if (copyCount instanceof HTMLElement) {
-                copyCount.textContent = cards.length === 1 ? "1 copy" : `${cards.length} copies`;
+                const visibleCount = cards.filter((card) => !isCopyRemoved(card)).length;
+                copyCount.textContent = visibleCount === 1 ? "1 copy" : `${visibleCount} copies`;
             }
+
+            syncCopySelector(cards);
+            showActiveCopyCard(cards);
         };
 
         const createCopyCard = () => {
@@ -756,14 +1222,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 copyList.appendChild(newCard);
                 initializeLiveTagEditors(newCard);
+                activeCopyIndex = getCopyCards().indexOf(newCard);
                 renumberCopyCards();
             });
         }
 
         if (duplicateCopyButton instanceof HTMLButtonElement && copyList instanceof HTMLElement) {
             duplicateCopyButton.addEventListener("click", () => {
-                const cards = Array.from(copyList.querySelectorAll("[data-copy-card]"));
-                const sourceCard = cards[cards.length - 1];
+                const cards = getCopyCards();
+                const visibleCards = getVisibleCopyCards();
+                const sourceCard = cards[activeCopyIndex] && !isCopyRemoved(cards[activeCopyIndex])
+                    ? cards[activeCopyIndex]
+                    : visibleCards[visibleCards.length - 1];
                 const newCard = duplicateCopyCard(sourceCard);
                 if (!newCard) {
                     return;
@@ -771,7 +1241,67 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 copyList.appendChild(newCard);
                 initializeLiveTagEditors(newCard);
+                activeCopyIndex = getCopyCards().indexOf(newCard);
                 renumberCopyCards();
+            });
+        }
+
+        if (removeCopyButton instanceof HTMLButtonElement && copyList instanceof HTMLElement) {
+            removeCopyButton.addEventListener("click", () => {
+                const cards = getCopyCards();
+                const visibleCards = cards.filter((card) => !isCopyRemoved(card));
+                if (visibleCards.length <= 1) {
+                    return;
+                }
+
+                const activeCard = cards[activeCopyIndex];
+                if (!(activeCard instanceof HTMLElement)) {
+                    return;
+                }
+
+                const idField = activeCard.querySelector("[data-copy-field='id']");
+                if (idField instanceof HTMLInputElement && idField.value === "0") {
+                    const nextVisible = visibleCards.find((card) => card !== activeCard);
+                    activeCard.remove();
+                    activeCopyIndex = nextVisible ? Math.max(0, getCopyCards().indexOf(nextVisible)) : 0;
+                    renumberCopyCards();
+                    return;
+                }
+
+                const removeField = activeCard.querySelector("[data-copy-field='remove']");
+                if (removeField instanceof HTMLInputElement) {
+                    removeField.checked = true;
+                }
+
+                const remainingCards = getCopyCards().filter((card) => card !== activeCard && !isCopyRemoved(card));
+                activeCopyIndex = remainingCards.length > 0 ? getCopyCards().indexOf(remainingCards[0]) : 0;
+                renumberCopyCards();
+            });
+        }
+
+        copySelector?.addEventListener("change", () => {
+            if (!(copySelector instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            activeCopyIndex = Number(copySelector.value) || 0;
+            showActiveCopyCard();
+        });
+
+        if (copyList instanceof HTMLElement) {
+            copyList.addEventListener("change", (event) => {
+                const target = event.target;
+                if (
+                    target instanceof HTMLSelectElement &&
+                    ["location", "condition", "status"].includes(target.dataset.copyField ?? "")
+                ) {
+                    renumberCopyCards();
+                    return;
+                }
+
+                if (target instanceof HTMLInputElement && target.dataset.copyField === "remove") {
+                    renumberCopyCards();
+                }
             });
         }
 

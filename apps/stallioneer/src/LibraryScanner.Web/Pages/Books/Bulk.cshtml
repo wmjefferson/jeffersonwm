@@ -5,40 +5,18 @@
     ViewData["Title"] = "Bulk tools";
 }
 
-<section class="page-heading">
-    <div>
-        <p class="eyebrow">Batch workflow</p>
-        <h1>Bulk tools</h1>
-        <p class="muted-block">Use this page for multi-book changes so Inventory can stay focused on browsing and single-book edits.</p>
-    </div>
-    <div class="header-actions">
-        <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back to inventory</a>
-    </div>
-</section>
-
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <div class="alert alert-success">@Model.StatusMessage</div>
 }
 
-<section class="stats-grid compact-stats-grid">
-    <div class="stat">
-        <span class="stat-label">Titles</span>
-        <strong>@Model.TotalTitles</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Items</span>
-        <strong>@Model.TotalItems</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Tags</span>
-        <strong>@Model.TotalTags</strong>
-    </div>
-    <div class="stat">
-        <span class="stat-label">Collections</span>
-        <strong>@Model.TotalCollections</strong>
-    </div>
-</section>
+<p class="bulk-status-row" aria-label="Bulk inventory status">
+    <span><strong>@Model.TotalTitles</strong> Titles</span>
+    <span><strong>@Model.TotalItems</strong> Items</span>
+    <span><strong>@Model.TotalTags</strong> Tags</span>
+    <span><strong>@Model.TotalCollections</strong> Collections</span>
+    <span aria-hidden="true"></span>
+</p>
 
 <form method="get" class="toolbar bulk-filter-toolbar">
     <input asp-for="Query" class="form-control" placeholder="Search title, ISBN, author, publisher, tags, collections, status, or location" />
@@ -147,16 +125,14 @@ else
             <table class="table inventory-table">
                 <thead>
                     <tr>
-                        <th>Book</th>
-                        <th>ISBN</th>
-                        <th>Qty</th>
-                        <th>Location</th>
-                        <th>Tags</th>
-                        <th>Collections</th>
-                        <th>Status</th>
                         <th class="selection-column">
                             <input type="checkbox" data-select-all aria-label="Select all books" />
                         </th>
+                        <th>Book</th>
+                        <th>ISBN</th>
+                        <th>Qty</th>
+                        <th>Collections + tags</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -164,6 +140,9 @@ else
                 {
                     var titleAuthor = string.IsNullOrWhiteSpace(book.Authors) ? book.Title : $"{book.Title} - {book.Authors}";
                     <tr>
+                        <td class="selection-column">
+                            <input type="checkbox" name="SelectedBookIds" value="@book.Id" data-select-item data-book-id="@book.Id" aria-label="Select @book.Title" />
+                        </td>
                         <td>
                             <div class="book-cell">
                                 @if (!string.IsNullOrWhiteSpace(book.CoverImageUrl))
@@ -177,12 +156,9 @@ else
                                 <div>
                                     <div class="copy-line">
                                         <a class="book-title-link" asp-page="/Books/Edit" asp-route-id="@book.Id"><strong>@book.Title</strong></a>
-                                        <button type="button" class="copy-button text-copy-button" data-copy-text="@titleAuthor" title="Copy title and author" aria-label="Copy title and author">Copy</button>
+                                        <button type="button" class="copy-button" data-copy-text="@titleAuthor" title="Copy title and author" aria-label="Copy title and author"><span class="copy-icon" aria-hidden="true"></span></button>
                                     </div>
-                                    @if (!string.IsNullOrWhiteSpace(book.Authors))
-                                    {
-                                        <span>@book.Authors</span>
-                                    }
+                                    <span>@book.Authors</span>
                                     @if (!string.IsNullOrWhiteSpace(book.Publisher))
                                     {
                                         <small>@book.Publisher @book.PublishedDate</small>
@@ -193,117 +169,29 @@ else
                         <td>
                             <div class="copy-line">
                                 <span>@book.Isbn13</span>
-                                <button type="button" class="copy-button text-copy-button" data-copy-text="@book.Isbn13" title="Copy ISBN" aria-label="Copy ISBN">Copy</button>
+                                <button type="button" class="copy-button" data-copy-text="@book.Isbn13" title="Copy ISBN" aria-label="Copy ISBN"><span class="copy-icon" aria-hidden="true"></span></button>
                             </div>
                         </td>
                         <td>@book.EffectiveQuantity</td>
-                        <td>@(book.Location?.Name ?? "-")</td>
                         <td>
-                            <div class="tag-list">
-                                @foreach (var bookTag in book.BookTags.OrderBy(bookTag => bookTag.Tag.Name))
-                                {
-                                    <span class="tag-pill" style="--tag-color:@bookTag.Tag.Color" title="@bookTag.Tag.Description">@bookTag.Tag.Name</span>
-                                }
-                            </div>
-                        </td>
-                        <td>
-                            <div class="tag-list">
+                            <div class="tag-list tag-list--metadata">
                                 @foreach (var collectionBook in book.CollectionBooks.OrderBy(item => item.Collection.Name))
                                 {
-                                    <span class="status-pill collection-pill" title="@collectionBook.Collection.Description">@collectionBook.Collection.Name</span>
+                                    <span class="collection-pill">@collectionBook.Collection.Name</span>
+                                }
+                                @foreach (var bookTag in book.BookTags.OrderBy(bookTag => bookTag.Tag.Name))
+                                {
+                                    <span class="tag-pill" style="--tag-color:@bookTag.Tag.Color">@bookTag.Tag.Name</span>
                                 }
                             </div>
                         </td>
                         <td><span class="status-pill">@book.Status</span></td>
-                        <td class="selection-column">
-                            <input type="checkbox" name="SelectedBookIds" value="@book.Id" data-select-item data-book-id="@book.Id" aria-label="Select @book.Title" />
-                        </td>
                     </tr>
                 }
                 </tbody>
             </table>
         </div>
     </form>
-
-    <section class="bulk-admin-grid">
-        <details class="details-accordion panel" open>
-            <summary class="details-accordion__summary">
-                <h2>Import / export</h2>
-            </summary>
-            <div class="details-accordion__body">
-                <p class="form-hint">CSV uses Stallioneer's fixed common field set. PDF lets you choose which fields appear in a printable inventory report.</p>
-                <div class="import-export-grid">
-                    <form method="post" asp-page-handler="Export" class="inline-form export-form export-form--simple">
-                        <div class="field-stack">
-                            <label>Export inventory</label>
-                            <span class="form-hint">Downloads the full library as CSV.</span>
-                        </div>
-                        <button type="submit" class="btn btn-outline-secondary">Export CSV</button>
-                    </form>
-
-                    <form method="post" asp-page-handler="ExportPdf" class="pdf-export-form export-form">
-                        <div class="field-stack">
-                            <label>Export PDF fields</label>
-                            <div class="export-field-list">
-                                @foreach (var field in Model.ExportFields)
-                                {
-                                    var isChecked = LibraryScanner.Web.Services.InventoryExportField.DefaultPdfKeys.Contains(field.Key);
-                                    <label class="checkbox-pill">
-                                        <input type="checkbox" name="PdfFieldKeys" value="@field.Key" checked="@isChecked" />
-                                        <span>@field.Label</span>
-                                    </label>
-                                }
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-outline-secondary">Export PDF</button>
-                    </form>
-
-                    <form method="post" asp-page-handler="ExportLog" class="export-log-form export-form">
-                        <div class="field-stack">
-                            <label>Export log</label>
-                            <span class="form-hint">Downloads inventory actions over a custom date range.</span>
-                            <div class="field-grid export-log-range">
-                                <div>
-                                    <label asp-for="LogStartDate">From</label>
-                                    <input asp-for="LogStartDate" type="date" class="form-control" />
-                                </div>
-                                <div>
-                                    <label asp-for="LogEndDate">To</label>
-                                    <input asp-for="LogEndDate" type="date" class="form-control" />
-                                </div>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-outline-secondary">Export log CSV</button>
-                    </form>
-
-                    <form method="post" asp-page-handler="Import" enctype="multipart/form-data" class="import-form">
-                        <div class="field-stack">
-                            <label asp-for="ImportFile">Import CSV</label>
-                            <input asp-for="ImportFile" type="file" accept=".csv,text/csv" class="form-control" />
-                            <span class="form-hint">New rows need ISBN-13 and title. Duplicate ISBN-13 rows inside the same file are skipped after the first match.</span>
-                        </div>
-                        <div class="field-stack">
-                            <label>Import mode</label>
-                            <label class="radio-line">
-                                <input type="radio" asp-for="ImportMode" value="@LibraryScanner.Web.Pages.Books.BulkModel.ImportModes.MergeUpdate" checked />
-                                <span>Append new books and update matching ISBN-13 records</span>
-                            </label>
-                            <label class="radio-line">
-                                <input type="radio" asp-for="ImportMode" value="@LibraryScanner.Web.Pages.Books.BulkModel.ImportModes.AppendIgnore" />
-                                <span>Append new books and ignore matching ISBN-13 records</span>
-                            </label>
-                            <label class="radio-line">
-                                <input type="radio" asp-for="ImportMode" value="@LibraryScanner.Web.Pages.Books.BulkModel.ImportModes.Overwrite" />
-                                <span>Overwrite book inventory with this CSV</span>
-                            </label>
-                            <span class="form-hint">Overwrite clears books, book tags, collection links, and inventory history before importing. Accounts and reusable tag/location/collection names remain.</span>
-                        </div>
-                        <button type="submit" class="btn btn-primary" onclick="return confirm('Import this CSV using the selected mode? Overwrite mode clears the current book inventory first.');">Import CSV</button>
-                    </form>
-                </div>
-            </div>
-        </details>
-    </section>
 }
 
 <script id="bulk-selection-data" type="application/json">

@@ -11,8 +11,10 @@ const gameEngine = {
   /**
    * Check if the player has leveled up and apply changes
    */
-  async checkLevelUp() {
-    const [[player]] = await db.execute('SELECT * FROM player WHERE id = 1');
+  async checkLevelUp(userId = 1) {
+    const [[player]] = await db.execute('SELECT * FROM player WHERE id = ?', [userId]);
+    if (!player) return { leveled_up: false };
+
     let leveledUp = false;
     let { level, xp, xp_to_next } = player;
 
@@ -34,8 +36,8 @@ const gameEngine = {
     else title = 'Recruit';
 
     await db.execute(
-      `UPDATE player SET level = ?, xp = ?, xp_to_next = ?, title = ?, updated_at = NOW() WHERE id = 1`,
-      [level, xp, xp_to_next, title]
+      `UPDATE player SET level = ?, xp = ?, xp_to_next = ?, title = ?, updated_at = NOW() WHERE id = ?`,
+      [level, xp, xp_to_next, title, userId]
     );
 
     return { leveled_up: leveledUp, new_level: level, new_title: title };
@@ -76,18 +78,19 @@ const gameEngine = {
   /**
    * Add an entry to the activity feed
    */
-  async addActivity(type, message, icon, xpEarned = 0, goldEarned = 0) {
+  async addActivity(userId = 1, type, message, icon, xpEarned = 0, goldEarned = 0) {
     await db.execute(
-      `INSERT INTO activity_feed (type, message, icon, xp_earned, gold_earned) VALUES (?, ?, ?, ?, ?)`,
-      [type, message, icon, xpEarned, goldEarned]
+      `INSERT INTO activity_feed (user_id, type, message, icon, xp_earned, gold_earned) VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, type, message, icon, xpEarned, goldEarned]
     );
   },
 
   /**
    * Check and unlock achievements based on current player state
    */
-  async checkAchievements() {
-    const [[player]] = await db.execute('SELECT * FROM player WHERE id = 1');
+  async checkAchievements(userId = 1) {
+    const [[player]] = await db.execute('SELECT * FROM player WHERE id = ?', [userId]);
+    if (!player) return [];
     const newlyUnlocked = [];
 
     const achievementChecks = [
@@ -104,14 +107,17 @@ const gameEngine = {
 
     for (const check of achievementChecks) {
       if (check.condition) {
-        const [[existing]] = await db.execute('SELECT id FROM achievements WHERE `key` = ?', [check.key]);
+        const [[existing]] = await db.execute(
+          'SELECT id FROM achievements WHERE user_id = ? AND `key` = ?',
+          [userId, check.key]
+        );
         if (!existing) {
           await db.execute(
-            'INSERT IGNORE INTO achievements (`key`, name, description, icon) VALUES (?, ?, ?, ?)',
-            [check.key, check.name, check.description, check.icon]
+            'INSERT IGNORE INTO achievements (user_id, `key`, name, description, icon) VALUES (?, ?, ?, ?, ?)',
+            [userId, check.key, check.name, check.description, check.icon]
           );
           newlyUnlocked.push({ key: check.key, name: check.name, description: check.description, icon: check.icon });
-          await this.addActivity('achievement', `🏆 Achievement unlocked: ${check.name}`, '🏆', 0, 0);
+          await this.addActivity(userId, 'achievement', `🏆 Achievement unlocked: ${check.name}`, '🏆', 0, 0);
         }
       }
     }
@@ -122,10 +128,12 @@ const gameEngine = {
   /**
    * Add Health XP and check for health level ups
    */
-  async addHealthXP(amount) {
+  async addHealthXP(userId = 1, amount = 0) {
     if (amount <= 0) return { leveled_up: false };
 
-    const [[player]] = await db.execute('SELECT * FROM player WHERE id = 1');
+    const [[player]] = await db.execute('SELECT * FROM player WHERE id = ?', [userId]);
+    if (!player) return { leveled_up: false };
+
     let { health_level, health_xp, health_xp_to_next, max_hp, hp } = player;
 
     // Default values if NULL
@@ -148,12 +156,12 @@ const gameEngine = {
     }
 
     await db.execute(
-      `UPDATE player SET health_level = ?, health_xp = ?, health_xp_to_next = ?, max_hp = ?, hp = ?, updated_at = NOW() WHERE id = 1`,
-      [health_level, health_xp, health_xp_to_next, max_hp, hp]
+      `UPDATE player SET health_level = ?, health_xp = ?, health_xp_to_next = ?, max_hp = ?, hp = ?, updated_at = NOW() WHERE id = ?`,
+      [health_level, health_xp, health_xp_to_next, max_hp, hp, userId]
     );
 
     if (leveledUp) {
-      await this.addActivity('levelup_health', `🍏 Health leveled up to Level ${health_level}! Max HP increased to ${max_hp}!`, '🍏', 0, 0);
+      await this.addActivity(userId, 'levelup_health', `🍏 Health leveled up to Level ${health_level}! Max HP increased to ${max_hp}!`, '🍏', 0, 0);
     }
 
     return { leveled_up: leveledUp, new_level: health_level, new_max_hp: max_hp };
@@ -162,8 +170,12 @@ const gameEngine = {
   /**
    * Reset daily tasks completion status
    */
-  async resetDailyTasks() {
-    await db.execute("UPDATE tasks SET is_completed_today = 0 WHERE recurrence = 'daily'");
+  async resetDailyTasks(userId = null) {
+    if (userId) {
+      await db.execute("UPDATE tasks SET is_completed_today = 0 WHERE recurrence = 'daily' AND user_id = ?", [userId]);
+    } else {
+      await db.execute("UPDATE tasks SET is_completed_today = 0 WHERE recurrence = 'daily'");
+    }
   }
 };
 

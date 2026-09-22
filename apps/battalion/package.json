@@ -1,14 +1,14 @@
 {
   "name": "battalion",
-  "version": "1.2.35",
+  "version": "1.3.0",
   "private": true,
   "description": "Battalion - A gamified life-tracker RPG",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "cd backend && node --watch index.js",
     "dev:client": "cd client && npx vite --host",
-    "setup": "cd backend && node db/seed.js && node ..\\..\\scripts\\finish-stamp.mjs --label \"setup\"",
-    "build": "cd client && npx vite build && node ..\\..\\scripts\\finish-stamp.mjs --label \"build\"",
+    "setup": "cd backend && node db/seed.js && node ..\\..\\..\\scripts\\finish-stamp.mjs --label \"setup\"",
+    "build": "cd client && npx vite build && node ..\\..\\..\\scripts\\finish-stamp.mjs --label \"build\"",
     "server": "cd backend && node index.js",
     "start": "cd backend && node index.js",
     "prod": "set NODE_ENV=production && cd backend && node index.js",

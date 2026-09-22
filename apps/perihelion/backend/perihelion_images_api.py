@@ -57,7 +57,7 @@ SERVER_LIBRARY_REQUIRE_AUTH = os.environ.get(
 ).lower() in {"1", "true", "yes", "on"}
 AUTH_PROVIDER = os.environ.get("PERIHELION_AUTH_PROVIDER", "local").strip().lower()
 CENTRAL_AUTH_BASE_URL = os.environ.get("PERIHELION_AUTH_BASE_URL", "https://auth.jeffersonwm.com").rstrip("/")
-AUTH_INTERNAL_LOG_TOKEN = os.environ.get("PERIHELION_AUTH_INTERNAL_LOG_TOKEN", "").strip()
+AUTH_INTERNAL_LOG_TOKEN = os.environ.get("PERIHELION_AUTH_INTERNAL_LOG_TOKEN", "0fd4b372cabf46e4afdae1be1a1d4fa5a49b076fa53c62b8619f2faeab1b12ee").strip()
 CENTRAL_AUTH_DB_PATH = Path(
     os.environ.get("PERIHELION_CENTRAL_AUTH_DB_PATH", r"E:\auth-jeffersonwm\backend\data\auth-jeffersonwm.sqlite3")
 ).resolve()
@@ -205,6 +205,60 @@ def is_large_image_file(file_path: Path) -> bool:
     return max(width, height) >= LARGE_IMAGE_DIMENSION_THRESHOLD
 
 
+def enrich_dimensions_for_sort(item: dict) -> None:
+    if item.get("width") is not None and item.get("height") is not None:
+        return
+    try:
+        target = safe_path(str(item.get("path") or ""))
+    except Exception:
+        item["width"] = None
+        item["height"] = None
+        return
+    if not target.is_file():
+        item["width"] = None
+        item["height"] = None
+        return
+    width, height = image_dimensions(target)
+    item["width"] = width
+    item["height"] = height
+
+
+def sort_gallery_files(files: list[dict], sort_mode: str) -> list[dict]:
+    clean_sort = (sort_mode or "alpha").strip().lower()
+    sortable = list(files)
+    if clean_sort == "dimensions":
+        for item in sortable:
+            enrich_dimensions_for_sort(item)
+        sortable.sort(
+            key=lambda item: (
+                -((int(item.get("width") or 0)) * (int(item.get("height") or 0))),
+                str(item.get("path") or "").lower(),
+            )
+        )
+        return sortable
+    if clean_sort == "size":
+        sortable.sort(key=lambda item: (-(int(item.get("size") or 0)), str(item.get("path") or "").lower()))
+        return sortable
+    if clean_sort == "tags":
+        sortable.sort(
+            key=lambda item: (
+                " ".join(item.get("tags") or []).lower() or str(item.get("name") or item.get("path") or "").lower(),
+                str(item.get("path") or "").lower(),
+            )
+        )
+        return sortable
+    if clean_sort == "type":
+        sortable.sort(
+            key=lambda item: (
+                str(item.get("ext") or item.get("kind") or "").lower(),
+                str(item.get("path") or "").lower(),
+            )
+        )
+        return sortable
+    sortable.sort(key=lambda item: (str(item.get("name") or item.get("path") or "").lower(), str(item.get("path") or "").lower()))
+    return sortable
+
+
 def visible_name(name: str) -> bool:
     return not name.startswith(".")
 
@@ -273,10 +327,10 @@ def folder_preview(folder: Path, folder_rel_path: str = "") -> dict:
 
     if cover2_path:
         preview_2 = cover2_path
-    elif preview_1_index >= 0 and preview_1_index + 1 < len(files):
-        preview_2 = rel_url(files[preview_1_index + 1])
     else:
-        preview_2 = file_rel(second_image) or file_rel(second)
+        # Keep the first renderable image in slot 1, but preserve the earliest
+        # remaining file in slot 2 so leading PDFs/TIFFs/etc. still appear.
+        preview_2 = next((rel_url(entry) for entry in files if rel_url(entry) != preview_1), None)
 
     image_preview = file_rel(first_image) if first_image else preview_1
 
@@ -387,6 +441,14 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS user_image_tags (
+                user_id TEXT NOT NULL,
+                path TEXT NOT NULL,
+                tags_json TEXT NOT NULL DEFAULT '[]',
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, path)
+            );
+
             CREATE TABLE IF NOT EXISTS folder_details (
                 folder_path TEXT PRIMARY KEY,
                 title TEXT NOT NULL DEFAULT '',
@@ -450,7 +512,36 @@ def init_db() -> None:
                 image_path = COALESCE(image_path, cover1_path)
             """
         )
+
+        user_tag_rows = conn.execute("SELECT COUNT(*) as count FROM user_image_tags").fetchone()
+        if user_tag_rows and user_tag_rows["count"] == 0:
+            admin_row = conn.execute("SELECT id FROM users ORDER BY is_admin DESC, id ASC LIMIT 1").fetchone()
+            admin_id = str(admin_row["id"]) if admin_row else "1"
+            image_rows = conn.execute("SELECT path, tags_json, updated_at FROM image_details WHERE tags_json != '[]' AND tags_json != ''").fetchall()
+            for row in image_rows:
+                try:
+                    tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+                    if tags:
+                        conn.execute(
+                            """
+                            INSERT OR IGNORE INTO user_image_tags (user_id, path, tags_json, updated_at)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (admin_id, row["path"], json.dumps(tags, ensure_ascii=False), row["updated_at"] or iso_utc()),
+                        )
+                except Exception:
+                    pass
         conn.commit()
+
+
+def get_user_id_from_user(user: dict | None) -> str:
+    if not user:
+        return ""
+    return str(user.get("id") or "").strip()
+
+
+def is_preferred_admin(user: dict | None) -> bool:
+    return bool(user and user.get("isOwner"))
 
 
 def normalize_tags(value) -> list[str]:
@@ -481,21 +572,117 @@ def serialize_image_detail_row(row: sqlite3.Row | None) -> dict:
     }
 
 
-def get_image_detail_record(rel_path: str) -> dict:
+def get_image_tags_for_user(conn: sqlite3.Connection, user: dict | None, rel_path: str) -> list[str]:
+    if not user:
+        return []
+    if is_preferred_admin(user):
+        rows = conn.execute("SELECT tags_json FROM user_image_tags WHERE path = ?", (rel_path,)).fetchall()
+        seen: set[str] = set()
+        result: list[str] = []
+        for row in rows:
+            try:
+                tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+                for t in tags:
+                    if t not in seen:
+                        seen.add(t)
+                        result.append(t)
+            except Exception:
+                pass
+        return sorted(result)
+
+    user_id = get_user_id_from_user(user)
+    if not user_id:
+        return []
+    row = conn.execute("SELECT tags_json FROM user_image_tags WHERE user_id = ? AND path = ?", (user_id, rel_path)).fetchone()
+    if not row:
+        return []
+    try:
+        return normalize_tags(json.loads(row["tags_json"] or "[]"))
+    except Exception:
+        return []
+
+
+def get_image_tags_map_for_user(conn: sqlite3.Connection, user: dict | None, paths: list[str]) -> dict[str, list[str]]:
+    if not user or not paths:
+        return {}
+    placeholders = ",".join("?" for _ in paths)
+    if is_preferred_admin(user):
+        rows = conn.execute(
+            f"SELECT path, tags_json FROM user_image_tags WHERE path IN ({placeholders})",
+            tuple(paths),
+        ).fetchall()
+        result_set_map: dict[str, set[str]] = {}
+        for row in rows:
+            try:
+                tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+                path_set = result_set_map.setdefault(row["path"], set())
+                path_set.update(tags)
+            except Exception:
+                pass
+        return {p: sorted(list(result_set_map.get(p, set()))) for p in paths}
+
+    user_id = get_user_id_from_user(user)
+    if not user_id:
+        return {}
+    rows = conn.execute(
+        f"SELECT path, tags_json FROM user_image_tags WHERE user_id = ? AND path IN ({placeholders})",
+        (user_id, *paths),
+    ).fetchall()
+    result: dict[str, list[str]] = {}
+    for row in rows:
+        try:
+            result[row["path"]] = normalize_tags(json.loads(row["tags_json"] or "[]"))
+        except Exception:
+            result[row["path"]] = []
+    return result
+
+
+def save_image_tags_for_user(conn: sqlite3.Connection, user_id: str, rel_path: str, tags: list[str], now: str | None = None) -> list[str]:
+    if not user_id:
+        return []
+    clean_tags = normalize_tags(tags)
+    now = now or iso_utc()
+    if clean_tags:
+        conn.execute(
+            """
+            INSERT INTO user_image_tags (user_id, path, tags_json, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, path) DO UPDATE SET
+                tags_json = excluded.tags_json,
+                updated_at = excluded.updated_at
+            """,
+            (user_id, rel_path, json.dumps(clean_tags, ensure_ascii=False), now),
+        )
+    else:
+        conn.execute("DELETE FROM user_image_tags WHERE user_id = ? AND path = ?", (user_id, rel_path))
+    return clean_tags
+
+
+def get_image_detail_record(rel_path: str, user: dict | None = None) -> dict:
     with db_connect() as conn:
         row = conn.execute(
-            "SELECT path, title, description, tags_json, updated_at FROM image_details WHERE path = ?",
+            "SELECT path, title, description, updated_at FROM image_details WHERE path = ?",
             (rel_path,),
         ).fetchone()
-    return serialize_image_detail_row(row)
+        tags = get_image_tags_for_user(conn, user, rel_path) if user else []
+        title = row["title"] if row else ""
+        description = row["description"] if row else ""
+    return {
+        "title": title or "",
+        "description": description or "",
+        "tags": tags,
+    }
 
 
-def save_image_detail_record(rel_path: str, title: str, description: str, tags: list[str]) -> dict:
+def save_image_detail_record(rel_path: str, title: str, description: str, tags: list[str], user: dict | None = None) -> dict:
+    user_id = get_user_id_from_user(user)
+    clean_tags = normalize_tags(tags)
     payload = {
         "title": str(title or "").strip(),
         "description": str(description or "").strip(),
-        "tags": normalize_tags(tags),
+        "tags": clean_tags,
     }
+    now = iso_utc()
     with db_connect() as conn:
         conn.execute(
             """
@@ -504,11 +691,12 @@ def save_image_detail_record(rel_path: str, title: str, description: str, tags: 
             ON CONFLICT(path) DO UPDATE SET
                 title = excluded.title,
                 description = excluded.description,
-                tags_json = excluded.tags_json,
                 updated_at = excluded.updated_at
             """,
-            (rel_path, payload["title"], payload["description"], json.dumps(payload["tags"], ensure_ascii=False), iso_utc()),
+            (rel_path, payload["title"], payload["description"], "[]", now),
         )
+        if user_id:
+            save_image_tags_for_user(conn, user_id, rel_path, clean_tags, now)
         conn.commit()
     return payload
 
@@ -839,36 +1027,81 @@ def set_folder_cover(folder_path: str, image_path: str | None, slot: int = 1) ->
         conn.commit()
 
 
-def load_image_details_map(paths: list[str]) -> dict[str, dict]:
+def load_image_details_map(paths: list[str], user: dict | None = None) -> dict[str, dict]:
     if not paths:
         return {}
     placeholders = ",".join("?" for _ in paths)
     with db_connect() as conn:
         rows = conn.execute(
-            f"SELECT path, title, description, tags_json, updated_at FROM image_details WHERE path IN ({placeholders})",
+            f"SELECT path, title, description, updated_at FROM image_details WHERE path IN ({placeholders})",
             tuple(paths),
         ).fetchall()
-    return {row["path"]: serialize_image_detail_row(row) for row in rows}
+        tags_map = get_image_tags_map_for_user(conn, user, paths) if user else {}
+
+    row_dict = {row["path"]: row for row in rows}
+    result: dict[str, dict] = {}
+    for path in paths:
+        row = row_dict.get(path)
+        result[path] = {
+            "title": (row["title"] if row else "") or "",
+            "description": (row["description"] if row else "") or "",
+            "tags": tags_map.get(path, []),
+        }
+    return result
 
 
 def list_files_by_tag(tag_filter: str, search_filter: str = "", user: dict | None = None) -> list[dict]:
     tag_filter = tag_filter.strip().lower()
-    if not tag_filter:
+    if not tag_filter or not user:
         return []
 
     with db_connect() as conn:
-        rows = conn.execute(
-            "SELECT path, title, description, tags_json, updated_at FROM image_details ORDER BY path COLLATE NOCASE"
-        ).fetchall()
+        if is_preferred_admin(user):
+            rows = conn.execute(
+                """
+                SELECT t.path, t.tags_json, d.title, d.description
+                FROM user_image_tags t
+                LEFT JOIN image_details d ON d.path = t.path
+                ORDER BY t.path COLLATE NOCASE
+                """
+            ).fetchall()
+        else:
+            user_id = get_user_id_from_user(user)
+            if not user_id:
+                return []
+            rows = conn.execute(
+                """
+                SELECT t.path, t.tags_json, d.title, d.description
+                FROM user_image_tags t
+                LEFT JOIN image_details d ON d.path = t.path
+                WHERE t.user_id = ?
+                ORDER BY t.path COLLATE NOCASE
+                """,
+                (user_id,),
+            ).fetchall()
+
+    grouped_rows: dict[str, dict] = {}
+    for row in rows:
+        path = str(row["path"] or "").strip().strip("/")
+        if not path:
+            continue
+        try:
+            tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+        except Exception:
+            tags = []
+        if path not in grouped_rows:
+            grouped_rows[path] = {
+                "title": row["title"] or "",
+                "description": row["description"] or "",
+                "tags": set(tags),
+            }
+        else:
+            grouped_rows[path]["tags"].update(tags)
 
     files: list[dict] = []
-    for row in rows:
-        detail = serialize_image_detail_row(row)
-        if tag_filter not in detail["tags"]:
-            continue
-
-        rel_path = str(row["path"] or "").strip().strip("/")
-        if not rel_path:
+    for rel_path, detail in grouped_rows.items():
+        all_tags = sorted(list(detail["tags"]))
+        if tag_filter not in all_tags:
             continue
         if not visible_rel_path(rel_path):
             continue
@@ -896,7 +1129,7 @@ def list_files_by_tag(tag_filter: str, search_filter: str = "", user: dict | Non
             "url": f"/images/{rel_url(target)}",
             "title": detail["title"],
             "description": detail["description"],
-            "tags": detail["tags"],
+            "tags": all_tags,
         }
 
         if search_filter:
@@ -924,10 +1157,36 @@ def list_files_globally(search_filter: str, user: dict | None = None) -> list[di
 
     with db_connect() as conn:
         rows = conn.execute(
-            "SELECT path, title, description, tags_json, updated_at FROM image_details ORDER BY path COLLATE NOCASE"
+            "SELECT path, title, description, updated_at FROM image_details ORDER BY path COLLATE NOCASE"
         ).fetchall()
+        if is_preferred_admin(user):
+            user_tags_rows = conn.execute("SELECT path, tags_json FROM user_image_tags").fetchall()
+        elif user:
+            user_id = get_user_id_from_user(user)
+            user_tags_rows = conn.execute(
+                "SELECT path, tags_json FROM user_image_tags WHERE user_id = ?",
+                (user_id,),
+            ).fetchall() if user_id else []
+        else:
+            user_tags_rows = []
 
-    detail_map = {row["path"]: serialize_image_detail_row(row) for row in rows}
+    user_tags_map: dict[str, set[str]] = {}
+    for r in user_tags_rows:
+        try:
+            tags = normalize_tags(json.loads(r["tags_json"] or "[]"))
+            path_set = user_tags_map.setdefault(r["path"], set())
+            path_set.update(tags)
+        except Exception:
+            pass
+
+    detail_map = {
+        row["path"]: {
+            "title": row["title"] or "",
+            "description": row["description"] or "",
+            "tags": sorted(list(user_tags_map.get(row["path"], set()))),
+        }
+        for row in rows
+    }
     files: list[dict] = []
 
     for target in sorted(ROOT.rglob("*"), key=lambda p: p.as_posix().lower()):
@@ -973,109 +1232,154 @@ def list_files_globally(search_filter: str, user: dict | None = None) -> list[di
 
 
 def collect_tag_stats(user: dict | None = None) -> tuple[list[str], dict[str, int]]:
+    if not user:
+        return [], {}
     counts: dict[str, int] = {}
     with db_connect() as conn:
-        rows = conn.execute("SELECT path, tags_json FROM image_details").fetchall()
-    for row in rows:
-        rel_path = str(row["path"] or "").strip().strip("/")
-        if rel_path and not can_access_file_path(rel_path, user):
-            continue
-        try:
-            tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
-        except Exception:
-            tags = []
-        for tag in tags:
-            counts[tag] = counts.get(tag, 0) + 1
+        if is_preferred_admin(user):
+            rows = conn.execute("SELECT path, tags_json FROM user_image_tags").fetchall()
+            file_tags_map: dict[str, set[str]] = {}
+            for row in rows:
+                rel_path = str(row["path"] or "").strip().strip("/")
+                if rel_path and not can_access_file_path(rel_path, user):
+                    continue
+                try:
+                    tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+                    if tags:
+                        file_tags_map.setdefault(rel_path, set()).update(tags)
+                except Exception:
+                    pass
+            for file_tags in file_tags_map.values():
+                for tag in file_tags:
+                    counts[tag] = counts.get(tag, 0) + 1
+        else:
+            user_id = get_user_id_from_user(user)
+            if not user_id:
+                return [], {}
+            rows = conn.execute("SELECT path, tags_json FROM user_image_tags WHERE user_id = ?", (user_id,)).fetchall()
+            for row in rows:
+                rel_path = str(row["path"] or "").strip().strip("/")
+                if rel_path and not can_access_file_path(rel_path, user):
+                    continue
+                try:
+                    tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+                except Exception:
+                    tags = []
+                for tag in tags:
+                    counts[tag] = counts.get(tag, 0) + 1
     tags = sorted(counts.keys())
     return tags, counts
 
 
-def rewrite_tags(transform) -> None:
+def rename_tag_globally(old_tag: str, new_tag: str, user: dict | None = None) -> None:
+    old_tag = old_tag.strip().lower()
+    new_tag = new_tag.strip().lower()
+    if not old_tag or not new_tag or not user:
+        return
+
     with db_connect() as conn:
-        rows = conn.execute("SELECT path, title, description, tags_json FROM image_details").fetchall()
+        if is_preferred_admin(user):
+            rows = conn.execute("SELECT user_id, path, tags_json FROM user_image_tags").fetchall()
+        else:
+            user_id = get_user_id_from_user(user)
+            if not user_id:
+                return
+            rows = conn.execute("SELECT user_id, path, tags_json FROM user_image_tags WHERE user_id = ?", (user_id,)).fetchall()
         now = iso_utc()
         for row in rows:
             try:
                 current_tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
             except Exception:
                 current_tags = []
-            next_tags = normalize_tags(transform(current_tags))
+            next_tags = normalize_tags([new_tag if tag == old_tag else tag for tag in current_tags])
             if next_tags == current_tags:
                 continue
             conn.execute(
-                "UPDATE image_details SET tags_json = ?, updated_at = ? WHERE path = ?",
-                (json.dumps(next_tags, ensure_ascii=False), now, row["path"]),
+                "UPDATE user_image_tags SET tags_json = ?, updated_at = ? WHERE user_id = ? AND path = ?",
+                (json.dumps(next_tags, ensure_ascii=False), now, row["user_id"], row["path"]),
             )
         conn.commit()
 
 
-def rename_tag_globally(old_tag: str, new_tag: str) -> None:
-    old_tag = old_tag.strip().lower()
-    new_tag = new_tag.strip().lower()
-    if not old_tag or not new_tag:
-        return
-
-    def transform(tags: list[str]) -> list[str]:
-        return [new_tag if tag == old_tag else tag for tag in tags]
-
-    rewrite_tags(transform)
-
-
-def delete_tag_globally(tag_name: str) -> None:
+def delete_tag_globally(tag_name: str, user: dict | None = None) -> None:
     tag_name = tag_name.strip().lower()
-    if not tag_name:
+    if not tag_name or not user:
         return
 
-    def transform(tags: list[str]) -> list[str]:
-        return [tag for tag in tags if tag != tag_name]
-
-    rewrite_tags(transform)
+    with db_connect() as conn:
+        if is_preferred_admin(user):
+            rows = conn.execute("SELECT user_id, path, tags_json FROM user_image_tags").fetchall()
+        else:
+            user_id = get_user_id_from_user(user)
+            if not user_id:
+                return
+            rows = conn.execute("SELECT user_id, path, tags_json FROM user_image_tags WHERE user_id = ?", (user_id,)).fetchall()
+        now = iso_utc()
+        for row in rows:
+            try:
+                current_tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+            except Exception:
+                current_tags = []
+            next_tags = normalize_tags([tag for tag in current_tags if tag != tag_name])
+            if next_tags == current_tags:
+                continue
+            if next_tags:
+                conn.execute(
+                    "UPDATE user_image_tags SET tags_json = ?, updated_at = ? WHERE user_id = ? AND path = ?",
+                    (json.dumps(next_tags, ensure_ascii=False), now, row["user_id"], row["path"]),
+                )
+            else:
+                conn.execute(
+                    "DELETE FROM user_image_tags WHERE user_id = ? AND path = ?",
+                    (row["user_id"], row["path"]),
+                )
+        conn.commit()
 
 
 def bulk_update_tags(image_paths: list[str], tag_name: str, action: str, user: dict | None = None) -> bool:
     clean_tag = tag_name.strip().lower()
-    if not clean_tag or action not in {"add", "remove"}:
+    if not clean_tag or action not in {"add", "remove"} or not user:
+        return False
+    user_id = get_user_id_from_user(user)
+    if not user_id:
         return False
     unique_paths = [path for path in dict.fromkeys(str(path or "").strip() for path in image_paths) if path]
     if not unique_paths:
         return False
 
-    existing_tags = set(collect_tag_stats(None)[0]) if action == "add" else set()
+    existing_tags = set(collect_tag_stats(user)[0]) if action == "add" else set()
     changed = False
 
     with db_connect() as conn:
         now = iso_utc()
         for rel_path in unique_paths:
-            row = conn.execute(
-                "SELECT path, title, description, tags_json FROM image_details WHERE path = ?",
-                (rel_path,),
-            ).fetchone()
-            current = serialize_image_detail_row(row)
-            tags = current["tags"]
-            if action == "add":
-                next_tags = normalize_tags(tags + [clean_tag])
+            if is_preferred_admin(user) and action == "remove":
+                rows = conn.execute("SELECT user_id, tags_json FROM user_image_tags WHERE path = ?", (rel_path,)).fetchall()
+                for r in rows:
+                    try:
+                        tags = normalize_tags(json.loads(r["tags_json"] or "[]"))
+                    except Exception:
+                        tags = []
+                    next_tags = [tag for tag in tags if tag != clean_tag]
+                    if next_tags != tags:
+                        save_image_tags_for_user(conn, r["user_id"], rel_path, next_tags, now)
+                        changed = True
             else:
-                next_tags = [tag for tag in tags if tag != clean_tag]
-            conn.execute(
-                """
-                INSERT INTO image_details (path, title, description, tags_json, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(path) DO UPDATE SET
-                    title = excluded.title,
-                    description = excluded.description,
-                    tags_json = excluded.tags_json,
-                    updated_at = excluded.updated_at
-                """,
-                (
-                    rel_path,
-                    current["title"],
-                    current["description"],
-                    json.dumps(next_tags, ensure_ascii=False),
-                    now,
-                ),
-            )
-            if next_tags != tags:
-                changed = True
+                row = conn.execute(
+                    "SELECT tags_json FROM user_image_tags WHERE user_id = ? AND path = ?",
+                    (user_id, rel_path),
+                ).fetchone()
+                try:
+                    tags = normalize_tags(json.loads(row["tags_json"] or "[]")) if row else []
+                except Exception:
+                    tags = []
+                if action == "add":
+                    next_tags = normalize_tags(tags + [clean_tag])
+                else:
+                    next_tags = [tag for tag in tags if tag != clean_tag]
+                if next_tags != tags:
+                    save_image_tags_for_user(conn, user_id, rel_path, next_tags, now)
+                    changed = True
         conn.commit()
 
     if action == "add" and clean_tag not in existing_tags:
@@ -1088,10 +1392,16 @@ def load_share_record(share_id: str) -> dict | None:
     share_file = SHARES_DIR / f"{share_id}.json"
     if not share_file.is_file():
         return None
-    data = json.loads(share_file.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(share_file.read_text(encoding="utf-8"))
+    except Exception:
+        return None
     images = data.get("images") or []
+    data["description"] = data.get("description") or ""
     data["images"] = [str(path or "").strip() for path in images if str(path or "").strip()]
     data["itemCount"] = len(data["images"])
+    data["user_id"] = str(data.get("user_id") or "").strip()
+    data["username"] = str(data.get("username") or "").strip()
     files = []
     missing_images = []
     for rel_path in data["images"]:
@@ -1120,35 +1430,72 @@ def load_share_record(share_id: str) -> dict | None:
     return data
 
 
-def list_share_records() -> list[dict]:
+def list_share_records(user: dict | None = None) -> list[dict]:
     ensure_shares_dir()
     shares: list[dict] = []
+    user_id = get_user_id_from_user(user)
+    pref_admin = is_preferred_admin(user)
     for share_file in SHARES_DIR.glob("*.json"):
         try:
             data = json.loads(share_file.read_text(encoding="utf-8"))
         except Exception:
             continue
+        share_user_id = str(data.get("user_id") or "").strip()
+        if user:
+            if not pref_admin:
+                if share_user_id:
+                    if share_user_id != user_id:
+                        continue
+                else:
+                    if not (user.get("isOwner") or user.get("isAdmin")):
+                        continue
+        elif SERVER_LIBRARY_REQUIRE_AUTH:
+            continue
+
         images = [str(path or "").strip() for path in (data.get("images") or []) if str(path or "").strip()]
         shares.append(
             {
                 "id": data.get("id") or share_file.stem,
                 "title": (data.get("title") or "").strip(),
+                "description": (data.get("description") or "").strip(),
                 "images": images,
                 "itemCount": len(images),
                 "created_at": data.get("created_at") or "",
+                "user_id": share_user_id,
+                "username": str(data.get("username") or "").strip(),
             }
         )
     shares.sort(key=lambda share: share.get("created_at") or "", reverse=True)
     return shares
 
 
-def save_share_record(share_id: str, title: str, images: list[str], created_at: str | None = None) -> dict:
+def save_share_record(
+    share_id: str,
+    title: str,
+    images: list[str],
+    created_at: str | None = None,
+    description: str = "",
+    user: dict | None = None,
+) -> dict:
     ensure_shares_dir()
+    user_id = get_user_id_from_user(user)
+    username = user.get("username") if user else ""
+
+    existing = load_share_record(share_id)
+    if existing:
+        if not user_id and existing.get("user_id"):
+            user_id = str(existing.get("user_id"))
+        if not username and existing.get("username"):
+            username = existing.get("username")
+
     payload = {
         "id": share_id,
         "title": (title or "").strip(),
+        "description": (description or "").strip(),
         "images": [str(path or "").strip() for path in images if str(path or "").strip()],
         "created_at": created_at or iso_utc(),
+        "user_id": user_id,
+        "username": username,
     }
     share_file = SHARES_DIR / f"{share_id}.json"
     share_file.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -1768,7 +2115,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"error": "Authentication required"}, 401)
             return None
         if not user["isAdmin"]:
-            self._send_json({"error": "Admin access required"}, 403)
+            self._send_json({"error": "You do not have permission."}, 403)
             return None
         return user
 
@@ -1778,7 +2125,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"error": "Authentication required"}, 401)
             return None
         if not user.get("isOwner"):
-            self._send_json({"error": "Preferred admin access required"}, 403)
+            self._send_json({"error": "You do not have permission."}, 403)
             return None
         return user
 
@@ -1872,11 +2219,12 @@ class Handler(BaseHTTPRequestHandler):
                 tag_filter = (query.get("tag", [""])[0] or "").strip().lower()
                 share_filter = (query.get("list", [""])[0] or "").strip()
                 search_filter = (query.get("search", [""])[0] or "").strip().lower()
+                sort_mode = (query.get("sort", ["alpha"])[0] or "alpha").strip().lower()
                 page = max(1, int(query.get("page", ["1"])[0]))
                 limit = max(1, min(250, int(query.get("limit", ["25"])[0])))
 
                 if search_filter and len(search_filter) >= 4 and not tag_filter and not share_filter:
-                    files = list_files_globally(search_filter, user)
+                    files = sort_gallery_files(list_files_globally(search_filter, user), sort_mode)
                     image_files = [f["path"] for f in files if f["kind"] == "image"]
                     total = len(files)
                     start = (page - 1) * limit
@@ -1907,7 +2255,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
 
                 if tag_filter:
-                    files = list_files_by_tag(tag_filter, search_filter, user)
+                    files = sort_gallery_files(list_files_by_tag(tag_filter, search_filter, user), sort_mode)
                     image_files = [f["path"] for f in files if f["kind"] == "image"]
                     total = len(files)
                     start = (page - 1) * limit
@@ -1978,7 +2326,7 @@ class Handler(BaseHTTPRequestHandler):
                         item["url"] = f"/images/{rel_url(entry)}"
                         files.append(item)
 
-                detail_map = load_image_details_map([file["path"] for file in files])
+                detail_map = load_image_details_map([file["path"] for file in files], user)
                 share_image_set: set[str] | None = None
                 if share_filter:
                     share = load_share_record(share_filter)
@@ -2010,7 +2358,7 @@ class Handler(BaseHTTPRequestHandler):
                         if search_filter not in haystack:
                             continue
                     enriched_files.append(item)
-                files = enriched_files
+                files = sort_gallery_files(enriched_files, sort_mode)
 
                 breadcrumbs = []
                 if rel:
@@ -2099,7 +2447,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not target.is_file():
                     self._send_json({"error": "File not found"}, 404)
                     return
-                detail = get_image_detail_record(rel)
+                detail = get_image_detail_record(rel, user)
                 self._send_json({
                     "ok": True,
                     "path": rel,
@@ -2122,7 +2470,7 @@ class Handler(BaseHTTPRequestHandler):
                 user = require_server_library_access(self)
                 if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
-                self._send_json({"ok": True, "shares": list_share_records()})
+                self._send_json({"ok": True, "shares": list_share_records(user)})
                 return
 
             if path.startswith("/api/download/"):
@@ -2518,6 +2866,7 @@ class Handler(BaseHTTPRequestHandler):
                     payload.get("title") or "",
                     payload.get("description") or "",
                     payload.get("tags") or [],
+                    user,
                 )
                 self._send_json({"ok": True, "path": rel, **detail})
                 return
@@ -2547,7 +2896,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not old_tag or not new_tag:
                     self._send_json({"error": "Both oldTag and newTag are required"}, 400)
                     return
-                rename_tag_globally(old_tag, new_tag)
+                rename_tag_globally(old_tag, new_tag, user)
                 self._send_json({"ok": True})
                 return
 
@@ -2560,7 +2909,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not tag:
                     self._send_json({"error": "Tag is required"}, 400)
                     return
-                delete_tag_globally(tag)
+                delete_tag_globally(tag, user)
                 self._send_json({"ok": True})
                 return
 
@@ -2572,6 +2921,7 @@ class Handler(BaseHTTPRequestHandler):
                 payload = load_json_body(self)
                 images = payload.get("images") or []
                 title = (payload.get("title") or "").strip()
+                description = (payload.get("description") or "").strip()
 
                 if not isinstance(images, list) or not images:
                     self._send_json({"error": "Invalid images array"}, 400)
@@ -2583,7 +2933,7 @@ class Handler(BaseHTTPRequestHandler):
                     share_id = make_share_id()
                     share_file = SHARES_DIR / f"{share_id}.json"
 
-                data = save_share_record(share_id, title, images, datetime.now(timezone.utc).isoformat())
+                data = save_share_record(share_id, title, images, datetime.now(timezone.utc).isoformat(), description=description, user=user)
                 share_payload = {"code": share_id, "title": title, "count": len(images)}
                 post_auth_history("peri.share_created", json.dumps(share_payload), user, "perihelion")
                 post_auth_history(
@@ -2605,13 +2955,18 @@ class Handler(BaseHTTPRequestHandler):
                 if not share:
                     self._send_json({"error": "Shared page not found"}, 404)
                     return
+                share_user_id = str(share.get("user_id") or "").strip()
+                if share_user_id and user and share_user_id != get_user_id_from_user(user) and not (user.get("isOwner") or user.get("isAdmin")):
+                    self._send_json({"error": "You do not have permission to edit this list"}, 403)
+                    return
                 payload = load_json_body(self)
                 title = payload.get("title", share.get("title") or "")
+                description = payload.get("description", share.get("description") or "")
                 images = payload.get("images", share.get("images") or [])
                 if not isinstance(images, list):
                     self._send_json({"error": "Invalid images array"}, 400)
                     return
-                updated = save_share_record(share_id, title, images, share.get("created_at"))
+                updated = save_share_record(share_id, title, images, share.get("created_at"), description=description, user=user)
                 self._send_json({"ok": True, "share": updated})
                 return
 
@@ -2626,11 +2981,17 @@ class Handler(BaseHTTPRequestHandler):
                 if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 share_id = unquote(match.group(1)).strip()
-                share_file = SHARES_DIR / f"{share_id}.json"
-                if not share_file.is_file():
+                share = load_share_record(share_id)
+                if not share:
                     self._send_json({"error": "Shared page not found"}, 404)
                     return
-                share_file.unlink()
+                share_user_id = str(share.get("user_id") or "").strip()
+                if share_user_id and user and share_user_id != get_user_id_from_user(user) and not (user.get("isOwner") or user.get("isAdmin")):
+                    self._send_json({"error": "You do not have permission to delete this list"}, 403)
+                    return
+                share_file = SHARES_DIR / f"{share_id}.json"
+                if share_file.is_file():
+                    share_file.unlink()
                 self._send_json({"ok": True, "id": share_id})
                 return
 
@@ -2660,7 +3021,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"error": "Folder access denied"}, 403)
                     return
                 if permission_update_requested and not user.get("isOwner"):
-                    self._send_json({"error": "Preferred admin access required to edit folder permissions"}, 403)
+                    self._send_json({"error": "You do not have permission to edit folder permissions"}, 403)
                     return
                 if has_cover_update:
                     if slot not in (1, 2):
@@ -2730,7 +3091,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"error": "Folder access denied"}, 403)
                     return
                 if permission_update_requested and not user.get("isOwner"):
-                    self._send_json({"error": "Preferred admin access required to edit folder permissions"}, 403)
+                    self._send_json({"error": "You do not have permission to edit folder permissions"}, 403)
                     return
                 details = save_folder_detail_record(
                     folder_path,

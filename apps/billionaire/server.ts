@@ -3,11 +3,47 @@ import crypto from 'node:crypto';
 import dotenv from 'dotenv';
 import express from 'express';
 import fs from 'node:fs';
+import mysql from 'mysql2/promise';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const envFile = process.env.BILLIONAIRE_ENV_FILE || (process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development');
 dotenv.config({ path: path.join(process.cwd(), envFile) });
+dotenv.config({ path: path.resolve(process.cwd(), '..', 'jeffersonwm', envFile) });
+dotenv.config();
+
+let pool: mysql.Pool | null = null;
+const widgetDbHost = process.env.JEFFERSONWM_WIDGET_DB_HOST || process.env.MYSQL_HOST;
+const widgetDbUser = process.env.JEFFERSONWM_WIDGET_DB_USER || process.env.MYSQL_USER;
+const widgetDbPassword = process.env.JEFFERSONWM_WIDGET_DB_PASSWORD || process.env.MYSQL_PASSWORD;
+const widgetDbName = process.env.JEFFERSONWM_WIDGET_DB_NAME || process.env.MYSQL_DATABASE || 'jeffers4_jeffwm_widget';
+const widgetDbPort = Number(process.env.JEFFERSONWM_WIDGET_DB_PORT || process.env.MYSQL_PORT || 3306);
+
+if (widgetDbHost && widgetDbUser && widgetDbPassword) {
+  pool = mysql.createPool({
+    host: widgetDbHost,
+    user: widgetDbUser,
+    password: widgetDbPassword,
+    database: widgetDbName,
+    port: widgetDbPort,
+    waitForConnections: true,
+    connectionLimit: 5,
+    queueLimit: 0,
+    connectTimeout: 4000,
+  });
+}
+
+const fallbackActiveFonts = [
+  'Archivo', 'Barrio', 'Betania Patmos In', 'Bitcount Grid Double', 'Cabin Sketch',
+  'DM Sans', 'DotGothic16', 'Dr Sugiyama', 'DynaPuff', 'Jost', 'Lacquer',
+  'Libertinus Keyboard', 'Libre Baskerville', 'Life Savers', 'Londrina Sketch',
+  'Marcellus', 'Merriweather', 'Michroma', 'Monoton', 'Noto Color Emoji',
+  'Onest', 'Oswald', 'Palette Mosaic', 'Playfair Display', 'Playwrite NZ',
+  'Playwrite NZ Guides', 'Purple Purse', 'Raleway', 'Rock 3D', 'Sacramento',
+  'Saira Stencil', 'Shizuru', 'Sirin Stencil', 'Slackside One', 'Smokum',
+  'Smooch', 'Smooch Sans', 'Stardos Stencil', 'Stick No Bills',
+  'UnifrakturMaguntia', 'Wavefont'
+];
 
 type AuthUser = {
   id: string;
@@ -31,7 +67,7 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}
 const DATA_DIR = path.resolve(process.cwd(), process.env.DATA_DIR || './data');
 const DB_PATH = path.join(DATA_DIR, 'billionaire.sqlite');
 const AUTH_BASE_URL = (process.env.AUTH_BASE_URL || 'https://auth.jeffersonwm.com').replace(/\/$/, '');
-const AUTH_INTERNAL_LOG_TOKEN = (process.env.BILLIONAIRE_AUTH_INTERNAL_LOG_TOKEN || process.env.AUTH_INTERNAL_LOG_TOKEN || '').trim();
+const AUTH_INTERNAL_LOG_TOKEN = (process.env.BILLIONAIRE_AUTH_INTERNAL_LOG_TOKEN || process.env.AUTH_INTERNAL_LOG_TOKEN || '0fd4b372cabf46e4afdae1be1a1d4fa5a49b076fa53c62b8619f2faeab1b12ee').trim();
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
@@ -203,7 +239,7 @@ const requireOwner = async (req: express.Request, res: express.Response) => {
   const status = await getAuthStatus(req);
   const user = status.user;
   if (!user?.isOwner) {
-    res.status(403).json({ ok: false, error: 'Preferred admin access required.' });
+    res.status(403).json({ ok: false, error: 'You do not have permission.' });
     return null;
   }
   return user;
@@ -245,6 +281,24 @@ app.get('/health', (_req, res) => {
 app.get('/api/auth/status', async (req, res) => {
   const auth = await getAuthStatus(req);
   res.json({ ok: true, user: auth.user || null });
+});
+
+app.get('/api/fonts', async (_req, res) => {
+  if (pool) {
+    try {
+      const [rows] = await pool.query(
+        'SELECT name FROM widget_fonts WHERE round IN (1, 2) AND weight > 0 ORDER BY name ASC'
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        const fonts = (rows as Array<{ name: string }>).map((r) => r.name);
+        res.json({ ok: true, fonts });
+        return;
+      }
+    } catch (error) {
+      console.warn('Failed to query widget_fonts from MySQL, using fallback fonts:', error);
+    }
+  }
+  res.json({ ok: true, fonts: fallbackActiveFonts });
 });
 
 app.post('/api/submissions', async (req, res) => {

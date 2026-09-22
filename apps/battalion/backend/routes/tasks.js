@@ -9,10 +9,13 @@ const router = express.Router();
 // All routes require authentication
 router.use(requireAuth);
 
-// GET /api/tasks - Get all tasks
+// GET /api/tasks - Get all tasks for current user
 router.get('/', async (req, res) => {
   try {
-    const [tasks] = await db.execute('SELECT * FROM tasks ORDER BY sort_order, category');
+    const [tasks] = await db.execute(
+      'SELECT * FROM tasks WHERE user_id = ? ORDER BY sort_order, category',
+      [req.userId]
+    );
     res.json(tasks);
   } catch (err) {
     console.error('Get tasks error:', err);
@@ -30,12 +33,12 @@ router.post('/', async (req, res) => {
     }
 
     const [result] = await db.execute(
-      `INSERT INTO tasks (name, description, category, difficulty, recurrence, xp_reward, gold_reward, hp_penalty, stat_reward)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, description || '', category, difficulty || 'medium', recurrence || 'daily', xp_reward || 25, gold_reward || 10, hp_penalty || 5, stat_reward || 2]
+      `INSERT INTO tasks (user_id, name, description, category, difficulty, recurrence, xp_reward, gold_reward, hp_penalty, stat_reward)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.userId, name, description || '', category, difficulty || 'medium', recurrence || 'daily', xp_reward || 25, gold_reward || 10, hp_penalty || 5, stat_reward || 2]
     );
 
-    const [[task]] = await db.execute('SELECT * FROM tasks WHERE id = ?', [result.insertId]);
+    const [[task]] = await db.execute('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [result.insertId, req.userId]);
     res.status(201).json(task);
   } catch (err) {
     console.error('Create task error:', err);
@@ -47,7 +50,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const [[existing]] = await db.execute('SELECT * FROM tasks WHERE id = ?', [id]);
+    const [[existing]] = await db.execute('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [id, req.userId]);
     if (!existing) {
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -65,17 +68,17 @@ router.put('/:id', async (req, res) => {
     if (gold_reward !== undefined) { updates.push('gold_reward = ?'); values.push(gold_reward); }
     if (hp_penalty !== undefined) { updates.push('hp_penalty = ?'); values.push(hp_penalty); }
     if (stat_reward !== undefined) { updates.push('stat_reward = ?'); values.push(stat_reward); }
-    if (is_active !== undefined) { updates.push('is_active = ?'); values.push(is_active); }
+    if (is_active !== undefined) { updates.push('is_active = ?'); values.push(is_active ? 1 : 0); }
     if (sort_order !== undefined) { updates.push('sort_order = ?'); values.push(sort_order); }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
-    values.push(id);
-    await db.execute(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, values);
+    values.push(id, req.userId);
+    await db.execute(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`, values);
 
-    const [[task]] = await db.execute('SELECT * FROM tasks WHERE id = ?', [id]);
+    const [[task]] = await db.execute('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [id, req.userId]);
     res.json(task);
   } catch (err) {
     console.error('Update task error:', err);
@@ -87,12 +90,12 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const [[existing]] = await db.execute('SELECT * FROM tasks WHERE id = ?', [id]);
+    const [[existing]] = await db.execute('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [id, req.userId]);
     if (!existing) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
-    await db.execute('DELETE FROM tasks WHERE id = ?', [id]);
+    await db.execute('DELETE FROM tasks WHERE id = ? AND user_id = ?', [id, req.userId]);
     res.json({ success: true });
   } catch (err) {
     console.error('Delete task error:', err);
@@ -110,12 +113,15 @@ router.post('/:id/complete', async (req, res) => {
       return res.status(400).json({ error: 'Status must be completed, failed, or skipped' });
     }
 
-    const [[task]] = await db.execute('SELECT * FROM tasks WHERE id = ?', [id]);
+    const [[task]] = await db.execute('SELECT * FROM tasks WHERE id = ? AND user_id = ?', [id, req.userId]);
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
-    const [[player]] = await db.execute('SELECT * FROM player WHERE id = 1');
+    const [[player]] = await db.execute('SELECT * FROM player WHERE id = ?', [req.userId]);
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
 
     let xpEarned = 0;
     let goldEarned = 0;
@@ -151,13 +157,13 @@ router.post('/:id/complete', async (req, res) => {
           hp = ?,
           total_tasks_completed = total_tasks_completed + 1,
           updated_at = NOW()
-        WHERE id = 1`,
-        [xpEarned, goldEarned, statChange, newHp]
+        WHERE id = ?`,
+        [xpEarned, goldEarned, statChange, newHp, req.userId]
       );
 
       // Reward Health XP for completing vitality tasks
       if (task.category === 'vitality') {
-        await gameEngine.addHealthXP(xpEarned);
+        await gameEngine.addHealthXP(req.userId, xpEarned);
       }
 
       // Update task
@@ -166,25 +172,25 @@ router.post('/:id/complete', async (req, res) => {
           is_completed_today = 1,
           times_completed = times_completed + 1,
           last_completed = NOW()
-        WHERE id = ?`,
-        [id]
+        WHERE id = ? AND user_id = ?`,
+        [id, req.userId]
       );
 
       // Log task completion
       await db.execute(
-        `INSERT INTO task_log (task_id, task_name, status, xp_earned, gold_earned, hp_change, stat_category, stat_change)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, task.name, 'completed', xpEarned, goldEarned, hpChange, task.category, statChange]
+        `INSERT INTO task_log (user_id, task_id, task_name, status, xp_earned, gold_earned, hp_change, stat_category, stat_change)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [req.userId, id, task.name, 'completed', xpEarned, goldEarned, hpChange, task.category, statChange]
       );
 
       // Add activity
-      await gameEngine.addActivity('task_complete', `✅ Completed: ${task.name}`, '✅', xpEarned, goldEarned);
+      await gameEngine.addActivity(req.userId, 'task_complete', `✅ Completed: ${task.name}`, '✅', xpEarned, goldEarned);
 
       // Check level up
-      levelResult = await gameEngine.checkLevelUp();
+      levelResult = await gameEngine.checkLevelUp(req.userId);
 
       // Check achievements
-      achievementsUnlocked = await gameEngine.checkAchievements();
+      achievementsUnlocked = await gameEngine.checkAchievements(req.userId);
 
     } else if (status === 'failed') {
       // Apply HP penalty (toned down by 50%)
@@ -200,8 +206,8 @@ router.post('/:id/complete', async (req, res) => {
           total_tasks_failed = total_tasks_failed + 1,
           is_burnout = ?,
           updated_at = NOW()
-        WHERE id = 1`,
-        [newHp, isBurnout]
+        WHERE id = ?`,
+        [newHp, isBurnout, req.userId]
       );
 
       // Update task
@@ -209,22 +215,22 @@ router.post('/:id/complete', async (req, res) => {
         `UPDATE tasks SET
           is_completed_today = 1,
           times_failed = times_failed + 1
-        WHERE id = ?`,
-        [id]
+        WHERE id = ? AND user_id = ?`,
+        [id, req.userId]
       );
 
       // Log task failure
       await db.execute(
-        `INSERT INTO task_log (task_id, task_name, status, hp_change) VALUES (?, ?, ?, ?)`,
-        [id, task.name, 'failed', hpChange]
+        `INSERT INTO task_log (user_id, task_id, task_name, status, hp_change) VALUES (?, ?, ?, ?, ?)`,
+        [req.userId, id, task.name, 'failed', hpChange]
       );
 
       // Add activity
-      await gameEngine.addActivity('task_failed', `❌ Failed: ${task.name}`, '❌', 0, 0);
+      await gameEngine.addActivity(req.userId, 'task_failed', `❌ Failed: ${task.name}`, '❌', 0, 0);
 
       // Check burnout
       if (isBurnout) {
-        await gameEngine.addActivity('burnout', '🔥 BURNOUT! HP has reached 0. Take care of yourself!', '🔥', 0, 0);
+        await gameEngine.addActivity(req.userId, 'burnout', '🔥 BURNOUT! HP has reached 0. Take care of yourself!', '🔥', 0, 0);
       }
 
     } else if (status === 'skipped') {
@@ -234,28 +240,28 @@ router.post('/:id/complete', async (req, res) => {
       hpChange = newHp - player.hp;
 
       await db.execute(
-        'UPDATE player SET hp = ?, updated_at = NOW() WHERE id = 1',
-        [newHp]
+        'UPDATE player SET hp = ?, updated_at = NOW() WHERE id = ?',
+        [newHp, req.userId]
       );
 
       // Update task
       await db.execute(
-        'UPDATE tasks SET is_completed_today = 1 WHERE id = ?',
-        [id]
+        'UPDATE tasks SET is_completed_today = 1 WHERE id = ? AND user_id = ?',
+        [id, req.userId]
       );
 
       // Log task skip
       await db.execute(
-        `INSERT INTO task_log (task_id, task_name, status, hp_change) VALUES (?, ?, ?, ?)`,
-        [id, task.name, 'skipped', hpChange]
+        `INSERT INTO task_log (user_id, task_id, task_name, status, hp_change) VALUES (?, ?, ?, ?, ?)`,
+        [req.userId, id, task.name, 'skipped', hpChange]
       );
 
       // Add activity
-      await gameEngine.addActivity('task_skipped', `⏭️ Skipped: ${task.name}`, '⏭️', 0, 0);
+      await gameEngine.addActivity(req.userId, 'task_skipped', `⏭️ Skipped: ${task.name}`, '⏭️', 0, 0);
     }
 
     // Get updated player
-    const [[updatedPlayer]] = await db.execute('SELECT * FROM player WHERE id = 1');
+    const [[updatedPlayer]] = await db.execute('SELECT * FROM player WHERE id = ?', [req.userId]);
     const { password_hash, ...playerData } = updatedPlayer;
 
     res.json({
@@ -283,8 +289,8 @@ router.post('/:id/complete', async (req, res) => {
 // POST /api/tasks/reset-daily - Reset daily tasks
 router.post('/reset-daily', async (req, res) => {
   try {
-    await db.execute("UPDATE tasks SET is_completed_today = 0 WHERE recurrence = 'daily'");
-    await gameEngine.addActivity('system', '🔄 Daily tasks reset!', '🔄', 0, 0);
+    await gameEngine.resetDailyTasks(req.userId);
+    await gameEngine.addActivity(req.userId, 'system', '🔄 Daily tasks reset!', '🔄', 0, 0);
     broadcast({ type: 'reset_daily', timestamp: new Date().toISOString() });
     res.json({ success: true });
   } catch (err) {
@@ -293,7 +299,7 @@ router.post('/reset-daily', async (req, res) => {
   }
 });
 
-// POST /api/tasks/clear?mode=3days|all - Clear historical data
+// POST /api/tasks/clear?mode=3days|all - Clear historical data for current user
 router.post('/clear', requireAuth, async (req, res) => {
   try {
     const { mode, revert_stats } = req.query;
@@ -313,7 +319,6 @@ router.post('/clear', requireAuth, async (req, res) => {
     }
 
     if (intervalStr) {
-      // If reverting stats, sum deltas from action_log for the period and reverse them
       if (shouldRevert) {
         const [[sums]] = await db.execute(`SELECT
           COALESCE(SUM(energy_delta), 0) as e, COALESCE(SUM(stress_delta), 0) as s,
@@ -321,7 +326,7 @@ router.post('/clear', requireAuth, async (req, res) => {
           COALESCE(SUM(health_delta), 0) as h, COALESCE(SUM(hygiene_delta), 0) as hy,
           COALESCE(SUM(fun_delta), 0) as f, COALESCE(SUM(discipline_delta), 0) as d,
           COUNT(*) as cnt
-          FROM action_log WHERE performed_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`);
+          FROM action_log WHERE user_id = ? AND performed_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`, [req.userId]);
 
         if (sums.cnt > 0) {
           await db.execute(
@@ -332,24 +337,23 @@ router.post('/clear', requireAuth, async (req, res) => {
               stat_fun = GREATEST(stat_fun - ?, 0), stat_discipline = GREATEST(stat_discipline - ?, 0),
               xp = GREATEST(xp - (? * 10), 0), gold = GREATEST(gold - (? * 4), 0),
               total_tasks_completed = GREATEST(total_tasks_completed - ?, 0),
-              updated_at = NOW() WHERE id = 1`,
-            [sums.e, sums.s, sums.m, sums.so, sums.h, sums.hy, sums.f, sums.d, sums.cnt, sums.cnt, sums.cnt]
+              updated_at = NOW() WHERE id = ?`,
+            [sums.e, sums.s, sums.m, sums.so, sums.h, sums.hy, sums.f, sums.d, sums.cnt, sums.cnt, sums.cnt, req.userId]
           );
         }
       }
 
-      await db.execute(`DELETE FROM activity_feed WHERE created_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`);
-      await db.execute(`DELETE FROM action_log WHERE performed_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`);
-      await db.execute(`DELETE FROM task_log WHERE completed_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`);
-      await db.execute(`DELETE FROM habit_log WHERE logged_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`);
-      await db.execute(`DELETE FROM mood_log WHERE logged_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`);
+      await db.execute(`DELETE FROM activity_feed WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`, [req.userId]);
+      await db.execute(`DELETE FROM action_log WHERE user_id = ? AND performed_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`, [req.userId]);
+      await db.execute(`DELETE FROM task_log WHERE user_id = ? AND completed_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`, [req.userId]);
+      await db.execute(`DELETE FROM habit_log WHERE user_id = ? AND logged_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`, [req.userId]);
+      await db.execute(`DELETE FROM mood_log WHERE user_id = ? AND logged_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr})`, [req.userId]);
 
-      // Reset completed today tasks in this range
       try {
-        const [completedTasks] = await db.execute(`SELECT DISTINCT task_id FROM task_log WHERE completed_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr}) AND status = 'completed'`);
+        const [completedTasks] = await db.execute(`SELECT DISTINCT task_id FROM task_log WHERE user_id = ? AND completed_at >= DATE_SUB(NOW(), INTERVAL ${intervalStr}) AND status = 'completed'`, [req.userId]);
         for (const t of completedTasks) {
           if (t.task_id) {
-            await db.execute('UPDATE tasks SET is_completed_today = 0 WHERE id = ?', [t.task_id]);
+            await db.execute('UPDATE tasks SET is_completed_today = 0 WHERE id = ? AND user_id = ?', [t.task_id, req.userId]);
           }
         }
       } catch (e) {
@@ -357,31 +361,30 @@ router.post('/clear', requireAuth, async (req, res) => {
       }
 
       const msg = shouldRevert ? `🗑️ Cleared ${labelStr} + reverted stats` : `🗑️ Cleared ${labelStr} of history`;
-      await gameEngine.addActivity('system', msg, '🗑️', 0, 0);
+      await gameEngine.addActivity(req.userId, 'system', msg, '🗑️', 0, 0);
 
     } else if (mode === 'all') {
-      await db.execute("DELETE FROM activity_feed");
-      await db.execute("DELETE FROM action_log");
-      await db.execute("DELETE FROM task_log");
-      await db.execute("DELETE FROM habit_log");
-      await db.execute("DELETE FROM mood_log");
-      await db.execute("UPDATE tasks SET is_completed_today = 0, times_completed = 0, times_failed = 0");
-      await db.execute("UPDATE habits SET current_streak = 0, times_logged = 0");
-      await db.execute("UPDATE actions SET times_performed = 0, last_performed = NULL");
+      await db.execute("DELETE FROM activity_feed WHERE user_id = ?", [req.userId]);
+      await db.execute("DELETE FROM action_log WHERE user_id = ?", [req.userId]);
+      await db.execute("DELETE FROM task_log WHERE user_id = ?", [req.userId]);
+      await db.execute("DELETE FROM habit_log WHERE user_id = ?", [req.userId]);
+      await db.execute("DELETE FROM mood_log WHERE user_id = ?", [req.userId]);
+      await db.execute("UPDATE tasks SET is_completed_today = 0, times_completed = 0, times_failed = 0 WHERE user_id = ?", [req.userId]);
+      await db.execute("UPDATE habits SET current_streak = 0, times_logged = 0 WHERE user_id = ?", [req.userId]);
+      await db.execute("UPDATE actions SET times_performed = 0, last_performed = NULL WHERE 1=1"); // taxonomy remains global
 
       if (shouldRevert) {
-        // Reset player to starting values
         await db.execute(`UPDATE player SET
           xp = 0, gold = 0, level = 1, xp_to_next = 100, title = 'Recruit',
           hp = 100, max_hp = 100,
           health_level = 1, health_xp = 0, health_xp_to_next = 100,
-          stat_energy = 50, stat_stress = 50, stat_money = 50, stat_social = 50,
-          stat_health = 50, stat_hygiene = 50, stat_fun = 50, stat_discipline = 50,
+          stat_energy = 50, stat_stress = 30, stat_money = 100, stat_social = 20,
+          stat_health = 50, stat_hygiene = 50, stat_fun = 20, stat_discipline = 20,
           total_tasks_completed = 0, total_tasks_failed = 0, total_habits_logged = 0,
-          updated_at = NOW() WHERE id = 1`);
-        await gameEngine.addActivity('system', '🗑️ Full reset — stats restored to defaults', '🗑️', 0, 0);
+          updated_at = NOW() WHERE id = ?`, [req.userId]);
+        await gameEngine.addActivity(req.userId, 'system', '🗑️ Full reset — stats restored to defaults', '🗑️', 0, 0);
       } else {
-        await gameEngine.addActivity('system', '🗑️ All history cleared', '🗑️', 0, 0);
+        await gameEngine.addActivity(req.userId, 'system', '🗑️ All history cleared', '🗑️', 0, 0);
       }
 
     } else {

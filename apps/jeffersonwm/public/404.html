@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap");
+
+      :root {
+        --frame: 36px;
+        --topbar-height: 36px;
+        --top-gap: 6px;
+        --footer-height: 36px;
+        --body-top-offset: calc(var(--topbar-height) + var(--top-gap));
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        background: #fafafa;
+        color: #202522;
+        font-family: "Inter Tight", "Segoe UI", Arial, sans-serif;
+        margin: 0;
+        overflow-x: hidden;
+        padding: var(--body-top-offset) 0 calc(var(--footer-height) + 24px);
+      }
+
+      body::before {
+        background-image: url("/images/backgrounds/can_you_make_this_image_2K_202609072050-transparent.png");
+        background-position: top left;
+        background-repeat: repeat;
+        background-size: 720px auto;
+        content: "";
+        inset: 0;
+        opacity: 0.06;
+        pointer-events: none;
+        position: fixed;
+        z-index: 0;
+      }
+
+      .page-banner {
+        background: rgba(250, 250, 250, 0.93);
+        border-bottom: 1px solid #e5e5e5;
+        left: 0;
+        min-height: var(--topbar-height);
+        position: fixed;
+        right: 0;
+        z-index: 1000;
+      }
+
+      .page-banner--top {
+        top: 0;
+      }
+
+      .page-banner--bottom {
+        border-bottom: 0;
+        border-top: 1px solid #e5e5e5;
+        bottom: 0;
+        top: auto;
+      }
+
+      .shell-frame {
+        margin: 0 auto;
+        max-width: 100%;
+        width: calc(100% - (var(--frame) * 2));
+      }
+
+      .page-banner__inner {
+        align-items: center;
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        min-height: var(--topbar-height);
+      }
+
+      .page-banner__brand,
+      .page-banner__link,
+      .page-banner__button {
+        color: #202522;
+        font-family: "Inter Tight", "Segoe UI", Arial, sans-serif;
+        font-size: 0.875rem;
+        font-weight: 700;
+        letter-spacing: 0;
+        line-height: 1;
+        text-decoration: none;
+        transition: color 150ms ease;
+      }
+
+      .page-banner__button {
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .page-banner__brand:hover,
+      .page-banner__link:hover,
+      .page-banner__button:hover,
+      .page-banner__button:focus-visible {
+        color: #de8bf7;
+        outline: none;
+      }
+
+      .page-banner--bottom .page-banner__inner {
+        color: #6b7280;
+        font-size: 0.875rem;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .page-banner__copyright {
+        color: #6b7280;
+        font-size: 0.875rem;
+        letter-spacing: 0;
+        line-height: 1;
+        margin: 0;
+        overflow: hidden;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .page-banner__copyright-link {
+        color: #111827;
+        text-decoration: none;
+        transition: color 1000ms ease;
+      }
+
+      .page-banner__copyright-link--primary {
+        font-weight: 600;
+      }
+
+      .page-banner__copyright-link:hover {
+        color: #de8bf7;
+        transition-duration: 150ms;
+      }
+
+      .page-banner__link--inline {
+        font-size: inherit;
+        font-weight: 700;
+      }
+
+      .shell-gutters {
+        inset: var(--topbar-height) 0 var(--footer-height);
+        pointer-events: none;
+        position: fixed;
+        z-index: 5;
+      }
+
+      .shell-gutter {
+        border-left: 1px solid #e5e5e5;
+        bottom: 0;
+        position: absolute;
+        top: 0;
+      }
+
+      .shell-gutter--left {
+        left: var(--frame);
+      }
+
+      .shell-gutter--right {
+        right: var(--frame);
+      }
+
+      main {
+        min-height: calc(100vh - var(--body-top-offset) - var(--footer-height) - 24px);
+        position: relative;
+        z-index: 20;
+      }
+
+      @media (max-width: 640px) {
+        :root {
+          --frame: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page-banner page-banner--top">
+      <div class="page-banner__inner shell-frame">
+        <span class="page-banner__brand">404</span>
+        <button class="page-banner__button" type="button" data-auth-open>Sign In</button>
+      </div>
+    </header>
+
+    <div class="shell-gutters" aria-hidden="true">
+      <div class="shell-gutter shell-gutter--left"></div>
+      <div class="shell-gutter shell-gutter--right"></div>
+    </div>
+
+    <main class="shell-frame" aria-label="Page not found"></main>
+
+    <footer class="page-banner page-banner--bottom">
+      <div class="page-banner__inner shell-frame">
+        <div aria-hidden="true"></div>
+        <p class="page-banner__copyright">
+          &copy; 2026
+          <a
+            class="page-banner__copyright-link page-banner__copyright-link--primary"
+            href="https://jeffersonwm.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Jefferson Williams
+          </a>
+          . All rights reserved.
+          <a
+            href="https://github.com/wmjefferson/jeffersonwm"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="page-banner__copyright-link page-banner__link--inline"
+          >
+            GitHub
+          </a>
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      (() => {
+        const authBaseUrl = "https://auth.jeffersonwm.com";
+        const signInButton = document.querySelector("[data-auth-open]");
+        let authPopupPoll = 0;
+
+        const stopAuthPopupPoll = () => {
+          if (authPopupPoll) {
+            window.clearInterval(authPopupPoll);
+            authPopupPoll = 0;
+          }
+        };
+
+        const openAuth = () => {
+          const url = new URL(`${authBaseUrl}/home`);
+          url.searchParams.set("returnTo", window.location.href);
+          url.searchParams.set("popup", "1");
+
+          const width = 440;
+          const height = 620;
+          const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+          const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+          const popup = window.open(
+            url.toString(),
+            "jeffersonwm-auth-popup",
+            `width=${width},height=${height},left=${left},top=${top}`
+          );
+
+          if (!popup) {
+            window.location.assign(url.toString());
+            return;
+          }
+
+          popup.focus();
+          stopAuthPopupPoll();
+          authPopupPoll = window.setInterval(() => {
+            if (popup.closed) {
+              stopAuthPopupPoll();
+              window.location.reload();
+            }
+          }, 700);
+        };
+
+        signInButton?.addEventListener("click", openAuth);
+
+        window.addEventListener("message", (event) => {
+          if (event.origin !== authBaseUrl) {
+            return;
+          }
+
+          if (event.data?.type === "auth:success" || event.data?.type === "auth:logout") {
+            stopAuthPopupPoll();
+            window.location.reload();
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

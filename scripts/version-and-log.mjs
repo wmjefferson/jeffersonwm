@@ -90,6 +90,16 @@ function quoteForCmd(value) {
   return `"${value.replaceAll('"', '\\"')}"`;
 }
 
+function printUsageExamples() {
+  console.log(`\nUsage examples:`);
+  console.log(`  npm run version:patch                         # Bump the current root package patch version`);
+  console.log(`  npm run version:minor                         # Bump the current root package minor version`);
+  console.log(`  npm run version:major                         # Bump the current root package major version`);
+  console.log(`  npm run version:patch:aphelion                # Bump Aphelion and write a version log entry`);
+  console.log(`  npm run version:minor:peri                    # Bump Perihelion using its short alias`);
+  console.log(`  node scripts/version-and-log.mjs --app lionship --type patch --note "Short note"\n`);
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const appName = String(args.app || '').toLowerCase();
@@ -129,6 +139,8 @@ function main() {
   if (logResult.status !== 0) {
     process.exit(logResult.status || 1);
   }
+
+  printUsageExamples();
 }
 
 main();

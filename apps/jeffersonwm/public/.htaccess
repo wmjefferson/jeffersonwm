@@ -1,8 +1,23 @@
+Options -Indexes
+ErrorDocument 404 /404.html
 RewriteEngine On
 
 # Force HTTPS
 RewriteCond %{HTTPS} off
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Shared under-construction page
+RewriteRule ^underconstruction/?$ /underconstruction.html [L]
+
+# Paused public apps
+RewriteRule ^bull(/.*)?$ /underconstruction?site=bullion [R=302,L]
+RewriteRule ^bullion(/.*)?$ /underconstruction?site=bullion [R=302,L]
+RewriteRule ^clio(/.*)?$ /underconstruction?site=clionidae [R=302,L]
+RewriteRule ^clionidae(/.*)?$ /underconstruction?site=clionidae [R=302,L]
+RewriteRule ^mill(/.*)?$ /underconstruction?site=millionfold [R=302,L]
+RewriteRule ^millionfold(/.*)?$ /underconstruction?site=millionfold [R=302,L]
+RewriteRule ^verm(/.*)?$ /underconstruction?site=vermilion [R=302,L]
+RewriteRule ^vermilion(/.*)?$ /underconstruction?site=vermilion [R=302,L]
 
 # Redirect 4-character short URLs to perihelion share page
 RewriteCond %{REQUEST_FILENAME} !-f
@@ -37,11 +52,6 @@ RewriteRule ^development/?$ /development/index.html [L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^jeffersonwm(/.*)?$ /jeffersonwm/index.html [L]
-
-# Bullion app routing
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^bullion(/.*)?$ /bullion/index.html [L]
 
 # Lionship app routing
 RewriteCond %{REQUEST_FILENAME} !-f
@@ -85,43 +95,6 @@ RewriteRule ^perihelion/home(/.*)?$ /perihelion/index.html [L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^perihelion(/.*)?$ /perihelion/index.html [L]
-
-# Clionidae is decommissioned; send old public paths back to JeffersonWM Home.
-RewriteRule ^clionidae(/.*)?$ / [R=302,L]
-
-# Vermilion app routing split
-# 1. Landing page paused; send vermilion root straight to /home
-# RewriteCond %{REQUEST_URI} ^/vermilion/?$
-# RewriteRule ^(.*)$ /vermilion/landing.html [L]
-RewriteCond %{REQUEST_URI} ^/vermilion/?$
-RewriteRule ^vermilion/?$ /vermilion/home [R=302,L]
-
-# 2. Rewrite /vermilion/home to index.html (the SPA)
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^vermilion/home(/.*)?$ /vermilion/index.html [L]
-
-# 3. Rewrite any other vermilion paths (deep links) to index.html
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^vermilion(/.*)?$ /vermilion/index.html [L]
-
-# Millionfold app routing split
-# 1. Landing page paused; send millionfold root straight to /home
-# RewriteCond %{REQUEST_URI} ^/millionfold/?$
-# RewriteRule ^(.*)$ /millionfold/landing.html [L]
-RewriteCond %{REQUEST_URI} ^/millionfold/?$
-RewriteRule ^millionfold/?$ /millionfold/home [R=302,L]
-
-# 2. Rewrite /millionfold/home to index.html (the SPA)
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^millionfold/home(/.*)?$ /millionfold/index.html [L]
-
-# 3. Rewrite any other millionfold paths (deep links) to index.html
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^millionfold(/.*)?$ /millionfold/index.html [L]
 
 # Serve assets directly
 RewriteCond %{REQUEST_FILENAME} -f [OR]

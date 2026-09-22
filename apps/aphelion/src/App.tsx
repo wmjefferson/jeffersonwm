@@ -72,7 +72,7 @@ export default function App() {
   const apiBaseUrl = import.meta.env.VITE_APHELION_API_BASE_URL || '';
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const isHighlightsPage = currentHash === '#highlights';
-  const isAdminPage = currentHash === '#admin' || currentHash === '#options' || currentHash === '#admin-highlights';
+  const isAdminPage = currentHash === '#admin' || currentHash === '#options' || currentHash === '#admin-highlights' || currentHash === '#curation';
   const [viewport, setViewport] = useState({
     width: Math.max(100, window.innerWidth - TOTAL_SIDE_GUTTER),
     height: Math.max(100, window.innerHeight - TOTAL_BANNER_HEIGHT),
@@ -131,6 +131,7 @@ export default function App() {
 
   const authBaseUrl = authStatus?.authBaseUrl || 'https://auth.jeffersonwm.com';
   const currentUser = authStatus?.user || null;
+  const isGeneralPublic = authStatus?.requireAuth !== false && !currentUser;
   const canUseAccountTools = Boolean(currentUser) || authStatus?.requireAuth === false;
   const canAccessAdmin = authStatus?.requireAuth === false || Boolean(currentUser?.isOwner);
 
@@ -214,11 +215,11 @@ export default function App() {
       currentHash === '#admin'
       || currentHash === '#options'
       || currentHash === '#admin-highlights'
+      || currentHash === '#curation'
     );
 
     if (!isHomeRoute && !isHighlightsRoute && !isAdminRoute) {
-      window.history.replaceState(null, '', normalizedBasePath);
-      setCurrentHash('');
+      window.location.assign('/404.html');
     }
   }, [currentHash]);
 
@@ -391,6 +392,12 @@ export default function App() {
     localStorage.setItem('aphelion_highlighted_blocks', JSON.stringify([...highlightedBlocks]));
   }, [highlightedBlocks]);
 
+  useEffect(() => {
+    if (!authLoading && isGeneralPublic && highlightedBlocks.size > 5) {
+      setHighlightedBlocks((current) => new Set([...current].slice(-5)));
+    }
+  }, [authLoading, highlightedBlocks.size, isGeneralPublic]);
+
   const handleBlockClick = useCallback((image: ImageItem, blockIndex: number) => {
     setHighlightedBlocks((current) => {
       const next = new Set(current);
@@ -401,10 +408,13 @@ export default function App() {
         next.add(blockIndex);
       }
       logHighlightEvent({ action, blockIndex, image });
+      if (isGeneralPublic && next.size > 5) {
+        return new Set([...next].slice(-5));
+      }
       return next;
     });
     setSelectedImage(image);
-  }, [logHighlightEvent]);
+  }, [isGeneralPublic, logHighlightEvent]);
 
   const selectedImages = useMemo(() => {
     if (page !== 'selected') {
@@ -513,7 +523,7 @@ export default function App() {
 
   if (isHighlightsPage) {
     return (
-      <Suspense fallback={<div className="min-h-screen bg-[#FAFAFA]" />}>
+      <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
         <HighlightsPage
           apiBaseUrl={apiBaseUrl}
           authStatus={authStatus}
@@ -527,14 +537,14 @@ export default function App() {
 
   if (isAdminPage) {
     if (authLoading) {
-      return <div className="min-h-screen bg-[#FAFAFA]" />;
+      return <div className="min-h-screen bg-transparent" />;
     }
     if (!canAccessAdmin) {
       window.history.replaceState(null, '', '/aphelion/');
       return null;
     }
     return (
-      <Suspense fallback={<div className="min-h-screen bg-[#FAFAFA]" />}>
+      <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
         <AdminPage apiBaseUrl={apiBaseUrl} authStatus={authStatus} onSignOut={handleSignOut} />
       </Suspense>
     );
@@ -542,8 +552,8 @@ export default function App() {
 
   if (page === 'selected') {
     return (
-      <div className="flex min-h-screen flex-col bg-[#FAFAFA] text-slate-800">
-        <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-start shrink-0 relative z-20">
+      <div className="relative z-10 flex min-h-screen flex-col bg-transparent text-slate-800">
+        <header className="h-[36px] px-6 bg-[#FAFAFA]/95 flex items-center justify-start shrink-0 relative z-20">
           <button
             type="button"
             onClick={() => setPage('grid')}
@@ -553,29 +563,34 @@ export default function App() {
           </button>
         </header>
 
-        <main className="h-[calc(100vh-72px)] overflow-y-auto border-t border-[#e5e5e5] bg-[#FAFAFA] px-[36px] py-[36px]">
+        <main className="h-[calc(100vh-72px)] overflow-y-auto border-t border-[#e5e5e5] bg-transparent px-[36px] py-[36px]">
           <div className="grid grid-cols-2 gap-[36px] min-[1180px]:grid-cols-4 min-[1700px]:grid-cols-5">
-            {selectedImages.map(({ blockIndex, image }) => (
+            {selectedImages.map(({ blockIndex, image }) => {
+              const isChecked = checkedSelectedBlocks.has(blockIndex);
+              return (
               <figure key={blockIndex} className="relative m-0">
-                <label className="absolute right-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center border border-[#e5e5e5] bg-[#FAFAFA]/95">
-                  <input
-                    type="checkbox"
-                    checked={checkedSelectedBlocks.has(blockIndex)}
-                    onChange={() => toggleSelectedDownloadBlock(blockIndex)}
-                    className="h-3.5 w-3.5 accent-[#111827]"
-                  />
-                </label>
+                <button
+                  type="button"
+                  onClick={() => toggleSelectedDownloadBlock(blockIndex)}
+                  className={`block aspect-square w-full border transition-colors duration-150 ${
+                    isChecked ? 'border-[#3f72a8]' : 'border-transparent hover:border-[#d8d8d8]'
+                  }`}
+                  aria-pressed={isChecked}
+                  aria-label={`${isChecked ? 'Remove' : 'Add'} ${image.title} from download`}
+                >
                 <img
                   src={image.thumbUrl || image.imageUrl}
                   alt={image.title}
-                  className="block aspect-square w-full border border-[#e5e5e5] object-cover"
+                  className="block h-full w-full border border-[#e5e5e5] object-cover"
                   loading="lazy"
                 />
+                </button>
               </figure>
-            ))}
+              );
+            })}
           </div>
         </main>
-        <footer className="flex h-[36px] items-center justify-between border-t border-[#e5e5e5] bg-[#FAFAFA] px-6 font-sans text-sm text-gray-700">
+        <footer className="flex h-[36px] items-center justify-between border-t border-[#e5e5e5] bg-[#FAFAFA]/95 px-6 font-sans text-sm text-gray-700">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -602,9 +617,27 @@ export default function App() {
               {downloadingZip ? 'Downloading...' : `Download (${checkedSelectedBlocks.size})`}
             </button>
           </div>
-          <div>
-            © 2026 Jefferson Williams. All rights reserved.
-          </div>
+          <p className="m-0 leading-none text-gray-500 text-xs sm:text-sm font-sans truncate">
+            &copy; {new Date().getFullYear()}{' '}
+            <a
+              href="https://jeffersonwm.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+            >
+              Jefferson Williams
+            </a>
+            . All rights reserved.{' '}
+            <a
+              href="https://github.com/wmjefferson/jeffersonwm"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+            >
+              GitHub
+            </a>
+            .
+          </p>
         </footer>
       </div>
     );
@@ -613,8 +646,8 @@ export default function App() {
   const centerSquareSize = config.centerSquare?.size || 640;
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#FAFAFA] text-slate-800">
-      <header className="h-[36px] px-4 sm:px-6 bg-[#FAFAFA] flex items-center justify-between shrink-0 relative z-20">
+    <div className="relative z-10 w-screen h-screen overflow-hidden bg-transparent text-slate-800">
+      <header className="h-[36px] px-4 sm:px-6 bg-[#FAFAFA]/95 flex items-center justify-between shrink-0 relative z-20">
         <div className="flex items-center">
           <a
             href="/aphelion/"
@@ -674,13 +707,13 @@ export default function App() {
         </div>
       </header>
 
-      <main className="relative h-[calc(100vh-72px)] overflow-hidden bg-[#FAFAFA] px-[36px] z-10">
-        <div className="pointer-events-none absolute left-[36px] top-0 bottom-0 z-[55] border-l border-[#e5e5e5]" />
-        <div className="pointer-events-none absolute right-[36px] top-0 bottom-0 z-[55] border-r border-[#e5e5e5]" />
-        <div className="pointer-events-none absolute left-0 right-0 top-0 z-[55] border-t border-[#e5e5e5]" />
-        <div className="pointer-events-none absolute left-0 right-0 bottom-0 z-[55] border-b border-[#e5e5e5]" />
+      <main className="relative h-[calc(100vh-72px)] overflow-hidden bg-transparent px-[36px] z-10">
+        <div className="pointer-events-none absolute left-0 top-0 bottom-0 z-[55] w-[36px] border-r border-[#d8d8d8] bg-[#FAFAFA]/70" />
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 z-[55] w-[36px] border-l border-[#d8d8d8] bg-[#FAFAFA]/70" />
+        <div className="pointer-events-none absolute left-0 right-0 top-0 z-[55] border-t border-[#d8d8d8]" />
+        <div className="pointer-events-none absolute left-0 right-0 bottom-0 z-[55] border-b border-[#d8d8d8]" />
         <div
-          className="pointer-events-none fixed left-1/2 top-1/2 z-[60] -translate-x-1/2 -translate-y-1/2 border border-[#e5e5e5]"
+          className="pointer-events-none fixed left-1/2 top-1/2 z-[60] -translate-x-1/2 -translate-y-1/2 border border-[#b8b8b8]"
           style={{
             width: `${centerSquareSize}px`,
             height: `${centerSquareSize}px`,
@@ -700,7 +733,7 @@ export default function App() {
         />
       </main>
 
-      <footer className="h-[36px] px-4 sm:px-6 bg-[#FAFAFA] flex items-center justify-end shrink-0 relative z-20">
+      <footer className="h-[36px] px-4 sm:px-6 bg-[#FAFAFA]/95 flex items-center justify-end shrink-0 relative z-20">
         <p className="m-0 leading-none text-gray-500 text-xs sm:text-sm font-sans truncate">
           &copy; {new Date().getFullYear()}{' '}
           <a

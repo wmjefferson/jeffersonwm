@@ -71,6 +71,16 @@ interface FeedWeekSummaryStyle {
   purpose: string;
 }
 
+interface FeedWeekSummaryStyleDraftVariant extends FeedWeekSummaryStyle {
+  content: string;
+}
+
+interface FeedWeekSummaryStyleDraft {
+  week_key: string;
+  variants: FeedWeekSummaryStyleDraftVariant[];
+  updated_at: string;
+}
+
 interface WeekSiteSummary {
   siteKey: string;
   siteLabel: string;
@@ -115,6 +125,8 @@ const inferredFeedApiBase =
 const FEED_API_BASE = (import.meta.env.VITE_API_BASE_URL || inferredFeedApiBase).replace(/\/$/, '');
 const FEED_ATOM_URL = `${FEED_API_BASE}/atom.xml`;
 const FEED_TIMEZONE = 'America/Los_Angeles';
+const WEEK_SUMMARY_PRIMARY_STYLE_ID = 'compact-plain-bullets';
+const WEEK_SUMMARY_HIDDEN_MARKER = '<!-- feed-summary-hidden -->';
 const FEED_LEGEND_LINKS: Record<string, string> = {
   'auth/multimillion': 'https://github.com/wmjefferson',
   battalion: 'https://jeffersonwm.com/battalion/',
@@ -327,6 +339,72 @@ function formatIsoDate(date: Date) {
 
 function formatWeekRange(start: Date, end: Date) {
   return `${feedWeekRangeFormatter.format(start)} – ${feedWeekRangeFormatter.format(end)}`;
+}
+
+function parseWeekSummaryStyleVariants(raw: string): FeedWeekSummaryStyleDraftVariant[] {
+  const headingPattern = /^##\s+([a-z0-9-]+)(?:\s+\|\s+(.+?))?\s*$/gim;
+  const headings = [...raw.matchAll(headingPattern)];
+
+  return headings
+    .map((match, index) => {
+      const nextMatch = headings[index + 1];
+      const id = match[1].trim();
+      const label = (match[2] || id).trim();
+      const contentStart = (match.index || 0) + match[0].length;
+      const contentEnd = nextMatch?.index ?? raw.length;
+      const content = raw.slice(contentStart, contentEnd).trim();
+
+      if (!id || !content) {
+        return null;
+      }
+
+      return {
+        id,
+        label,
+        mode: '',
+        purpose: '',
+        content,
+      } satisfies FeedWeekSummaryStyleDraftVariant;
+    })
+    .filter((entry): entry is FeedWeekSummaryStyleDraftVariant => Boolean(entry));
+}
+
+function getPrimaryWeekSummaryContent(raw: string) {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return '';
+  }
+  if (trimmed.includes(WEEK_SUMMARY_HIDDEN_MARKER)) {
+    return '';
+  }
+
+  const variants = parseWeekSummaryStyleVariants(trimmed);
+  if (variants.length === 0) {
+    return trimmed;
+  }
+
+  return (
+    variants.find((variant) => variant.id === WEEK_SUMMARY_PRIMARY_STYLE_ID)?.content ||
+    variants[0].content
+  ).trim();
+}
+
+function updateWeekSummaryStyleSection(raw: string, styleId: string, nextContent: string) {
+  const headingPattern = /^##\s+([a-z0-9-]+)(?:\s+\|\s+(.+?))?\s*$/gim;
+  const headings = [...raw.matchAll(headingPattern)];
+  if (headings.length === 0) {
+    return `${nextContent.trim()}\n`;
+  }
+
+  const targetHeading = headings.find((heading) => heading[1].trim() === styleId) || headings[0];
+  const targetIndex = headings.indexOf(targetHeading);
+  const nextHeading = headings[targetIndex + 1];
+  const contentStart = (targetHeading.index || 0) + targetHeading[0].length;
+  const contentEnd = nextHeading?.index ?? raw.length;
+  const before = raw.slice(0, contentStart).replace(/[ \t]+$/g, '');
+  const after = raw.slice(contentEnd).trimStart();
+
+  return `${before}\n\n${nextContent.trim()}${after ? `\n\n${after}` : '\n'}`;
 }
 
 function getFeedSiteLabel(siteName: string) {
@@ -864,6 +942,7 @@ export default function App() {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [weekSummaries, setWeekSummaries] = useState<Record<string, FeedWeekSummary>>({});
   const [weekSummaryStyles, setWeekSummaryStyles] = useState<FeedWeekSummaryStyle[]>([]);
+  const [weekSummaryStyleDrafts, setWeekSummaryStyleDrafts] = useState<Record<string, FeedWeekSummaryStyleDraft>>({});
   const [view, setView] = useState<FeedView>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -984,7 +1063,21 @@ export default function App() {
 
       const data = (await response.json()) as FeedWeekSummaryStyle[];
       setWeekSummaryStyles(data);
-      setSelectedWeekSummaryStyleId((current) => current || data[0]?.id || '');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchWeekSummaryStyleDrafts = async () => {
+    try {
+      const response = await fetch(apiUrl('/api/feed/week-summary-variants'));
+      if (!response.ok) {
+        throw new Error('Failed to fetch weekly summary style drafts');
+      }
+
+      const data = (await response.json()) as FeedWeekSummaryStyleDraft[];
+      const draftMap = Object.fromEntries(data.map((draft) => [draft.week_key, draft]));
+      setWeekSummaryStyleDrafts(draftMap);
     } catch (err) {
       console.error(err);
     }
@@ -1174,13 +1267,14 @@ export default function App() {
   };
 
   const handleEditWeekSummary = () => {
-    if (!activeWeek) {
+    if (!activeWeek || activeWeekIsCurrent) {
       return;
     }
 
     setExpandedWeekSummaryKey(activeWeek.key);
     setEditingWeekSummaryKey(activeWeek.key);
-    setWeekSummaryDraft(activeWeekSummary?.content || '');
+    setSelectedWeekSummaryStyleId('');
+    setWeekSummaryDraft(activeWeekSummaryContent);
     setError(null);
   };
 
@@ -1191,6 +1285,10 @@ export default function App() {
 
   const handleWeekSummaryStyleChange = (styleId: string) => {
     setSelectedWeekSummaryStyleId(styleId);
+    if (!styleId) {
+      setWeekSummaryDraft('');
+      return;
+    }
 
     const selectedStyle = generatedWeekSummaryVariants.find((style) => style.id === styleId);
     if (!selectedStyle?.content.trim()) {
@@ -1206,7 +1304,8 @@ export default function App() {
     }
 
     const content = weekSummaryDraft.trim();
-    if (!content) {
+    const shouldHideSummary = !selectedWeekSummaryStyleId && !content;
+    if (!content && !shouldHideSummary) {
       setError('Weekly summary cannot be empty.');
       return;
     }
@@ -1215,12 +1314,24 @@ export default function App() {
     setError(null);
 
     try {
+      const activeWeekBackendVariants = activeWeek ? weekSummaryStyleDrafts[activeWeek.key]?.variants || [] : [];
+      const shouldSaveFullSummaryFile =
+        activeWeekBackendVariants.length === 0 && Boolean(activeWeekSummary) && activeWeekSummaryVariants.length > 0;
+      const selectedStyleId = selectedWeekSummaryStyleId || WEEK_SUMMARY_PRIMARY_STYLE_ID;
+      const summaryContentToSave =
+        shouldHideSummary
+          ? WEEK_SUMMARY_HIDDEN_MARKER
+          : shouldSaveFullSummaryFile && activeWeekSummary
+          ? updateWeekSummaryStyleSection(activeWeekSummary.content, selectedStyleId, content)
+          : content;
       const response = await fetch(apiUrl(`/api/feed/week-summaries/${activeWeek.key}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           secret: secretInput,
-          content,
+          content: summaryContentToSave,
+          hide_summary: shouldHideSummary,
+          style_id: shouldSaveFullSummaryFile ? undefined : selectedStyleId,
           week_year: activeWeek.weekYear,
           week_number: activeWeek.weekNumber,
           start_date: formatIsoDate(activeWeek.start),
@@ -1237,7 +1348,7 @@ export default function App() {
         throw new Error(errorData.error || 'Failed to save weekly summary');
       }
 
-      await fetchWeekSummaries();
+      await Promise.all([fetchWeekSummaries(), fetchWeekSummaryStyleDrafts()]);
       setEditingWeekSummaryKey(null);
       setExpandedWeekSummaryKey(activeWeek.key);
       setWeekSummaryDraft('');
@@ -1386,6 +1497,7 @@ export default function App() {
     fetchFeed();
     fetchWeekSummaries();
     fetchWeekSummaryStyles();
+    fetchWeekSummaryStyleDrafts();
     const interval = setInterval(fetchFeed, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -1765,6 +1877,17 @@ export default function App() {
   const activeWeekIndex = weeks.findIndex((week) => week.key === activeWeekKey);
   const activeWeek = activeWeekIndex >= 0 ? weeks[activeWeekIndex] : weeks[0] || null;
   const activeWeekSummary = activeWeek ? weekSummaries[activeWeek.key] || null : null;
+  const activeWeekSummaryVariants = useMemo(
+    () => (activeWeekSummary ? parseWeekSummaryStyleVariants(activeWeekSummary.content) : []),
+    [activeWeekSummary],
+  );
+  const activeWeekSummaryContent = activeWeekSummary
+    ? getPrimaryWeekSummaryContent(activeWeekSummary.content)
+    : '';
+  const currentWeekKey = useMemo(() => getWeekMetadata(new Date().toISOString()).key, []);
+  const activeWeekIsCurrent = Boolean(activeWeek && activeWeek.key === currentWeekKey);
+  const canUseActiveWeekSummary = Boolean(activeWeek && !activeWeekIsCurrent);
+  const canShowActiveWeekSummaryToggle = canUseActiveWeekSummary && (Boolean(activeWeekSummary) || isLoggedIn);
   const groupedItems = groupFeedItems(activeWeek?.items || []);
   const activeWeekSiteSummaries = useMemo<WeekSiteSummary[]>(() => {
     if (!activeWeek) {
@@ -1805,14 +1928,37 @@ export default function App() {
       }));
   }, [activeWeek, items]);
   const generatedWeekSummaryVariants = useMemo(
-    () =>
-      weekSummaryStyles
+    () => {
+      const draftVariants: FeedWeekSummaryStyleDraftVariant[] = activeWeek
+        ? weekSummaryStyleDrafts[activeWeek.key]?.variants || []
+        : [];
+      const fileBackedVariants: FeedWeekSummaryStyleDraftVariant[] =
+        draftVariants.length > 0 ? draftVariants : activeWeekSummaryVariants;
+
+      if (fileBackedVariants.length > 0) {
+        const draftsById = new Map<string, FeedWeekSummaryStyleDraftVariant>(
+          fileBackedVariants.map((draft) => [draft.id, draft]),
+        );
+        const knownDrafts = weekSummaryStyles
+          .map((style) => ({
+            ...style,
+            content: draftsById.get(style.id)?.content || '',
+          }))
+          .filter((style) => style.content.trim().length > 0);
+        const knownStyleIds = new Set(weekSummaryStyles.map((style) => style.id));
+        const extraDrafts = fileBackedVariants.filter((draft) => !knownStyleIds.has(draft.id));
+
+        return [...knownDrafts, ...extraDrafts];
+      }
+
+      return weekSummaryStyles
         .map((style) => ({
           ...style,
           content: renderWeekSummaryVariant(style.id, activeWeekSiteSummaries),
         }))
-        .filter((style) => style.content.trim().length > 0),
-    [activeWeekSiteSummaries, weekSummaryStyles],
+        .filter((style) => style.content.trim().length > 0);
+    },
+    [activeWeek, activeWeekSiteSummaries, activeWeekSummaryVariants, weekSummaryStyleDrafts, weekSummaryStyles],
   );
   const selectedWeekSummaryStyle =
     generatedWeekSummaryVariants.find((style) => style.id === selectedWeekSummaryStyleId) || null;
@@ -2031,6 +2177,7 @@ export default function App() {
           </div>
         )}
 
+        {/* Legend popup paused for now; keep the implementation nearby for a later return.
         {showLegend && (
           <div className="modal-scrim" onClick={() => setShowLegend(false)}>
             <motion.div
@@ -2097,6 +2244,7 @@ export default function App() {
             </motion.div>
           </div>
         )}
+        */}
       </AnimatePresence>
 
       <main className="feed-main">
@@ -2133,9 +2281,11 @@ export default function App() {
               Version notes, public logs, and code movement in one running line. Release notes and status changes land
               in the same chronology.
             </p>
+            {/* Legend link paused for now while the popup format is being reconsidered.
             <button type="button" className="hero-copy feed-subtitle-link" onClick={() => setShowLegend(true)}>
               Legend.
             </button>
+            */}
             <div className="feed-view-switcher" role="tablist" aria-label="Feed views">
               <button
                 type="button"
@@ -2257,26 +2407,26 @@ export default function App() {
                   <p className="feed-week-range">
                     {formatWeekRange(activeWeek.start, activeWeek.end)} · {activeWeek.items.length} entr{activeWeek.items.length === 1 ? 'y' : 'ies'}
                   </p>
-                  <button
-                    type="button"
-                    className="feed-link-button feed-week-summary-link"
-                    onClick={() => {
-                      const isExpanded = expandedWeekSummaryKey === activeWeek.key;
-                      setExpandedWeekSummaryKey(isExpanded ? null : activeWeek.key);
-                      if (isExpanded) {
-                        setEditingWeekSummaryKey(null);
-                        setWeekSummaryDraft('');
-                      }
-                    }}
-                  >
-                    {expandedWeekSummaryKey === activeWeek.key
-                      ? 'Hide Summary'
-                      : activeWeekSummary
-                        ? 'View Summary'
-                        : isLoggedIn
-                          ? 'Add Summary'
-                          : 'Summary'}
-                  </button>
+                  {canShowActiveWeekSummaryToggle && (
+                    <button
+                      type="button"
+                      className="feed-link-button feed-week-summary-link"
+                      onClick={() => {
+                        const isExpanded = expandedWeekSummaryKey === activeWeek.key;
+                        setExpandedWeekSummaryKey(isExpanded ? null : activeWeek.key);
+                        if (isExpanded) {
+                          setEditingWeekSummaryKey(null);
+                          setWeekSummaryDraft('');
+                        }
+                      }}
+                    >
+                      {expandedWeekSummaryKey === activeWeek.key
+                        ? 'Hide Summary'
+                        : activeWeekSummary
+                          ? 'View Summary'
+                          : 'Add Summary'}
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
@@ -2321,7 +2471,7 @@ export default function App() {
           </div>
 
           <AnimatePresence initial={false}>
-            {activeWeek && expandedWeekSummaryKey === activeWeek.key && (
+            {canUseActiveWeekSummary && activeWeek && expandedWeekSummaryKey === activeWeek.key && (
               <motion.div
                 key={activeWeek.key}
                 initial={{ opacity: 0, height: 0 }}
@@ -2330,7 +2480,6 @@ export default function App() {
                 className="feed-week-summary-panel"
               >
                 <div className="feed-week-summary-copy">
-                  <span className="eyebrow">Weekly TL;DR</span>
                   {editingWeekSummaryKey === activeWeek.key ? (
                     <>
                       <p className="helper-copy">Keep this short and readable. A few sentences is enough.</p>
@@ -2338,10 +2487,10 @@ export default function App() {
                         {weekSummaryStyles.length > 0 && (
                           <div className="feed-week-summary-generator-head">
                             <label className="field-label" htmlFor="feed-week-summary-style">
-                              Generated Style
+                              Summary Draft
                             </label>
                             <p className="helper-copy feed-week-summary-generator-copy">
-                              Choose a summary style and it will load into the editor below for rewriting.
+                              Choose an editable weekly draft and it will load into the editor below for rewriting.
                             </p>
                           </div>
                         )}
@@ -2354,7 +2503,7 @@ export default function App() {
                                 value={selectedWeekSummaryStyleId}
                                 onChange={(event) => handleWeekSummaryStyleChange(event.target.value)}
                               >
-                                <option value="">Select a generated style</option>
+                                <option value="">No summary selected</option>
                                 {generatedWeekSummaryVariants.map((style) => (
                                   <option key={style.id} value={style.id}>
                                     {style.label}
@@ -2368,7 +2517,7 @@ export default function App() {
                               )}
                             </>
                           ) : (
-                            <p className="helper-copy">No generated weekly summary is available for this week yet.</p>
+                            <p className="helper-copy">No weekly summary draft is available for this week yet.</p>
                           )
                         ) : null}
                         <textarea
@@ -2382,7 +2531,7 @@ export default function App() {
                   ) : activeWeekSummary ? (
                     <div
                       className="feed-html feed-week-summary-body"
-                      dangerouslySetInnerHTML={{ __html: formatMarkdownHtml(activeWeekSummary.content) }}
+                      dangerouslySetInnerHTML={{ __html: formatMarkdownHtml(activeWeekSummaryContent) }}
                     />
                   ) : (
                     <p className="helper-copy">No weekly summary.</p>

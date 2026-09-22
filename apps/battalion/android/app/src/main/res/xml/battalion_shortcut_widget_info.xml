@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="60dp"
+    android:minHeight="60dp"
+    android:targetCellWidth="1"
+    android:targetCellHeight="1"
+    android:minResizeWidth="50dp"
+    android:minResizeHeight="50dp"
+    android:maxResizeWidth="450dp"
+    android:maxResizeHeight="450dp"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_shortcut_layout"
+    android:configure="com.jeffersonwm.battalion.ShortcutWidgetConfigActivity"
+    android:widgetCategory="home_screen"
+    android:resizeMode="horizontal|vertical"
+    android:widgetFeatures="reconfigurable"
+    android:description="@string/shortcut_widget_description" />

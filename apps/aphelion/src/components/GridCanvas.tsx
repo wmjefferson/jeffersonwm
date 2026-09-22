@@ -110,7 +110,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d', { alpha: false });
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
@@ -125,9 +125,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
 
     const isBlankMode = overlayMode === 'blank';
 
-    // Fill canvas background
-    ctx.fillStyle = '#FAFAFA';
-    ctx.fillRect(0, 0, width, height);
+    ctx.clearRect(0, 0, width, height);
 
     const isSearchActive = searchResults.length > 0 && searchFilter.trim().length > 0;
     const searchSet = isSearchActive ? new Set(searchResults) : null;
@@ -431,7 +429,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
   const isBlankMode = overlayMode === 'blank';
 
   return (
-    <div ref={containerRef} className="relative w-full h-full overflow-hidden select-none bg-[#FAFAFA]">
+    <div ref={containerRef} className="relative w-full h-full overflow-hidden select-none bg-transparent">
       <canvas
         ref={canvasRef}
         onMouseMove={handleMouseMove}

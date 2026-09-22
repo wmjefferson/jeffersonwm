@@ -19,6 +19,7 @@ const SERIES_SEPARATOR = ' | ';
 
 type FilterMode = (typeof FILTER_OPTIONS)[number]['id'];
 type CountPanel = 'rarity' | 'series' | 'attributes' | '';
+type HighlightSortMode = 'highlights' | 'downloads' | 'recent';
 
 type AdminActionRecord = {
   id: string;
@@ -56,7 +57,9 @@ type FolderTreeNode = {
 type HighlightAdminImageSummary = {
   key: string;
   count: number;
-  lastSelectedAt: string;
+  lastSelectedAt: string | null;
+  downloadCount?: number;
+  lastDownloadedAt?: string | null;
   blockIndex: number | null;
   image: {
     id: number | null;
@@ -76,6 +79,11 @@ type HighlightAdminSummary = {
   clearedCount: number;
   allImages: HighlightAdminImageSummary[];
   topImages: HighlightAdminImageSummary[];
+  downloadedImages?: HighlightAdminImageSummary[];
+  downloadStats?: {
+    totalDownloadEvents: number;
+    totalDownloadedItems: number;
+  };
   topFolders: Array<{ folder: string; count: number }>;
   daily: Array<{ date: string; selected: number; cleared: number }>;
 };
@@ -315,6 +323,7 @@ export function AdminPage({
   const [highlightSummary, setHighlightSummary] = useState<HighlightAdminSummary | null>(null);
   const [highlightLoading, setHighlightLoading] = useState(false);
   const [highlightError, setHighlightError] = useState('');
+  const [highlightSortMode, setHighlightSortMode] = useState<HighlightSortMode>('highlights');
   const [highlightViewer, setHighlightViewer] = useState<HighlightImageViewerState | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -489,6 +498,7 @@ export function AdminPage({
   const selectedAttributeHeader = selectedAttributeFilters.length > 0 ? selectedAttributeFilters.map((item) => `#${item}`).join(', ') : 'With Attributes';
   const isOptionsPage = currentHash === '#options';
   const isAdminHighlightsPage = currentHash === '#admin-highlights';
+  const isCurationPage = currentHash === '#curation';
 
   useEffect(() => {
     if (!isAdminHighlightsPage) {
@@ -551,7 +561,40 @@ export function AdminPage({
       return [];
     }
 
-    return highlightSummary.allImages.map((item) => {
+    const byKey = new Map<string, HighlightAdminImageSummary>();
+    for (const item of highlightSummary.allImages) {
+      byKey.set(item.key, item);
+    }
+    for (const item of highlightSummary.downloadedImages || []) {
+      const existing = byKey.get(item.key);
+      byKey.set(item.key, {
+        ...item,
+        ...existing,
+        image: existing?.image || item.image,
+        count: existing?.count || 0,
+        lastSelectedAt: existing?.lastSelectedAt || '',
+        downloadCount: item.downloadCount || existing?.downloadCount || 0,
+        lastDownloadedAt: item.lastDownloadedAt || existing?.lastDownloadedAt || null,
+      });
+    }
+
+    return Array.from(byKey.values()).sort((left, right) => {
+      if (highlightSortMode === 'downloads') {
+        return (right.downloadCount || 0) - (left.downloadCount || 0)
+          || String(right.lastDownloadedAt || '').localeCompare(String(left.lastDownloadedAt || ''))
+          || right.count - left.count;
+      }
+      if (highlightSortMode === 'recent') {
+        const rightRecent = [right.lastSelectedAt, right.lastDownloadedAt].filter(Boolean).sort().at(-1) || '';
+        const leftRecent = [left.lastSelectedAt, left.lastDownloadedAt].filter(Boolean).sort().at(-1) || '';
+        return String(rightRecent).localeCompare(String(leftRecent))
+          || right.count - left.count
+          || (right.downloadCount || 0) - (left.downloadCount || 0);
+      }
+      return right.count - left.count
+        || String(right.lastSelectedAt || '').localeCompare(String(left.lastSelectedAt || ''))
+        || (right.downloadCount || 0) - (left.downloadCount || 0);
+    }).map((item) => {
       const matchedCard = cards.find((card) => card.imageCode === item.image.code) || null;
       const directUrl = matchedCard
         ? prefixApiUrl(apiBaseUrl, withImageSize(matchedCard.imageUrl, 2048))
@@ -568,7 +611,7 @@ export function AdminPage({
         displayTitle: matchedCard?.title || matchedCard?.sourceTitle || item.image.title || item.image.code,
       };
     });
-  }, [apiBaseUrl, cards, highlightSummary]);
+  }, [apiBaseUrl, cards, highlightSortMode, highlightSummary]);
 
   useEffect(() => {
     if (!selectedCard) {
@@ -1245,13 +1288,39 @@ export function AdminPage({
       <>
         <main className="h-[calc(100vh-72px)] overflow-y-auto px-[36px] py-[16px]">
           <div className="mb-4 border-b border-[#e5e5e5] pb-2 font-sans text-sm text-gray-900">
-            <span className="font-semibold">Highlights</span> - review the current master highlight list with card identity details and direct image links.
+            <span className="font-semibold">Highlights</span> - review the current master highlight list with card identity details, download stats, and direct image links.
             {highlightSummary && (
               <span className="ml-2 text-gray-500">
-                {highlightedCards.length} highlighted image{highlightedCards.length === 1 ? '' : 's'} in the current public summary.
+                {highlightedCards.length} image{highlightedCards.length === 1 ? '' : 's'} tracked.
+                {' '}
+                {highlightSummary.downloadStats?.totalDownloadedItems || 0} downloaded item{(highlightSummary.downloadStats?.totalDownloadedItems || 0) === 1 ? '' : 's'} logged.
               </span>
             )}
           </div>
+
+          {highlightSummary && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 font-sans text-xs text-gray-700">
+              <span className="font-semibold uppercase tracking-[0.16em] text-gray-500">Sort</span>
+              {([
+                ['highlights', 'Highlights'],
+                ['downloads', 'Downloads'],
+                ['recent', 'Recent Activity'],
+              ] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setHighlightSortMode(mode)}
+                  className={`border px-3 py-1.5 font-semibold transition-colors duration-150 ${
+                    highlightSortMode === mode
+                      ? 'border-blue-700 text-blue-700'
+                      : 'border-[#d8d8d8] text-gray-700 hover:text-[#de8bf7]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {highlightError && (
             <div className="mb-4 border border-red-200 bg-red-50 px-4 py-3 font-sans text-sm text-red-700">
@@ -1263,7 +1332,7 @@ export function AdminPage({
             <div className="font-sans text-sm text-gray-500">Loading highlight details...</div>
           ) : highlightSummary && highlightedCards.length === 0 ? (
             <div className="border border-[#e5e5e5] bg-white px-4 py-6 font-sans text-sm text-gray-500">
-              No active highlighted images are currently recorded.
+              No active highlighted or downloaded images are currently recorded.
             </div>
           ) : (
             <div className="grid gap-4">
@@ -1302,8 +1371,14 @@ export function AdminPage({
                         </div>
                       </div>
                       <div className="shrink-0 text-right font-sans text-xs text-gray-500">
-                        <div>{summary.count} selected</div>
-                        <div>{new Date(summary.lastSelectedAt).toLocaleString()}</div>
+                        <div>{summary.count} highlighted</div>
+                        <div>{summary.downloadCount || 0} downloaded</div>
+                        {summary.lastSelectedAt && (
+                          <div>highlight {new Date(summary.lastSelectedAt).toLocaleString()}</div>
+                        )}
+                        {summary.lastDownloadedAt && (
+                          <div>download {new Date(summary.lastDownloadedAt).toLocaleString()}</div>
+                        )}
                       </div>
                     </div>
 
@@ -1388,10 +1463,10 @@ export function AdminPage({
 
   return (
     <div
-      className="min-h-screen overflow-x-hidden bg-[#FAFAFA] text-gray-950"
+      className="relative z-10 min-h-screen overflow-x-hidden bg-transparent text-gray-950"
       style={{ scrollbarGutter: 'stable' }}
     >
-      <header className="h-[36px] px-6 bg-[#FAFAFA] flex items-center justify-between shrink-0 relative z-20 border-b border-[#e5e5e5]">
+      <header className="h-[36px] px-6 bg-[#FAFAFA]/95 flex items-center justify-between shrink-0 relative z-20 border-b border-[#e5e5e5]">
         <div className="flex items-center">
           <a
             href="/aphelion/"
@@ -1407,25 +1482,19 @@ export function AdminPage({
           >
             Highlights
           </a>
-          {isAdminHighlightsPage ? (
-            <>
-              <a href="/aphelion/#admin" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
-                Admin
-              </a>
-              <a href="/aphelion/#options" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
-                Options
-              </a>
-            </>
-          ) : isOptionsPage ? (
-            <a href="/aphelion/#admin" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
-              Admin
-            </a>
-          ) : (
-            <a href="/aphelion/#options" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
-              Options
-            </a>
-          )}
-          <a href="/aphelion/" className="hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150">
+          <a
+            href="/aphelion/#curation"
+            className={`transition-colors duration-1000 hover:duration-150 hover:text-[#de8bf7] ${isCurationPage ? 'text-blue-700' : ''}`}
+          >
+            Curation
+          </a>
+          <a
+            href="/aphelion/#options"
+            className={`transition-colors duration-1000 hover:duration-150 hover:text-[#de8bf7] ${isOptionsPage ? 'text-blue-700' : ''}`}
+          >
+            Options
+          </a>
+          <a href="/aphelion/" className="text-red-600 hover:text-red-700 transition-colors duration-1000 hover:duration-150">
             Public
           </a>
           <button
@@ -1477,7 +1546,7 @@ export function AdminPage({
             {renderActionHistory()}
           </div>
         </main>
-      ) : (
+      ) : isCurationPage ? (
       <main className="h-[calc(100vh-72px)] overflow-hidden px-[36px] py-[12px]">
         <div className="relative mb-1 grid grid-cols-6 border-b border-[#e5e5e5] pb-1 font-sans text-xs text-gray-900">
           <div className="min-w-0 text-center"><span className="font-semibold">Total</span> - {stats.total}</div>
@@ -2106,11 +2175,33 @@ export function AdminPage({
           </div>
         )}
       </main>
+      ) : (
+        <main className="h-[calc(100vh-72px)] overflow-hidden px-[36px] py-[16px]">
+          <div className="h-full border-t border-[#e5e5e5]" />
+        </main>
       )}
-      <footer className="flex h-[36px] items-center justify-end border-t border-[#e5e5e5] bg-[#FAFAFA] px-6 font-sans text-sm text-gray-700">
-        <div>
-          © 2026 Jefferson Williams. All rights reserved.
-        </div>
+      <footer className="flex h-[36px] items-center justify-end border-t border-[#e5e5e5] bg-[#FAFAFA]/95 px-6 font-sans text-sm text-gray-700">
+        <p className="m-0 leading-none text-gray-500 text-xs sm:text-sm font-sans truncate">
+          &copy; {new Date().getFullYear()}{' '}
+          <a
+            href="https://jeffersonwm.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+          >
+            Jefferson Williams
+          </a>
+          . All rights reserved.{' '}
+          <a
+            href="https://github.com/wmjefferson/jeffersonwm"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+          >
+            GitHub
+          </a>
+          .
+        </p>
       </footer>
       {imagePreviewOpen && selectedCard && (
         <button

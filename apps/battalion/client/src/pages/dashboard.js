@@ -91,8 +91,25 @@ function connectSSE() {
 
 async function loadDashboard(shouldRenderQuote = false) {
   try {
-    const data = await publicDashboard.get();
-    renderHeader(data.player);
+    const urlParams = new URLSearchParams(window.location.search);
+    const userParam = urlParams.get('user') || urlParams.get('u');
+
+    const data = await publicDashboard.get(userParam);
+    if (!data || !data.player) {
+      const headerEl = document.getElementById('dash-header');
+      if (headerEl) {
+        headerEl.innerHTML = `
+          <div style="padding:40px 20px; text-align:center;">
+            <h2 style="color:#ef4444; margin-bottom:8px;">Profile Not Found or Private</h2>
+            <p style="color:#666; font-size:13px;">This public dashboard is currently unavailable or set to private.</p>
+            <a href="${window.location.pathname}#dashboard" class="btn btn--primary btn--sm" style="margin-top:12px; display:inline-block; text-decoration:none;">View Home Dashboard</a>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    renderHeader(data.player, userParam, data.meta);
     renderBars(data.player);
     renderInlineStats(data.player, data.stats);
     renderStats(data.player);
@@ -107,7 +124,7 @@ async function loadDashboard(shouldRenderQuote = false) {
       const res = await auth.check();
       const authLink = document.getElementById('dash-auth-link');
       if (authLink && res.authenticated) {
-        authLink.innerHTML = `<a href="#admin" class="btn btn--ghost btn--sm" style="text-decoration:none;">Admin Hub →</a>`;
+        authLink.innerHTML = `<a href="#admin" class="btn btn--primary btn--sm" style="text-decoration:none;">Admin Hub (${res.player.username}) →</a>`;
       } else if (authLink) {
         authLink.innerHTML = `<a href="#login" class="btn btn--ghost btn--sm" style="text-decoration:none;">Sign In →</a>`;
       }
@@ -116,18 +133,40 @@ async function loadDashboard(shouldRenderQuote = false) {
     }
   } catch (err) {
     console.error('Dashboard load error:', err);
+    const headerEl = document.getElementById('dash-header');
+    if (headerEl) {
+      headerEl.innerHTML = `
+        <div style="padding:40px 20px; text-align:center;">
+          <h2 style="color:#ef4444; margin-bottom:8px;">Unable to Load Dashboard</h2>
+          <p style="color:#666; font-size:13px;">${err.message || 'Profile is private or does not exist.'}</p>
+          <a href="${window.location.pathname}#dashboard" class="btn btn--primary btn--sm" style="margin-top:12px; display:inline-block; text-decoration:none;">View Home Dashboard</a>
+        </div>
+      `;
+    }
   }
 }
 
-function renderHeader(p) {
+function renderHeader(p, userParam, meta = {}) {
   const el = document.getElementById('dash-header');
   if (!el) return;
+
+  const isCustomUser = Boolean(userParam);
+  const isTemplate = meta.is_master_template;
+
   el.innerHTML = `
+    ${isCustomUser ? `
+      <div style="margin-bottom:8px;">
+        <span style="font-size:11px; text-transform:uppercase; letter-spacing:1px; background:${isTemplate ? '#f3e8ff' : '#dbeafe'}; color:${isTemplate ? '#6b21a8' : '#1e40af'}; padding:3px 8px; border-radius:12px; font-weight:600;">
+          ${isTemplate ? '⚙️ Master Startup Template Preview' : '⚔️ Public Shared Profile'}
+        </span>
+      </div>
+    ` : ''}
     <h1 class="dash-header__name">${p.username || 'Commander'}</h1>
     <div class="dash-header__meta">
       <span class="dash-header__level">Level ${p.level || 1}</span>
       <span class="dash-header__sep">·</span>
       <span class="dash-header__title">${p.title || 'Recruit'}</span>
+      ${p.slug ? `<span class="dash-header__sep">·</span><span style="font-size:12px; opacity:0.6;">@${p.slug}</span>` : ''}
     </div>
   `;
 }

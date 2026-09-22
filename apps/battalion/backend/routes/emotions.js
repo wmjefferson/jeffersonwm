@@ -1,16 +1,14 @@
 const express = require('express');
-const { db } = require('../db/db');
-const { emoDb } = require('../db/db');
+const { db, emoDb } = require('../db/db');
 const requireAuth = require('../middleware/auth');
 const { broadcast } = require('../utils/events');
 
 const router = express.Router();
 
-// GET /api/emotions/categories — list all emotion categories with modifiers
+// GET /api/emotions/categories — list all emotion categories with modifiers (taxonomy is global)
 router.get('/categories', async (req, res) => {
   try {
     const [categories] = await emoDb.execute('SELECT * FROM emotion_categories ORDER BY label');
-    // Parse JSON fields
     const parsed = categories.map(c => ({
       ...c,
       favored_tags: typeof c.favored_tags === 'string' ? JSON.parse(c.favored_tags) : c.favored_tags,
@@ -25,7 +23,7 @@ router.get('/categories', async (req, res) => {
   }
 });
 
-// GET /api/emotions — list all individual emotions, optionally filtered by category
+// GET /api/emotions — list all individual emotions (taxonomy is global)
 router.get('/', async (req, res) => {
   try {
     const { category } = req.query;
@@ -36,7 +34,6 @@ router.get('/', async (req, res) => {
       params = [category];
     }
     const [emotions] = await emoDb.execute(sql, params);
-    // Parse JSON fields
     const parsed = emotions.map(e => ({
       ...e,
       related_emotions: typeof e.related_emotions === 'string' ? JSON.parse(e.related_emotions) : e.related_emotions,
@@ -48,16 +45,16 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/emotions/current — get player's current active emotion
+// GET /api/emotions/current — get player's current active emotion for scoped user
 router.get('/current', requireAuth, async (req, res) => {
   try {
     const [[current]] = await db.execute(
-      'SELECT * FROM emotion_log ORDER BY logged_at DESC LIMIT 1'
+      'SELECT * FROM emotion_log WHERE user_id = ? ORDER BY logged_at DESC LIMIT 1',
+      [req.userId]
     );
     if (!current) {
       return res.json({ emotion: null, category: null });
     }
-    // Fetch the category data
     const [[cat]] = await emoDb.execute(
       'SELECT * FROM emotion_categories WHERE category_id = ?',
       [current.category_id]
@@ -76,10 +73,10 @@ router.get('/current', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/emotions/log — log an emotion (sets current feeling)
+// POST /api/emotions/log — log an emotion for scoped user
 router.post('/log', requireAuth, async (req, res) => {
   try {
-    const { emotion_name, category_id, tier, note } = req.body;
+    const { emotion_name, category_id, tier, note, logged_at } = req.body;
 
     if (!emotion_name || !category_id) {
       return res.status(400).json({ error: 'emotion_name and category_id are required' });
@@ -87,7 +84,6 @@ router.post('/log', requireAuth, async (req, res) => {
 
     const emotionTier = tier || 3;
 
-    // Fetch the category data to get flat modifiers
     const [[cat]] = await emoDb.execute(
       'SELECT * FROM emotion_categories WHERE category_id = ?',
       [category_id]
@@ -98,11 +94,12 @@ router.post('/log', requireAuth, async (req, res) => {
     }
 
     const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
-    
-    // Get player to apply stats
-    const [[player]] = await db.execute('SELECT * FROM player WHERE id = 1');
 
-    // Calculate new stats
+    const [[player]] = await db.execute('SELECT * FROM player WHERE id = ?', [req.userId]);
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
     const energyDelta = cat.energy_flat || 0;
     const stressDelta = cat.stress_flat || 0;
     const disciplineDelta = cat.discipline_flat || 0;
@@ -119,13 +116,10 @@ router.post('/log', requireAuth, async (req, res) => {
       stat_discipline: clamp(player.stat_discipline + disciplineDelta, 0, 100)
     };
 
-    // Calculate XP based on positive deltas
     const posDeltas = [energyDelta, -stressDelta, socialDelta, healthDelta, funDelta, disciplineDelta].filter(d => d > 0).length;
-    // Base XP just for feeling an emotion and logging it
-    const xpEarned = Math.max(5, posDeltas * 5); 
+    const xpEarned = Math.max(5, posDeltas * 5);
     const goldEarned = Math.floor(xpEarned * 0.4);
 
-    // Map emotion to a mood modifier based on category valence
     const positiveCategories = ['accepting_open', 'connected_loving', 'curious', 'tender', 'aliveness_joy', 'courageous_powerful', 'grateful', 'hopeful'];
     const negativeCategories = ['angry_annoyed', 'guilt', 'despair_sad', 'fragile', 'disconnected_numb', 'embarrassed_shame', 'powerless', 'fear', 'stressed_tense', 'unsettled_doubt'];
 
@@ -142,29 +136,36 @@ router.post('/log', requireAuth, async (req, res) => {
       moodValue = 'okay'; moodModifier = 1.0;
     }
 
-    // Update player's stats and current_mood
     await db.execute(
-      `UPDATE player SET 
-        current_mood = ?, mood_modifier = ?, 
+      `UPDATE player SET
+        current_mood = ?, mood_modifier = ?,
         stat_energy = ?, stat_stress = ?, stat_social = ?, stat_health = ?, stat_fun = ?, stat_discipline = ?,
         xp = xp + ?, gold = gold + ?,
-        updated_at = NOW() 
-      WHERE id = 1`,
+        updated_at = NOW()
+      WHERE id = ?`,
       [
         moodValue, moodModifier,
         newStats.stat_energy, newStats.stat_stress, newStats.stat_social, newStats.stat_health, newStats.stat_fun, newStats.stat_discipline,
-        xpEarned, goldEarned
+        xpEarned, goldEarned,
+        req.userId
       ]
     );
 
-    // Insert into emotion_log
-    await db.execute(
-      `INSERT INTO emotion_log (emotion_name, category_id, tier, note, energy_delta, stress_delta, discipline_delta, social_delta, health_delta, fun_delta, xp_earned, gold_earned)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [emotion_name, category_id, emotionTier, note || '', energyDelta, stressDelta, disciplineDelta, socialDelta, healthDelta, funDelta, xpEarned, goldEarned]
-    );
+    let emoInsertSql = `INSERT INTO emotion_log (user_id, emotion_name, category_id, tier, note, energy_delta, stress_delta, discipline_delta, social_delta, health_delta, fun_delta, xp_earned, gold_earned`;
+    let emoValuesSql = `VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`;
+    const emoInsertParams = [req.userId, emotion_name, category_id, emotionTier, note || '', energyDelta, stressDelta, disciplineDelta, socialDelta, healthDelta, funDelta, xpEarned, goldEarned];
 
-    // Build delta string for activity feed
+    if (logged_at) {
+      emoInsertSql += `, logged_at)`;
+      emoValuesSql += `, ?)`;
+      emoInsertParams.push(logged_at);
+    } else {
+      emoInsertSql += `)`;
+      emoValuesSql += `)`;
+    }
+
+    await db.execute(`${emoInsertSql} ${emoValuesSql}`, emoInsertParams);
+
     const deltaStr = [];
     if (energyDelta) deltaStr.push(`⚡${energyDelta > 0 ? '+' : ''}${energyDelta}`);
     if (stressDelta) deltaStr.push(`stress ${stressDelta > 0 ? '+' : ''}${stressDelta}`);
@@ -173,21 +174,18 @@ router.post('/log', requireAuth, async (req, res) => {
     if (funDelta) deltaStr.push(`fun ${funDelta > 0 ? '+' : ''}${funDelta}`);
     if (socialDelta) deltaStr.push(`soc ${socialDelta > 0 ? '+' : ''}${socialDelta}`);
 
-    // Add to activity feed
     const catLabel = cat.label;
     const emoji = positiveCategories.includes(category_id) ? '💚' : negativeCategories.includes(category_id) ? '💔' : '💭';
     const msgStats = deltaStr.length > 0 ? ` [${deltaStr.join(' ')}]` : '';
     await db.execute(
-      `INSERT INTO activity_feed (type, message, icon, xp_earned, gold_earned) VALUES (?, ?, ?, ?, ?)`,
-      ['emotion', `${emoji} Feeling: ${emotion_name} (${catLabel})${msgStats}`, emoji, xpEarned, goldEarned]
+      `INSERT INTO activity_feed (user_id, type, message, icon, xp_earned, gold_earned) VALUES (?, ?, ?, ?, ?, ?)`,
+      [req.userId, 'emotion', `${emoji} Feeling: ${emotion_name} (${catLabel})${msgStats}`, emoji, xpEarned, goldEarned]
     );
 
-    // Check level up
     const gameEngine = require('../utils/gameEngine');
-    const levelResult = await gameEngine.checkLevelUp();
-    const [[updatedPlayer]] = await db.execute('SELECT * FROM player WHERE id = 1');
+    const levelResult = await gameEngine.checkLevelUp(req.userId);
+    const [[updatedPlayer]] = await db.execute('SELECT * FROM player WHERE id = ?', [req.userId]);
 
-    // Broadcast
     broadcast({
       type: 'emotion_logged',
       emotion: emotion_name,
@@ -225,14 +223,31 @@ router.post('/log', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/emotions/history — recent emotion history
+// GET /api/emotions/history — emotion history for scoped user
 router.get('/history', requireAuth, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 50;
-    const [logs] = await db.execute(
-      'SELECT * FROM emotion_log ORDER BY logged_at DESC LIMIT ?',
-      [limit]
-    );
+    const { limit, startDate, endDate } = req.query;
+    let query = 'SELECT * FROM emotion_log WHERE user_id = ?';
+    const params = [req.userId];
+
+    if (startDate) {
+      query += ' AND logged_at >= ?';
+      params.push(startDate);
+    }
+    if (endDate) {
+      query += ' AND logged_at <= ?';
+      params.push(endDate);
+    }
+
+    query += ' ORDER BY logged_at DESC';
+
+    if (limit !== 'all') {
+      const parsedLimit = parseInt(limit) || 50;
+      query += ' LIMIT ?';
+      params.push(parsedLimit);
+    }
+
+    const [logs] = await db.execute(query, params);
     res.json(logs);
   } catch (err) {
     console.error('Get emotion history error:', err);
@@ -241,9 +256,10 @@ router.get('/history', requireAuth, async (req, res) => {
 });
 
 // Helper to synchronize player mood after deleting logs
-async function syncPlayerMood() {
+async function syncPlayerMood(userId) {
   const [[latestLog]] = await db.execute(
-    'SELECT * FROM emotion_log ORDER BY logged_at DESC LIMIT 1'
+    'SELECT * FROM emotion_log WHERE user_id = ? ORDER BY logged_at DESC LIMIT 1',
+    [userId]
   );
 
   let moodValue = 'okay';
@@ -265,8 +281,8 @@ async function syncPlayerMood() {
   }
 
   await db.execute(
-    `UPDATE player SET current_mood = ?, mood_modifier = ?, updated_at = NOW() WHERE id = 1`,
-    [moodValue, moodModifier]
+    `UPDATE player SET current_mood = ?, mood_modifier = ?, updated_at = NOW() WHERE id = ?`,
+    [moodValue, moodModifier, userId]
   );
 
   broadcast({
@@ -281,21 +297,16 @@ async function syncPlayerMood() {
 router.delete('/log/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // Check if the log exists
-    const [[log]] = await db.execute('SELECT * FROM emotion_log WHERE id = ?', [id]);
+
+    const [[log]] = await db.execute('SELECT * FROM emotion_log WHERE id = ? AND user_id = ?', [id, req.userId]);
     if (!log) {
       return res.status(404).json({ error: 'Emotion log not found' });
     }
 
-    // Delete the log
-    await db.execute('DELETE FROM emotion_log WHERE id = ?', [id]);
+    await db.execute('DELETE FROM emotion_log WHERE id = ? AND user_id = ?', [id, req.userId]);
+    await syncPlayerMood(req.userId);
 
-    // Re-sync player mood
-    await syncPlayerMood();
-
-    // Broadcast update so client refreshes state if needed
-    const [[updatedPlayer]] = await db.execute('SELECT * FROM player WHERE id = 1');
+    const [[updatedPlayer]] = await db.execute('SELECT * FROM player WHERE id = ?', [req.userId]);
     broadcast({
       type: 'emotion_deleted',
       id,
@@ -318,17 +329,14 @@ router.delete('/log', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid days parameter. Must be 1, 2, or 3.' });
     }
 
-    // Delete logs from the last X days
     await db.execute(
-      'DELETE FROM emotion_log WHERE logged_at >= NOW() - INTERVAL ? DAY',
-      [days]
+      'DELETE FROM emotion_log WHERE user_id = ? AND logged_at >= NOW() - INTERVAL ? DAY',
+      [req.userId, days]
     );
 
-    // Re-sync player mood
-    await syncPlayerMood();
+    await syncPlayerMood(req.userId);
 
-    // Broadcast update
-    const [[updatedPlayer]] = await db.execute('SELECT * FROM player WHERE id = 1');
+    const [[updatedPlayer]] = await db.execute('SELECT * FROM player WHERE id = ?', [req.userId]);
     broadcast({
       type: 'emotions_cleared',
       days,
@@ -343,7 +351,7 @@ router.delete('/log', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/emotions — create a new emotion (admin only/requires auth)
+// POST /api/emotions — create a new emotion taxonomy item
 router.post('/', requireAuth, async (req, res) => {
   try {
     const {
@@ -384,7 +392,7 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
-// PUT /api/emotions/:id — update an existing emotion (admin only/requires auth)
+// PUT /api/emotions/:id — update an existing emotion taxonomy item
 router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
@@ -431,7 +439,7 @@ router.put('/:id', requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/emotions/:id — delete an emotion (admin only/requires auth)
+// DELETE /api/emotions/:id — delete an emotion taxonomy item
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;

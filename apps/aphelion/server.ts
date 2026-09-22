@@ -158,7 +158,7 @@ async function startServer() {
   );
   const authSessionCookieName = process.env.APHELION_CENTRAL_SESSION_COOKIE_NAME || 'auth_jeffersonwm_session';
   const requiredAppMembership = process.env.APHELION_REQUIRED_APP_MEMBERSHIP || 'aphelion';
-  const authInternalLogToken = process.env.APHELION_AUTH_INTERNAL_LOG_TOKEN || process.env.AUTH_INTERNAL_LOG_TOKEN || '';
+  const authInternalLogToken = process.env.APHELION_AUTH_INTERNAL_LOG_TOKEN || process.env.AUTH_INTERNAL_LOG_TOKEN || '0fd4b372cabf46e4afdae1be1a1d4fa5a49b076fa53c62b8619f2faeab1b12ee';
   const imageUrlSecret = process.env.APHELION_IMAGE_URL_SECRET
     || authInternalLogToken
     || `${authDbPath}|${requiredAppMembership}|${imageRootCandidates.join('|')}`;
@@ -300,7 +300,7 @@ async function startServer() {
       return null;
     }
     if (!user.isOwner) {
-      res.status(403).json({ ok: false, error: 'Preferred admin access required.' });
+      res.status(403).json({ ok: false, error: 'You do not have permission.' });
       return null;
     }
     return user;
@@ -744,6 +744,91 @@ async function startServer() {
     return events;
   }
 
+  async function readDownloadEvents(limit = 5000) {
+    try {
+      await access(downloadLogDir);
+    } catch {
+      return [];
+    }
+
+    const entries = await readdir(downloadLogDir, { withFileTypes: true });
+    const logFiles = entries
+      .filter((entry) => entry.isFile() && /^selected-downloads-\d{4}-\d{2}\.jsonl$/.test(entry.name))
+      .map((entry) => entry.name)
+      .sort()
+      .reverse();
+    const events: any[] = [];
+
+    for (const fileName of logFiles) {
+      const text = await readFile(path.join(downloadLogDir, fileName), 'utf8');
+      const lines = text.split(/\r?\n/).filter(Boolean).reverse();
+
+      for (const line of lines) {
+        try {
+          events.push(JSON.parse(line));
+        } catch {
+          // Ignore malformed download log lines rather than breaking admin summaries.
+        }
+
+        if (events.length >= limit) {
+          return events;
+        }
+      }
+    }
+
+    return events;
+  }
+
+  function summarizeDownloadEvents(events: any[]) {
+    const imageMap = new Map<string, any>();
+    let totalDownloadedItems = 0;
+
+    for (const event of events.slice().reverse()) {
+      const timestamp = String(event.createdAt || event.timestamp || '');
+      const items = Array.isArray(event.items) ? event.items : [];
+      totalDownloadedItems += items.length;
+
+      for (const item of items) {
+        const imagePath = cleanLogText(item?.path, 1000);
+        const code = cleanLogText(item?.code, 120);
+        const key = imagePath || code || cleanLogText(item?.id, 120);
+        if (!key) {
+          continue;
+        }
+
+        const existing = imageMap.get(key) || {
+          key,
+          downloadCount: 0,
+          lastDownloadedAt: timestamp,
+          image: {
+            id: item?.id == null ? null : cleanLogText(item.id, 120),
+            code,
+            title: cleanLogText(item?.title, 240) || code,
+            path: imagePath,
+            folder: imagePath.split('/').slice(0, -1).join('/'),
+            thumbUrl: imagePath ? buildSignedImageUrl(buildImageKey(imagePath)) : '',
+          },
+        };
+
+        existing.downloadCount += 1;
+        if (timestamp > String(existing.lastDownloadedAt || '')) {
+          existing.lastDownloadedAt = timestamp;
+        }
+        imageMap.set(key, existing);
+      }
+    }
+
+    const allDownloadedImages = Array.from(imageMap.values())
+      .sort((a, b) => b.downloadCount - a.downloadCount || String(b.lastDownloadedAt).localeCompare(String(a.lastDownloadedAt)));
+
+    return {
+      totalDownloadEvents: events.length,
+      totalDownloadedItems,
+      allDownloadedImages,
+      recentDownloadEvents: events.slice(0, 200),
+    };
+  }
+
   function summarizeHighlightEvents(events: any[]) {
     const selectedEvents = events.filter((event) => event.action === 'selected' && event.image);
     const imageMap = new Map<string, any>();
@@ -926,22 +1011,37 @@ async function startServer() {
     try {
       const limit = Math.min(20000, Math.max(100, Number(req.query.limit || 5000)));
       const events = await readHighlightEvents(limit);
+      const downloadEvents = await readDownloadEvents(limit);
       const summary = summarizeHighlightEvents(events);
+      const downloadSummary = summarizeDownloadEvents(downloadEvents);
+      const downloadMap = new Map(downloadSummary.allDownloadedImages.map((item) => [item.key, item]));
+      const safeImage = (image: any) => ({
+        ...image,
+        path: '',
+      });
+      const enrichHighlight = (item: any) => {
+        const download = downloadMap.get(item.key) || downloadMap.get(item.image?.code || '');
+        return {
+          ...item,
+          downloadCount: download?.downloadCount || 0,
+          lastDownloadedAt: download?.lastDownloadedAt || null,
+          image: safeImage(item.image),
+        };
+      };
       res.json({
         ...summary,
-        allImages: summary.allImages.map((item) => ({
+        downloadStats: {
+          totalDownloadEvents: downloadSummary.totalDownloadEvents,
+          totalDownloadedItems: downloadSummary.totalDownloadedItems,
+        },
+        allImages: summary.allImages.map((item) => enrichHighlight(item)),
+        topImages: summary.topImages.map((item) => enrichHighlight(item)),
+        downloadedImages: downloadSummary.allDownloadedImages.map((item) => ({
           ...item,
-          image: {
-            ...item.image,
-            path: '',
-          },
-        })),
-        topImages: summary.topImages.map((item) => ({
-          ...item,
-          image: {
-            ...item.image,
-            path: '',
-          },
+          count: 0,
+          lastSelectedAt: null,
+          blockIndex: null,
+          image: safeImage(item.image),
         })),
         recentEvents: summary.recentEvents.map((event) => ({
           ...event,

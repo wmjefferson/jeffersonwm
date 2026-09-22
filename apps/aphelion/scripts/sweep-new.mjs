@@ -71,13 +71,13 @@ function printHelp() {
 Aphelion NEW-folder sweep
 
 Preview counts, NEW files, duplicate matches, and rename plan:
-  npm run rename:sweep -- --preview
+  node scripts/sweep-new.mjs --preview
 
 Delete duplicate files from 00 - NEW after confirmation:
   npm run rename:sweep
 
 Rename/move remaining 00 - NEW files into numbered folders:
-  npm run rename:sweep -- --rename --digits 5
+  node scripts/sweep-new.mjs --rename --digits 5
 
 Options:
   --preview             Show totals, NEW files, duplicate matches, and planned sequence names.
@@ -89,6 +89,15 @@ Options:
   --history <path>      Manifest path. Defaults to <library>\\.aphelion-rename-history.json.
   --yes                 Skip delete confirmation. Use carefully.
 `);
+}
+
+function printUsageExamples() {
+  console.log(`\nUsage examples:`);
+  console.log(`  node scripts/sweep-new.mjs --preview          # Review NEW-folder counts and planned actions`);
+  console.log(`  npm run rename:sweep                          # Delete duplicate NEW files after confirmation`);
+  console.log(`  node scripts/sweep-new.mjs --rename --digits 5`);
+  console.log(`  node scripts/sweep-new.mjs --new-folder "00 - NEW" --preview`);
+  console.log(`  node scripts/sweep-new.mjs --library "\\\\JEFFERSHIZZLE-D\\Dotcoms E\\images\\keep" --preview\n`);
 }
 
 function parseEnvFile(filePath) {
@@ -549,17 +558,20 @@ async function main() {
 
   if (args.preview) {
     console.log('Preview only. No files were deleted, renamed, or moved.');
+    printUsageExamples();
     return;
   }
 
   if (args.rename) {
     await applyRenamePlan(plan, libraryRoot, history, historyPath, args);
     syncTargetCount(libraryRoot);
+    printUsageExamples();
     return;
   }
 
   await deleteDuplicateMatches(matches, args);
   syncTargetCount(libraryRoot);
+  printUsageExamples();
 }
 
 main().catch((error) => {

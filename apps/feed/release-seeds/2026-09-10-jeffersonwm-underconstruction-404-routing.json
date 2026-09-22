@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "JeffersonWM under-construction and 404 routing pass",
+  "content": "<p>JeffersonWM now has a cleaner shared safety layer for unfinished and missing pages.</p><p><strong>What changed:</strong></p><ul><li><strong>Under construction:</strong> added a shared JeffersonWM-hosted under-construction page that can show the target site name from a query parameter, matching the current banner/auth/copyright shell.</li><li><strong>Paused apps:</strong> root routing now sends paused public paths such as Bullion, Clionidae, Millionfold, and Vermilion to the shared under-construction page instead of leaving each one to fail differently.</li><li><strong>404 handling:</strong> added a simple shared 404 page with top-left <code>404</code>, top-right Sign In, bottom-right copyright, directory browsing disabled, and Apache <code>ErrorDocument 404 /404.html</code>.</li><li><strong>App route guards:</strong> Aphelion, Battalion, Billionaire, Lionship, and Stallioneer now route unknown app paths toward the shared 404 baseline while preserving their normal valid app paths.</li><li><strong>Design cleanup:</strong> tested a randomized garbled-text image treatment for 404s, then intentionally returned the page to a quieter blank main window with only the shared background.</li></ul><p>This gives the platform a more consistent public edge: unfinished sites explain themselves, bad URLs land somewhere calm, and future app routing work has a shared page to point at.</p>",
+  "url": "https://jeffersonwm.com/404.html",
+  "source": "manual",
+  "external_id": "jeffersonwm-underconstruction-404-routing-2026-09-10",
+  "created_at": "2026-09-10 20:45:00"
+}

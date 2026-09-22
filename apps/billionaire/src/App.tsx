@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { VanityMatch } from './lib/vanityMatcher';
 
 type AuthUser = {
   id: string;
@@ -91,6 +92,22 @@ const buildAuthUrl = () => {
   return url;
 };
 
+const isCurrentAppPath = () => {
+  const basePath = import.meta.env.BASE_URL || '/billionaire/';
+  const normalizedBasePath = basePath.endsWith('/') ? basePath : `${basePath}/`;
+  const currentPath = window.location.pathname.endsWith('/')
+    ? window.location.pathname
+    : `${window.location.pathname}/`;
+  return normalizedBasePath === '/' || currentPath === normalizedBasePath;
+};
+
+const getCurrentRoute = () => {
+  if (!isCurrentAppPath()) return 'not-found';
+  if (window.location.hash === '') return 'home';
+  if (window.location.hash === '#admin') return 'admin';
+  return 'not-found';
+};
+
 const getFontSizeStyle = (text: string) => {
   const len = text ? text.length : 1;
   const vw = (115 / (len + 0.8)).toFixed(2);
@@ -100,6 +117,127 @@ const getFontSizeStyle = (text: string) => {
   };
 };
 
+const DEFAULT_ACTIVE_FONTS = [
+  'Archivo', 'Barrio', 'Betania Patmos In', 'Bitcount Grid Double', 'Cabin Sketch',
+  'DM Sans', 'DotGothic16', 'Dr Sugiyama', 'DynaPuff', 'Jost', 'Lacquer',
+  'Libertinus Keyboard', 'Libre Baskerville', 'Life Savers', 'Londrina Sketch',
+  'Marcellus', 'Merriweather', 'Michroma', 'Monoton', 'Noto Color Emoji',
+  'Onest', 'Oswald', 'Palette Mosaic', 'Playfair Display', 'Playwrite NZ',
+  'Playwrite NZ Guides', 'Purple Purse', 'Raleway', 'Rock 3D', 'Sacramento',
+  'Saira Stencil', 'Shizuru', 'Sirin Stencil', 'Slackside One', 'Smokum',
+  'Smooch', 'Smooch Sans', 'Stardos Stencil', 'Stick No Bills',
+  'UnifrakturMaguntia', 'Wavefont'
+];
+
+const loadedFonts = new Set<string>(['Average', 'Inter Tight']);
+
+const loadGoogleFont = (fontName: string) => {
+  if (!fontName || loadedFonts.has(fontName)) return;
+  loadedFonts.add(fontName);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName).replace(/%20/g, '+')}&display=swap`;
+  document.head.appendChild(link);
+};
+
+const preloadFontBatch = (fontNames: string[]) => {
+  if (!fontNames || fontNames.length === 0) return;
+  const toLoad = fontNames.filter((f) => !loadedFonts.has(f));
+  toLoad.forEach((f) => loadedFonts.add(f));
+  for (let i = 0; i < toLoad.length; i += 15) {
+    const chunk = toLoad.slice(i, i + 15);
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?${chunk.map((f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}`).join('&')}&display=swap`;
+    document.head.appendChild(link);
+  }
+};
+
+preloadFontBatch(DEFAULT_ACTIVE_FONTS);
+
+function VanityWordsList({ phone }: { phone: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [matches, setMatches] = useState<VanityMatch[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const digits = phone.replace(/\D/g, '');
+
+    if (digits.length < 3) {
+      setMatches([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    import('./lib/vanityMatcher')
+      .then(async ({ findVanityWords }) => {
+        const nextMatches = await findVanityWords(phone);
+        if (!cancelled) {
+          setMatches(nextMatches);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMatches([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [phone]);
+
+  if (matches.length === 0) {
+    return (
+      <div className="vanity-container">
+        <span className="vanity-label">Words:</span>
+        <span className="vanity-empty">{loading ? 'Checking...' : 'None detected'}</span>
+      </div>
+    );
+  }
+
+  const displayed = expanded ? matches : matches.slice(0, 6);
+  const hasMore = matches.length > 6;
+
+  return (
+    <div className="vanity-container">
+      <div className="vanity-header">
+        <span className="vanity-label">Words ({matches.length}):</span>
+        {hasMore && (
+          <button
+            type="button"
+            className="vanity-toggle-btn"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? 'Less' : `+${matches.length - 6} more`}
+          </button>
+        )}
+      </div>
+      <div className="vanity-chip-grid">
+        {displayed.map((m, idx) => (
+          <span
+            key={`${m.word}-${m.startIndex}-${m.endIndex}-${idx}`}
+            className={`vanity-chip ${m.isFullMatch ? 'vanity-chip--full' : m.wordLength >= 5 ? 'vanity-chip--major' : ''}`}
+            title={`Digits ${m.startIndex + 1}–${m.endIndex} (${m.digitSpan}) → ${m.breakdown}`}
+          >
+            <strong className="vanity-chip__word">{m.word}</strong>
+            <span className={`vanity-chip__method vanity-chip__method--${m.method}`}>
+              {m.method.toUpperCase()}
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [submissionId, setSubmissionId] = useState<string | null>(null);
@@ -108,11 +246,36 @@ export default function App() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [route, setRoute] = useState(() => (window.location.hash === '#admin' ? 'admin' : 'home'));
+  const [route, setRoute] = useState(() => getCurrentRoute());
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [adminError, setAdminError] = useState('');
   const [adminLoading, setAdminLoading] = useState(false);
+  const [fontPool, setFontPool] = useState<string[]>(DEFAULT_ACTIVE_FONTS);
+  const [currentFont, setCurrentFont] = useState('Average');
   const authPopupRef = useRef<Window | null>(null);
+
+  const pickRandomFont = (pool = fontPool) => {
+    if (!pool || pool.length === 0) return;
+    const candidates = pool.filter((f) => f !== currentFont);
+    const nextFont = candidates.length > 0
+      ? candidates[Math.floor(Math.random() * candidates.length)]
+      : pool[0];
+    loadGoogleFont(nextFont);
+    setCurrentFont(nextFont);
+  };
+
+  const loadFonts = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/fonts`);
+      const data = await response.json();
+      if (data.ok && Array.isArray(data.fonts) && data.fonts.length > 0) {
+        setFontPool(data.fonts);
+        preloadFontBatch(data.fonts);
+      }
+    } catch {
+      // Use built-in round 1-2 active fonts pool
+    }
+  };
 
   const loadAuthStatus = async () => {
     const response = await fetch(`${API_BASE}/api/auth/status`, { credentials: 'include' });
@@ -129,7 +292,7 @@ export default function App() {
       const response = await fetch(`${API_BASE}/api/admin/submissions`, { credentials: 'include' });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Preferred admin access required.');
+        throw new Error(data.error || 'You do not have permission.');
       }
       setAuthUser(data.user || null);
       setSubmissions(Array.isArray(data.submissions) ? data.submissions : []);
@@ -172,10 +335,15 @@ export default function App() {
 
   useEffect(() => {
     void loadAuthStatus();
+    void loadFonts();
 
     const handleHashChange = () => {
-      const nextRoute = window.location.hash === '#admin' ? 'admin' : 'home';
+      const nextRoute = getCurrentRoute();
       setRoute(nextRoute);
+      if (nextRoute === 'not-found') {
+        window.location.assign('/404.html');
+        return;
+      }
       if (nextRoute === 'admin') void loadAdmin();
     };
 
@@ -194,7 +362,12 @@ export default function App() {
 
     window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('message', handleAuthMessage);
-    if (window.location.hash === '#admin') void loadAdmin();
+    const initialRoute = getCurrentRoute();
+    if (initialRoute === 'not-found') {
+      window.location.assign('/404.html');
+    } else if (initialRoute === 'admin') {
+      void loadAdmin();
+    }
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
       window.removeEventListener('message', handleAuthMessage);
@@ -204,6 +377,7 @@ export default function App() {
   const handlePhoneChange = (value: string) => {
     setPhoneNumber(formatPhone(value));
     setError('');
+    pickRandomFont();
   };
 
   const submitPhone = async () => {
@@ -246,6 +420,7 @@ export default function App() {
     setPhoneNumber('');
     setStatusMessage('');
     setError('');
+    pickRandomFont();
   };
 
   const handleAssociateClick = async () => {
@@ -328,7 +503,10 @@ export default function App() {
               autoComplete="tel"
               placeholder="+1"
               value={phoneNumber}
-              style={getFontSizeStyle(phoneNumber)}
+              style={{
+                ...getFontSizeStyle(phoneNumber),
+                fontFamily: `"${currentFont}", "Average", "Inter Tight", "Segoe UI", Arial, sans-serif`,
+              }}
               onChange={(event) => handlePhoneChange(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void submitPhone();
@@ -385,6 +563,7 @@ export default function App() {
                 <p className="submission-card__meta">
                   {formatDate(submission.createdAt)} / {submission.status}
                 </p>
+                <VanityWordsList phone={submission.phone} />
               </div>
               <dl className="submission-card__details">
                 <div><dt>Location</dt><dd>{submission.approximateLocation || 'Unknown'}</dd></div>
@@ -404,6 +583,10 @@ export default function App() {
       )}
     </section>
   );
+
+  if (route === 'not-found') {
+    return null;
+  }
 
   return (
     <div className="shell">

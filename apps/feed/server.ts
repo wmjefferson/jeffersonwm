@@ -18,6 +18,31 @@ const app = express();
 const PORT = Number(process.env.PORT || "8050");
 const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+const AUTH_BASE_URL = (process.env.AUTH_BASE_URL || "https://auth.jeffersonwm.com").replace(/\/$/, "");
+const AUTH_INTERNAL_LOG_TOKEN = (process.env.FEED_AUTH_INTERNAL_LOG_TOKEN || process.env.AUTH_INTERNAL_LOG_TOKEN || "0fd4b372cabf46e4afdae1be1a1d4fa5a49b076fa53c62b8619f2faeab1b12ee").trim();
+
+async function logAuthHistory(action: string, target: string | Record<string, unknown>, username = "feed") {
+  const targetStr = typeof target === "string" ? target : JSON.stringify(target);
+  try {
+    await fetch(`${AUTH_BASE_URL}/api/history/log`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-auth-internal-token": AUTH_INTERNAL_LOG_TOKEN,
+      },
+      body: JSON.stringify({
+        action,
+        site: "feed",
+        target: targetStr,
+        userId: null,
+        username,
+        internalToken: AUTH_INTERNAL_LOG_TOKEN,
+      }),
+    });
+  } catch (error) {
+    console.warn("Feed could not log to Auth history:", error);
+  }
+}
 const UPLOAD_DIR = process.env.FEED_UPLOAD_DIR || path.join(process.cwd(), "uploads", "feed");
 const parser = new Parser();
 const CHANGELOG_SOURCE_URLS = (process.env.CHANGELOG_SOURCE_URLS || "")
@@ -167,6 +192,19 @@ interface FeedWeekSummaryStyleRow {
   purpose: string;
 }
 
+interface FeedWeekSummaryStyleDraftVariantRow extends FeedWeekSummaryStyleRow {
+  content: string;
+}
+
+interface FeedWeekSummaryStyleDraftRow {
+  week_key: string;
+  variants: FeedWeekSummaryStyleDraftVariantRow[];
+  updated_at: string;
+}
+
+const WEEK_SUMMARY_PRIMARY_STYLE_ID = "compact-plain-bullets";
+const WEEK_SUMMARY_HIDDEN_MARKER = "<!-- feed-summary-hidden -->";
+
 const ALLOWED_TINT_COLORS = new Set([
   "#f4d7d7",
   "#f3dfcf",
@@ -270,6 +308,15 @@ function normalizeIsoDateOnly(value: unknown) {
   return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
 }
 
+function normalizeWeekSummaryStyleId(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return /^[a-z0-9-]+$/.test(trimmed) ? trimmed : null;
+}
+
 function resolveWeekSummariesDir() {
   if (process.env.FEED_WEEK_SUMMARIES_DIR) {
     return process.env.FEED_WEEK_SUMMARIES_DIR;
@@ -346,7 +393,8 @@ async function loadWeekSummariesFromFiles() {
     }
 
     const filePath = path.join(summariesDir, entry.name);
-    const content = (await readFile(filePath, "utf8")).trim();
+    const rawContent = (await readFile(filePath, "utf8")).trim();
+    const content = getPrimaryWeekSummaryContent(rawContent);
     if (!content) {
       continue;
     }
@@ -395,6 +443,126 @@ async function loadWeekSummaryStyles() {
       return { id, label, mode, purpose } satisfies FeedWeekSummaryStyleRow;
     })
     .filter((entry): entry is FeedWeekSummaryStyleRow => Boolean(entry));
+}
+
+function parseWeekSummaryStyleDrafts(raw: string) {
+  const headingPattern = /^##\s+([a-z0-9-]+)(?:\s+\|\s+(.+?))?\s*$/gim;
+  const headings = [...raw.matchAll(headingPattern)];
+
+  return headings
+    .map((match, index) => {
+      const nextMatch = headings[index + 1];
+      const id = match[1].trim();
+      const label = (match[2] || id).trim();
+      const contentStart = (match.index || 0) + match[0].length;
+      const contentEnd = nextMatch?.index ?? raw.length;
+      const content = raw.slice(contentStart, contentEnd).trim();
+
+      if (!id || !content) {
+        return null;
+      }
+
+      return {
+        id,
+        label,
+        mode: "",
+        purpose: "",
+        content,
+      } satisfies FeedWeekSummaryStyleDraftVariantRow;
+    })
+    .filter((entry): entry is FeedWeekSummaryStyleDraftVariantRow => Boolean(entry));
+}
+
+function getPrimaryWeekSummaryContent(raw: string) {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (trimmed.includes(WEEK_SUMMARY_HIDDEN_MARKER)) {
+    return "";
+  }
+
+  const variants = parseWeekSummaryStyleDrafts(trimmed);
+  if (variants.length === 0) {
+    return trimmed;
+  }
+
+  return (
+    variants.find((variant) => variant.id === WEEK_SUMMARY_PRIMARY_STYLE_ID)?.content ||
+    variants[0].content
+  ).trim();
+}
+
+function markWeekSummaryHidden(raw: string) {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return `${WEEK_SUMMARY_HIDDEN_MARKER}\n`;
+  }
+  if (trimmed.includes(WEEK_SUMMARY_HIDDEN_MARKER)) {
+    return `${trimmed}\n`;
+  }
+
+  return `${WEEK_SUMMARY_HIDDEN_MARKER}\n${trimmed}\n`;
+}
+
+function unmarkWeekSummaryHidden(raw: string) {
+  return raw
+    .replace(WEEK_SUMMARY_HIDDEN_MARKER, "")
+    .replace(/^\s+/, "");
+}
+
+function updateWeekSummaryStyleSection(raw: string, styleId: string, nextContent: string) {
+  const headingPattern = /^##\s+([a-z0-9-]+)(?:\s+\|\s+(.+?))?\s*$/gim;
+  const headings = [...raw.matchAll(headingPattern)];
+  if (headings.length === 0) {
+    return `${nextContent.trim()}\n`;
+  }
+
+  const targetHeading = headings.find((heading) => heading[1].trim() === styleId) || headings[0];
+  const targetIndex = headings.indexOf(targetHeading);
+  const nextHeading = headings[targetIndex + 1];
+  const contentStart = (targetHeading.index || 0) + targetHeading[0].length;
+  const contentEnd = nextHeading?.index ?? raw.length;
+  const before = raw.slice(0, contentStart).replace(/[ \t]+$/g, "");
+  const after = raw.slice(contentEnd).trimStart();
+
+  return `${before}\n\n${nextContent.trim()}${after ? `\n\n${after}` : "\n"}`;
+}
+
+async function loadWeekSummaryStyleDraftsFromFiles() {
+  const summariesDir = resolveWeekSummariesDir();
+  await mkdir(summariesDir, { recursive: true });
+
+  const files = await readdir(summariesDir, { withFileTypes: true });
+  const drafts: FeedWeekSummaryStyleDraftRow[] = [];
+
+  for (const entry of files) {
+    if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== ".md") {
+      continue;
+    }
+
+    const weekKey = normalizeWeekKey(path.basename(entry.name, ".md"));
+    if (!weekKey) {
+      continue;
+    }
+
+    const filePath = path.join(summariesDir, entry.name);
+    const content = await readFile(filePath, "utf8");
+    const variants = parseWeekSummaryStyleDrafts(content);
+    if (variants.length === 0) {
+      continue;
+    }
+
+    const fileStats = await stat(filePath);
+    drafts.push({
+      week_key: weekKey,
+      variants,
+      updated_at: fileStats.mtime.toISOString(),
+    });
+  }
+
+  drafts.sort((a, b) => b.week_key.localeCompare(a.week_key));
+  return drafts;
 }
 
 function escapeHtml(value: string) {
@@ -1106,6 +1274,19 @@ app.get("/api/feed/week-summary-styles", async (_req, res) => {
   }
 });
 
+async function handleWeekSummaryVariants(_req: express.Request, res: express.Response) {
+  try {
+    const drafts = await loadWeekSummaryStyleDraftsFromFiles();
+    res.json(drafts);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch weekly summary variants" });
+  }
+}
+
+app.get("/api/feed/week-summary-variants", handleWeekSummaryVariants);
+app.get("/api/feed/week-summary-style-drafts", handleWeekSummaryVariants);
+
 app.get("/atom.xml", async (_req, res) => {
   try {
     const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY pinned_at IS NULL, pinned_at DESC, created_at DESC LIMIT 200");
@@ -1198,6 +1379,7 @@ app.post("/api/feed", async (req, res) => {
       tintColor,
     ]);
     
+    void logAuthHistory('feed.entry_created', title);
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -1247,6 +1429,7 @@ app.put("/api/feed/:id", async (req, res) => {
       [title, content || null, url || null, source || entry.source || "manual", normalizedCreatedAt, tintColor, id],
     );
 
+    void logAuthHistory('feed.entry_updated', title);
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -1256,7 +1439,7 @@ app.put("/api/feed/:id", async (req, res) => {
 
 app.put("/api/feed/week-summaries/:weekKey", async (req, res) => {
   const normalizedWeekKey = normalizeWeekKey(req.params.weekKey);
-  const { secret, content } = req.body || {};
+  const { secret, content, style_id, hide_summary } = req.body || {};
 
   if (secret !== process.env.FEED_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -1267,7 +1450,8 @@ app.put("/api/feed/week-summaries/:weekKey", async (req, res) => {
   }
 
   const summaryContent = typeof content === "string" ? content.trim() : "";
-  if (!summaryContent) {
+  const shouldHideSummary = hide_summary === true;
+  if (!summaryContent && !shouldHideSummary) {
     return res.status(400).json({ error: "Summary content is required" });
   }
 
@@ -1275,7 +1459,27 @@ app.put("/api/feed/week-summaries/:weekKey", async (req, res) => {
     const summariesDir = resolveWeekSummariesDir();
     await mkdir(summariesDir, { recursive: true });
     const filePath = path.join(summariesDir, `${normalizedWeekKey}.md`);
-    await writeFile(filePath, `${summaryContent.trim()}\n`, "utf8");
+    const existingContent = existsSync(filePath) ? await readFile(filePath, "utf8") : "";
+    if (shouldHideSummary) {
+      await writeFile(filePath, markWeekSummaryHidden(existingContent), "utf8");
+      void logAuthHistory('feed.summary_hidden', `Summary hidden for ${normalizedWeekKey}`);
+      return res.json({ success: true });
+    }
+
+    const visibleExistingContent = unmarkWeekSummaryHidden(existingContent);
+    const existingStyles = parseWeekSummaryStyleDrafts(visibleExistingContent);
+    const normalizedStyleId = normalizeWeekSummaryStyleId(style_id);
+    const nextContent =
+      existingStyles.length > 0
+        ? updateWeekSummaryStyleSection(
+            visibleExistingContent,
+            normalizedStyleId || WEEK_SUMMARY_PRIMARY_STYLE_ID,
+            summaryContent,
+          )
+        : `${summaryContent.trim()}\n`;
+
+    await writeFile(filePath, nextContent, "utf8");
+    void logAuthHistory('feed.summary_generated', `Summary for ${normalizedWeekKey}`);
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -1292,8 +1496,8 @@ app.post("/api/feed/:id/pin", async (req, res) => {
   }
 
   try {
-    const [rows] = await pool.query("SELECT id FROM feed_items WHERE id = ? LIMIT 1", [id]);
-    const entry = Array.isArray(rows) ? rows[0] as { id: number } | undefined : undefined;
+    const [rows] = await pool.query("SELECT id, title FROM feed_items WHERE id = ? LIMIT 1", [id]);
+    const entry = Array.isArray(rows) ? rows[0] as { id: number; title: string } | undefined : undefined;
 
     if (!entry) {
       return res.status(404).json({ error: "Feed item not found" });
@@ -1304,6 +1508,7 @@ app.post("/api/feed/:id/pin", async (req, res) => {
       [pinned ? new Date().toISOString().slice(0, 19).replace("T", " ") : null, id],
     );
 
+    void logAuthHistory('feed.entry_pinned', `${pinned ? 'Pinned' : 'Unpinned'}: ${entry.title || `Item #${id}`}`);
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -1320,8 +1525,8 @@ app.delete("/api/feed/:id", async (req, res) => {
   }
 
   try {
-    const [rows] = await pool.query("SELECT id, source FROM feed_items WHERE id = ? LIMIT 1", [id]);
-    const entry = Array.isArray(rows) ? rows[0] as { id: number; source: string } | undefined : undefined;
+    const [rows] = await pool.query("SELECT id, title, source FROM feed_items WHERE id = ? LIMIT 1", [id]);
+    const entry = Array.isArray(rows) ? rows[0] as { id: number; title: string; source: string } | undefined : undefined;
 
     if (!entry) {
       return res.status(404).json({ error: "Feed item not found" });
@@ -1332,6 +1537,7 @@ app.delete("/api/feed/:id", async (req, res) => {
     }
 
     await pool.execute("DELETE FROM feed_items WHERE id = ?", [id]);
+    void logAuthHistory('feed.entry_deleted', entry.title || `Item #${id}`);
     res.json({ success: true });
   } catch (err) {
     console.error(err);

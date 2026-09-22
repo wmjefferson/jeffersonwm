@@ -1,0 +1,9 @@
+﻿{
+  "secret": "the-feed-secret",
+  "title": "Battalion native Android companion app, interactive widgets, and session management",
+  "content": "<p>Battalion expands to mobile with a native Kotlin Android companion app featuring live dashboard integration, interactive widgets, and full session recovery.</p><p><strong>What changed:</strong></p><ul><li><strong>Native Android Companion:</strong> Built with Kotlin, Jetpack Compose, and OkHttp/Gson for API 26+ Android devices. Features live HP/XP/Gold dashboard meters, category-expanded emotion logging, and a category + masonry action performer with long-press Favorites toggling and HUD confirmation popups.</li><li><strong>Customizable Home Screen Widgets:</strong> Added a 3x1 expandable (up to 5x2) Status Widget that toggles between individual stats (HP, XP, Health) or displays all three when expanded, and a resizable 1x1 Quick-Action shortcut widget featuring in-app shortcut reassignment, favorites filtering, customizable button background colors, and responsive text/emoji sizing.</li><li><strong>Visual Polish & Art:</strong> Integrated <code>battvert03.jpg</code> with a dark gradient scrim for the companion app and login screens, and <code>batthorz01.jpg</code> for home screen widget backdrops.</li><li><strong>Account & Session Recovery:</strong> Added an in-app Account & Session modal with one-tap credential refresh, backstack-clearing logout with prefilled username retention, and automatic HTTP 401 retry recovery.</li></ul>",
+  "url": "https://battalion.jeffersonwm.com",
+  "source": "manual",
+  "external_id": "battalion-android-companion-widgets-and-session-2026-09-06",
+  "created_at": "2026-09-06 21:47:00"
+}
