@@ -110,6 +110,9 @@ public static class ThemeManager
             UpdateBrush("TextPrimaryBrush", Color.FromRgb(0xFF, 0xFF, 0xFF));
             UpdateBrush("TextSecondaryBrush", Color.FromRgb(0xA0, 0xA0, 0xA0));
             UpdateBrush("HighlightCardBrush", Color.FromRgb(0x3D, 0x27, 0x20));
+            UpdateBrush("ActiveHighlightCardBrush", Color.FromRgb(0x18, 0x2A, 0x3E));
+            UpdateBrush("ActiveHighlightBorderBrush", Color.FromRgb(0x38, 0x8A, 0xDE));
+            UpdateBrush("InfoBrush", Color.FromRgb(0x38, 0x8A, 0xDE));
             UpdateBrush("SecondaryAccentBrush", Color.FromRgb(0x4E, 0xCD, 0xC4));
             UpdateBrush("SuccessBrush", Color.FromRgb(0x4C, 0xAF, 0x50));
             UpdateBrush("WarningBrush", Color.FromRgb(0xFF, 0xC1, 0x07));
@@ -129,6 +132,9 @@ public static class ThemeManager
             UpdateBrush("TextPrimaryBrush", Color.FromRgb(0x1A, 0x1A, 0x1A));
             UpdateBrush("TextSecondaryBrush", Color.FromRgb(0x5C, 0x5C, 0x5C));
             UpdateBrush("HighlightCardBrush", Color.FromRgb(0xFF, 0xF2, 0xEC));
+            UpdateBrush("ActiveHighlightCardBrush", Color.FromRgb(0xEE, 0xF6, 0xFF));
+            UpdateBrush("ActiveHighlightBorderBrush", Color.FromRgb(0x00, 0x78, 0xD4));
+            UpdateBrush("InfoBrush", Color.FromRgb(0x00, 0x78, 0xD4));
             UpdateBrush("SecondaryAccentBrush", Color.FromRgb(0x00, 0x82, 0x72));
             UpdateBrush("SuccessBrush", Color.FromRgb(0x10, 0x7C, 0x41));
             UpdateBrush("WarningBrush", Color.FromRgb(0xCA, 0x50, 0x10));

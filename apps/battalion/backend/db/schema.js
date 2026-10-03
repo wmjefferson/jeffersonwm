@@ -298,6 +298,14 @@ async function initDatabase() {
     } catch (e) {}
   }
 
+  // Scoping for custom actions (NULL = global master action, INT = user personal action)
+  try {
+    await db.execute('ALTER TABLE actions ADD COLUMN user_id INT NULL DEFAULT NULL AFTER id');
+  } catch (e) {}
+  try {
+    await db.execute('ALTER TABLE actions ADD INDEX idx_actions_user_id (user_id)');
+  } catch (e) {}
+
   // Adjust achievements unique key from key-only to (user_id, `key`)
   try {
     await db.execute('ALTER TABLE achievements DROP INDEX `key`');

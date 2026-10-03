@@ -12,51 +12,113 @@
         </Grid.RowDefinitions>
 
         <!-- Top Controls -->
-        <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,12">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="2*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="2*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <TextBlock Text="Device:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
-                <ComboBox Grid.Column="1" ItemsSource="{Binding RegisteredDevices}" SelectedItem="{Binding SelectedDevice}" Margin="0,0,16,0">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding CategoryIcon}" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding FriendlyName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <Border Background="{DynamicResource SecondaryAccentBrush}" CornerRadius="3" Padding="4,1" Margin="8,0,0,0"
-                                        Visibility="{Binding IsMacroPad, Converter={StaticResource BoolToVis}}" VerticalAlignment="Center">
-                                    <TextBlock Text="Macro Pad" FontSize="10" Foreground="White" FontWeight="Bold"/>
-                                </Border>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
+                <!-- Row 0: Device & Profile Selection -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="2" Text="Profile:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
-                <ComboBox Grid.Column="3" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" DisplayMemberPath="Name" Margin="0,0,12,0"/>
+                    <TextBlock Text="Device:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+                    <ComboBox Grid.Column="1" ItemsSource="{Binding RegisteredDevices}" SelectedItem="{Binding SelectedDevice}" Margin="0,0,16,0">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding CategoryIcon}" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding FriendlyName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <Border Background="{DynamicResource SecondaryAccentBrush}" CornerRadius="3" Padding="4,1" Margin="8,0,0,0"
+                                            Visibility="{Binding IsMacroPad, Converter={StaticResource BoolToVis}}" VerticalAlignment="Center">
+                                        <TextBlock Text="Active" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                                    </Border>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
 
-                <StackPanel Grid.Column="4" Orientation="Horizontal">
-                    <Button Content="+ New Profile" Command="{Binding NewProfileCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0"/>
-                    <Button Content="Delete" Command="{Binding DeleteProfileCommand}" Style="{StaticResource DangerButton}"/>
-                </StackPanel>
+                    <TextBlock Grid.Column="2" Text="Profile:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+                    
+                    <Grid Grid.Column="3" Margin="0,0,12,0">
+                        <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" DisplayMemberPath="Name"
+                                  Visibility="{Binding IsRenamingProfile, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
+                        <TextBox Text="{Binding RenameProfileText, UpdateSourceTrigger=PropertyChanged}"
+                                 Visibility="{Binding IsRenamingProfile, Converter={StaticResource BoolToVis}}"/>
+                    </Grid>
+
+                    <StackPanel Grid.Column="4" Orientation="Horizontal">
+                        <!-- Normal Buttons -->
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsRenamingProfile, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                            <Button Content="✏️ Rename" Command="{Binding StartRenameProfileCommand}" Style="{StaticResource SecondaryButton}" IsEnabled="{Binding HasActiveDevices}" Margin="0,0,6,0" ToolTip="Rename current profile"/>
+                            <Button Content="+ New Profile" Command="{Binding NewProfileCommand}" Style="{StaticResource SecondaryButton}" IsEnabled="{Binding HasActiveDevices}" Margin="0,0,6,0"/>
+                            <Button Content="Delete" Command="{Binding DeleteProfileCommand}" Style="{StaticResource DangerButton}" IsEnabled="{Binding HasActiveDevices}"/>
+                        </StackPanel>
+                        <!-- Renaming Buttons -->
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsRenamingProfile, Converter={StaticResource BoolToVis}}">
+                            <Button Content="✓ Save" Command="{Binding SaveRenameProfileCommand}" Margin="0,0,6,0"/>
+                            <Button Content="✕ Cancel" Command="{Binding CancelRenameProfileCommand}" Style="{StaticResource SecondaryButton}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Row 1: Auto-Switch Target Application -->
+                <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock Text="🎯 Target App (Auto-Switch):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="(switches to this profile when app focuses)" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <TextBox Grid.Column="1" Text="{Binding SelectedProfile.TargetProcessName, UpdateSourceTrigger=PropertyChanged}" 
+                             VerticalAlignment="Center" Margin="0,0,8,0"
+                             ToolTip="Process name without .exe (e.g. opera, chrome, msedge, excel). Leave empty for default profile."/>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="Opera" Command="{Binding SetTargetAppCommand}" CommandParameter="opera" Style="{StaticResource SecondaryButton}" Padding="7,2" Margin="0,0,4,0" ToolTip="Set target to Opera browser"/>
+                        <Button Content="Chrome" Command="{Binding SetTargetAppCommand}" CommandParameter="chrome" Style="{StaticResource SecondaryButton}" Padding="7,2" Margin="0,0,4,0" ToolTip="Set target to Google Chrome"/>
+                        <Button Content="Excel" Command="{Binding SetTargetAppCommand}" CommandParameter="excel" Style="{StaticResource SecondaryButton}" Padding="7,2" Margin="0,0,4,0" ToolTip="Set target to Microsoft Excel"/>
+                        <Button Content="Clear" Command="{Binding ClearTargetAppCommand}" Style="{StaticResource SecondaryButton}" Padding="7,2" ToolTip="Clear target app (default profile)"/>
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
 
         <!-- Main Area -->
         <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.4*"/>
-                <ColumnDefinition Width="1*"/>
-            </Grid.ColumnDefinitions>
+            <!-- Empty state when no keypad is activated yet -->
+            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="30"
+                    Visibility="{Binding HasActiveDevices, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="440">
+                    <TextBlock Text="⚡" FontSize="42" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                    <TextBlock Text="No Active Keypads" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,8"
+                               FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system, sans-serif"/>
+                    <TextBlock Text="To assign macros and shortcuts, go to the Devices tab and click 'Activate' on your keypad." 
+                               FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,16"/>
+                </StackPanel>
+            </Border>
 
-            <!-- Key List -->
-            <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+            <!-- Main Layout when devices are active -->
+            <Grid Visibility="{Binding HasActiveDevices, Converter={StaticResource BoolToVis}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.4*"/>
+                    <ColumnDefinition Width="1*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Key List -->
+                <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -161,7 +223,9 @@
                                 </WrapPanel>
 
                                 <TextBlock Text="Target Key" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                                <ComboBox ItemsSource="{Binding AvailableKeys}" SelectedItem="{Binding SelectedMapping.TargetKey}" IsEditable="True" Margin="0,0,0,12"/>
+                                <ComboBox ItemsSource="{Binding AvailableKeys}" SelectedItem="{Binding SelectedMapping.TargetKey}" 
+                                          IsEditable="True" Text="{Binding SelectedMapping.TargetKey, UpdateSourceTrigger=PropertyChanged}"
+                                          Margin="0,0,0,12"/>
                             </StackPanel>
 
                             <!-- 2. TEXT TYPE ACTION FORM -->
@@ -239,6 +303,136 @@
                                 <TextBlock Text="Macro Name" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
                                 <TextBox Text="{Binding SelectedMapping.SelectedMacroName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12"/>
                             </StackPanel>
+
+                            <!-- 6. WEB ACTION FORM -->
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedMapping.ActionType}" Value="Web">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+
+                                <TextBlock Text="Target URL Pattern" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                <TextBox Text="{Binding SelectedMapping.WebUrlMatch, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
+
+                                <TextBlock Text="Browser Click Steps" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                        <Button Content="🔴 Record from Browser" Command="{Binding StartRecordWebCommand}" 
+                                                Visibility="{Binding IsRecordingWeb, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"
+                                                Style="{StaticResource SecondaryButton}" Padding="8,4" Margin="0,0,6,0"/>
+                                        <Button Content="⏹ Stop Recording" Command="{Binding StopRecordWebCommand}" 
+                                                Visibility="{Binding IsRecordingWeb, Converter={StaticResource BoolToVis}}"
+                                                Style="{StaticResource DangerButton}" Padding="8,4" Margin="0,0,6,0"/>
+                                        <Button Content="Clear Steps" Command="{Binding ClearWebStepsCommand}" 
+                                                Style="{StaticResource SecondaryButton}" Padding="8,4"/>
+                                    </StackPanel>
+                                    
+                                    <Button Grid.Column="1" Content="▶ Test in Browser" Command="{Binding TestWebActionCommand}" 
+                                            Style="{StaticResource SecondaryButton}" Padding="8,4"/>
+                                </Grid>
+
+                                <TextBlock Text="{Binding WebRecordStatusText}" Foreground="{DynamicResource PrimaryAccentBrush}" 
+                                           FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+                                <ListBox ItemsSource="{Binding SelectedMapping.WebSteps}" MinHeight="90" MaxHeight="180" 
+                                         BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" 
+                                         Background="{DynamicResource CardBrush}" Margin="0,0,0,12">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="4,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="🖱" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Description}" FontWeight="SemiBold" FontSize="12"/>
+                                                    <TextBlock Text="{Binding Selector}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Text="{Binding DelayMs, StringFormat='{}+{0}ms'}" FontSize="10" 
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+
+                            <!-- 7. GOOGLE DOCS HIGHLIGHT FORM -->
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedMapping.ActionType}" Value="GoogleDocsHighlight">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+
+                                <!-- Info banner -->
+                                <Border Background="#1A4ECDC4" BorderBrush="{DynamicResource SecondaryAccentBrush}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="🎨 Google Docs Highlight" FontWeight="Bold" FontSize="13" Margin="0,0,0,4"/>
+                                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}">
+                                            <Run>Applies your exact highlight color via the Lionfish Companion Extension. If the extension is not active, cleanly applies the active toolbar color via Google Docs search menu.</Run>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Highlight Color" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                <ComboBox ItemsSource="{Binding HighlightColors}" SelectedItem="{Binding SelectedMapping.GoogleDocsHighlightColor}" Margin="0,0,0,10">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Border Width="14" Height="14" CornerRadius="3" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="#888888"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding}" Value="None">    <Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="#888"/><Setter Property="BorderThickness" Value="1"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding}" Value="Yellow">  <Setter Property="Background" Value="#FFFF00"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding}" Value="Green">   <Setter Property="Background" Value="#86EFAC"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding}" Value="Cyan">    <Setter Property="Background" Value="#67E8F9"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding}" Value="Magenta"> <Setter Property="Background" Value="#F0ABFC"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding}" Value="Orange">  <Setter Property="Background" Value="#FDBA74"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding}" Value="Purple">  <Setter Property="Background" Value="#C084FC"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding}" Value="Red">     <Setter Property="Background" Value="#FCA5A5"/></DataTrigger>
+                                                                <DataTrigger Binding="{Binding}" Value="Blue">    <Setter Property="Background" Value="#93C5FD"/></DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                </Border>
+                                                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <!-- Tips card -->
+                                <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10">
+                                    <StackPanel>
+                                        <TextBlock Text="💡 Usage Tips" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6"/>
+                                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,3">• Select text first, then press your keypad button.</TextBlock>
+                                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,3">• If wrong color applies, try increasing keystroke delay (see SequenceAction in profile JSON).</TextBlock>
+                                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}">• For instant highlight: set a custom shortcut in Google Docs (Tools → Keyboard Shortcuts) and use Keystroke type.</TextBlock>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
                         </StackPanel>
                     </ScrollViewer>
 
@@ -257,4 +451,5 @@
             </Border>
         </Grid>
     </Grid>
+</Grid>
 </UserControl>

@@ -20,7 +20,24 @@ public static class InputSimulator
         public uint type;
 
         [FieldOffset(8)]
+        public MOUSEINPUT mi;
+
+        [FieldOffset(8)]
         public KEYBDINPUT ki;
+
+        [FieldOffset(8)]
+        public HARDWAREINPUT hi;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MOUSEINPUT
+    {
+        public int dx;
+        public int dy;
+        public uint mouseData;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -33,35 +50,57 @@ public static class InputSimulator
         public IntPtr dwExtraInfo;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HARDWAREINPUT
+    {
+        public uint uMsg;
+        public ushort wParamL;
+        public ushort wParamH;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint nInputs, [In] INPUT[] pInputs, int cbSize);
 
+    [DllImport("user32.dll")]
+    private static extern uint MapVirtualKey(uint uCode, uint uMapType);
+
     public static void SendKeyCombination(VirtualKeyCode key, ModifierKeys modifiers)
     {
-        var inputs = new List<INPUT>();
-
         // 1. Modifiers Down
-        if (modifiers.HasFlag(ModifierKeys.Ctrl)) inputs.Add(CreateKeyInput(VirtualKeyCode.Control, false));
-        if (modifiers.HasFlag(ModifierKeys.Shift)) inputs.Add(CreateKeyInput(VirtualKeyCode.Shift, false));
-        if (modifiers.HasFlag(ModifierKeys.Alt)) inputs.Add(CreateKeyInput(VirtualKeyCode.Alt, false));
-        if (modifiers.HasFlag(ModifierKeys.Win)) inputs.Add(CreateKeyInput(VirtualKeyCode.LWin, false));
+        var modDown = new List<INPUT>();
+        if (modifiers.HasFlag(ModifierKeys.Ctrl)) modDown.Add(CreateKeyInput(VirtualKeyCode.Control, false));
+        if (modifiers.HasFlag(ModifierKeys.Shift)) modDown.Add(CreateKeyInput(VirtualKeyCode.Shift, false));
+        if (modifiers.HasFlag(ModifierKeys.Alt)) modDown.Add(CreateKeyInput(VirtualKeyCode.Alt, false));
+        if (modifiers.HasFlag(ModifierKeys.Win)) modDown.Add(CreateKeyInput(VirtualKeyCode.LWin, false));
+
+        if (modDown.Count > 0)
+        {
+            SendInput((uint)modDown.Count, modDown.ToArray(), Marshal.SizeOf<INPUT>());
+            Thread.Sleep(5);
+        }
 
         // 2. Target Key Down & Up
         if (key != VirtualKeyCode.None)
         {
-            inputs.Add(CreateKeyInput(key, false));
-            inputs.Add(CreateKeyInput(key, true));
+            var keyStroke = new[]
+            {
+                CreateKeyInput(key, false),
+                CreateKeyInput(key, true)
+            };
+            SendInput((uint)keyStroke.Length, keyStroke, Marshal.SizeOf<INPUT>());
         }
 
-        // 3. Modifiers Up (reverse order)
-        if (modifiers.HasFlag(ModifierKeys.Win)) inputs.Add(CreateKeyInput(VirtualKeyCode.LWin, true));
-        if (modifiers.HasFlag(ModifierKeys.Alt)) inputs.Add(CreateKeyInput(VirtualKeyCode.Alt, true));
-        if (modifiers.HasFlag(ModifierKeys.Shift)) inputs.Add(CreateKeyInput(VirtualKeyCode.Shift, true));
-        if (modifiers.HasFlag(ModifierKeys.Ctrl)) inputs.Add(CreateKeyInput(VirtualKeyCode.Control, true));
-
-        if (inputs.Count > 0)
+        if (modDown.Count > 0)
         {
-            SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf<INPUT>());
+            Thread.Sleep(5);
+            // 3. Modifiers Up (reverse order)
+            var modUp = new List<INPUT>();
+            if (modifiers.HasFlag(ModifierKeys.Win)) modUp.Add(CreateKeyInput(VirtualKeyCode.LWin, true));
+            if (modifiers.HasFlag(ModifierKeys.Alt)) modUp.Add(CreateKeyInput(VirtualKeyCode.Alt, true));
+            if (modifiers.HasFlag(ModifierKeys.Shift)) modUp.Add(CreateKeyInput(VirtualKeyCode.Shift, true));
+            if (modifiers.HasFlag(ModifierKeys.Ctrl)) modUp.Add(CreateKeyInput(VirtualKeyCode.Control, true));
+
+            SendInput((uint)modUp.Count, modUp.ToArray(), Marshal.SizeOf<INPUT>());
         }
     }
 
@@ -142,13 +181,15 @@ public static class InputSimulator
             flags |= KEYEVENTF_EXTENDEDKEY;
         }
 
+        ushort scanCode = (ushort)MapVirtualKey((uint)key, 0);
+
         return new INPUT
         {
             type = INPUT_KEYBOARD,
             ki = new KEYBDINPUT
             {
                 wVk = (ushort)key,
-                wScan = 0,
+                wScan = scanCode,
                 dwFlags = flags,
                 time = 0,
                 dwExtraInfo = IntPtr.Zero

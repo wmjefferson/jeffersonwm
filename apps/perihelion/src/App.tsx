@@ -44,6 +44,14 @@ interface FolderEntry {
   hasCoverOverride?: boolean;
   visibleToUsers: boolean;
   visibleToAdmins: boolean;
+  defaultAccess: {
+    user: 'allow' | 'block';
+    admin: 'allow' | 'block';
+  };
+  defaultAccessInherited: {
+    user: boolean;
+    admin: boolean;
+  };
 }
 
 interface FolderApiEntry {
@@ -68,6 +76,18 @@ interface FolderApiEntry {
   hasCoverOverride?: boolean;
   visibleToUsers?: boolean;
   visibleToAdmins?: boolean;
+  defaultAccess?: {
+    user?: 'allow' | 'block';
+    admin?: 'allow' | 'block';
+  };
+  defaultAccessInherited?: {
+    user?: boolean;
+    admin?: boolean;
+  };
+  defaultAccessMixed?: {
+    user?: boolean;
+    admin?: boolean;
+  };
 }
 
 interface AuthUser {
@@ -96,6 +116,23 @@ interface AuthStatus {
 
 type FolderAccountAccessMode = 'allow' | 'deny';
 type FolderAccountAccess = Record<string, FolderAccountAccessMode>;
+
+type ShareScope = 'private' | 'all' | 'selected';
+
+interface ShareAccessRecord {
+  owner_user_id?: string;
+  owner_username?: string;
+  share_scope?: ShareScope;
+  shared_account_ids?: string[];
+}
+
+interface ShareRecord extends ShareAccessRecord {
+  id: string;
+  title: string;
+  images: string[];
+  itemCount: number;
+  created_at: string;
+}
 
 interface FolderParentAccess {
   visibleToUsers: boolean;
@@ -228,6 +265,18 @@ const mapFolderApiEntry = (folder: FolderApiEntry): FolderEntry => ({
   hasCoverOverride: folder.hasCoverOverride ?? false,
   visibleToUsers: folder.visibleToUsers ?? true,
   visibleToAdmins: folder.visibleToAdmins ?? true,
+  defaultAccess: {
+    user: folder.defaultAccess?.user ?? ((folder.visibleToUsers ?? true) ? 'allow' : 'block'),
+    admin: folder.defaultAccess?.admin ?? ((folder.visibleToAdmins ?? true) ? 'allow' : 'block'),
+  },
+  defaultAccessInherited: {
+    user: folder.defaultAccessInherited?.user ?? false,
+    admin: folder.defaultAccessInherited?.admin ?? false,
+  },
+  defaultAccessMixed: {
+    user: folder.defaultAccessMixed?.user ?? false,
+    admin: folder.defaultAccessMixed?.admin ?? false,
+  },
 });
 
 const APIBASE = 'https://api.jeffersonwm.com';
@@ -787,7 +836,8 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  const [allShares, setAllShares] = useState<{ id: string; title: string; images: string[]; itemCount: number; created_at: string }[]>([]);
+  const [allShares, setAllShares] = useState<ShareRecord[]>([]);
+  const [tagAccess, setTagAccess] = useState<Record<string, ShareAccessRecord>>({});
   const [showTagsPopover, setShowTagsPopover] = useState(false);
   const [showListsPopover, setShowListsPopover] = useState(false);
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
@@ -1637,6 +1687,7 @@ export default function App() {
         const data = await res.json();
         setAllTags(data.tags || []);
         setTagCounts(data.tagCounts || {});
+        setTagAccess(data.tagAccess || {});
       }
     } catch (err) {
       console.error('Failed to fetch tags', err);
@@ -2251,7 +2302,10 @@ export default function App() {
     if (!centralMode && accountPanel === 'admin' && authStatus?.user?.isAdmin) {
       loadAdminUsers();
     }
-  }, [accountPanel, authStatus?.provider, authStatus?.user?.id, authStatus?.user?.isAdmin]);
+    if (view === 'options' && authStatus?.user?.isAdmin && adminUsers.length === 0) {
+      loadAdminUsers();
+    }
+  }, [accountPanel, authStatus?.provider, authStatus?.user?.id, authStatus?.user?.isAdmin, view, adminUsers.length]);
 
   const fetchImages = async (p: number, l: number, path: string, tag: string = '', list: string = '', search: string = '', sort: GallerySortMode = 'alpha') => {
     setLoading(true);
@@ -2700,6 +2754,36 @@ export default function App() {
     }
   };
 
+  const handleUpdateTagAccess = async (tag: string, shareScope: ShareScope, accountIds: string[] = []) => {
+    try {
+      const res = await fetch(`${API_PATH}/tags/access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag, shareScope, accountIds }),
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to update tag sharing');
+      setTagAccess(prev => ({
+        ...prev,
+        [tag]: {
+          ...(prev[tag] || {}),
+          share_scope: shareScope,
+          shared_account_ids: accountIds,
+        },
+      }));
+      fetchTags();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleToggleTagAccountShare = async (tag: string, accountId: string) => {
+    const current = tagAccess[tag] || {};
+    const ids = current.shared_account_ids || [];
+    const nextIds = ids.includes(accountId) ? ids.filter(id => id !== accountId) : [...ids, accountId];
+    await handleUpdateTagAccess(tag, 'selected', nextIds);
+  };
+
   const handleRenameList = async (shareId: string, currentTitle: string) => {
     const newTitle = window.prompt(`Rename list to:`, currentTitle);
     if (newTitle === null) return;
@@ -2717,6 +2801,32 @@ export default function App() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleUpdateListAccess = async (shareId: string, shareScope: ShareScope, accountIds: string[] = []) => {
+    try {
+      const res = await fetch(`${API_PATH}/share/${shareId}/access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shareScope, accountIds }),
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to update list sharing');
+      const data = await res.json();
+      if (data.share) {
+        setAllShares(prev => sortSharesNewestFirst(prev.map(share => share.id === shareId ? data.share : share)));
+      } else {
+        fetchShares();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleToggleListAccountShare = async (share: ShareRecord, accountId: string) => {
+    const ids = share.shared_account_ids || [];
+    const nextIds = ids.includes(accountId) ? ids.filter(id => id !== accountId) : [...ids, accountId];
+    await handleUpdateListAccess(share.id, 'selected', nextIds);
   };
 
   const handleDeleteList = async (shareId: string, title: string) => {
@@ -3112,6 +3222,7 @@ export default function App() {
   const pendingUsers = adminUsers.filter(user => !user.isApproved && !user.isBlocked);
   const approvedUsers = adminUsers.filter(user => user.isApproved && !user.isBlocked);
   const blockedUsers = adminUsers.filter(user => user.isBlocked);
+  const sharingAccountTargets = approvedUsers.filter(user => String(user.id) !== String(authStatus?.user?.id));
   const showPrivateGate = showForcedAuthGate || (!loading && Boolean(accessError));
   const usesCentralAuth = authStatus?.provider === 'central';
   const authBaseUrl = authStatus?.authBaseUrl || 'https://auth.jeffersonwm.com';
@@ -3584,75 +3695,73 @@ export default function App() {
                   {allTags.length === 0 ? (
                     <div className="py-12 text-center text-xs font-bold uppercase tracking-widest text-[#6a716b] dark:text-[#9da69e]">No tags found.</div>
                   ) : (
-                    allTags.map(tag => (
-                      <div key={tag} className="peri-card flex items-center justify-between gap-4 px-4 py-3 text-xs font-sans lowercase">
-                        {renamingTag === tag ? (
-                          <div className="flex min-w-0 flex-1 items-center gap-2">
-                            <span className="font-bold text-[#202522] dark:text-[#fafafa] text-sm">#</span>
-                            <input
-                              type="text"
-                              value={renamingTagValue}
-                              onChange={event => setRenamingTagValue(event.target.value.toLowerCase())}
-                              onKeyDown={event => {
-                                if (event.key === 'Enter') {
-                                  event.preventDefault();
-                                  handleRenameTag(tag);
-                                }
-                                if (event.key === 'Escape') {
-                                  setRenamingTag(null);
-                                  setRenamingTagValue('');
-                                }
-                              }}
-                              className="peri-input min-w-0 flex-1 px-3 py-1.5 text-xs font-bold lowercase"
-                              autoFocus
-                            />
-                          </div>
-                        ) : (
-                          <span className="min-w-0 flex-1 truncate font-bold text-[#202522] dark:text-[#fafafa] text-sm">
-                            #{tag} <span className="text-xs uppercase text-[#6a716b] dark:text-[#9da69e] font-normal">({tagCounts[tag] || 0} items)</span>
-                          </span>
-                        )}
-                        <div className="flex shrink-0 items-center gap-3 font-sans text-xs font-bold uppercase">
+                    allTags.map(tag => {
+                      const access = tagAccess[tag] || {};
+                      const scope = access.share_scope || 'private';
+                      const selectedIds = access.shared_account_ids || [];
+                      return (
+                      <div key={tag} className="peri-card flex flex-col gap-3 px-4 py-3 text-xs font-sans lowercase">
+                        <div className="flex items-center justify-between gap-4">
                           {renamingTag === tag ? (
-                            <>
-                              <button
-                                onClick={() => handleRenameTag(tag)}
-                                className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-[#202522] dark:hover:text-[#fafafa] cursor-pointer"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setRenamingTag(null);
-                                  setRenamingTagValue('');
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              <span className="font-bold text-[#202522] dark:text-[#fafafa] text-sm">#</span>
+                              <input
+                                type="text"
+                                value={renamingTagValue}
+                                onChange={event => setRenamingTagValue(event.target.value.toLowerCase())}
+                                onKeyDown={event => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    handleRenameTag(tag);
+                                  }
+                                  if (event.key === 'Escape') {
+                                    setRenamingTag(null);
+                                    setRenamingTagValue('');
+                                  }
                                 }}
-                                className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-[#202522] dark:hover:text-[#fafafa] cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                            </>
+                                className="peri-input min-w-0 flex-1 px-3 py-1.5 text-xs font-bold lowercase"
+                                autoFocus
+                              />
+                            </div>
                           ) : (
-                            <>
-                              <button
-                                onClick={() => {
-                                  setRenamingTag(tag);
-                                  setRenamingTagValue(tag);
-                                }}
-                                className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-[#202522] dark:hover:text-[#fafafa] cursor-pointer"
-                              >
-                                Rename
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTag(tag)}
-                                className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
-                              >
-                                Delete
-                              </button>
-                            </>
+                            <span className="min-w-0 flex-1 truncate font-bold text-[#202522] dark:text-[#fafafa] text-sm">
+                              #{tag} <span className="text-xs uppercase text-[#6a716b] dark:text-[#9da69e] font-normal">({tagCounts[tag] || 0} items)</span>
+                            </span>
                           )}
+                          <div className="flex shrink-0 items-center gap-3 font-sans text-xs font-bold uppercase">
+                            {renamingTag === tag ? (
+                              <>
+                                <button onClick={() => handleRenameTag(tag)} className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-[#202522] dark:hover:text-[#fafafa] cursor-pointer">Save</button>
+                                <button onClick={() => { setRenamingTag(null); setRenamingTagValue(''); }} className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-[#202522] dark:hover:text-[#fafafa] cursor-pointer">Cancel</button>
+                              </>
+                            ) : (
+                              <>
+                                <button onClick={() => { setRenamingTag(tag); setRenamingTagValue(tag); }} className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-[#202522] dark:hover:text-[#fafafa] cursor-pointer">Rename</button>
+                                <button onClick={() => handleDeleteTag(tag)} className="text-[#6a716b] dark:text-[#9da69e] transition-colors hover:text-red-600 dark:hover:text-red-400 cursor-pointer">Delete</button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 uppercase text-[10px] font-bold tracking-wide">
+                          <button type="button" onClick={() => handleUpdateTagAccess(tag, 'private')} className={scope === 'private' ? 'text-[#1f5f8b] underline' : 'text-[#6a716b] dark:text-[#9da69e]'}>Private</button>
+                          <button type="button" onClick={() => handleUpdateTagAccess(tag, 'all')} className={scope === 'all' ? 'text-[#1f5f8b] underline' : 'text-[#6a716b] dark:text-[#9da69e]'}>All accounts</button>
+                          {sharingAccountTargets.map(account => {
+                            const accountId = String(account.id);
+                            return (
+                              <button
+                                key={`${tag}-${accountId}`}
+                                type="button"
+                                onClick={() => handleToggleTagAccountShare(tag, accountId)}
+                                className={scope === 'selected' && selectedIds.includes(accountId) ? 'text-[#1f5f8b] underline' : 'text-[#6a716b] dark:text-[#9da69e]'}
+                              >
+                                {account.username}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -3666,34 +3775,44 @@ export default function App() {
                   {allShares.length === 0 ? (
                     <div className="py-12 text-center text-xs font-bold uppercase tracking-widest text-[#6a716b] dark:text-[#9da69e]">No lists found.</div>
                   ) : (
-                    allShares.map(share => (
-                      <div key={share.id} className="peri-card flex items-center justify-between gap-4 px-4 py-3 text-xs font-sans">
-                        <div className="flex flex-col min-w-0 pr-2">
-                          <span className="font-bold text-[#202522] dark:text-[#fafafa] truncate text-sm uppercase">{share.title || share.id}</span>
-                          <span className="text-[10px] text-[#6a716b] dark:text-[#9da69e] mt-0.5 uppercase tracking-wide">{share.itemCount} items • ID: {share.id}</span>
+                    allShares.map(share => {
+                      const scope = share.share_scope || 'private';
+                      const selectedIds = share.shared_account_ids || [];
+                      return (
+                      <div key={share.id} className="peri-card flex flex-col gap-3 px-4 py-3 text-xs font-sans">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex flex-col min-w-0 pr-2">
+                            <span className="font-bold text-[#202522] dark:text-[#fafafa] truncate text-sm uppercase">{share.title || share.id}</span>
+                            <span className="text-[10px] text-[#6a716b] dark:text-[#9da69e] mt-0.5 uppercase tracking-wide">
+                              {share.itemCount} items • ID: {share.id} • Owner: {share.owner_username || share.owner_user_id || 'wm'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 uppercase font-sans text-xs font-bold shrink-0">
+                            <button onClick={() => window.open(buildSharePageUrl(share.id), '_blank')} className="text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#fafafa] transition-colors cursor-pointer">Open</button>
+                            <button onClick={() => handleRenameList(share.id, share.title)} className="text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#fafafa] transition-colors cursor-pointer">Rename</button>
+                            <button onClick={() => handleDeleteList(share.id, share.title)} className="text-[#6a716b] dark:text-[#9da69e] hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer">Delete</button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4 uppercase font-sans text-xs font-bold shrink-0">
-                          <button
-                            onClick={() => window.open(buildSharePageUrl(share.id), '_blank')}
-                            className="text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#fafafa] transition-colors cursor-pointer"
-                          >
-                            Open
-                          </button>
-                          <button
-                            onClick={() => handleRenameList(share.id, share.title)}
-                            className="text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#fafafa] transition-colors cursor-pointer"
-                          >
-                            Rename
-                          </button>
-                          <button
-                            onClick={() => handleDeleteList(share.id, share.title)}
-                            className="text-[#6a716b] dark:text-[#9da69e] hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
-                          >
-                            Delete
-                          </button>
+                        <div className="flex flex-wrap items-center gap-2 uppercase text-[10px] font-bold tracking-wide">
+                          <button type="button" onClick={() => handleUpdateListAccess(share.id, 'private')} className={scope === 'private' ? 'text-[#1f5f8b] underline' : 'text-[#6a716b] dark:text-[#9da69e]'}>Private</button>
+                          <button type="button" onClick={() => handleUpdateListAccess(share.id, 'all')} className={scope === 'all' ? 'text-[#1f5f8b] underline' : 'text-[#6a716b] dark:text-[#9da69e]'}>All accounts</button>
+                          {sharingAccountTargets.map(account => {
+                            const accountId = String(account.id);
+                            return (
+                              <button
+                                key={`${share.id}-${accountId}`}
+                                type="button"
+                                onClick={() => handleToggleListAccountShare(share, accountId)}
+                                className={scope === 'selected' && selectedIds.includes(accountId) ? 'text-[#1f5f8b] underline' : 'text-[#6a716b] dark:text-[#9da69e]'}
+                              >
+                                {account.username}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -4320,6 +4439,11 @@ export default function App() {
                 const rightPreviewKind = folder.secondaryThumbnailKind || (rightPreviewPath ? getMediaKind(rightPreviewPath) : null);
                 const folderRetryKey = `folder:${folder.path}:${leftPreviewPath ?? 'empty'}:${rightPreviewPath ?? 'empty'}`;
                 const folderRetryToken = previewRetryTokens[folderRetryKey] || 0;
+                const adminDefaultAccessBadge = {
+                  mode: folder.defaultAccess.admin,
+                  inherited: folder.defaultAccessInherited.admin,
+                  mixed: folder.defaultAccessMixed?.admin ?? false,
+                };
 
                 return (
                 <div
@@ -4455,6 +4579,21 @@ export default function App() {
                         <span className="peri-chip px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-widest text-[#666]">
                           {folder.fileCount} {folder.fileCount === 1 ? 'File' : 'Files'}
                         </span>
+                        {authStatus?.user?.isOwner ? (
+                          <span
+                            className={`peri-chip px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-widest ${
+                              adminDefaultAccessBadge.mode === 'allow' ? 'text-[#1f5f8b]' : 'text-[#9f2f22]'
+                            }`}
+                          >
+                            Admin {adminDefaultAccessBadge.mode}
+                            {adminDefaultAccessBadge.inherited ? ' (inherit)' : ''}
+                          </span>
+                        ) : null}
+                        {authStatus?.user?.isOwner && adminDefaultAccessBadge.mixed ? (
+                          <span className="peri-chip px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-widest text-[#8A5A44]">
+                            Mixed
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -4821,17 +4960,17 @@ export default function App() {
                           onChange={event => setFolderQuickVisibleToAdmins(event.target.checked)}
                           className="h-4 w-4 accent-black"
                         />
-                        Reg Admin
+                        Admin
                       </label>
                     ) : (
                       <div className="flex items-center gap-2 text-[#888]">
                         <Minus size={14} strokeWidth={2.25} />
-                        Reg Admin inherited off
+                        Admin inherited off
                       </div>
                     )}
                     <div className="flex items-center gap-2 text-[#666]">
                       <Check size={14} strokeWidth={2.25} />
-                      Pref Admin
+                      Owner
                     </div>
                   </div>
                   <div className="mt-3 border-t border-[#d4d4d8] pt-3">
@@ -4856,7 +4995,7 @@ export default function App() {
                                 : currentMode === 'deny'
                                   ? 'Explicit deny'
                                   : inheritedLabel;
-                          const role = user.isOwner ? 'Pref Admin' : user.isAdmin ? 'Reg Admin' : 'User';
+                          const role = user.isOwner ? 'Owner' : user.isAdmin ? 'Admin' : 'User';
                           const setAccountMode = (mode: FolderAccountAccessMode | 'inherit') => {
                             setFolderQuickAccountAccess(prev => {
                               const next = { ...prev };
@@ -5683,7 +5822,7 @@ export default function App() {
                   <>
                     <div className="border-[2px] border-[#666] bg-[#F7F7F7] px-4 py-4 flex flex-col gap-3">
                       <div className="text-[11px] font-bold uppercase tracking-widest text-black">
-                        Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' • Admin' : ''}
+                        Signed in as {authStatus.user.username}{authStatus.user.isOwner ? ' • Owner' : authStatus.user.isAdmin ? ' • Admin' : ''}
                       </div>
                       <p className="text-xs font-sans text-[#666] leading-relaxed">
                         Your settings, history, approvals, and password changes now live in Multimillion. Sign out here if you want to switch to a different account. If this archive still stays locked, ask for Perihelion access in the central dashboard.
@@ -5708,7 +5847,7 @@ export default function App() {
                 <>
                   <div className="border-[2px] border-[#666] bg-[#F7F7F7] px-4 py-4 flex flex-col gap-2">
                     <div className="text-[11px] font-bold uppercase tracking-widest text-black">
-                      Signed in as {authStatus.user.username}{authStatus.user.isAdmin ? ' • Admin' : ''}
+                      Signed in as {authStatus.user.username}{authStatus.user.isOwner ? ' • Owner' : authStatus.user.isAdmin ? ' • Admin' : ''}
                     </div>
                     <div className="text-xs font-sans text-[#666] leading-relaxed">
                       Sign out completely before moving into another account. Downloads tied to this account will appear below.
@@ -5883,7 +6022,7 @@ export default function App() {
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="min-w-0">
                                     <div className="text-[11px] font-bold uppercase tracking-widest text-black truncate">
-                                      {user.username} {user.isAdmin ? ' • Admin' : ''}
+                                      {user.username} {user.isOwner ? ' • Owner' : user.isAdmin ? ' • Admin' : ''}
                                     </div>
                                     <div className="text-[10px] font-bold uppercase tracking-widest text-[#888]">
                                       Requested {new Date(user.createdAt).toLocaleString()}
@@ -5939,7 +6078,7 @@ export default function App() {
                               <div key={user.id} className="px-4 py-3 flex items-center justify-between gap-4">
                                 <div className="min-w-0">
                                   <div className="text-[11px] font-bold uppercase tracking-widest text-black truncate">
-                                    {user.username} {user.isAdmin ? ' • Admin' : ''}
+                                    {user.username} {user.isOwner ? ' • Owner' : user.isAdmin ? ' • Admin' : ''}
                                   </div>
                                   <div className="text-[10px] font-bold uppercase tracking-widest text-[#888]">
                                     Approved {user.approvedAt ? new Date(user.approvedAt).toLocaleString() : 'Recently'}
@@ -5991,7 +6130,7 @@ export default function App() {
                               <div key={user.id} className="px-4 py-3 flex items-center justify-between gap-4">
                                 <div className="min-w-0">
                                   <div className="text-[11px] font-bold uppercase tracking-widest text-black truncate">
-                                    {user.username} {user.isAdmin ? ' • Admin' : ''}
+                                    {user.username} {user.isOwner ? ' • Owner' : user.isAdmin ? ' • Admin' : ''}
                                   </div>
                                   <div className="text-[10px] font-bold uppercase tracking-widest text-[#888]">
                                     Blocked {user.blockedAt ? new Date(user.blockedAt).toLocaleString() : 'Recently'}

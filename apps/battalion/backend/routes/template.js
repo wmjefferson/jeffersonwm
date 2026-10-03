@@ -79,7 +79,7 @@ router.get('/export', async (req, res) => {
   }
 });
 
-// PUT /api/template - Update template defaults (Preferred Admin only)
+// PUT /api/template - Update template defaults (Owner only)
 router.put('/', requireOwner, async (req, res) => {
   try {
     const { stats, tasks, habits, change_summary, version } = req.body;

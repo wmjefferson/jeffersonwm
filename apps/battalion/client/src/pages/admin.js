@@ -192,7 +192,7 @@ export async function renderAdmin(container) {
           </label>
           <button class="btn btn--ghost btn--sm" id="btn-public" title="Public View">🌍 Public</button>
           <button class="btn btn--ghost btn--sm" id="btn-settings" title="Settings">⚙️ Settings</button>
-          <button class="btn btn--ghost btn--sm" id="btn-logout" title="Logout">🚪</button>
+          <button class="btn btn--ghost btn--sm" id="btn-logout" title="Sign Out">Sign Out</button>
         </div>
       </div>
     </div>
@@ -431,7 +431,7 @@ export async function renderAdmin(container) {
   setupAccordionShell();
   attachEventListeners();
   
-  // ─── Setup User Switcher for Preferred Admin & Central Auth Status ───
+  // ─── Setup User Switcher for Owner & Central Auth Status ───
   try {
     const authCheck = await auth.check().catch(() => ({ authenticated: false }));
     const switcherContainer = document.getElementById('sb-user-switcher-container');
@@ -442,7 +442,7 @@ export async function renderAdmin(container) {
         const activeId = authCheck.actingPlayer?.id || authCheck.player?.id;
         if (users.length > 0) {
           switcherHtml = `
-            <select id="sb-user-switcher" title="Switch User Context (Preferred Admin)" style="font-size:12px; padding:3px 8px; cursor:pointer; border:1px solid #a855f7; background:#faf5ff; color:#6b21a8; font-weight:600; border-radius:4px; max-width:210px;">
+            <select id="sb-user-switcher" title="Switch User Context" style="font-size:12px; padding:3px 8px; cursor:pointer; border:1px solid #a855f7; background:#faf5ff; color:#6b21a8; font-weight:600; border-radius:4px; max-width:210px;">
               <option value="">👤 My Account (${authCheck.player.username})</option>
               <optgroup label="Accounts & Templates">
                 ${users.filter(u => u.id !== authCheck.player.id).map(u => `
@@ -1389,9 +1389,12 @@ function attachEventListeners() {
 
   // ─── Logout ─────────────────────────────────────────────────
   document.getElementById('btn-logout')?.addEventListener('click', async () => {
+    showLoading();
     try {
       await auth.logout();
     } catch (_) {}
+    hideLoading();
+    showToast('Signed out successfully', 'info');
     navigate('#login');
   });
 

@@ -131,37 +131,19 @@ public class InterceptionService : IDisposable
     }
 
     /// <summary>
-    /// Enumerates all connected keyboard/keypad devices using the Windows Raw Input API.
-    /// Returns real device info including friendly names and hardware IDs.
+    /// Enumerates all connected keyboard/keypad devices using the Windows SetupAPI (authoritative PnP hardware)
+    /// supplemented by Raw Input. Returns real device info including friendly names and hardware IDs.
     /// </summary>
     public List<DeviceInfo> GetAllKeyboardDevices()
     {
         var devices = new List<DeviceInfo>();
-
-        uint deviceCount = 0;
-        uint structSize = (uint)Marshal.SizeOf<RAWINPUTDEVICELIST>();
-        uint result = GetRawInputDeviceList(null, ref deviceCount, structSize);
-
-        if (result == unchecked((uint)-1) || deviceCount == 0)
-            return devices;
-
-        var rawDevices = new RAWINPUTDEVICELIST[deviceCount];
-        result = GetRawInputDeviceList(rawDevices, ref deviceCount, structSize);
-
-        if (result == unchecked((uint)-1))
-            return devices;
-
         int handleIndex = 0;
-        for (int i = 0; i < deviceCount; i++)
+
+        // 1. Primary: Enumerate via Windows SetupAPI (authoritative PnP manager)
+        // This reliably discovers devices even if they just reconnected, power-cycled, or haven't sent a key yet.
+        var setupApiPaths = GetSetupApiKeyboardPaths();
+        foreach (var devicePath in setupApiPaths)
         {
-            var rawDevice = rawDevices[i];
-            if (rawDevice.dwType != RIM_TYPEKEYBOARD)
-                continue;
-
-            string? devicePath = GetDevicePath(rawDevice.hDevice);
-            if (string.IsNullOrEmpty(devicePath))
-                continue;
-
             var (friendlyName, hardwareId, category, connType, isLaptop) = ClassifyDevice(devicePath);
 
             if (category.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
@@ -198,6 +180,71 @@ public class InterceptionService : IDisposable
             devices.Add(deviceInfo);
         }
 
+        // 2. Secondary: Supplement with Windows Raw Input devices
+        try
+        {
+            uint deviceCount = 0;
+            uint structSize = (uint)Marshal.SizeOf<RAWINPUTDEVICELIST>();
+            uint result = GetRawInputDeviceList(null, ref deviceCount, structSize);
+
+            if (result != unchecked((uint)-1) && deviceCount > 0)
+            {
+                var rawDevices = new RAWINPUTDEVICELIST[deviceCount];
+                if (GetRawInputDeviceList(rawDevices, ref deviceCount, structSize) != unchecked((uint)-1))
+                {
+                    for (int i = 0; i < deviceCount; i++)
+                    {
+                        var rawDevice = rawDevices[i];
+                        if (rawDevice.dwType != RIM_TYPEKEYBOARD)
+                            continue;
+
+                        string? devicePath = GetDevicePath(rawDevice.hDevice);
+                        if (string.IsNullOrEmpty(devicePath))
+                            continue;
+
+                        var (friendlyName, hardwareId, category, connType, isLaptop) = ClassifyDevice(devicePath);
+
+                        if (category.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        var existing = devices.FirstOrDefault(d =>
+                            (isLaptop && d.IsLaptopKeyboard) ||
+                            (!isLaptop && !string.IsNullOrEmpty(hardwareId) && d.HardwareId.Equals(hardwareId, StringComparison.OrdinalIgnoreCase)));
+
+                        if (existing != null)
+                        {
+                            if (!existing.AllDevicePaths.Contains(devicePath))
+                            {
+                                existing.AllDevicePaths.Add(devicePath);
+                            }
+                        }
+                        else
+                        {
+                            var deviceInfo = new DeviceInfo
+                            {
+                                DeviceHandle = handleIndex++,
+                                HardwareId = hardwareId,
+                                DevicePath = devicePath,
+                                AllDevicePaths = new List<string> { devicePath },
+                                FriendlyName = friendlyName,
+                                DeviceCategory = category,
+                                ConnectionType = connType,
+                                IsLaptopKeyboard = isLaptop,
+                                IsRegistered = false,
+                                IsMasterKeyboard = isLaptop,
+                                DeviceType = isLaptop ? DeviceType.MasterKeyboard : DeviceType.Unknown
+                            };
+                            devices.Add(deviceInfo);
+                        }
+                    }
+                }
+            }
+        }
+        catch { }
+
+        // 3. Keep device map in Interception driver fresh
+        RefreshInterceptionDeviceMap();
+
         lock (_allDiscoveredDevices)
         {
             _allDiscoveredDevices.Clear();
@@ -205,6 +252,59 @@ public class InterceptionService : IDisposable
         }
 
         return devices;
+    }
+
+    private static List<string> GetSetupApiKeyboardPaths()
+    {
+        var paths = new List<string>();
+        Guid guid = GUID_DEVINTERFACE_KEYBOARD;
+        IntPtr devInfo = SetupDiGetClassDevs(ref guid, IntPtr.Zero, IntPtr.Zero, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+        if (devInfo == (IntPtr)(-1)) return paths;
+
+        try
+        {
+            var ifData = new SP_DEVICE_INTERFACE_DATA();
+            ifData.cbSize = (uint)Marshal.SizeOf(typeof(SP_DEVICE_INTERFACE_DATA));
+
+            uint index = 0;
+            while (SetupDiEnumDeviceInterfaces(devInfo, IntPtr.Zero, ref guid, index, ref ifData))
+            {
+                uint reqSize = 0;
+                var devData = new SP_DEVINFO_DATA();
+                devData.cbSize = (uint)Marshal.SizeOf(typeof(SP_DEVINFO_DATA));
+
+                SetupDiGetDeviceInterfaceDetail(devInfo, ref ifData, IntPtr.Zero, 0, ref reqSize, ref devData);
+                if (reqSize > 0)
+                {
+                    IntPtr detailBuffer = Marshal.AllocHGlobal((int)reqSize);
+                    try
+                    {
+                        Marshal.WriteInt32(detailBuffer, IntPtr.Size == 8 ? 8 : 6);
+                        if (SetupDiGetDeviceInterfaceDetail(devInfo, ref ifData, detailBuffer, reqSize, ref reqSize, ref devData))
+                        {
+                            IntPtr pPath = new IntPtr(detailBuffer.ToInt64() + 4);
+                            string? path = Marshal.PtrToStringAuto(pPath);
+                            if (!string.IsNullOrEmpty(path))
+                            {
+                                paths.Add(path);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(detailBuffer);
+                    }
+                }
+                index++;
+            }
+        }
+        catch { }
+        finally
+        {
+            SetupDiDestroyDeviceInfoList(devInfo);
+        }
+
+        return paths;
     }
 
     private string? GetDevicePath(IntPtr hDevice)
@@ -259,7 +359,7 @@ public class InterceptionService : IDisposable
 
         if (hardwareId.Equals("VID_30FA&PID_1340", StringComparison.OrdinalIgnoreCase))
         {
-            return ("8-Button Macro Pad (with Rotary Knob)", hardwareId, "USB Macro Keypad", "USB", false);
+            return ("8-Button Macro Pad (with Power Switch)", hardwareId, "USB Macro Keypad", "USB", false);
         }
 
         string friendlyName = GetFriendlyNameFromRegistry(devicePath, hardwareId);
@@ -661,4 +761,39 @@ public class InterceptionService : IDisposable
         uint uiCommand,
         IntPtr pData,
         ref uint pcbSize);
+
+    // ========== SetupAPI P/Invokes (Authoritative Windows PnP Keyboard Devices) ==========
+    private static readonly Guid GUID_DEVINTERFACE_KEYBOARD = new("884b96c3-56ef-11d1-bc8c-00a0c91405dd");
+    private const uint DIGCF_PRESENT = 0x00000002;
+    private const uint DIGCF_DEVICEINTERFACE = 0x00000010;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SP_DEVICE_INTERFACE_DATA
+    {
+        public uint cbSize;
+        public Guid interfaceClassGuid;
+        public uint flags;
+        public IntPtr reserved;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct SP_DEVINFO_DATA
+    {
+        public uint cbSize;
+        public Guid classGuid;
+        public uint devInst;
+        public IntPtr reserved;
+    }
+
+    [DllImport("setupapi.dll", SetLastError = true)]
+    private static extern IntPtr SetupDiGetClassDevs(ref Guid classGuid, IntPtr enumerator, IntPtr hwndParent, uint flags);
+
+    [DllImport("setupapi.dll", SetLastError = true)]
+    private static extern bool SetupDiEnumDeviceInterfaces(IntPtr deviceInfoSet, IntPtr deviceInfoData, ref Guid interfaceClassGuid, uint memberIndex, ref SP_DEVICE_INTERFACE_DATA deviceInterfaceData);
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    private static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr deviceInfoSet, ref SP_DEVICE_INTERFACE_DATA deviceInterfaceData, IntPtr deviceInterfaceDetailData, uint deviceInterfaceDetailDataSize, ref uint requiredSize, ref SP_DEVINFO_DATA deviceInfoData);
+
+    [DllImport("setupapi.dll", SetLastError = true)]
+    private static extern bool SetupDiDestroyDeviceInfoList(IntPtr deviceInfoSet);
 }

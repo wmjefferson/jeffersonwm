@@ -1,4 +1,5 @@
 @page
+@using System.Text.Json
 @model LibraryScanner.Web.Pages.Books.IndexModel
 @{
     ViewData["Title"] = "Inventory";
@@ -20,6 +21,7 @@
 <form method="get" class="inventory-filter-form" data-inventory-filter-form>
     <input asp-for="Sort" type="hidden" data-inventory-sort-value />
     <input asp-for="PageNumber" type="hidden" value="1" data-inventory-page-number />
+    <input asp-for="TagMode" type="hidden" data-inventory-tag-mode-value />
     <div class="inventory-search-row">
         <input asp-for="Query" class="form-control" placeholder="Search ISBN, title, author, publisher, tags, collections, location, notes" data-inventory-query />
         <button class="btn btn-outline-secondary" type="submit">Search</button>
@@ -109,6 +111,81 @@
     </div>
 </form>
 
+<form method="post" class="inventory-selection-form">
+    <input asp-for="Query" type="hidden" />
+    <input asp-for="Sort" type="hidden" />
+    <input asp-for="PageSize" type="hidden" />
+    <input asp-for="PageNumber" type="hidden" />
+    <input asp-for="TagMode" type="hidden" />
+    @foreach (var id in Model.CollectionIds)
+    {
+        <input type="hidden" name="CollectionIds" value="@id" />
+    }
+    @foreach (var id in Model.TagIds)
+    {
+        <input type="hidden" name="TagIds" value="@id" />
+    }
+    @foreach (var id in Model.LocationIds)
+    {
+        <input type="hidden" name="LocationIds" value="@id" />
+    }
+    @foreach (var status in Model.Statuses)
+    {
+        <input type="hidden" name="Statuses" value="@status" />
+    }
+
+<section class="panel inventory-selection-panel" data-inventory-selection-panel>
+    <div class="inventory-selection-summary">
+        <div>
+            <h2>Selected books</h2>
+            <p class="form-hint">
+                Showing <span data-inventory-visible-count>@Model.Books.Count</span> visible books out of @Model.FilteredCount matching the current filters.
+                <span data-inventory-selected-count>No books selected yet.</span>
+            </p>
+        </div>
+    </div>
+
+    <div class="inventory-selection-work-grid">
+        <div class="inventory-tag-toggle-column">
+            <div class="inventory-tag-toggle-head">
+                <span class="inventory-shared-label">Tag toggles</span>
+                <span class="inventory-tag-mode" aria-label="Tag filter mode">
+                    <button type="button" class="tag-mode-button is-active" data-inventory-tag-mode="and" aria-pressed="true">AND</button>
+                    <button type="button" class="tag-mode-button" data-inventory-tag-mode="or" aria-pressed="false">OR</button>
+                </span>
+            </div>
+            <div class="tag-list" data-inventory-shared-tags></div>
+        </div>
+        <div class="field-stack inventory-combined-actions">
+            <select asp-for="SelectedCollectionId" asp-items="Model.CollectionOptions.Skip(1)" class="form-select">
+                <option value="">Add to collection</option>
+            </select>
+            <select asp-for="SelectedStatus" asp-items="Model.StatusOptions" class="form-select">
+                <option value="">Set availability</option>
+            </select>
+            <select asp-for="SelectedLocationId" asp-items="Model.LocationOptions" class="form-select"></select>
+            <button type="submit" asp-page-handler="ApplySelectedFields" class="btn btn-outline-secondary">Apply</button>
+        </div>
+    </div>
+
+    <div class="inventory-selection-shared" data-inventory-selection-shared hidden>
+        <div>
+            <span class="inventory-shared-label">Shared collections</span>
+            <div class="tag-list" data-inventory-shared-collections></div>
+        </div>
+        <div>
+            <span class="inventory-shared-label">Availability</span>
+            <div class="tag-list" data-inventory-shared-status></div>
+        </div>
+        <div>
+            <span class="inventory-shared-label">Location</span>
+            <div class="tag-list" data-inventory-shared-location></div>
+        </div>
+    </div>
+
+    <p class="form-hint inventory-inline-hint" data-inventory-empty-state>Select books in the table below to see their shared tags, collections, availability, and location here.</p>
+</section>
+
 @if (Model.Books.Count == 0)
 {
     <div class="empty-state">
@@ -117,6 +194,7 @@
         <a class="btn btn-primary" asp-page="/Books/Create">Add book</a>
     </div>
 }
+
 else
 {
     <div class="table-wrap">
@@ -139,7 +217,7 @@ else
                     var titleAuthor = string.IsNullOrWhiteSpace(book.Authors) ? book.Title : $"{book.Title} - {book.Authors}";
                     <tr>
                         <td class="selection-column">
-                            <input type="checkbox" name="SelectedBookIds" value="@book.Id" data-select-item aria-label="Select @book.Title" />
+                            <input type="checkbox" name="SelectedBookIds" value="@book.Id" data-select-item data-book-id="@book.Id" aria-label="Select @book.Title" />
                         </td>
                         <td>
                             <div class="book-cell">
@@ -198,3 +276,13 @@ else
         </div>
     </div>
 }
+
+</form>
+
+<script id="inventory-selection-data" type="application/json">
+@Html.Raw(JsonSerializer.Serialize(Model.SelectableBooks))
+</script>
+
+<script id="tag-data" type="application/json">
+@Html.Raw(JsonSerializer.Serialize(Model.AvailableTags))
+</script>

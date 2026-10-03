@@ -537,7 +537,7 @@ export default function App() {
     <section className="admin-panel">
       <div className="admin-panel__header">
         <div>
-          <p className="eyebrow">Owner Review</p>
+          <p className="eyebrow">Admin Review</p>
           <h1>Phone Submissions</h1>
         </div>
         <button type="button" className="text-button" onClick={() => { window.location.hash = ''; setRoute('home'); }}>

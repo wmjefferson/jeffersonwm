@@ -29,6 +29,24 @@ async function resolveSessionPlayer(req) {
   let player = null;
 
   if (authUser) {
+    const hasAccess = Boolean(
+      authUser.isOwner ||
+      (
+        authUser.accountState === 'approved' &&
+        Array.isArray(authUser.memberships) &&
+        authUser.memberships.includes('battalion')
+      )
+    );
+
+    if (!hasAccess) {
+      return {
+        player: null,
+        accessDenied: true,
+        authUser,
+        message: 'Access to Battalion has not been granted for your Central Auth account. Please ask an admin to enable Battalion permissions.'
+      };
+    }
+
     // Attempt lookup by auth_user_id
     if (authUser.id) {
       const [[byAuthId]] = await db.execute(
@@ -99,7 +117,7 @@ async function resolveSessionPlayer(req) {
     req.session.playerId = player.id;
   }
 
-  // 3. User Switcher handling for Preferred Admin (Owner)
+  // 3. User Switcher handling for Owner
   let actingPlayer = player;
   let actingUserId = player.id;
 
@@ -134,7 +152,10 @@ async function resolveSessionPlayer(req) {
 async function requireAuth(req, res, next) {
   try {
     const resolved = await resolveSessionPlayer(req);
-    if (!resolved) {
+    if (!resolved || !resolved.player) {
+      if (resolved && resolved.accessDenied) {
+        return res.status(403).json({ error: resolved.message || 'Access denied: Battalion permission not enabled in Central Auth' });
+      }
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
@@ -152,7 +173,7 @@ async function requireAuth(req, res, next) {
 }
 
 /**
- * Express middleware requiring Preferred Admin (owner)
+ * Express middleware requiring Owner
  */
 function requireOwner(req, res, next) {
   if (!req.player || req.player.role !== 'owner') {
@@ -162,7 +183,7 @@ function requireOwner(req, res, next) {
 }
 
 /**
- * Express middleware requiring Admin (owner or regular admin)
+ * Express middleware requiring Admin (owner or admin)
  */
 function requireAdmin(req, res, next) {
   if (!req.player || !['owner', 'admin'].includes(req.player.role)) {

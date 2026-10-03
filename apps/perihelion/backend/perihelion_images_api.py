@@ -39,6 +39,7 @@ SHARES_DIR = Path(r"E:\perihelion\shares").resolve()
 DATA_DIR = Path(os.environ.get("PERIHELION_DATA_DIR", r"E:\perihelion\data")).resolve()
 THUMB_CACHE_DIR = Path(os.environ.get("PERIHELION_THUMB_CACHE_DIR", str(DATA_DIR / "thumb-cache"))).resolve()
 DB_PATH = DATA_DIR / "perihelion.sqlite3"
+TAG_SHARING_PATH = DATA_DIR / "tag-sharing.json"
 DEFAULT_ORIGIN = "https://jeffersonwm.com"
 ALLOWED_ORIGINS = {
     "https://jeffersonwm.com",
@@ -307,11 +308,18 @@ def folder_preview(folder: Path, folder_rel_path: str = "") -> dict:
         folder_detail = get_folder_detail_record(folder_rel_path)
         folder_title = folder_detail["title"]
         folder_description = folder_detail["description"]
-        visible_to_users = folder_detail["visibleToUsers"]
-        visible_to_admins = folder_detail["visibleToAdmins"]
+        access_display = folder_default_access_display(folder_rel_path, folder_detail)
+        access_display["defaultAccessMixed"] = folder_child_access_mixed(folder_rel_path)
+        visible_to_users = access_display["defaultAccess"]["user"] == "allow"
+        visible_to_admins = access_display["defaultAccess"]["admin"] == "allow"
     else:
         visible_to_users = True
         visible_to_admins = True
+        access_display = {
+            "defaultAccess": {"user": "allow", "admin": "allow"},
+            "defaultAccessInherited": {"user": False, "admin": False},
+            "defaultAccessMixed": {"user": False, "admin": False},
+        }
 
     def kind_for(rel: str | None) -> str | None:
         return guess_kind(Path(rel).suffix.lower()) if rel else None
@@ -354,6 +362,7 @@ def folder_preview(folder: Path, folder_rel_path: str = "") -> dict:
         "description": folder_description,
         "visibleToUsers": visible_to_users,
         "visibleToAdmins": visible_to_admins,
+        **access_display,
         "itemCount": item_count,
         "fileCount": file_count,
         "folderCount": folder_count,
@@ -540,8 +549,117 @@ def get_user_id_from_user(user: dict | None) -> str:
     return str(user.get("id") or "").strip()
 
 
-def is_preferred_admin(user: dict | None) -> bool:
+def get_username_from_user(user: dict | None) -> str:
+    if not user:
+        return ""
+    return str(user.get("username") or "").strip()
+
+
+def is_owner(user: dict | None) -> bool:
     return bool(user and user.get("isOwner"))
+
+
+def normalize_share_scope(value: str | None) -> str:
+    value = str(value or "private").strip().lower()
+    return value if value in {"private", "all", "selected"} else "private"
+
+
+def normalize_account_ids(values) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        clean = str(value or "").strip()
+        if clean and clean not in seen:
+            seen.add(clean)
+            result.append(clean)
+    return result
+
+
+def can_access_shared_item(item: dict, user: dict | None) -> bool:
+    if is_owner(user):
+        return True
+    user_id = get_user_id_from_user(user)
+    if not user_id:
+        return False
+    owner_user_id = str(item.get("owner_user_id") or item.get("user_id") or "").strip()
+    scope = normalize_share_scope(item.get("share_scope"))
+    account_ids = normalize_account_ids(item.get("shared_account_ids"))
+    return (
+        owner_user_id == user_id
+        or scope == "all"
+        or (scope == "selected" and user_id in account_ids)
+    )
+
+
+def can_manage_shared_item(item: dict, user: dict | None) -> bool:
+    if is_owner(user):
+        return True
+    user_id = get_user_id_from_user(user)
+    owner_user_id = str(item.get("owner_user_id") or item.get("user_id") or "").strip()
+    return bool(user_id and owner_user_id == user_id)
+
+
+def load_tag_sharing() -> dict:
+    ensure_data_dir()
+    if not TAG_SHARING_PATH.is_file():
+        return {}
+    try:
+        data = json.loads(TAG_SHARING_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_tag_sharing(data: dict) -> None:
+    ensure_data_dir()
+    TAG_SHARING_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def tag_share_key(owner_user_id: str, tag_name: str) -> str:
+    return f"{owner_user_id.strip()}::{tag_name.strip().lower()}"
+
+
+def get_tag_access_record(tag_name: str, owner_user_id: str, owner_username: str = "") -> dict:
+    tag_name = tag_name.strip().lower()
+    owner_user_id = owner_user_id.strip()
+    sharing = load_tag_sharing()
+    record = sharing.get(tag_share_key(owner_user_id, tag_name)) or {}
+    return {
+        "tag": tag_name,
+        "owner_user_id": owner_user_id,
+        "owner_username": str(record.get("owner_username") or owner_username or owner_user_id).strip(),
+        "share_scope": normalize_share_scope(record.get("share_scope")),
+        "shared_account_ids": normalize_account_ids(record.get("shared_account_ids")),
+    }
+
+
+def set_tag_access_record(
+    tag_name: str,
+    owner_user_id: str,
+    owner_username: str,
+    share_scope: str,
+    shared_account_ids,
+) -> dict:
+    tag_name = tag_name.strip().lower()
+    owner_user_id = owner_user_id.strip()
+    record = {
+        "tag": tag_name,
+        "owner_user_id": owner_user_id,
+        "owner_username": owner_username.strip() or owner_user_id,
+        "share_scope": normalize_share_scope(share_scope),
+        "shared_account_ids": normalize_account_ids(shared_account_ids),
+        "updated_at": iso_utc(),
+    }
+    sharing = load_tag_sharing()
+    sharing[tag_share_key(owner_user_id, tag_name)] = record
+    save_tag_sharing(sharing)
+    return record
+
+
+def can_access_tag_record(record: dict, user: dict | None) -> bool:
+    return can_access_shared_item(record, user)
 
 
 def normalize_tags(value) -> list[str]:
@@ -575,7 +693,7 @@ def serialize_image_detail_row(row: sqlite3.Row | None) -> dict:
 def get_image_tags_for_user(conn: sqlite3.Connection, user: dict | None, rel_path: str) -> list[str]:
     if not user:
         return []
-    if is_preferred_admin(user):
+    if is_owner(user):
         rows = conn.execute("SELECT tags_json FROM user_image_tags WHERE path = ?", (rel_path,)).fetchall()
         seen: set[str] = set()
         result: list[str] = []
@@ -593,20 +711,30 @@ def get_image_tags_for_user(conn: sqlite3.Connection, user: dict | None, rel_pat
     user_id = get_user_id_from_user(user)
     if not user_id:
         return []
-    row = conn.execute("SELECT tags_json FROM user_image_tags WHERE user_id = ? AND path = ?", (user_id, rel_path)).fetchone()
-    if not row:
-        return []
-    try:
-        return normalize_tags(json.loads(row["tags_json"] or "[]"))
-    except Exception:
-        return []
+    rows = conn.execute("SELECT user_id, tags_json FROM user_image_tags WHERE path = ?", (rel_path,)).fetchall()
+    sharing = load_tag_sharing()
+    result: set[str] = set()
+    for row in rows:
+        try:
+            tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+        except Exception:
+            tags = []
+        row_user_id = str(row["user_id"] or "").strip()
+        for tag in tags:
+            if row_user_id == user_id:
+                result.add(tag)
+                continue
+            record = sharing.get(tag_share_key(row_user_id, tag))
+            if record and can_access_tag_record(record, user):
+                result.add(tag)
+    return sorted(result)
 
 
 def get_image_tags_map_for_user(conn: sqlite3.Connection, user: dict | None, paths: list[str]) -> dict[str, list[str]]:
     if not user or not paths:
         return {}
     placeholders = ",".join("?" for _ in paths)
-    if is_preferred_admin(user):
+    if is_owner(user):
         rows = conn.execute(
             f"SELECT path, tags_json FROM user_image_tags WHERE path IN ({placeholders})",
             tuple(paths),
@@ -625,16 +753,25 @@ def get_image_tags_map_for_user(conn: sqlite3.Connection, user: dict | None, pat
     if not user_id:
         return {}
     rows = conn.execute(
-        f"SELECT path, tags_json FROM user_image_tags WHERE user_id = ? AND path IN ({placeholders})",
-        (user_id, *paths),
+        f"SELECT user_id, path, tags_json FROM user_image_tags WHERE path IN ({placeholders})",
+        tuple(paths),
     ).fetchall()
-    result: dict[str, list[str]] = {}
+    sharing = load_tag_sharing()
+    result_set_map: dict[str, set[str]] = {}
     for row in rows:
         try:
-            result[row["path"]] = normalize_tags(json.loads(row["tags_json"] or "[]"))
+            tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
         except Exception:
-            result[row["path"]] = []
-    return result
+            tags = []
+        row_user_id = str(row["user_id"] or "").strip()
+        for tag in tags:
+            if row_user_id == user_id:
+                result_set_map.setdefault(row["path"], set()).add(tag)
+                continue
+            record = sharing.get(tag_share_key(row_user_id, tag))
+            if record and can_access_tag_record(record, user):
+                result_set_map.setdefault(row["path"], set()).add(tag)
+    return {p: sorted(list(result_set_map.get(p, set()))) for p in paths}
 
 
 def save_image_tags_for_user(conn: sqlite3.Connection, user_id: str, rel_path: str, tags: list[str], now: str | None = None) -> list[str]:
@@ -712,12 +849,19 @@ def get_folder_detail_record(folder_path: str) -> dict:
             (folder_path,),
         ).fetchone()
     if not row:
-        return {"title": "", "description": "", "visibleToUsers": True, "visibleToAdmins": True}
+        return {
+            "title": "",
+            "description": "",
+            "visibleToUsers": True,
+            "visibleToAdmins": True,
+            "hasFolderDetail": False,
+        }
     return {
         "title": row["title"] or "",
         "description": row["description"] or "",
         "visibleToUsers": bool(row["visible_to_users"]),
         "visibleToAdmins": bool(row["visible_to_admins"]),
+        "hasFolderDetail": True,
     }
 
 
@@ -814,6 +958,105 @@ def save_folder_detail_record(
             conn.execute("DELETE FROM folder_details WHERE folder_path = ?", (folder_path,))
         conn.commit()
     return payload
+
+
+def folder_default_access_display(folder_path: str, details: dict | None = None) -> dict:
+    details = details or get_folder_detail_record(folder_path)
+    parent_access = level_parent_access(folder_path)
+    visible_to_users = bool(details.get("visibleToUsers")) and bool(parent_access.get("visibleToUsers"))
+    visible_to_admins = bool(details.get("visibleToAdmins")) and bool(parent_access.get("visibleToAdmins"))
+    inherited_user_block = not bool(parent_access.get("visibleToUsers"))
+    inherited_admin_block = not bool(parent_access.get("visibleToAdmins"))
+
+    return {
+        "defaultAccess": {
+            "user": "allow" if visible_to_users else "block",
+            "admin": "allow" if visible_to_admins else "block",
+        },
+        "defaultAccessInherited": {
+            "user": inherited_user_block,
+            "admin": inherited_admin_block,
+        },
+    }
+
+
+def folder_child_access_mixed(folder_path: str) -> dict:
+    folder_path = folder_path.strip().strip("/")
+    if not folder_path:
+        return {"user": False, "admin": False}
+    prefix = f"{folder_path}/%"
+    with db_connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT visible_to_users, visible_to_admins
+            FROM folder_details
+            WHERE folder_path LIKE ?
+            """,
+            (prefix,),
+        ).fetchall()
+    user_states = {bool(row["visible_to_users"]) for row in rows}
+    admin_states = {bool(row["visible_to_admins"]) for row in rows}
+    return {
+        "user": len(user_states) > 1,
+        "admin": len(admin_states) > 1,
+    }
+
+
+def post_folder_default_access_changed_event(
+    folder_path: str,
+    before: dict,
+    after: dict,
+    user: dict | None,
+) -> None:
+    if (
+        before.get("visibleToUsers") == after.get("visibleToUsers")
+        and before.get("visibleToAdmins") == after.get("visibleToAdmins")
+    ):
+        return
+
+    post_auth_history(
+        "peri.folder_default_access_changed",
+        json.dumps({
+            "folderPath": folder_path,
+            "before": {
+                "visibleToUsers": bool(before.get("visibleToUsers")),
+                "visibleToAdmins": bool(before.get("visibleToAdmins")),
+            },
+            "after": {
+                "visibleToUsers": bool(after.get("visibleToUsers")),
+                "visibleToAdmins": bool(after.get("visibleToAdmins")),
+            },
+        }),
+        user,
+    )
+
+
+def post_folder_account_access_changed_event(
+    folder_path: str,
+    before: dict[str, str],
+    after: dict[str, str],
+    user: dict | None,
+) -> None:
+    if before == after:
+        return
+
+    changed_user_ids = sorted(set(before.keys()) | set(after.keys()))
+    post_auth_history(
+        "peri.folder_account_access_changed",
+        json.dumps({
+            "folderPath": folder_path,
+            "changes": [
+                {
+                    "userId": user_id,
+                    "before": before.get(user_id, "inherit"),
+                    "after": after.get(user_id, "inherit"),
+                }
+                for user_id in changed_user_ids
+                if before.get(user_id, "inherit") != after.get(user_id, "inherit")
+            ],
+        }),
+        user,
+    )
 
 
 def folder_path_parts(folder_path: str) -> list[str]:
@@ -1056,10 +1299,10 @@ def list_files_by_tag(tag_filter: str, search_filter: str = "", user: dict | Non
         return []
 
     with db_connect() as conn:
-        if is_preferred_admin(user):
+        if is_owner(user):
             rows = conn.execute(
                 """
-                SELECT t.path, t.tags_json, d.title, d.description
+                SELECT t.user_id, t.path, t.tags_json, d.title, d.description
                 FROM user_image_tags t
                 LEFT JOIN image_details d ON d.path = t.path
                 ORDER BY t.path COLLATE NOCASE
@@ -1071,16 +1314,15 @@ def list_files_by_tag(tag_filter: str, search_filter: str = "", user: dict | Non
                 return []
             rows = conn.execute(
                 """
-                SELECT t.path, t.tags_json, d.title, d.description
+                SELECT t.user_id, t.path, t.tags_json, d.title, d.description
                 FROM user_image_tags t
                 LEFT JOIN image_details d ON d.path = t.path
-                WHERE t.user_id = ?
                 ORDER BY t.path COLLATE NOCASE
-                """,
-                (user_id,),
+                """
             ).fetchall()
 
     grouped_rows: dict[str, dict] = {}
+    sharing = load_tag_sharing()
     for row in rows:
         path = str(row["path"] or "").strip().strip("/")
         if not path:
@@ -1089,6 +1331,14 @@ def list_files_by_tag(tag_filter: str, search_filter: str = "", user: dict | Non
             tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
         except Exception:
             tags = []
+        row_user_id = str(row["user_id"] or "").strip()
+        if not is_owner(user) and row_user_id != get_user_id_from_user(user):
+            tags = [
+                tag for tag in tags
+                if can_access_tag_record(sharing.get(tag_share_key(row_user_id, tag)) or {}, user)
+            ]
+        if not tags:
+            continue
         if path not in grouped_rows:
             grouped_rows[path] = {
                 "title": row["title"] or "",
@@ -1159,21 +1409,25 @@ def list_files_globally(search_filter: str, user: dict | None = None) -> list[di
         rows = conn.execute(
             "SELECT path, title, description, updated_at FROM image_details ORDER BY path COLLATE NOCASE"
         ).fetchall()
-        if is_preferred_admin(user):
-            user_tags_rows = conn.execute("SELECT path, tags_json FROM user_image_tags").fetchall()
+        if is_owner(user):
+            user_tags_rows = conn.execute("SELECT user_id, path, tags_json FROM user_image_tags").fetchall()
         elif user:
-            user_id = get_user_id_from_user(user)
-            user_tags_rows = conn.execute(
-                "SELECT path, tags_json FROM user_image_tags WHERE user_id = ?",
-                (user_id,),
-            ).fetchall() if user_id else []
+            user_tags_rows = conn.execute("SELECT user_id, path, tags_json FROM user_image_tags").fetchall()
         else:
             user_tags_rows = []
 
     user_tags_map: dict[str, set[str]] = {}
+    sharing = load_tag_sharing()
+    current_user_id = get_user_id_from_user(user)
     for r in user_tags_rows:
         try:
             tags = normalize_tags(json.loads(r["tags_json"] or "[]"))
+            row_user_id = str(r["user_id"] or "").strip()
+            if not is_owner(user) and row_user_id != current_user_id:
+                tags = [
+                    tag for tag in tags
+                    if can_access_tag_record(sharing.get(tag_share_key(row_user_id, tag)) or {}, user)
+                ]
             path_set = user_tags_map.setdefault(r["path"], set())
             path_set.update(tags)
         except Exception:
@@ -1236,8 +1490,8 @@ def collect_tag_stats(user: dict | None = None) -> tuple[list[str], dict[str, in
         return [], {}
     counts: dict[str, int] = {}
     with db_connect() as conn:
-        if is_preferred_admin(user):
-            rows = conn.execute("SELECT path, tags_json FROM user_image_tags").fetchall()
+        if is_owner(user):
+            rows = conn.execute("SELECT user_id, path, tags_json FROM user_image_tags").fetchall()
             file_tags_map: dict[str, set[str]] = {}
             for row in rows:
                 rel_path = str(row["path"] or "").strip().strip("/")
@@ -1256,7 +1510,8 @@ def collect_tag_stats(user: dict | None = None) -> tuple[list[str], dict[str, in
             user_id = get_user_id_from_user(user)
             if not user_id:
                 return [], {}
-            rows = conn.execute("SELECT path, tags_json FROM user_image_tags WHERE user_id = ?", (user_id,)).fetchall()
+            rows = conn.execute("SELECT user_id, path, tags_json FROM user_image_tags").fetchall()
+            sharing = load_tag_sharing()
             for row in rows:
                 rel_path = str(row["path"] or "").strip().strip("/")
                 if rel_path and not can_access_file_path(rel_path, user):
@@ -1265,10 +1520,76 @@ def collect_tag_stats(user: dict | None = None) -> tuple[list[str], dict[str, in
                     tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
                 except Exception:
                     tags = []
+                row_user_id = str(row["user_id"] or "").strip()
+                if row_user_id != user_id:
+                    tags = [
+                        tag for tag in tags
+                        if can_access_tag_record(sharing.get(tag_share_key(row_user_id, tag)) or {}, user)
+                    ]
                 for tag in tags:
                     counts[tag] = counts.get(tag, 0) + 1
     tags = sorted(counts.keys())
     return tags, counts
+
+
+def tag_owner_ids(tag_name: str, user: dict | None = None) -> list[str]:
+    tag_name = tag_name.strip().lower()
+    if not tag_name:
+        return []
+    with db_connect() as conn:
+        if is_owner(user):
+            rows = conn.execute("SELECT DISTINCT user_id, tags_json FROM user_image_tags").fetchall()
+        else:
+            user_id = get_user_id_from_user(user)
+            rows = conn.execute(
+                "SELECT DISTINCT user_id, tags_json FROM user_image_tags WHERE user_id = ?",
+                (user_id,),
+            ).fetchall() if user_id else []
+    result: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        try:
+            tags = normalize_tags(json.loads(row["tags_json"] or "[]"))
+        except Exception:
+            tags = []
+        row_user_id = str(row["user_id"] or "").strip()
+        if tag_name in tags and row_user_id and row_user_id not in seen:
+            seen.add(row_user_id)
+            result.append(row_user_id)
+    return result
+
+
+def tag_access_payload(tags: list[str], user: dict | None = None) -> dict:
+    sharing = load_tag_sharing()
+    current_user_id = get_user_id_from_user(user)
+    result: dict[str, dict] = {}
+    for tag in tags:
+        owner_ids = tag_owner_ids(tag, user)
+        selected_records = []
+        for owner_id in owner_ids:
+            record = sharing.get(tag_share_key(owner_id, tag)) or {
+                "tag": tag,
+                "owner_user_id": owner_id,
+                "owner_username": owner_id,
+                "share_scope": "private",
+                "shared_account_ids": [],
+            }
+            if is_owner(user) or owner_id == current_user_id or can_access_tag_record(record, user):
+                selected_records.append(record)
+        primary = selected_records[0] if selected_records else {
+            "tag": tag,
+            "owner_user_id": current_user_id,
+            "owner_username": get_username_from_user(user),
+            "share_scope": "private",
+            "shared_account_ids": [],
+        }
+        result[tag] = {
+            "owner_user_id": str(primary.get("owner_user_id") or "").strip(),
+            "owner_username": str(primary.get("owner_username") or primary.get("owner_user_id") or "").strip(),
+            "share_scope": normalize_share_scope(primary.get("share_scope")),
+            "shared_account_ids": normalize_account_ids(primary.get("shared_account_ids")),
+        }
+    return result
 
 
 def rename_tag_globally(old_tag: str, new_tag: str, user: dict | None = None) -> None:
@@ -1278,7 +1599,7 @@ def rename_tag_globally(old_tag: str, new_tag: str, user: dict | None = None) ->
         return
 
     with db_connect() as conn:
-        if is_preferred_admin(user):
+        if is_owner(user):
             rows = conn.execute("SELECT user_id, path, tags_json FROM user_image_tags").fetchall()
         else:
             user_id = get_user_id_from_user(user)
@@ -1307,7 +1628,7 @@ def delete_tag_globally(tag_name: str, user: dict | None = None) -> None:
         return
 
     with db_connect() as conn:
-        if is_preferred_admin(user):
+        if is_owner(user):
             rows = conn.execute("SELECT user_id, path, tags_json FROM user_image_tags").fetchall()
         else:
             user_id = get_user_id_from_user(user)
@@ -1353,7 +1674,7 @@ def bulk_update_tags(image_paths: list[str], tag_name: str, action: str, user: d
     with db_connect() as conn:
         now = iso_utc()
         for rel_path in unique_paths:
-            if is_preferred_admin(user) and action == "remove":
+            if is_owner(user) and action == "remove":
                 rows = conn.execute("SELECT user_id, tags_json FROM user_image_tags WHERE path = ?", (rel_path,)).fetchall()
                 for r in rows:
                     try:
@@ -1402,6 +1723,10 @@ def load_share_record(share_id: str) -> dict | None:
     data["itemCount"] = len(data["images"])
     data["user_id"] = str(data.get("user_id") or "").strip()
     data["username"] = str(data.get("username") or "").strip()
+    data["owner_user_id"] = str(data.get("owner_user_id") or "wm").strip()
+    data["owner_username"] = str(data.get("owner_username") or data.get("username") or data["owner_user_id"]).strip()
+    data["share_scope"] = normalize_share_scope(data.get("share_scope"))
+    data["shared_account_ids"] = normalize_account_ids(data.get("shared_account_ids"))
     files = []
     missing_images = []
     for rel_path in data["images"]:
@@ -1434,21 +1759,16 @@ def list_share_records(user: dict | None = None) -> list[dict]:
     ensure_shares_dir()
     shares: list[dict] = []
     user_id = get_user_id_from_user(user)
-    pref_admin = is_preferred_admin(user)
+    owner_access = is_owner(user)
     for share_file in SHARES_DIR.glob("*.json"):
         try:
             data = json.loads(share_file.read_text(encoding="utf-8"))
         except Exception:
             continue
-        share_user_id = str(data.get("user_id") or "").strip()
+        share_user_id = str(data.get("owner_user_id") or data.get("user_id") or "wm").strip()
         if user:
-            if not pref_admin:
-                if share_user_id:
-                    if share_user_id != user_id:
-                        continue
-                else:
-                    if not (user.get("isOwner") or user.get("isAdmin")):
-                        continue
+            if not owner_access and not can_access_shared_item(data, user):
+                continue
         elif SERVER_LIBRARY_REQUIRE_AUTH:
             continue
 
@@ -1462,7 +1782,11 @@ def list_share_records(user: dict | None = None) -> list[dict]:
                 "itemCount": len(images),
                 "created_at": data.get("created_at") or "",
                 "user_id": share_user_id,
-                "username": str(data.get("username") or "").strip(),
+                "username": str(data.get("owner_username") or data.get("username") or "").strip(),
+                "owner_user_id": share_user_id,
+                "owner_username": str(data.get("owner_username") or data.get("username") or share_user_id).strip(),
+                "share_scope": normalize_share_scope(data.get("share_scope")),
+                "shared_account_ids": normalize_account_ids(data.get("shared_account_ids")),
             }
         )
     shares.sort(key=lambda share: share.get("created_at") or "", reverse=True)
@@ -1482,10 +1806,16 @@ def save_share_record(
     username = user.get("username") if user else ""
 
     existing = load_share_record(share_id)
+    share_scope = normalize_share_scope((existing or {}).get("share_scope"))
+    shared_account_ids = normalize_account_ids((existing or {}).get("shared_account_ids"))
     if existing:
-        if not user_id and existing.get("user_id"):
-            user_id = str(existing.get("user_id"))
-        if not username and existing.get("username"):
+        if existing.get("owner_user_id"):
+            user_id = str(existing.get("owner_user_id"))
+        elif not user_id:
+            user_id = "wm"
+        if existing.get("owner_username"):
+            username = existing.get("owner_username")
+        elif not username and existing.get("username"):
             username = existing.get("username")
 
     payload = {
@@ -1496,6 +1826,10 @@ def save_share_record(
         "created_at": created_at or iso_utc(),
         "user_id": user_id,
         "username": username,
+        "owner_user_id": user_id or "wm",
+        "owner_username": username or user_id or "wm",
+        "share_scope": share_scope,
+        "shared_account_ids": shared_account_ids,
     }
     share_file = SHARES_DIR / f"{share_id}.json"
     share_file.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -2463,7 +2797,7 @@ class Handler(BaseHTTPRequestHandler):
                 if SERVER_LIBRARY_REQUIRE_AUTH and not user:
                     return
                 tags, tag_counts = collect_tag_stats(user)
-                self._send_json({"ok": True, "tags": tags, "tagCounts": tag_counts})
+                self._send_json({"ok": True, "tags": tags, "tagCounts": tag_counts, "tagAccess": tag_access_payload(tags, user)})
                 return
 
             if path == "/api/shares":
@@ -2494,6 +2828,9 @@ class Handler(BaseHTTPRequestHandler):
                 share = load_share_record(share_id)
                 if not share:
                     self._send_json({"error": "Shared page not found"}, 404)
+                    return
+                if not can_access_shared_item(share, user):
+                    self._send_json({"error": "You do not have permission to view this list"}, 403)
                     return
                 share = dict(share)
                 share["images"] = [image for image in share.get("images", []) if can_access_file_path(str(image), user)]
@@ -2913,6 +3250,34 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True})
                 return
 
+            if path == "/api/tags/access":
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
+                    return
+                payload = load_json_body(self)
+                tag = (payload.get("tag") or "").strip().lower()
+                if not tag:
+                    self._send_json({"error": "Tag is required"}, 400)
+                    return
+                share_scope = normalize_share_scope(payload.get("shareScope"))
+                shared_account_ids = normalize_account_ids(payload.get("accountIds"))
+                owner_ids = tag_owner_ids(tag, user)
+                if not owner_ids:
+                    owner_ids = [get_user_id_from_user(user)]
+                if not is_owner(user):
+                    current_user_id = get_user_id_from_user(user)
+                    owner_ids = [owner_id for owner_id in owner_ids if owner_id == current_user_id]
+                if not owner_ids:
+                    self._send_json({"error": "You do not have permission to edit this tag"}, 403)
+                    return
+                records = [
+                    set_tag_access_record(tag, owner_id, get_username_from_user(user), share_scope, shared_account_ids)
+                    for owner_id in owner_ids
+                    if owner_id
+                ]
+                self._send_json({"ok": True, "tag": tag, "records": records})
+                return
+
             if path == "/api/share":
                 user = require_server_library_access(self)
                 if SERVER_LIBRARY_REQUIRE_AUTH and not user:
@@ -2955,8 +3320,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not share:
                     self._send_json({"error": "Shared page not found"}, 404)
                     return
-                share_user_id = str(share.get("user_id") or "").strip()
-                if share_user_id and user and share_user_id != get_user_id_from_user(user) and not (user.get("isOwner") or user.get("isAdmin")):
+                if user and not can_manage_shared_item(share, user):
                     self._send_json({"error": "You do not have permission to edit this list"}, 403)
                     return
                 payload = load_json_body(self)
@@ -2968,6 +3332,27 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 updated = save_share_record(share_id, title, images, share.get("created_at"), description=description, user=user)
                 self._send_json({"ok": True, "share": updated})
+                return
+
+            match = re.fullmatch(r"/api/share/([^/]+)/access", path)
+            if match:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
+                    return
+                share_id = unquote(match.group(1)).strip()
+                share = load_share_record(share_id)
+                if not share:
+                    self._send_json({"error": "Shared page not found"}, 404)
+                    return
+                if not can_manage_shared_item(share, user):
+                    self._send_json({"error": "You do not have permission to edit this list"}, 403)
+                    return
+                payload = load_json_body(self)
+                share["share_scope"] = normalize_share_scope(payload.get("shareScope"))
+                share["shared_account_ids"] = normalize_account_ids(payload.get("accountIds"))
+                share_file = SHARES_DIR / f"{share_id}.json"
+                share_file.write_text(json.dumps(share, ensure_ascii=False), encoding="utf-8")
+                self._send_json({"ok": True, "share": load_share_record(share_id)})
                 return
 
             if path == "/api/local-folder-opened":
@@ -2985,8 +3370,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not share:
                     self._send_json({"error": "Shared page not found"}, 404)
                     return
-                share_user_id = str(share.get("user_id") or "").strip()
-                if share_user_id and user and share_user_id != get_user_id_from_user(user) and not (user.get("isOwner") or user.get("isAdmin")):
+                if user and not can_manage_shared_item(share, user):
                     self._send_json({"error": "You do not have permission to delete this list"}, 403)
                     return
                 share_file = SHARES_DIR / f"{share_id}.json"
@@ -3043,15 +3427,24 @@ class Handler(BaseHTTPRequestHandler):
                     or "accountAccess" in payload
                 )
                 if has_detail_update or not has_cover_update:
-                    save_folder_detail_record(
+                    previous_details = get_folder_detail_record(folder_path)
+                    next_details = save_folder_detail_record(
                         folder_path,
                         title,
                         description,
                         visible_to_users if isinstance(visible_to_users, bool) else None,
                         visible_to_admins if isinstance(visible_to_admins, bool) else None,
                     )
+                    post_folder_default_access_changed_event(folder_path, previous_details, next_details, user)
                     if isinstance(account_access, dict):
-                        save_folder_account_access(folder_path, account_access)
+                        previous_account_access = get_folder_account_access(folder_path)
+                        next_account_access = save_folder_account_access(folder_path, account_access)
+                        post_folder_account_access_changed_event(
+                            folder_path,
+                            previous_account_access,
+                            next_account_access,
+                            user,
+                        )
                 cover_state = get_folder_cover_state(folder_path)
                 details = get_folder_detail_record(folder_path)
                 self._send_json({
@@ -3093,6 +3486,7 @@ class Handler(BaseHTTPRequestHandler):
                 if permission_update_requested and not user.get("isOwner"):
                     self._send_json({"error": "You do not have permission to edit folder permissions"}, 403)
                     return
+                previous_details = get_folder_detail_record(folder_path)
                 details = save_folder_detail_record(
                     folder_path,
                     title,
@@ -3100,8 +3494,16 @@ class Handler(BaseHTTPRequestHandler):
                     visible_to_users if isinstance(visible_to_users, bool) else None,
                     visible_to_admins if isinstance(visible_to_admins, bool) else None,
                 )
+                post_folder_default_access_changed_event(folder_path, previous_details, details, user)
                 if isinstance(account_access, dict):
-                    save_folder_account_access(folder_path, account_access)
+                    previous_account_access = get_folder_account_access(folder_path)
+                    next_account_access = save_folder_account_access(folder_path, account_access)
+                    post_folder_account_access_changed_event(
+                        folder_path,
+                        previous_account_access,
+                        next_account_access,
+                        user,
+                    )
                 self._send_json({
                     "ok": True,
                     "folderPath": folder_path,
@@ -3197,3 +3599,4 @@ if __name__ == "__main__":
         print("Perihelion image service stopped.")
     finally:
         server.server_close()
+

@@ -94,6 +94,56 @@ type HighlightImageViewerState = {
   directUrl: string;
 };
 
+type ShopLabImage = {
+  fileName: string;
+  path: string;
+  imageCode: string;
+  title: string;
+  description: string;
+  rarity: CardRarity | null;
+  seriesName: string;
+  editionSize: number | null;
+  reviewStatus: ReviewStatus;
+  attributes: string[];
+  sourceTitle: string;
+  sourceTags: string[];
+  imageUrl: string;
+  thumbUrl: string;
+};
+
+type ShopLabGroup = {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  fulfillment: string;
+  sourceFolder: string;
+  imageCount: number;
+  description: string;
+  productionNotes: string;
+  pricingNotes: string;
+  sampleNotes: string;
+  notes: string;
+  images: ShopLabImage[];
+};
+
+type ShopLabPayload = {
+  ok: boolean;
+  generatedAt: string;
+  sourceRoot: string;
+  options: {
+    types: string[];
+    statuses: string[];
+    fulfillments: string[];
+  };
+  groups: ShopLabGroup[];
+};
+
+type ShopLabImageViewerState = {
+  group: ShopLabGroup;
+  image: ShopLabImage;
+};
+
 const EMPTY_EDITOR: EditorState = {
   title: '',
   description: '',
@@ -102,6 +152,12 @@ const EMPTY_EDITOR: EditorState = {
   editionSize: '',
   reviewStatus: 'untagged',
   attributes: [],
+};
+
+const EMPTY_SHOP_LAB_OPTIONS = {
+  types: '',
+  statuses: '',
+  fulfillments: '',
 };
 
 const ACTION_HISTORY_STORAGE_KEY = 'aphelion_admin_action_history';
@@ -325,6 +381,18 @@ export function AdminPage({
   const [highlightError, setHighlightError] = useState('');
   const [highlightSortMode, setHighlightSortMode] = useState<HighlightSortMode>('highlights');
   const [highlightViewer, setHighlightViewer] = useState<HighlightImageViewerState | null>(null);
+  const [shopLab, setShopLab] = useState<ShopLabPayload | null>(null);
+  const [shopLabLoading, setShopLabLoading] = useState(false);
+  const [shopLabError, setShopLabError] = useState('');
+  const [shopLabSavingId, setShopLabSavingId] = useState('');
+  const [shopLabSavedId, setShopLabSavedId] = useState('');
+  const [shopLabEditGroup, setShopLabEditGroup] = useState<ShopLabGroup | null>(null);
+  const [shopLabViewGroup, setShopLabViewGroup] = useState<ShopLabGroup | null>(null);
+  const [shopLabImageViewer, setShopLabImageViewer] = useState<ShopLabImageViewerState | null>(null);
+  const [shopLabDraggedImage, setShopLabDraggedImage] = useState<{ groupId: string; imagePath: string } | null>(null);
+  const [shopLabOptionDraft, setShopLabOptionDraft] = useState(EMPTY_SHOP_LAB_OPTIONS);
+  const [shopLabOptionsSaving, setShopLabOptionsSaving] = useState(false);
+  const [shopLabOptionsSaved, setShopLabOptionsSaved] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadedEditorPathRef = useRef('');
@@ -499,6 +567,7 @@ export function AdminPage({
   const isOptionsPage = currentHash === '#options';
   const isAdminHighlightsPage = currentHash === '#admin-highlights';
   const isCurationPage = currentHash === '#curation';
+  const isShopLabPage = currentHash === '#shop-lab';
 
   useEffect(() => {
     if (!isAdminHighlightsPage) {
@@ -540,6 +609,52 @@ export function AdminPage({
       cancelled = true;
     };
   }, [apiBaseUrl, isAdminHighlightsPage]);
+
+  useEffect(() => {
+    if (!isShopLabPage && !isOptionsPage) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadShopLab() {
+      setShopLabLoading(true);
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/admin/shop-lab`, {
+          credentials: 'include',
+        });
+        if (!response.ok) {
+          throw new Error(`Shop Lab returned ${response.status}`);
+        }
+
+        const payload = (await response.json()) as ShopLabPayload;
+        if (cancelled) {
+          return;
+        }
+
+        setShopLab(payload);
+        setShopLabOptionDraft({
+          types: payload.options.types.join('\n'),
+          statuses: payload.options.statuses.join('\n'),
+          fulfillments: payload.options.fulfillments.join('\n'),
+        });
+        setShopLabError('');
+      } catch (loadError) {
+        if (!cancelled) {
+          setShopLabError(loadError instanceof Error ? loadError.message : 'Shop Lab could not be loaded.');
+        }
+      } finally {
+        if (!cancelled) {
+          setShopLabLoading(false);
+        }
+      }
+    }
+
+    void loadShopLab();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, isOptionsPage, isShopLabPage]);
 
   useEffect(() => {
     if (!highlightViewer) {
@@ -1173,6 +1288,546 @@ export function AdminPage({
     );
   }
 
+  function formatShopType(type: ShopLabGroup['type']) {
+    return type || 'Miscellany';
+  }
+
+  function openShopLabImageInCuration(image: ShopLabImage) {
+    const folderPath = image.path.split('/').slice(0, -1).join('/');
+    setSelectedPath(image.path);
+    setSelectedFolder(folderPath);
+    setExpandedFolders((current) => Array.from(new Set([
+      ...current,
+      ...collectAncestorPaths(folderPath),
+      folderPath,
+    ].filter(Boolean))));
+    setSearch('');
+    setCurrentHash('#curation');
+    window.location.hash = 'curation';
+    recordAction('Shop Lab edit', `Opened ${image.fileName} from ${folderPath || 'root'} in Curation`);
+  }
+
+  function updateShopLabGroup(groupId: string, updates: Partial<Pick<ShopLabGroup, 'title' | 'description' | 'type' | 'status' | 'fulfillment' | 'productionNotes' | 'pricingNotes' | 'sampleNotes' | 'images'>>) {
+    setShopLabEditGroup((current) => (current?.id === groupId ? { ...current, ...updates } : current));
+    setShopLab((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        groups: current.groups.map((group) => (
+          group.id === groupId ? { ...group, ...updates } : group
+        )),
+      };
+    });
+  }
+
+  async function saveShopLabGroup(group: ShopLabGroup) {
+    setShopLabSavingId(group.id);
+    setShopLabSavedId('');
+    setShopLabError('');
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/admin/shop-lab/${encodeURIComponent(group.id)}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: group.title,
+          description: group.description,
+          type: group.type,
+          status: group.status,
+          fulfillment: group.fulfillment,
+          productionNotes: group.productionNotes,
+          pricingNotes: group.pricingNotes,
+          sampleNotes: group.sampleNotes,
+          imageOrder: group.images.map((image) => image.path),
+        }),
+      });
+      const responseText = await response.text();
+      let payload: (ShopLabPayload & { error?: string }) | null = null;
+      try {
+        payload = JSON.parse(responseText) as ShopLabPayload & { error?: string };
+      } catch {
+        throw new Error(response.ok ? 'Shop Lab returned an unreadable response.' : `Shop Lab save returned ${response.status}. The Aphelion server may need a restart.`);
+      }
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `Shop Lab save returned ${response.status}`);
+      }
+
+      setShopLab(payload);
+      const updatedGroup = payload.groups.find((item) => item.id === group.id) || group;
+      setShopLabEditGroup((current) => (current?.id === group.id ? null : current));
+      setShopLabViewGroup((current) => (current?.id === group.id ? updatedGroup : current));
+      setShopLabImageViewer((current) => (current?.group.id === group.id ? { ...current, group: updatedGroup } : current));
+      setShopLabSavedId(group.id);
+      window.setTimeout(() => {
+        setShopLabSavedId((current) => (current === group.id ? '' : current));
+      }, 1400);
+      recordAction('Shop Lab saved', `Updated ${group.title}`);
+    } catch (saveError) {
+      setShopLabError(saveError instanceof Error ? saveError.message : 'Shop Lab group could not be saved.');
+    } finally {
+      setShopLabSavingId('');
+    }
+  }
+
+  function parseShopLabOptionText(value: string) {
+    return Array.from(new Set(
+      value
+        .split(/\r?\n|,/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    ));
+  }
+
+  async function saveShopLabOptions() {
+    setShopLabOptionsSaving(true);
+    setShopLabOptionsSaved(false);
+    setShopLabError('');
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/admin/shop-lab/options`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          types: parseShopLabOptionText(shopLabOptionDraft.types),
+          statuses: parseShopLabOptionText(shopLabOptionDraft.statuses),
+          fulfillments: parseShopLabOptionText(shopLabOptionDraft.fulfillments),
+        }),
+      });
+      const responseText = await response.text();
+      let payload: (ShopLabPayload & { error?: string }) | null = null;
+      try {
+        payload = JSON.parse(responseText) as ShopLabPayload & { error?: string };
+      } catch {
+        throw new Error(response.ok ? 'Shop Lab options returned an unreadable response.' : `Shop Lab options save returned ${response.status}. The Aphelion server may need a restart.`);
+      }
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `Shop Lab options save returned ${response.status}`);
+      }
+
+      setShopLab(payload);
+      setShopLabOptionDraft({
+        types: payload.options.types.join('\n'),
+        statuses: payload.options.statuses.join('\n'),
+        fulfillments: payload.options.fulfillments.join('\n'),
+      });
+      setShopLabOptionsSaved(true);
+      window.setTimeout(() => setShopLabOptionsSaved(false), 1400);
+      recordAction('Shop Lab options saved', 'Updated product type, status, and fulfillment choices');
+    } catch (error) {
+      setShopLabError(error instanceof Error ? error.message : 'Shop Lab options could not be saved.');
+    } finally {
+      setShopLabOptionsSaving(false);
+    }
+  }
+
+  function reorderShopLabImage(groupId: string, draggedPath: string, targetPath: string) {
+    if (draggedPath === targetPath) {
+      setShopLabDraggedImage(null);
+      return;
+    }
+
+    let reorderedGroup: ShopLabGroup | null = null;
+    const reorder = (group: ShopLabGroup) => {
+      const images = group.images.slice();
+      const draggedIndex = images.findIndex((image) => image.path === draggedPath);
+      const targetIndex = images.findIndex((image) => image.path === targetPath);
+      if (draggedIndex < 0 || targetIndex < 0) {
+        return group;
+      }
+
+      const [draggedImage] = images.splice(draggedIndex, 1);
+      images.splice(targetIndex, 0, draggedImage);
+      const nextGroup = { ...group, images };
+      reorderedGroup = nextGroup;
+      return nextGroup;
+    };
+
+    setShopLab((current) => current
+      ? { ...current, groups: current.groups.map((group) => (group.id === groupId ? reorder(group) : group)) }
+      : current);
+    setShopLabViewGroup((current) => (current?.id === groupId ? reorder(current) : current));
+    setShopLabEditGroup((current) => (current?.id === groupId ? reorder(current) : current));
+    setShopLabImageViewer((current) => (current?.group.id === groupId ? { ...current, group: reorder(current.group) } : current));
+    setShopLabDraggedImage(null);
+
+    if (reorderedGroup) {
+      void saveShopLabGroup(reorderedGroup);
+    }
+  }
+
+  async function downloadShopLabExport(kind: 'json' | 'csv') {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/admin/shop-lab/exports/${kind}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `Shop Lab export returned ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `aphelion-shop-lab-${new Date().toISOString().slice(0, 10)}.${kind}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      recordAction('Shop Lab export', `${kind.toUpperCase()} export downloaded`);
+    } catch (error) {
+      setShopLabError(error instanceof Error ? error.message : 'Shop Lab export failed.');
+    }
+  }
+
+  function renderShopLabPage() {
+    const renderShopImageTile = (group: ShopLabGroup, image: ShopLabImage, allowDragOrder = false, index = 0) => (
+      <article
+        key={image.path}
+        className={`group border bg-[#fafafa] ${shopLabDraggedImage?.imagePath === image.path ? 'border-[#de8bf7] opacity-60' : 'border-[#efefef]'}`}
+        draggable={allowDragOrder}
+        onDragStart={(event) => {
+          if (!allowDragOrder) return;
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', image.path);
+          setShopLabDraggedImage({ groupId: group.id, imagePath: image.path });
+        }}
+        onDragOver={(event) => {
+          if (!allowDragOrder || shopLabDraggedImage?.groupId !== group.id) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'move';
+        }}
+        onDrop={(event) => {
+          if (!allowDragOrder || shopLabDraggedImage?.groupId !== group.id) return;
+          event.preventDefault();
+          reorderShopLabImage(group.id, shopLabDraggedImage.imagePath, image.path);
+        }}
+        onDragEnd={() => setShopLabDraggedImage(null)}
+        title={image.path}
+      >
+        <div className="relative">
+          <button type="button" onClick={() => setShopLabImageViewer({ group, image })} className="block w-full">
+            <img
+              src={prefixApiUrl(apiBaseUrl, image.thumbUrl)}
+              alt={image.fileName}
+              draggable={false}
+              className="aspect-square w-full object-cover grayscale-[0.15] transition duration-150 group-hover:grayscale-0"
+            />
+          </button>
+          <button
+            type="button"
+            aria-label={`Edit ${image.fileName} in curation`}
+            onClick={() => openShopLabImageInCuration(image)}
+            className="absolute right-1 top-1 grid h-6 w-6 place-items-center border border-white/80 bg-white/90 font-sans text-[13px] font-semibold leading-none text-gray-700 opacity-10 shadow-sm transition hover:border-[#de8bf7] hover:text-[#de8bf7] hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
+          >
+            &#9998;
+          </button>
+        </div>
+        <div className="truncate border-t border-[#efefef] px-1 py-1 font-sans text-[10px] text-gray-500">
+          {image.fileName}
+        </div>
+        {allowDragOrder && (
+          <div className="flex items-center justify-between border-t border-[#efefef] px-1 py-1 font-sans text-[10px] uppercase tracking-[0.12em] text-gray-500">
+            <span>{index + 1}</span>
+            <span>Drag</span>
+          </div>
+        )}
+      </article>
+    );
+
+    return (
+      <>
+        <main className="h-[calc(100vh-72px)] overflow-y-auto px-[36px] py-[16px]">
+          <div className="mb-4 flex items-start justify-between gap-4 border-b border-[#e5e5e5] pb-2 font-sans text-sm text-gray-900">
+            <div>
+              <span className="font-semibold">Shop Lab</span> - owner-only draft product grouping for Aph images. No checkout, public storefront, Shopify sync, or fulfillment automation yet.
+              {shopLab && (
+                <span className="ml-2 text-gray-500">
+                  {shopLab.groups.length} draft group{shopLab.groups.length === 1 ? '' : 's'} from {shopLab.sourceRoot}.
+                </span>
+              )}
+            </div>
+            <div className="flex shrink-0 gap-3 text-xs font-semibold uppercase tracking-[0.12em]">
+              <button type="button" onClick={() => void downloadShopLabExport('json')} className="hover:text-[#de8bf7]">
+                Export JSON
+              </button>
+              <button type="button" onClick={() => void downloadShopLabExport('csv')} className="hover:text-[#de8bf7]">
+                Export CSV
+              </button>
+            </div>
+          </div>
+
+          {shopLabLoading && (
+            <div className="border border-[#e5e5e5] bg-white p-4 font-sans text-sm text-gray-500">
+              Loading Shop Lab groups...
+            </div>
+          )}
+
+          {shopLabError && (
+            <div className="border border-red-200 bg-red-50 p-4 font-sans text-sm text-red-700">
+              {shopLabError}
+            </div>
+          )}
+
+          {!shopLabLoading && !shopLabError && shopLab && (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {shopLab.groups.map((group) => (
+                <section key={group.id} className="border border-[#e5e5e5] bg-white">
+                  <div className="flex items-start justify-between gap-4 border-b border-[#e5e5e5] px-4 py-3">
+                    <div className="min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => setShopLabViewGroup(group)}
+                        className="m-0 block max-w-full truncate p-0 text-left font-sans text-sm font-semibold text-gray-950 transition hover:text-[#de8bf7]"
+                      >
+                        {group.title}
+                      </button>
+                      <div className="mt-1 font-sans text-[11px] uppercase tracking-[0.16em] text-gray-500">
+                        {formatShopType(group.type)} - {group.status} - {group.imageCount} image{group.imageCount === 1 ? '' : 's'}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="border border-[#d8d8d8] px-2 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-600">
+                        {group.fulfillment}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Edit ${group.title}`}
+                        onClick={() => setShopLabEditGroup(group)}
+                        className="grid h-6 w-6 place-items-center border border-[#d8d8d8] bg-white font-sans text-[13px] font-semibold leading-none text-gray-700 transition hover:border-[#de8bf7] hover:text-[#de8bf7]"
+                      >
+                        &#9998;
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 p-4 font-sans text-sm text-gray-800">
+                    <div className="grid gap-1 text-xs text-gray-500">
+                      <div><span className="font-semibold text-gray-700">Source</span> - {group.sourceFolder}</div>
+                      <div className="line-clamp-2"><span className="font-semibold text-gray-700">Description</span> - {group.description}</div>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-2">
+                      {group.images.slice(0, 10).map((image) => renderShopImageTile(group, image))}
+                    </div>
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </main>
+
+        {shopLabEditGroup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 p-6 backdrop-blur-sm" onClick={() => setShopLabEditGroup(null)}>
+            <div className="max-h-[90vh] w-full max-w-xl overflow-hidden border border-[#d8d8d8] bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-[#e5e5e5] px-4 py-3 font-sans text-sm font-semibold text-gray-950">
+                Edit Shop Text
+                <button type="button" onClick={() => setShopLabEditGroup(null)} className="text-xs uppercase tracking-[0.12em] text-gray-500 hover:text-[#de8bf7]">
+                  Close
+                </button>
+              </div>
+              <div className="grid max-h-[calc(90vh-49px)] gap-3 overflow-y-auto p-4 font-sans text-sm text-gray-700">
+                <label className="grid gap-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Title</span>
+                  <input
+                    value={shopLabEditGroup.title}
+                    onChange={(event) => updateShopLabGroup(shopLabEditGroup.id, { title: event.target.value })}
+                    className="border border-[#d8d8d8] bg-[#fafafa] px-3 py-2 outline-none focus:border-[#9ca3af] focus:bg-white"
+                  />
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Description</span>
+                  <textarea
+                    value={shopLabEditGroup.description}
+                    onChange={(event) => updateShopLabGroup(shopLabEditGroup.id, { description: event.target.value })}
+                    className="min-h-32 resize-y border border-[#d8d8d8] bg-[#fafafa] px-3 py-2 outline-none focus:border-[#9ca3af] focus:bg-white"
+                  />
+                </label>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <label className="grid gap-1">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Product Type</span>
+                    <select
+                      value={shopLabEditGroup.type}
+                      onChange={(event) => updateShopLabGroup(shopLabEditGroup.id, { type: event.target.value })}
+                      className="border border-[#d8d8d8] bg-[#fafafa] px-3 py-2 outline-none focus:border-[#9ca3af] focus:bg-white"
+                    >
+                      {Array.from(new Set([...(shopLab?.options.types || []), shopLabEditGroup.type].filter(Boolean))).map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Status</span>
+                    <select
+                      value={shopLabEditGroup.status}
+                      onChange={(event) => updateShopLabGroup(shopLabEditGroup.id, { status: event.target.value })}
+                      className="border border-[#d8d8d8] bg-[#fafafa] px-3 py-2 outline-none focus:border-[#9ca3af] focus:bg-white"
+                    >
+                      {Array.from(new Set([...(shopLab?.options.statuses || []), shopLabEditGroup.status].filter(Boolean))).map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Fulfillment</span>
+                    <select
+                      value={shopLabEditGroup.fulfillment}
+                      onChange={(event) => updateShopLabGroup(shopLabEditGroup.id, { fulfillment: event.target.value })}
+                      className="border border-[#d8d8d8] bg-[#fafafa] px-3 py-2 outline-none focus:border-[#9ca3af] focus:bg-white"
+                    >
+                      {Array.from(new Set([...(shopLab?.options.fulfillments || []), shopLabEditGroup.fulfillment].filter(Boolean))).map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="grid gap-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Production Notes</span>
+                  <textarea
+                    value={shopLabEditGroup.productionNotes}
+                    onChange={(event) => updateShopLabGroup(shopLabEditGroup.id, { productionNotes: event.target.value })}
+                    className="min-h-20 resize-y border border-[#d8d8d8] bg-[#fafafa] px-3 py-2 outline-none focus:border-[#9ca3af] focus:bg-white"
+                    placeholder="Printer, sample status, paper/shirt notes, fulfillment steps..."
+                  />
+                </label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="grid gap-1">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Pricing Notes</span>
+                    <textarea
+                      value={shopLabEditGroup.pricingNotes}
+                      onChange={(event) => updateShopLabGroup(shopLabEditGroup.id, { pricingNotes: event.target.value })}
+                      className="min-h-20 resize-y border border-[#d8d8d8] bg-[#fafafa] px-3 py-2 outline-none focus:border-[#9ca3af] focus:bg-white"
+                      placeholder="Cost, target price, margin thoughts..."
+                    />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Sample Notes</span>
+                    <textarea
+                      value={shopLabEditGroup.sampleNotes}
+                      onChange={(event) => updateShopLabGroup(shopLabEditGroup.id, { sampleNotes: event.target.value })}
+                      className="min-h-20 resize-y border border-[#d8d8d8] bg-[#fafafa] px-3 py-2 outline-none focus:border-[#9ca3af] focus:bg-white"
+                      placeholder="Samples ordered/received, quality checks..."
+                    />
+                  </label>
+                </div>
+                <div className="flex items-center justify-end gap-3 pt-1">
+                  {shopLabSavedId === shopLabEditGroup.id && (
+                    <span className="font-sans text-[10px] uppercase tracking-[0.12em] text-green-700">Saved</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => saveShopLabGroup(shopLabEditGroup)}
+                    disabled={shopLabSavingId === shopLabEditGroup.id}
+                    className="border border-[#d8d8d8] bg-white px-3 py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-700 transition hover:border-[#de8bf7] hover:text-[#de8bf7] disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {shopLabSavingId === shopLabEditGroup.id ? 'Saving' : 'Save Text'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {shopLabViewGroup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 p-6 backdrop-blur-sm" onClick={() => setShopLabViewGroup(null)}>
+            <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden border border-[#d8d8d8] bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-center justify-between gap-4 border-b border-[#e5e5e5] px-4 py-3 font-sans text-sm text-gray-900">
+                <div className="min-w-0">
+                  <div className="truncate font-semibold">{shopLabViewGroup.title}</div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-gray-500">
+                    {shopLabViewGroup.imageCount} images - {shopLabViewGroup.sourceFolder}
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.12em]">
+                  <span className="text-gray-500">
+                    {shopLabSavingId === shopLabViewGroup.id ? 'Saving order' : 'Drag to reorder'}
+                  </span>
+                  <button type="button" onClick={() => setShopLabViewGroup(null)} className="hover:text-[#de8bf7]">
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-y-auto p-4">
+                <div className="grid grid-cols-5 gap-2">
+                  {shopLabViewGroup.images.map((image, index) => renderShopImageTile(shopLabViewGroup, image, true, index))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {shopLabImageViewer && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-white/70 p-6 backdrop-blur-sm" onClick={() => setShopLabImageViewer(null)}>
+            <div className="max-h-[90vh] max-w-[90vw] overflow-hidden border border-[#e5e5e5] bg-[#fafafa] shadow-xl" onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-center justify-between gap-4 border-b border-[#e5e5e5] px-4 py-3 font-sans text-sm text-gray-900">
+                <div className="min-w-0 flex-1 truncate font-semibold">{shopLabImageViewer.image.fileName}</div>
+                <div className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.12em]">
+                  <button type="button" onClick={() => openShopLabImageInCuration(shopLabImageViewer.image)} className="hover:text-[#de8bf7]">
+                    Edit
+                  </button>
+                  <button type="button" onClick={() => setShopLabImageViewer(null)} className="hover:text-[#de8bf7]">
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div className="flex max-h-[calc(90vh-49px)] flex-col bg-white">
+                <div className="flex min-h-0 flex-1 items-center justify-center">
+                  <img
+                    src={prefixApiUrl(apiBaseUrl, withImageSize(shopLabImageViewer.image.imageUrl, 2048))}
+                    alt={shopLabImageViewer.image.fileName}
+                    className="max-h-[calc(90vh-170px)] max-w-[90vw] object-contain"
+                  />
+                </div>
+                <div className="grid gap-1 border-t border-[#e5e5e5] bg-[#fafafa] px-4 py-3 font-sans text-xs text-gray-600">
+                  <div>
+                    <span className="font-semibold text-gray-800">Title</span>
+                    {' - '}
+                    {shopLabImageViewer.image.title || shopLabImageViewer.image.sourceTitle || shopLabImageViewer.image.fileName}
+                  </div>
+                  {shopLabImageViewer.image.description && (
+                    <div>
+                      <span className="font-semibold text-gray-800">Description</span>
+                      {' - '}
+                      {shopLabImageViewer.image.description}
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-semibold text-gray-800">Identity</span>
+                    {' - '}
+                    {shopLabImageViewer.image.imageCode || 'No code'} / {shopLabImageViewer.image.path}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-gray-800">Set</span>
+                    {' - '}
+                    {shopLabImageViewer.image.seriesName || shopLabImageViewer.group.title}
+                    {shopLabImageViewer.image.editionSize ? ` / edition ${shopLabImageViewer.image.editionSize}` : ''}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-gray-800">Attributes</span>
+                    {' - '}
+                    {[
+                      shopLabImageViewer.image.rarity,
+                      shopLabImageViewer.image.reviewStatus,
+                      ...shopLabImageViewer.image.attributes,
+                      ...shopLabImageViewer.image.sourceTags,
+                    ].filter(Boolean).join(', ') || 'None yet'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
   async function handleHighlightReset(mode: 'all' | 'least-popular-50' | 'least-popular-90') {
     setResetStatus('Checking current highlights...');
     try {
@@ -1248,7 +1903,7 @@ export function AdminPage({
         <div className="flex items-center justify-between border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
           <span>Highlight Maintenance</span>
           <span className="text-[10px] normal-case tracking-normal text-gray-400">
-            Preferred admin only
+            Admin only
           </span>
         </div>
         <div className="grid gap-3 p-4 font-sans text-sm text-gray-800">
@@ -1279,6 +1934,52 @@ export function AdminPage({
             <div className="text-gray-600">{resetStatus}</div>
           )}
         </div>
+      </section>
+    );
+  }
+
+  function renderShopLabOptions() {
+    return (
+      <section className="border border-[#e5e5e5] bg-white xl:col-span-2">
+        <div className="flex items-center justify-between border-b border-[#e5e5e5] px-4 py-3 font-sans text-xs uppercase tracking-[0.16em] text-gray-500">
+          <span>Shop Lab Options</span>
+          <div className="flex items-center gap-3">
+            {shopLabOptionsSaved && (
+              <span className="text-[10px] normal-case tracking-normal text-green-700">Saved</span>
+            )}
+            <button
+              type="button"
+              onClick={() => void saveShopLabOptions()}
+              disabled={shopLabOptionsSaving}
+              className="font-sans text-xs font-semibold normal-case tracking-normal text-gray-700 hover:text-[#de8bf7] disabled:cursor-wait disabled:opacity-60"
+            >
+              {shopLabOptionsSaving ? 'Saving' : 'Save Options'}
+            </button>
+          </div>
+        </div>
+        <div className="grid gap-4 p-4 font-sans text-sm text-gray-800 lg:grid-cols-3">
+          {([
+            ['types', 'Product Types', 'Postcard Pack, T-Shirt Series, Miscellany'],
+            ['statuses', 'Statuses', 'draft, sample ordered, approved'],
+            ['fulfillments', 'Fulfillment Categories', 'MOO/manual, Printful/local sample, undecided'],
+          ] as const).map(([key, label, placeholder]) => (
+            <label key={key} className="grid gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">{label}</span>
+              <textarea
+                value={shopLabOptionDraft[key]}
+                onChange={(event) => setShopLabOptionDraft((current) => ({ ...current, [key]: event.target.value }))}
+                placeholder={placeholder}
+                className="min-h-28 resize-y border border-[#d8d8d8] bg-[#fafafa] px-3 py-2 font-sans text-sm outline-none focus:border-[#9ca3af] focus:bg-white"
+              />
+              <span className="text-xs text-gray-500">One option per line, or comma separated.</span>
+            </label>
+          ))}
+        </div>
+        {shopLabError && (
+          <div className="border-t border-red-100 bg-red-50 px-4 py-3 font-sans text-sm text-red-700">
+            {shopLabError}
+          </div>
+        )}
       </section>
     );
   }
@@ -1489,6 +2190,12 @@ export function AdminPage({
             Curation
           </a>
           <a
+            href="/aphelion/#shop-lab"
+            className={`transition-colors duration-1000 hover:duration-150 hover:text-[#de8bf7] ${isShopLabPage ? 'text-blue-700' : ''}`}
+          >
+            Shop Lab
+          </a>
+          <a
             href="/aphelion/#options"
             className={`transition-colors duration-1000 hover:duration-150 hover:text-[#de8bf7] ${isOptionsPage ? 'text-blue-700' : ''}`}
           >
@@ -1509,6 +2216,8 @@ export function AdminPage({
 
       {isAdminHighlightsPage ? (
         renderAdminHighlightsPage()
+      ) : isShopLabPage ? (
+        renderShopLabPage()
       ) : isOptionsPage ? (
         <main className="h-[calc(100vh-72px)] overflow-y-auto px-[36px] py-[16px]">
           <div className="mb-4 border-b border-[#e5e5e5] pb-2 font-sans text-sm text-gray-900">
@@ -1519,6 +2228,7 @@ export function AdminPage({
           </div>
           <div className="grid gap-6 xl:grid-cols-2">
             {renderHighlightMaintenance()}
+            {renderShopLabOptions()}
             {renderLibraryOptions('Attribute Library', attributes, '/api/admin/attributes', setAttributes)}
             {renderLibraryOptions('Series Library', series, '/api/admin/series', setSeries)}
             <section className="border border-[#e5e5e5] bg-white">

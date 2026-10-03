@@ -16,6 +16,9 @@
     <SolidColorBrush x:Key="ErrorBrush" Color="#C42B1C"/>
     <SolidColorBrush x:Key="BorderBrush" Color="#D8D8DC"/>
     <SolidColorBrush x:Key="HighlightCardBrush" Color="#FFF2EC"/>
+    <SolidColorBrush x:Key="ActiveHighlightCardBrush" Color="#EEF6FF"/>
+    <SolidColorBrush x:Key="ActiveHighlightBorderBrush" Color="#0078D4"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="#0078D4"/>
     <SolidColorBrush x:Key="TabContainerBrush" Color="#EAEAEC"/>
     <SolidColorBrush x:Key="TabHoverBrush" Color="#DCDCDC"/>
     <SolidColorBrush x:Key="InputBgBrush" Color="#FFFFFF"/>

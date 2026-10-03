@@ -368,7 +368,7 @@ async function startServer() {
       const db = initDb()!;
       if (!Array.isArray(links)) return res.status(400).json({ error: 'Expected an array of links' });
       if (!canManageGlobalLinks(user)) {
-        return res.status(403).json({ error: 'Only the owner can sync the global master list.' });
+        return res.status(403).json({ error: 'Admin access required to sync the global master list.' });
       }
       for (const link of links) {
         await db.execute(

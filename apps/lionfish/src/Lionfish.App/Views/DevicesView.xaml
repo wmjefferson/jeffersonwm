@@ -55,10 +55,25 @@
                                 <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
                                 <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/>
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsHighlighted}" Value="True">
+                                    <!-- Activated Keypad Highlight: Turns Blue! -->
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsHighlighted}" Value="True"/>
+                                            <Condition Binding="{Binding IsMacroPad}" Value="True"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource ActiveHighlightBorderBrush}"/>
+                                        <Setter Property="Background" Value="{DynamicResource ActiveHighlightCardBrush}"/>
+                                    </MultiDataTrigger>
+
+                                    <!-- Deactivated / Standard Keyboard Highlight: Turns Warm Red/Orange -->
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsHighlighted}" Value="True"/>
+                                            <Condition Binding="{Binding IsMacroPad}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
                                         <Setter Property="BorderBrush" Value="{DynamicResource PrimaryAccentBrush}"/>
                                         <Setter Property="Background" Value="{DynamicResource HighlightCardBrush}"/>
-                                    </DataTrigger>
+                                    </MultiDataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
@@ -97,21 +112,44 @@
                                 
                                 <TextBlock Text="{Binding HardwareId}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2,0,0"/>
 
-                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                 <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                     <!-- Status Badges -->
                                     <Border Background="{DynamicResource PrimaryAccentBrush}" CornerRadius="4" Padding="6,2" Visibility="{Binding IsMaster, Converter={StaticResource BoolToVis}}" Margin="0,0,6,0">
                                         <TextBlock Text="🛡️ Master Keyboard (Protected)" FontSize="11" Foreground="White" FontWeight="Bold"/>
                                     </Border>
                                     <Border Background="{DynamicResource SecondaryAccentBrush}" CornerRadius="4" Padding="6,2" Visibility="{Binding IsMacroPad, Converter={StaticResource BoolToVis}}" Margin="0,0,6,0">
-                                        <TextBlock Text="⚡ Macro Pad (Intercepted)" FontSize="11" Foreground="White" FontWeight="Bold"/>
+                                        <TextBlock Text="⚡ Active Keypad" FontSize="11" Foreground="White" FontWeight="Bold"/>
                                     </Border>
                                     <Border Background="{DynamicResource BorderBrush}" CornerRadius="4" Padding="6,2" Visibility="{Binding IsUnregistered, Converter={StaticResource BoolToVis}}" Margin="0,0,6,0">
-                                        <TextBlock Text="Unassigned" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="Inactive" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                     </Border>
 
                                     <!-- Last Key Pressed Indicator -->
-                                    <Border Background="{DynamicResource HighlightCardBrush}" BorderBrush="{DynamicResource PrimaryAccentBrush}" BorderThickness="1" CornerRadius="4" Padding="6,2" Visibility="{Binding LastKeyPressed.Length, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="{Binding LastKeyPressed, StringFormat='Last key: [{0}]'}" FontSize="11" Foreground="{DynamicResource PrimaryAccentBrush}" FontWeight="SemiBold"/>
+                                    <Border BorderThickness="1" CornerRadius="4" Padding="6,2" Visibility="{Binding LastKeyPressed.Length, Converter={StaticResource BoolToVis}}">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{DynamicResource HighlightCardBrush}"/>
+                                                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryAccentBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMacroPad}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource ActiveHighlightCardBrush}"/>
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource ActiveHighlightBorderBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding LastKeyPressed, StringFormat='Last key: [{0}]'}" FontSize="11" FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{DynamicResource PrimaryAccentBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsMacroPad}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource ActiveHighlightBorderBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </Border>
                                 </StackPanel>
                             </StackPanel>
@@ -119,8 +157,8 @@
                             <!-- Role Buttons -->
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button Content="Set Master" Command="{Binding DataContext.SetAsMasterCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Visibility="{Binding IsMaster, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" ToolTip="Keep this keyboard typing normally"/>
-                                <Button Content="Set Macro Pad" Command="{Binding DataContext.RegisterAsMacroPadCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" Margin="0,0,6,0" Visibility="{Binding IsMacroPad, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" ToolTip="Intercept this keypad to trigger macros &amp; shortcuts"/>
-                                <Button Content="Unassign" Command="{Binding DataContext.UnregisterCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Visibility="{Binding IsUnregistered, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
+                                <Button Content="Activate" Command="{Binding DataContext.RegisterAsMacroPadCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" Margin="0,0,6,0" Visibility="{Binding IsMacroPad, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" ToolTip="Activate this keypad to trigger macros &amp; shortcuts"/>
+                                <Button Content="Deactivate" Command="{Binding DataContext.UnregisterCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Visibility="{Binding IsUnregistered, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" ToolTip="Deactivate and return keypad to standard typing"/>
                             </StackPanel>
                         </Grid>
                     </Border>

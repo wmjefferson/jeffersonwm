@@ -60,7 +60,7 @@ export async function renderReports(container) {
             </div>
           </div>
 
-          <button class="btn btn--ghost btn--sm" id="btn-back" title="Back to Admin">◀ Back</button>
+          <button class="btn btn--ghost btn--sm" id="btn-back" title="Back to Dashboard">◀ Dashboard</button>
         </div>
       </div>
     </div>

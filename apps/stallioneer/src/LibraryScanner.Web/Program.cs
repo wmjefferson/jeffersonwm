@@ -101,7 +101,7 @@ app.UseStatusCodePages(async context =>
         HttpMethods.IsGet(httpContext.Request.Method) &&
         !httpContext.Request.Path.StartsWithSegments("/api"))
     {
-        httpContext.Response.Redirect("https://jeffersonwm.com/404.html");
+        httpContext.Response.Redirect("/");
     }
 
     await Task.CompletedTask;
@@ -113,6 +113,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
+// Historical note: the former Bulk page was removed during development; Inventory now owns selection workflows.
 app.MapRazorPages()
    .WithStaticAssets();
 

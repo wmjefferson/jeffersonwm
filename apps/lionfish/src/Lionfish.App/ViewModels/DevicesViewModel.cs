@@ -12,6 +12,8 @@ namespace Lionfish.App.ViewModels;
 public partial class DevicesViewModel : ObservableObject
 {
     [ObservableProperty] private ObservableCollection<DeviceInfo> _devices = new();
+    public IReadOnlyList<DeviceInfo> AllDiscoveredDevices => _allDiscoveredDevices;
+    private readonly List<DeviceInfo> _allDiscoveredDevices = new();
     [ObservableProperty] private DeviceInfo? _selectedDevice;
     [ObservableProperty] private DeviceInfo? _masterKeyboard;
     [ObservableProperty] private bool _isListening;
@@ -73,6 +75,7 @@ public partial class DevicesViewModel : ObservableObject
                     var previousMacroPadHwIds = Devices.Where(d => d.IsMacroPad).Select(d => d.HardwareId).ToHashSet();
 
                     Devices.Clear();
+                    _allDiscoveredDevices.Clear();
 
                     foreach (var cd in coreDevices)
                     {
@@ -112,6 +115,12 @@ public partial class DevicesViewModel : ObservableObject
                             IsMacroPad = isMacroPad,
                             IsUnregistered = !isMaster && !isMacroPad
                         };
+
+                        _allDiscoveredDevices.Add(device);
+
+                        // Filter out user-hidden devices from the active Devices tab list
+                        if (config.HiddenDeviceHardwareIds.Any(hid => hid.Equals(cd.HardwareId, StringComparison.OrdinalIgnoreCase)))
+                            continue;
 
                         Devices.Add(device);
                     }
@@ -192,7 +201,7 @@ public partial class DevicesViewModel : ObservableObject
                 if (IsListening)
                 {
                     IsListening = false;
-                    StatusMessage = $"🎯 Identified '{match.FriendlyName}'! (Key: [{keyName}]) — Click 'Set Macro Pad' or 'Set Master' below.";
+                    StatusMessage = $"🎯 Identified '{match.FriendlyName}'! (Key: [{keyName}]) — Click 'Activate' or 'Set Master' below.";
                 }
                 else
                 {
@@ -237,6 +246,54 @@ public partial class DevicesViewModel : ObservableObject
                 }
 
                 UpdateCounts();
+            }
+        });
+    }
+
+    /// <summary>
+    /// Invoked when a key is pressed on an ACTIVATED keypad (captured by the Interception driver).
+    /// Highlights the active device in BLUE and shows the key pressed!
+    /// </summary>
+    public void OnInterceptedKeyInput(string hardwareId, string devicePath, string keyName)
+    {
+        System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+        {
+            // 1. Match by exact HardwareId or contained in DevicePath/AllDevicePaths
+            DeviceInfo? match = Devices.FirstOrDefault(d =>
+                (!string.IsNullOrEmpty(hardwareId) && d.HardwareId.Equals(hardwareId, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(devicePath) && d.DevicePath.Equals(devicePath, StringComparison.OrdinalIgnoreCase)) ||
+                (d.AllDevicePaths != null && !string.IsNullOrEmpty(devicePath) && d.AllDevicePaths.Any(p => p.Equals(devicePath, StringComparison.OrdinalIgnoreCase))));
+
+            // 2. If no exact match, try matching by VID/PID
+            if (match == null && !string.IsNullOrEmpty(hardwareId) && hardwareId.Contains("VID_", StringComparison.OrdinalIgnoreCase))
+            {
+                var vidMatch = System.Text.RegularExpressions.Regex.Match(hardwareId, @"VID_[0-9A-Fa-f]{4}&PID_[0-9A-Fa-f]{4}", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (vidMatch.Success)
+                {
+                    match = Devices.FirstOrDefault(d => d.HardwareId.Contains(vidMatch.Value, StringComparison.OrdinalIgnoreCase));
+                }
+            }
+
+            if (match != null)
+            {
+                // Reset highlight on all, highlight the responding device
+                foreach (var d in Devices)
+                {
+                    d.IsHighlighted = (d == match);
+                }
+
+                match.LastKeyPressed = keyName;
+                SelectedDevice = match;
+
+                if (IsListening)
+                {
+                    IsListening = false;
+                    StatusMessage = $"🎯 Identified active keypad '{match.FriendlyName}'! (Key: [{keyName}])";
+                }
+                else
+                {
+                    StatusMessage = $"⚡ Key [{keyName}] received from active keypad '{match.FriendlyName}'";
+                }
             }
         });
     }
@@ -354,7 +411,7 @@ public partial class DevicesViewModel : ObservableObject
         SortDevices();
         UpdateCounts();
         DevicesChanged?.Invoke();
-        StatusMessage = $"🎯 '{device.FriendlyName}' registered as Macro Pad! Go to the Key Map tab to assign shortcuts.";
+        StatusMessage = $"🎯 '{device.FriendlyName}' activated! Go to the Key Map tab to assign shortcuts.";
     }
 
     [RelayCommand]
@@ -376,7 +433,7 @@ public partial class DevicesViewModel : ObservableObject
         SortDevices();
         UpdateCounts();
         DevicesChanged?.Invoke();
-        StatusMessage = $"'{device.FriendlyName}' is now unregistered.";
+        StatusMessage = $"'{device.FriendlyName}' deactivated.";
     }
 
     [RelayCommand]

@@ -13,6 +13,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Stallioneer</title>
     <script type="importmap"></script>
+    <script>
+        (() => {
+            const savedTheme = localStorage.getItem("stallioneer-theme") || "system";
+            document.documentElement.dataset.theme = savedTheme;
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Joan&family=Sofia+Sans+Semi+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet" />
@@ -32,10 +38,10 @@
                 @if (User.Identity?.IsAuthenticated == true)
                 {
                     <a class="@BannerLinkClass("/Books/Index")" asp-area="" asp-page="/Books/Index">Inventory</a>
-                    <a class="@BannerLinkClass("/Books/Bulk")" asp-area="" asp-page="/Books/Bulk">Bulk</a>
                     @if (User.IsInRole(LibraryScanner.Web.Models.AppRoles.Admin))
                     {
-                        <a class="@BannerLinkClass("/Users/Admin")" asp-area="" asp-page="/Users/Admin">Options</a>
+                        <a class="@BannerLinkClass("/Users/Admin")" asp-area="" asp-page="/Users/Admin">Control</a>
+                        <a class="@BannerLinkClass("/Users/Options")" asp-area="" asp-page="/Users/Options">Options</a>
                     }
                 }
                 <partial name="_LoginPartial" />

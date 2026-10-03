@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /account/widget/
+
+Sitemap: https://jeffersonwm.com/sitemap.xml
+

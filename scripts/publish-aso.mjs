@@ -120,10 +120,15 @@ function isJeffersonwmRootSupportFile(relativePath) {
   return (
       relativePath === '.htaccess' ||
       relativePath === '404.html' ||
+      relativePath === 'about-for-ai.md' ||
+      relativePath === 'llms.txt' ||
+      relativePath === 'robots.txt' ||
+      relativePath === 'sitemap.xml' ||
       relativePath === 'versions.json' ||
       relativePath === 'underconstruction.html' ||
       relativePath.startsWith('account/') ||
       relativePath.startsWith('project-activity/') ||
+      relativePath.startsWith('scholarship/') ||
       relativePath.startsWith('status/') ||
       relativePath.startsWith('development/') ||
       relativePath.startsWith('images/backgrounds/') ||

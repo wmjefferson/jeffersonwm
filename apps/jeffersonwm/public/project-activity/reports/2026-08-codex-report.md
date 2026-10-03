@@ -20,7 +20,7 @@ August was the month the JeffersonWM ecosystem moved from "a network of working 
 
 The month had three strong themes.
 
-First, the platform became more serious about access. Auth moved beyond basic login into account types, app memberships, activity, notifications, admin controls, and popup return flows. Perihelion and Aphelion both started using those distinctions in real ways: public users, regular users, regular admins, and preferred admin/owner no longer mean the same thing.
+First, the platform became more serious about access. Auth moved beyond basic login into account types, app memberships, activity, notifications, admin controls, and popup return flows. Perihelion and Aphelion both started using those distinctions in real ways: public users, regular users, Admins, and Owner/owner no longer mean the same thing.
 
 Second, image-heavy apps became operational instead of experimental. Aphelion developed a MySQL-backed card identity workflow, highlight tracking, filtered curation, selected-image downloads, owner-only reset/export controls, and safer public-only routing. Perihelion added local-folder browsing, server-library gates, folder access permissions, staging summaries, and a clearer video-readiness map.
 
@@ -84,8 +84,8 @@ Major outcomes:
 - Admin Dashboard sections were reorganized into accordions for pending, approved, blocked, and deleted accounts.
 - The Activity page gained clearer headings, username search, site filters, action filters, and more normalized log presentation.
 - Account management gained create/edit popups so the Accounts page stays readable while still allowing owner-level edits to username, display name, password reset, account type/state, notes, and app access.
-- The account model was clarified around preferred admin/owner, regular admin, user, and visitor.
-- Bootstrap/core users were established around `wm` as the preferred admin/owner account and `jefferson` as a regular admin test account.
+- The account model was clarified around Owner/owner, Admin, user, and visitor.
+- Bootstrap/core users were established around `wm` as the Owner/owner account and `jefferson` as a Admin test account.
 - Username and display-name validation was tightened: usernames must be at least six characters and stay alphanumeric, while display names allow numbers, letters, dash, period, and spaces.
 - The notification system was separated from ordinary activity. General account-management events were blended back into Activity, while app-specific operational events stayed in Notifications.
 - Notifications gained explicit event labels for Lionship, Perihelion, Aphelion, and later Peri/Aphelion download/export/reset flows.
@@ -118,13 +118,13 @@ Major outcomes:
 - Image direct URLs were exposed in the inspection panel with copy behavior and popup viewing.
 - Admin/options pages were restored, hidden, reopened, and finally narrowed depending on publish risk and the current public-only plan.
 - Aphelion public routing was narrowed so only `/aphelion/` and `/aphelion/#highlights` remained public, while stray/private routes redirect home.
-- Auth integration was added for preferred-admin controls, signed-in selected downloads, activity/notification logging, and owner-only exports/resets.
+- Auth integration was added for Owner controls, signed-in selected downloads, activity/notification logging, and owner-only exports/resets.
 - Selected-image downloads gained checkboxes, select all/deselect all, zip generation, and Auth notification events.
 - Aphelion writes exact downloaded-item manifests to local JSONL logs for later analysis while Auth receives lighter account/count/timestamp events.
 - Owner-only options allow JSON export of the full image catalog or highlighted-image catalog; regular users do not receive JSON manifests.
-- Highlight reset became a preferred-admin-only action with soft-reset options and confirmation.
+- Highlight reset became an owner-only action with soft-reset options and confirmation.
 - The admin highlights surface became its own details-style list with larger/original image links and card identity fields.
-- Manual direct access to protected high-resolution image routes was blocked so only preferred-admin flows expose the larger originals where intended.
+- Manual direct access to protected high-resolution image routes was blocked so only Owner flows expose the larger originals where intended.
 
 Aphelion's August story is a good example of the month's broader method. The first instinct was to shape the interface, but the durable progress came from stabilizing runtime paths, choosing a real metadata layer, testing actual image failures, and only then building the curation tools on top.
 
@@ -138,7 +138,7 @@ Major outcomes:
 - Max Mode prewarms one next page after the current page settles, using the existing cached-thumbnail backend instead of fetching the whole archive.
 - The interface shell was moved closer to the lighter Auth/Clionidae frame, then later restored to the preferred pre-comparison state after a broader style experiment did not feel right.
 - Top browsing controls were tuned repeatedly around image height, items per page, Max Mode, Include Others, share code, tags, lists, and selection controls.
-- Folder access moved into implementation with role-level visibility, approved-account inherit/allow/deny states, and preferred-admin always-access.
+- Folder access moved into implementation with role-level visibility, approved-account inherit/allow/deny states, and Owner always-access.
 - Parent folder denials cascade to child folders and are enforced on listings, search, tags, media routes, downloads, and share views.
 - Dot-prefixed path hiding was tightened server-side.
 - A browser-side local-folder mode was added in development. Users can choose a folder on their machine and browse it through the Perihelion gallery flow.
@@ -148,10 +148,10 @@ Major outcomes:
 - The server library was explicitly separated from local-folder mode with `PERIHELION_SERVER_LIBRARY_REQUIRE_AUTH`.
 - Server-backed routes were gated across images, media, thumbnails, metadata, tags, shares, and downloads.
 - Perihelion adopted the same popup-style Auth flow as JeffersonWM Account.
-- Dashboard links split by account type: regular users return to JeffersonWM Account, while regular/preferred admins go to Auth.
+- Dashboard links split by account type: regular users return to JeffersonWM Account, while regular/Owners go to Auth.
 - Logout behavior now clears visible private content immediately rather than waiting for refresh.
 - The signed-out page was simplified toward a mostly blank access-required surface with only necessary banner text, sign-in, and copyright.
-- Folder permission editing was narrowed so only preferred admin can edit folder permissions.
+- Folder permission editing was narrowed so only Owner can edit folder permissions.
 - The open-local-folder, manage popup, individual image screens, and staging page were restyled toward the newer modal language.
 - Staging now opens with resize and compression sections expanded by default.
 - The staging left rail gained a compact summary of source mode, selected/available/missing totals, image/video/other counts, and known file size.
@@ -223,7 +223,7 @@ Major outcomes:
 
 - Lionship's offline mode was diagnosed as a public hostname/tunnel issue rather than a local database failure.
 - The Cloudflare route for `api-lionship.jeffersonwm.com` was restored toward the backend on port `8040`.
-- The Auth privilege model was discussed for Lionship: visitors can use the master list, users/admins can add/remove their own links, and preferred admin/owner controls the master list.
+- The Auth privilege model was discussed for Lionship: visitors can use the master list, users/admins can add/remove their own links, and Owner/owner controls the master list.
 - Lionship events were added to the Auth notification/event vocabulary so link changes can be tracked centrally.
 - The temporary widget bridge routes were removed as part of the JeffersonWM widget retirement.
 - Lionship began a visual alignment pass toward the Auth/Peri/Billionaire style language, including Inter Tight typography, fixed banners, shell gutters, popup-style Auth sign-in, account-name routing, and the shared copyright block.

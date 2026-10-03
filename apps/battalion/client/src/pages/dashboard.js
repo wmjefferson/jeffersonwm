@@ -1,6 +1,7 @@
 import { publicDashboard, auth } from '../utils/api.js';
-import { registerInterval } from '../main.js';
+import { registerInterval, navigate, showToast } from '../main.js';
 import { quotes } from '../utils/quotes.js';
+import { openCentralAuth } from '../utils/authPopup.js';
 
 let eventSource = null;
 
@@ -124,9 +125,15 @@ async function loadDashboard(shouldRenderQuote = false) {
       const res = await auth.check();
       const authLink = document.getElementById('dash-auth-link');
       if (authLink && res.authenticated) {
-        authLink.innerHTML = `<a href="#admin" class="btn btn--primary btn--sm" style="text-decoration:none;">Admin Hub (${res.player.username}) →</a>`;
+        authLink.innerHTML = `<a href="#admin" class="btn btn--primary btn--sm" style="text-decoration:none;">Dashboard (${res.player.username}) →</a>`;
       } else if (authLink) {
-        authLink.innerHTML = `<a href="#login" class="btn btn--ghost btn--sm" style="text-decoration:none;">Sign In →</a>`;
+        authLink.innerHTML = `<button type="button" class="btn btn--ghost btn--sm" id="btn-dash-signin" style="cursor:pointer;">Sign In →</button>`;
+        document.getElementById('btn-dash-signin')?.addEventListener('click', () => {
+          openCentralAuth((player) => {
+            showToast(player?.username ? `Welcome back, ${player.username}!` : 'Signed in successfully!', 'success');
+            navigate('#admin');
+          });
+        });
       }
     } catch (e) {
       // Not logged in

@@ -1,0 +1,102 @@
+@page "/Options"
+@model LibraryScanner.Web.Pages.Users.OptionsModel
+@{
+    ViewData["Title"] = "Options";
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-success">@Model.StatusMessage</div>
+}
+
+<section class="peri-page-shell" data-page-tabs>
+    <header class="peri-page-header">
+        <div>
+            <h1>Options</h1>
+            <p>Exports, page appearance, and library maintenance</p>
+        </div>
+    </header>
+
+    <nav class="peri-page-tabs" aria-label="Options sections">
+        <button type="button" class="peri-page-tab is-active" data-page-tab="theme" aria-pressed="true">Theme</button>
+        <button type="button" class="peri-page-tab" data-page-tab="export" aria-pressed="false">Export</button>
+        <button type="button" class="peri-page-tab" data-page-tab="delete" aria-pressed="false">Delete Library</button>
+    </nav>
+
+    <section class="peri-tab-panel is-active" data-page-tab-panel="theme">
+        <div class="peri-section-heading">
+            <h2>Page Appearance</h2>
+            <p>Select your preferred color theme for Stallioneer.</p>
+        </div>
+        <div class="theme-card-grid" data-theme-controls>
+            <button type="button" class="theme-card is-active" data-theme-choice="light" aria-pressed="true">
+                <span>Light Mode</span>
+                <strong>Classic bright paper theme</strong>
+            </button>
+            <button type="button" class="theme-card" data-theme-choice="dark" aria-pressed="false">
+                <span>Dark Mode</span>
+                <strong>Low-light dark theme</strong>
+            </button>
+            <button type="button" class="theme-card" data-theme-choice="system" aria-pressed="false">
+                <span>System</span>
+                <strong>Follows your operating system preference</strong>
+            </button>
+        </div>
+    </section>
+
+    <section class="peri-tab-panel" data-page-tab-panel="export" hidden>
+        <div class="peri-section-heading">
+            <h2>Export</h2>
+            <p>Download your visible library as CSV or as a field-selected PDF.</p>
+        </div>
+        <div class="panel options-panel">
+            <div class="options-export-grid options-export-grid--split">
+                <form method="post" asp-page-handler="ExportPdf" class="pdf-export-form export-form">
+                    <div class="field-stack">
+                        <label>Export PDF</label>
+                        <div class="export-field-list">
+                            @foreach (var field in Model.ExportFields)
+                            {
+                                var isChecked = LibraryScanner.Web.Services.InventoryExportField.DefaultPdfKeys.Contains(field.Key);
+                                <label class="checkbox-pill checkbox-pill--toggle pdf-field-toggle">
+                                    <input type="checkbox" name="PdfFieldKeys" value="@field.Key" checked="@isChecked" />
+                                    <span>@field.Label</span>
+                                </label>
+                            }
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary">Export PDF</button>
+                </form>
+
+                <form method="post" asp-page-handler="Export" class="export-form export-form--simple">
+                    <div class="field-stack">
+                        <label>Full export</label>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary">Export CSV</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <section class="peri-tab-panel" data-page-tab-panel="delete" hidden>
+        <div class="peri-section-heading">
+            <h2>Delete Library</h2>
+            <p>Remove the visible library for this account after confirming the entry count.</p>
+        </div>
+        <div class="panel options-panel danger-panel">
+            <form method="post" asp-page-handler="DeleteLibrary" class="delete-library-form" data-delete-library-form data-delete-count="@Model.Snapshot.TotalBooks">
+                <p class="form-hint">
+                    This deletes @Model.Snapshot.TotalBooks book entries and their related copies, covers, identifiers, notes, tags, collections, and locations visible to this account.
+                </p>
+                <label asp-for="DeleteConfirmationCount">Type @Model.Snapshot.TotalBooks to confirm</label>
+                <input asp-for="DeleteConfirmationCount" class="form-control" inputmode="numeric" autocomplete="off" />
+                <span asp-validation-for="DeleteConfirmationCount" class="text-danger"></span>
+                <button type="submit" class="btn btn-outline-danger">Delete library</button>
+            </form>
+        </div>
+    </section>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

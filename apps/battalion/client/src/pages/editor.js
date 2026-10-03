@@ -24,7 +24,7 @@ export async function renderEditor(container) {
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <h1 style="font-size:18px; font-weight:600;">📝 Data Editor</h1>
         <div>
-          <button id="btn-back" style="font-size:12px; padding:3px 8px; cursor:pointer; border:1px solid #ddd; background:#fff; border-radius:2px;">← Back to Admin</button>
+          <button id="btn-back" style="font-size:12px; padding:3px 8px; cursor:pointer; border:1px solid #ddd; background:#fff; border-radius:2px;">← Back to Dashboard</button>
         </div>
       </div>
 

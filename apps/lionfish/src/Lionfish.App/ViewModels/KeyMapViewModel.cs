@@ -24,13 +24,26 @@ public partial class KeyMapViewModel : ObservableObject
     [ObservableProperty] private Profile? _selectedProfile;
     [ObservableProperty] private ObservableCollection<DeviceInfo> _registeredDevices = new();
     [ObservableProperty] private DeviceInfo? _selectedDevice;
+    [ObservableProperty] private bool _hasActiveDevices;
 
     [ObservableProperty] private bool _isEditing;
     [ObservableProperty] private bool _isListeningForKey;
     [ObservableProperty] private string _listenStatusText = string.Empty;
 
-    public List<string> ActionTypes { get; } = new() { "Keystroke", "Text", "Launch", "Media", "Macro" };
+    [ObservableProperty] private bool _isRenamingProfile;
+    [ObservableProperty] private string _renameProfileText = string.Empty;
+
+    [ObservableProperty] private bool _isRecordingWeb;
+    [ObservableProperty] private string _webRecordStatusText = string.Empty;
+
+    public List<string> ActionTypes { get; } = new() { "Keystroke", "Text", "Launch", "Media", "Macro", "Web", "GoogleDocsHighlight" };
     public List<string> MediaCommands { get; } = new() { "PlayPause", "NextTrack", "PrevTrack", "VolumeUp", "VolumeDown", "Mute", "Stop" };
+    public List<string> HighlightColors { get; } = new()
+    {
+        "Yellow", "Green", "Cyan", "Magenta", "Orange", "Purple", "Red", "Blue", "None"
+    };
+
+
 
     public List<string> AvailableKeys { get; } = new()
     {
@@ -52,6 +65,144 @@ public partial class KeyMapViewModel : ObservableObject
     public KeyMapViewModel()
     {
         LoadAllProfiles();
+
+        if (Lionfish.Core.Web.BrowserBridgeService.Instance != null)
+        {
+            Lionfish.Core.Web.BrowserBridgeService.Instance.WebClickRecorded += OnWebClickRecorded;
+            Lionfish.Core.Web.BrowserBridgeService.Instance.RecordingStateChanged += OnBrowserRecordingStateChanged;
+        }
+    }
+
+    private void OnBrowserRecordingStateChanged(bool isRecording)
+    {
+        System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+        {
+            IsRecordingWeb = isRecording;
+            if (isRecording)
+            {
+                if (SelectedMapping == null && Mappings.Count > 0)
+                {
+                    SelectedMapping = Mappings[0];
+                }
+                if (SelectedMapping != null)
+                {
+                    SelectedMapping.ActionType = "Web";
+                    IsEditing = true;
+                    WebRecordStatusText = $"🔴 Recording clicks for [{SelectedMapping.KeyName}]... Click webpage elements.";
+                }
+                else
+                {
+                    WebRecordStatusText = "🔴 Recording clicks from browser...";
+                }
+            }
+            else
+            {
+                if (SelectedMapping != null)
+                {
+                    SelectedMapping.UpdateActionAssignment();
+                    SaveCurrentProfile();
+                    WebRecordStatusText = SelectedMapping.WebSteps.Count > 0
+                        ? $"✅ Finished recording! {SelectedMapping.WebSteps.Count} step(s) assigned to [{SelectedMapping.KeyName}]."
+                        : string.Empty;
+                }
+                else
+                {
+                    WebRecordStatusText = string.Empty;
+                }
+            }
+        });
+    }
+
+    private void OnWebClickRecorded(Lionfish.Core.Actions.WebStep step, string url)
+    {
+        System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+        {
+            if (SelectedMapping == null && Mappings.Count > 0)
+            {
+                SelectedMapping = Mappings[0];
+            }
+
+            if (SelectedMapping != null)
+            {
+                if (SelectedMapping.ActionType != "Web")
+                {
+                    SelectedMapping.ActionType = "Web";
+                }
+                IsEditing = true;
+                IsRecordingWeb = true;
+
+                SelectedMapping.WebSteps.Add(new WebStepModel
+                {
+                    Type = step.Type,
+                    Selector = step.Selector,
+                    Description = step.Description,
+                    DelayMs = step.DelayMs
+                });
+                if (!string.IsNullOrEmpty(url) && (string.IsNullOrEmpty(SelectedMapping.WebUrlMatch) || SelectedMapping.WebUrlMatch == "*"))
+                {
+                    SelectedMapping.WebUrlMatch = url;
+                }
+                SelectedMapping.UpdateActionAssignment();
+                SaveCurrentProfile();
+                WebRecordStatusText = $"🎯 Captured [{SelectedMapping.KeyName}]: {step.Description} ({SelectedMapping.WebSteps.Count} step{(SelectedMapping.WebSteps.Count == 1 ? "" : "s")})";
+            }
+        });
+    }
+
+    [RelayCommand]
+    private void StartRecordWeb()
+    {
+        if (SelectedMapping == null)
+        {
+            if (Mappings.Count > 0) SelectedMapping = Mappings[0];
+            else return;
+        }
+
+        SelectedMapping.ActionType = "Web";
+        IsEditing = true;
+        IsRecordingWeb = true;
+        WebRecordStatusText = $"🔴 Recording for [{SelectedMapping.KeyName}]... Click elements on the web page to capture.";
+        Lionfish.Core.Web.BrowserBridgeService.Instance?.StartRecording();
+    }
+
+    [RelayCommand]
+    private void StopRecordWeb()
+    {
+        IsRecordingWeb = false;
+        Lionfish.Core.Web.BrowserBridgeService.Instance?.StopRecording();
+        if (SelectedMapping != null)
+        {
+            SelectedMapping.UpdateActionAssignment();
+            SaveCurrentProfile();
+            WebRecordStatusText = SelectedMapping.WebSteps.Count > 0
+                ? $"✅ Finished recording! {SelectedMapping.WebSteps.Count} step(s) assigned to [{SelectedMapping.KeyName}]."
+                : string.Empty;
+        }
+        else
+        {
+            WebRecordStatusText = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    private void ClearWebSteps()
+    {
+        if (SelectedMapping != null)
+        {
+            SelectedMapping.WebSteps.Clear();
+            SelectedMapping.UpdateActionAssignment();
+        }
+    }
+
+    [RelayCommand]
+    private async Task TestWebActionAsync()
+    {
+        if (SelectedMapping == null || SelectedMapping.WebSteps.Count == 0) return;
+        var core = SelectedMapping.ToCoreMapping();
+        if (core.Action is Lionfish.Core.Actions.WebAction wa)
+        {
+            await wa.ExecuteAsync();
+        }
     }
 
     public void SetMappingEngine(MappingEngine engine)
@@ -66,24 +217,18 @@ public partial class KeyMapViewModel : ObservableObject
 
         RegisteredDevices.Clear();
 
-        var eligible = allDevices
-            .Where(d => !d.IsLaptop)
-            .OrderByDescending(d => d.IsMacroPad)
-            .ThenBy(d => d.FriendlyName)
+        // Only include activated keypad/macro pad devices
+        var activeDevices = allDevices
+            .Where(d => d.IsMacroPad)
+            .OrderBy(d => d.FriendlyName)
             .ToList();
 
-        foreach (var dev in eligible)
+        foreach (var dev in activeDevices)
         {
             RegisteredDevices.Add(dev);
         }
 
-        if (RegisteredDevices.Count == 0)
-        {
-            foreach (var dev in allDevices)
-            {
-                RegisteredDevices.Add(dev);
-            }
-        }
+        HasActiveDevices = RegisteredDevices.Count > 0;
 
         if (!string.IsNullOrEmpty(currentSelectedHwId))
         {
@@ -92,10 +237,21 @@ public partial class KeyMapViewModel : ObservableObject
 
         if (SelectedDevice == null && RegisteredDevices.Count > 0)
         {
-            SelectedDevice = RegisteredDevices.FirstOrDefault(d => d.IsMacroPad) ?? RegisteredDevices[0];
+            SelectedDevice = RegisteredDevices[0];
+        }
+        else if (RegisteredDevices.Count == 0)
+        {
+            SelectedDevice = null;
         }
 
-        FilterProfilesForDevice();
+        if (Profiles.Count == 0)
+        {
+            LoadAllProfiles();
+        }
+        else
+        {
+            FilterProfilesForDevice();
+        }
     }
 
     partial void OnSelectedDeviceChanged(DeviceInfo? value)
@@ -103,20 +259,55 @@ public partial class KeyMapViewModel : ObservableObject
         FilterProfilesForDevice();
     }
 
-    partial void OnSelectedProfileChanged(Profile? value)
+    partial void OnSelectedProfileChanged(Profile? oldValue, Profile? newValue)
     {
-        Mappings.Clear();
-        if (value != null)
+        if (oldValue != null)
         {
-            foreach (var m in value.Mappings)
+            oldValue.PropertyChanged -= OnProfilePropertyChanged;
+        }
+
+        Mappings.Clear();
+        if (newValue != null)
+        {
+            newValue.PropertyChanged += OnProfilePropertyChanged;
+            foreach (var m in newValue.Mappings)
             {
                 Mappings.Add(m);
             }
         }
         SyncCurrentProfileToEngine();
+        MappingsChanged?.Invoke();
     }
 
-    private void LoadAllProfiles()
+    private void OnProfilePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Profile.TargetProcessName) || e.PropertyName == nameof(Profile.Name))
+        {
+            SaveCurrentProfile();
+        }
+    }
+
+    [RelayCommand]
+    private void SetTargetApp(string? appName)
+    {
+        if (SelectedProfile != null && !string.IsNullOrWhiteSpace(appName))
+        {
+            SelectedProfile.TargetProcessName = appName.Trim();
+            SaveCurrentProfile();
+        }
+    }
+
+    [RelayCommand]
+    private void ClearTargetApp()
+    {
+        if (SelectedProfile != null)
+        {
+            SelectedProfile.TargetProcessName = null;
+            SaveCurrentProfile();
+        }
+    }
+
+    public void LoadAllProfiles()
     {
         var coreProfiles = _configStore.GetAllProfiles();
         Profiles.Clear();
@@ -182,7 +373,13 @@ public partial class KeyMapViewModel : ObservableObject
 
     private void FilterProfilesForDevice()
     {
-        if (Profiles.Count == 0) return;
+        if (Profiles.Count == 0)
+        {
+            LoadAllProfiles();
+            if (Profiles.Count == 0) return;
+        }
+
+        Profile? targetProfile = null;
 
         if (SelectedDevice != null)
         {
@@ -190,11 +387,25 @@ public partial class KeyMapViewModel : ObservableObject
                 !string.IsNullOrEmpty(p.DeviceHardwareId) &&
                 SelectedDevice.HardwareId.Contains(p.DeviceHardwareId, StringComparison.OrdinalIgnoreCase));
 
-            SelectedProfile = match ?? Profiles.FirstOrDefault(p => string.IsNullOrEmpty(p.DeviceHardwareId)) ?? Profiles[0];
+            targetProfile = match ?? Profiles.FirstOrDefault(p => string.IsNullOrEmpty(p.DeviceHardwareId)) ?? Profiles[0];
         }
         else
         {
-            SelectedProfile = Profiles[0];
+            targetProfile = Profiles[0];
+        }
+
+        if (SelectedProfile != targetProfile)
+        {
+            SelectedProfile = targetProfile;
+        }
+        else if (SelectedProfile != null && (Mappings.Count == 0 || Mappings.Count != SelectedProfile.Mappings.Count))
+        {
+            Mappings.Clear();
+            foreach (var m in SelectedProfile.Mappings)
+            {
+                Mappings.Add(m);
+            }
+            SyncCurrentProfileToEngine();
         }
     }
 
@@ -308,6 +519,41 @@ public partial class KeyMapViewModel : ObservableObject
         _configStore.SaveProfile(p.ToCoreProfile());
         Profiles.Add(p);
         SelectedProfile = p;
+    }
+
+    [RelayCommand]
+    private void StartRenameProfile()
+    {
+        if (SelectedProfile == null) return;
+        RenameProfileText = SelectedProfile.Name;
+        IsRenamingProfile = true;
+    }
+
+    [RelayCommand]
+    private void SaveRenameProfile()
+    {
+        if (SelectedProfile != null && !string.IsNullOrWhiteSpace(RenameProfileText))
+        {
+            SelectedProfile.Name = RenameProfileText.Trim();
+            _configStore.SaveProfile(SelectedProfile.ToCoreProfile());
+
+            var idx = Profiles.IndexOf(SelectedProfile);
+            if (idx >= 0)
+            {
+                var p = SelectedProfile;
+                Profiles[idx] = p;
+                SelectedProfile = p;
+            }
+
+            MappingsChanged?.Invoke();
+        }
+        IsRenamingProfile = false;
+    }
+
+    [RelayCommand]
+    private void CancelRenameProfile()
+    {
+        IsRenamingProfile = false;
     }
 
     [RelayCommand]

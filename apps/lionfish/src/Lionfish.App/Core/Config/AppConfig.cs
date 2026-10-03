@@ -21,4 +21,7 @@ public class AppConfig
     public string? ActiveProfileId { get; set; }
     public Dictionary<string, string> CustomDeviceNames { get; set; } = new();
     public string ThemeMode { get; set; } = "System";
+    public List<string> HiddenDeviceHardwareIds { get; set; } = new();
+    public bool AutoProfileSwitching { get; set; } = false;
+    public bool ShowOsdOverlay { get; set; } = false;
 }

@@ -1,79 +1,218 @@
 using System;
 using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using H.NotifyIcon;
 using Lionfish.App.Models;
+using Lionfish.App.ViewModels;
 
 namespace Lionfish.App.Services;
 
 public class TrayService : IDisposable
 {
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
+
     private TaskbarIcon? _taskbarIcon;
+    private MainViewModel? _mainVm;
 
     public void Initialize()
     {
-        // Programmatic TaskbarIcon setup
-        _taskbarIcon = new TaskbarIcon
+        try
         {
-            Icon = CreateIcon(System.Drawing.Color.Green),
-            ToolTipText = "Lionfish - Active | Profile: Default"
-        };
+            _taskbarIcon = new TaskbarIcon
+            {
+                Icon = CreateIcon(Color.FromArgb(52, 199, 89)), // Green
+                ToolTipText = "🦁 Lionfish Keypad Interceptor — Active",
+                Visibility = Visibility.Visible
+            };
 
-        _taskbarIcon.TrayLeftMouseUp += (s, e) => ToggleMainWindow();
+            _taskbarIcon.TrayLeftMouseUp += (s, e) => ToggleMainWindow();
+            _taskbarIcon.TrayMouseDoubleClick += (s, e) => ShowMainWindow();
 
-        UpdateContextMenu();
-    }
-
-    private void ToggleMainWindow()
-    {
-        var mainWindow = Application.Current.MainWindow;
-        if (mainWindow != null)
+            UpdateContextMenu();
+            _taskbarIcon.ForceCreate();
+        }
+        catch (Exception ex)
         {
-            if (mainWindow.IsVisible)
-            {
-                mainWindow.Hide();
-            }
-            else
-            {
-                mainWindow.Show();
-                mainWindow.Activate();
-            }
+            System.Diagnostics.Debug.WriteLine($"[TrayService] Initialize error: {ex.Message}");
         }
     }
 
-    private void UpdateContextMenu()
+    public void Attach(MainViewModel vm)
+    {
+        _mainVm = vm;
+
+        vm.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.InterceptionStatus) ||
+                e.PropertyName == nameof(MainViewModel.ActiveProfileName))
+            {
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    UpdateStatus(vm.InterceptionStatus, vm.KeyMapVM.SelectedProfile?.Name ?? "Default");
+                    UpdateContextMenu();
+                });
+            }
+        };
+
+        vm.SettingsVM.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(SettingsViewModel.ShowOsdOverlay))
+            {
+                Application.Current?.Dispatcher?.Invoke(UpdateContextMenu);
+            }
+        };
+
+        UpdateStatus(vm.InterceptionStatus, vm.KeyMapVM.SelectedProfile?.Name ?? "Default");
+        UpdateContextMenu();
+    }
+
+    public void ShowMainWindow()
+    {
+        Application.Current?.Dispatcher?.Invoke(() =>
+        {
+            var mainWindow = Application.Current.MainWindow;
+            if (mainWindow != null)
+            {
+                mainWindow.Show();
+                if (mainWindow.WindowState == WindowState.Minimized)
+                {
+                    mainWindow.WindowState = WindowState.Normal;
+                }
+                mainWindow.Activate();
+                mainWindow.Focus();
+                mainWindow.Topmost = true;
+                mainWindow.Topmost = false;
+            }
+        });
+    }
+
+    public void ToggleMainWindow()
+    {
+        Application.Current?.Dispatcher?.Invoke(() =>
+        {
+            var mainWindow = Application.Current.MainWindow;
+            if (mainWindow != null)
+            {
+                if (mainWindow.IsVisible && mainWindow.WindowState != WindowState.Minimized)
+                {
+                    mainWindow.Hide();
+                }
+                else
+                {
+                    ShowMainWindow();
+                }
+            }
+        });
+    }
+
+    public void UpdateContextMenu()
     {
         if (_taskbarIcon == null) return;
 
-        var contextMenu = new ContextMenu();
-
-        // Mock profile list
-        var profileItem1 = new MenuItem { Header = "Profile 1", IsCheckable = true, IsChecked = true };
-        var profileItem2 = new MenuItem { Header = "Profile 2", IsCheckable = true };
-        
-        contextMenu.Items.Add(profileItem1);
-        contextMenu.Items.Add(profileItem2);
-        contextMenu.Items.Add(new Separator());
-
-        var pauseItem = new MenuItem { Header = "Pause Interception" };
-        pauseItem.Click += (s, e) => { /* Mock toggle */ };
-        contextMenu.Items.Add(pauseItem);
-
-        var settingsItem = new MenuItem { Header = "Settings..." };
-        settingsItem.Click += (s, e) => 
+        Application.Current?.Dispatcher?.Invoke(() =>
         {
-            ToggleMainWindow(); // Show window
-        };
-        contextMenu.Items.Add(settingsItem);
+            var contextMenu = new ContextMenu();
 
-        contextMenu.Items.Add(new Separator());
+            // 1. Open Lionfish
+            var openItem = new MenuItem
+            {
+                Header = "🦁 Open Lionfish",
+                FontWeight = FontWeights.Bold
+            };
+            openItem.Click += (s, e) => ShowMainWindow();
+            contextMenu.Items.Add(openItem);
 
-        var exitItem = new MenuItem { Header = "Exit" };
-        exitItem.Click += (s, e) => Application.Current.Shutdown();
-        contextMenu.Items.Add(exitItem);
+            // 2. Pause / Resume Interception toggle
+            if (_mainVm != null)
+            {
+                bool isCapturing = _mainVm.Interception.IsCapturing;
+                var toggleItem = new MenuItem
+                {
+                    Header = isCapturing ? "⏸ Pause Interception" : "▶ Resume Interception"
+                };
+                toggleItem.Click += (s, e) =>
+                {
+                    if (isCapturing)
+                    {
+                        _mainVm.PauseInterceptionCommand.Execute(null);
+                    }
+                    else
+                    {
+                        _mainVm.ResumeInterceptionCommand.Execute(null);
+                    }
+                    UpdateContextMenu();
+                };
+                contextMenu.Items.Add(toggleItem);
+            }
 
-        _taskbarIcon.ContextMenu = contextMenu;
+            contextMenu.Items.Add(new Separator());
+
+            // 3. Profiles submenu
+            if (_mainVm != null && _mainVm.KeyMapVM.Profiles.Count > 0)
+            {
+                var profilesMenu = new MenuItem { Header = "Profiles" };
+                foreach (var profile in _mainVm.KeyMapVM.Profiles)
+                {
+                    var pItem = new MenuItem
+                    {
+                        Header = profile.Name,
+                        IsCheckable = true,
+                        IsChecked = _mainVm.KeyMapVM.SelectedProfile?.Id == profile.Id
+                    };
+                    var targetProfile = profile;
+                    pItem.Click += (s, e) =>
+                    {
+                        _mainVm.KeyMapVM.SelectedProfile = targetProfile;
+                        UpdateContextMenu();
+                    };
+                    profilesMenu.Items.Add(pItem);
+                }
+                contextMenu.Items.Add(profilesMenu);
+            }
+
+            // 3b. Show On-Screen Display (OSD) toggle
+            if (_mainVm != null)
+            {
+                var osdItem = new MenuItem
+                {
+                    Header = "🖥 Show On-Screen Display (OSD)",
+                    IsCheckable = true,
+                    IsChecked = _mainVm.SettingsVM.ShowOsdOverlay
+                };
+                osdItem.Click += (s, e) =>
+                {
+                    _mainVm.SettingsVM.ShowOsdOverlay = !_mainVm.SettingsVM.ShowOsdOverlay;
+                    UpdateContextMenu();
+                };
+                contextMenu.Items.Add(osdItem);
+            }
+
+            // 4. Settings...
+            var settingsItem = new MenuItem { Header = "⚙ Settings..." };
+            settingsItem.Click += (s, e) =>
+            {
+                if (_mainVm != null)
+                {
+                    _mainVm.SelectedTabIndex = 3; // Settings tab
+                }
+                ShowMainWindow();
+            };
+            contextMenu.Items.Add(settingsItem);
+
+            contextMenu.Items.Add(new Separator());
+
+            // 5. Exit
+            var exitItem = new MenuItem { Header = "❌ Exit Lionfish" };
+            exitItem.Click += (s, e) => Application.Current.Shutdown();
+            contextMenu.Items.Add(exitItem);
+
+            _taskbarIcon.ContextMenu = contextMenu;
+        });
     }
 
     public void UpdateStatus(InterceptionStatus status, string profileName)
@@ -82,32 +221,81 @@ public class TrayService : IDisposable
 
         Color iconColor = status switch
         {
-            InterceptionStatus.Active => Color.Green,
-            InterceptionStatus.Paused => Color.Gold,
-            InterceptionStatus.Error => Color.Red,
-            InterceptionStatus.DriverNotInstalled => Color.DarkRed,
+            InterceptionStatus.Active => Color.FromArgb(52, 199, 89),       // Green
+            InterceptionStatus.Paused => Color.FromArgb(255, 107, 53),      // Lionfish Orange
+            InterceptionStatus.Error => Color.FromArgb(255, 69, 58),        // Red
+            InterceptionStatus.DriverNotInstalled => Color.FromArgb(175, 40, 30),
             _ => Color.Gray
         };
 
-        _taskbarIcon.Icon = CreateIcon(iconColor);
-        _taskbarIcon.ToolTipText = $"Lionfish - {status} | Profile: {profileName}";
+        try
+        {
+            _taskbarIcon.Icon = CreateIcon(iconColor);
+            _taskbarIcon.ToolTipText = $"🦁 Lionfish — {status} | Profile: {profileName}";
+        }
+        catch { }
     }
 
-    private System.Drawing.Icon CreateIcon(Color color)
+    private static System.Drawing.Icon CreateIcon(Color color)
     {
-        using var bitmap = new Bitmap(16, 16);
-        using var graphics = Graphics.FromImage(bitmap);
-        graphics.Clear(Color.Transparent);
-        using var brush = new SolidBrush(color);
-        graphics.FillEllipse(brush, 2, 2, 12, 12);
-        
-        // Simple "L" letter in the icon
-        using var textBrush = new SolidBrush(Color.White);
-        using var fontFamily = new System.Drawing.FontFamily("Arial");
-        using var font = new Font(fontFamily, 8, System.Drawing.FontStyle.Bold);
-        graphics.DrawString("L", font, textBrush, 3, 2);
+        using var bitmap = new Bitmap(32, 32);
+        using (var g = Graphics.FromImage(bitmap))
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            g.Clear(Color.Transparent);
 
-        return System.Drawing.Icon.FromHandle(bitmap.GetHicon());
+            bool drewLogo = false;
+            try
+            {
+                var sri = System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/Assets/logo.png"));
+                if (sri != null)
+                {
+                    using var s = sri.Stream;
+                    using var logoImg = System.Drawing.Image.FromStream(s);
+                    g.DrawImage(logoImg, new Rectangle(0, 0, 30, 30));
+                    drewLogo = true;
+                }
+            }
+            catch { }
+
+            if (!drewLogo)
+            {
+                try
+                {
+                    var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                    var logoPath = System.IO.Path.Combine(exeDir, "Assets", "logo.png");
+                    if (System.IO.File.Exists(logoPath))
+                    {
+                        using var logoImg = System.Drawing.Image.FromFile(logoPath);
+                        g.DrawImage(logoImg, new Rectangle(0, 0, 30, 30));
+                        drewLogo = true;
+                    }
+                }
+                catch { }
+            }
+
+            if (!drewLogo)
+            {
+                using var fallbackBrush = new SolidBrush(Color.FromArgb(255, 107, 53));
+                g.FillEllipse(fallbackBrush, 2, 2, 26, 26);
+            }
+
+            // Status indicator dot in bottom-right corner
+            using var bgDotBrush = new SolidBrush(Color.FromArgb(30, 30, 46));
+            g.FillEllipse(bgDotBrush, 19, 19, 13, 13);
+            using var dotBrush = new SolidBrush(color);
+            g.FillEllipse(dotBrush, 21, 21, 9, 9);
+        }
+
+        IntPtr hIcon = bitmap.GetHicon();
+        var tempIcon = System.Drawing.Icon.FromHandle(hIcon);
+        using var ms = new MemoryStream();
+        tempIcon.Save(ms);
+        ms.Position = 0;
+        DestroyIcon(hIcon);
+        tempIcon.Dispose();
+        return new System.Drawing.Icon(ms);
     }
 
     public void Dispose()

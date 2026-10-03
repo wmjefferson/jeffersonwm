@@ -10,6 +10,7 @@ import type { ImageItem } from './src/types';
 import { createCurationDb } from './curationDb';
 import type {
   AdminCatalogPayload,
+  CardRarity,
   CardCatalogItem,
   CardMetadataRecord,
   CatalogStats,
@@ -63,6 +64,34 @@ type CatalogImageRecord = Omit<ImageItem, 'imageUrl' | 'thumbUrl'> & {
   imageKey: string;
   relativePath: string;
 };
+
+type ShopLabGroupType = 'postcard_pack' | 'shirt_series' | 'miscellany';
+
+type ShopLabMetadataRecord = {
+  title?: string;
+  description?: string;
+  type?: string;
+  status?: string;
+  fulfillment?: string;
+  productionNotes?: string;
+  pricingNotes?: string;
+  sampleNotes?: string;
+  imageOrder?: string[];
+  updatedAt?: string;
+};
+
+type ShopLabMetadataFile = {
+  groups?: Record<string, ShopLabMetadataRecord>;
+  options?: {
+    types?: string[];
+    statuses?: string[];
+    fulfillments?: string[];
+  };
+};
+
+const DEFAULT_SHOP_LAB_TYPES = ['Postcard Pack', 'T-Shirt Series', 'Miscellany'];
+const DEFAULT_SHOP_LAB_STATUSES = ['draft', 'sample ordered', 'approved', 'retired'];
+const DEFAULT_SHOP_LAB_FULFILLMENTS = ['MOO/manual', 'Printful/local sample', 'local printer', 'undecided'];
 
 function normalizeConfiguredPath(value: string) {
   const trimmed = value.trim().replace(/^"+|"+$/g, '');
@@ -188,6 +217,7 @@ async function startServer() {
   const weeklogDir = process.env.APHELION_WEEKLOG_DIR || path.join(process.cwd(), 'data', 'weeklog');
   const highlightLogDir = process.env.APHELION_HIGHLIGHT_LOG_DIR || path.join(process.cwd(), 'data', 'logs');
   const downloadLogDir = process.env.APHELION_DOWNLOAD_LOG_DIR || path.join(process.cwd(), 'data', 'downloads');
+  const shopLabMetadataPath = process.env.APHELION_SHOP_LAB_METADATA_PATH || path.join(process.cwd(), 'data', 'shop-lab-groups.json');
 
   function cookieMap(cookieHeader = '') {
     const cookies: Record<string, string> = {};
@@ -344,9 +374,10 @@ async function startServer() {
       .digest('base64url');
   }
 
-  function buildSignedImageUrl(imageKey: string, expiresAt = Math.floor(Date.now() / 1000) + imageUrlTtlSeconds) {
+  function buildSignedImageUrl(imageKey: string, expiresAt = Math.floor(Date.now() / 1000) + imageUrlTtlSeconds, relativePath = '') {
     const signature = buildImageSignature(imageKey, expiresAt);
-    return `/api/image?key=${encodeURIComponent(imageKey)}&exp=${expiresAt}&sig=${encodeURIComponent(signature)}`;
+    const pathParam = relativePath ? `&signedPath=${encodeURIComponent(sanitizeRelativePath(relativePath))}` : '';
+    return `/api/image?key=${encodeURIComponent(imageKey)}&exp=${expiresAt}&sig=${encodeURIComponent(signature)}${pathParam}`;
   }
 
   function safeCompareSignature(left: string, right: string) {
@@ -447,7 +478,7 @@ async function startServer() {
         cardUid: metadata?.cardUid || null,
         imagePath,
         imageCode: item.code,
-        folderPath: item.cameraInfo || '',
+        folderPath: path.posix.dirname(imagePath) === '.' ? '' : path.posix.dirname(imagePath),
         sourceTitle: item.title,
         sourceTags: item.tags,
         imageUrl,
@@ -676,6 +707,291 @@ async function startServer() {
     cachedCatalogAt = Date.now();
     await ensureWeeklyPositionLog(cachedCatalog);
     return cachedCatalog;
+  }
+
+  function getShopLabType(folderName: string): ShopLabGroupType {
+    const normalized = folderName.toLowerCase();
+    if (normalized.includes('postcard')) {
+      return 'postcard_pack';
+    }
+    if (normalized.includes('shirt')) {
+      return 'shirt_series';
+    }
+    return 'miscellany';
+  }
+
+  function getShopLabTitle(folderName: string) {
+    if (folderName === 'miscellany') {
+      return 'Miscellany';
+    }
+
+    return folderName
+      .split(/[-_\s]+/)
+      .filter(Boolean)
+      .map((part) => (/^\d+$/.test(part) ? part.padStart(2, '0') : titleCase(part)))
+      .join(' ');
+  }
+
+  function getDefaultShopLabTypeLabel(type: ShopLabGroupType) {
+    if (type === 'postcard_pack') {
+      return 'Postcard Pack';
+    }
+    if (type === 'shirt_series') {
+      return 'T-Shirt Series';
+    }
+    return 'Miscellany';
+  }
+
+  function getShopLabFulfillment(type: ShopLabGroupType) {
+    if (type === 'postcard_pack') {
+      return 'MOO/manual';
+    }
+    if (type === 'shirt_series') {
+      return 'Printful/local sample';
+    }
+    return 'undecided';
+  }
+
+  function getShopLabNotes(type: ShopLabGroupType) {
+    if (type === 'postcard_pack') {
+      return 'Draft postcard pack candidate. Check image sequence, card stock, finish, and whether this should become a multi-image MOO/manual run.';
+    }
+    if (type === 'shirt_series') {
+      return 'Draft shirt image series. Check which images are strongest for samples before committing to Printful or a local no-minimum printer.';
+    }
+    return 'Unassigned product candidates. Keep visible without forcing these into postcard or shirt production yet.';
+  }
+
+  async function readShopLabMetadata(): Promise<ShopLabMetadataFile> {
+    try {
+      const text = await readFile(shopLabMetadataPath, 'utf8');
+      const parsed = JSON.parse(text) as ShopLabMetadataFile;
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  async function writeShopLabMetadata(metadata: ShopLabMetadataFile) {
+    await mkdir(path.dirname(shopLabMetadataPath), { recursive: true });
+    await writeFile(shopLabMetadataPath, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
+  }
+
+  function uniqueShopLabOptions(values: unknown, defaults: string[]) {
+    const source = Array.isArray(values) ? values : [];
+    return Array.from(new Set([
+      ...defaults,
+      ...source.map((value) => cleanLogText(value, 80)).filter(Boolean),
+    ]));
+  }
+
+  function getShopLabOptions(metadata: ShopLabMetadataFile) {
+    return {
+      types: uniqueShopLabOptions(metadata.options?.types, DEFAULT_SHOP_LAB_TYPES),
+      statuses: uniqueShopLabOptions(metadata.options?.statuses, DEFAULT_SHOP_LAB_STATUSES),
+      fulfillments: uniqueShopLabOptions(metadata.options?.fulfillments, DEFAULT_SHOP_LAB_FULFILLMENTS),
+    };
+  }
+
+  function saveableShopLabOptions(values: unknown, defaults: string[]) {
+    return uniqueShopLabOptions(values, defaults);
+  }
+
+  function orderedShopLabImages<T extends { path: string }>(images: T[], imageOrder: unknown) {
+    const order = Array.isArray(imageOrder) ? imageOrder.map((item) => cleanLogText(item, 1200)).filter(Boolean) : [];
+    if (order.length === 0) {
+      return images;
+    }
+
+    const orderIndex = new Map(order.map((imagePath, index) => [imagePath, index]));
+    return images.slice().sort((left, right) => {
+      const leftIndex = orderIndex.get(left.path);
+      const rightIndex = orderIndex.get(right.path);
+      if (leftIndex == null && rightIndex == null) {
+        return 0;
+      }
+      if (leftIndex == null) {
+        return 1;
+      }
+      if (rightIndex == null) {
+        return -1;
+      }
+      return leftIndex - rightIndex;
+    });
+  }
+
+  function csvCell(value: unknown) {
+    return `"${String(value ?? '').replace(/"/g, '""')}"`;
+  }
+
+  async function buildShopLabGroups() {
+    const imageRoot = await getImageRoot();
+    const shopRootRelative = '00 - Aphelion';
+    const shopRoot = await resolveSafePath(shopRootRelative);
+    const entries = await readdir(shopRoot, { withFileTypes: true });
+    const metadata = await readShopLabMetadata();
+    const options = getShopLabOptions(metadata);
+    const groups: Array<{
+      id: string;
+      title: string;
+      type: string;
+      status: string;
+      fulfillment: string;
+      sourceFolder: string;
+      imageCount: number;
+      description: string;
+      productionNotes: string;
+      pricingNotes: string;
+      sampleNotes: string;
+      notes: string;
+      images: Array<{
+        fileName: string;
+        path: string;
+        imageCode: string;
+        title: string;
+        description: string;
+        rarity: CardRarity | null;
+        seriesName: string;
+        editionSize: number | null;
+        reviewStatus: string;
+        attributes: string[];
+        sourceTitle: string;
+        sourceTags: string[];
+        imageUrl: string;
+        thumbUrl: string;
+      }>;
+    }> = [];
+    const catalogByPath = new Map((await getCatalog()).map((item) => [item.relativePath, item]));
+    const metadataByPath = new Map<string, CardMetadataRecord>();
+    for (const record of await curationDb.listCardMetadata()) {
+      metadataByPath.set(record.imagePath, record);
+    }
+
+    async function getImageEntries(fullFolder: string, relativeFolder: string) {
+      const folderEntries = await readdir(fullFolder, { withFileTypes: true });
+      const images = [];
+      folderEntries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+      for (const entry of folderEntries) {
+        if (!entry.isFile() || !IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+          continue;
+        }
+
+        const relativePath = sanitizeRelativePath(path.posix.join(relativeFolder, entry.name));
+        const imageKey = buildImageKey(relativePath);
+        const imageUrl = buildSignedImageUrl(imageKey, undefined, relativePath);
+        const catalogRecord = catalogByPath.get(relativePath);
+        const metadata = metadataByPath.get(relativePath);
+        images.push({
+          fileName: entry.name,
+          path: relativePath,
+          imageCode: metadata?.imageCode || catalogRecord?.code || path.parse(entry.name).name,
+          title: metadata?.title || '',
+          description: metadata?.description || '',
+          rarity: metadata?.rarity || null,
+          seriesName: metadata?.seriesName || '',
+          editionSize: metadata?.editionSize ?? null,
+          reviewStatus: metadata?.reviewStatus || 'untagged',
+          attributes: metadata?.attributes || [],
+          sourceTitle: catalogRecord?.title || '',
+          sourceTags: catalogRecord?.tags || [],
+          imageUrl,
+          thumbUrl: `${imageUrl}&size=300`,
+        });
+      }
+
+      return images;
+    }
+
+    const folderEntries = entries
+      .filter((entry) => entry.isDirectory())
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+    for (const entry of folderEntries) {
+      const relativeFolder = sanitizeRelativePath(path.posix.join(shopRootRelative, entry.name));
+      const fullFolder = path.join(imageRoot, relativeFolder);
+      const images = await getImageEntries(fullFolder, relativeFolder);
+      const type = getShopLabType(entry.name);
+      const id = entry.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || entry.name;
+      const groupMetadata = metadata.groups?.[id] || {};
+      const defaultDescription = getShopLabNotes(type);
+      const orderedImages = orderedShopLabImages(images, groupMetadata.imageOrder);
+      groups.push({
+        id,
+        title: cleanLogText(groupMetadata.title, 160) || getShopLabTitle(entry.name),
+        type: cleanLogText(groupMetadata.type, 80) || getDefaultShopLabTypeLabel(type),
+        status: cleanLogText(groupMetadata.status, 80) || options.statuses[0] || 'draft',
+        fulfillment: cleanLogText(groupMetadata.fulfillment, 160) || getShopLabFulfillment(type),
+        sourceFolder: relativeFolder,
+        imageCount: orderedImages.length,
+        description: cleanLogText(groupMetadata.description, 1200) || defaultDescription,
+        productionNotes: cleanLogText(groupMetadata.productionNotes, 1600),
+        pricingNotes: cleanLogText(groupMetadata.pricingNotes, 1200),
+        sampleNotes: cleanLogText(groupMetadata.sampleNotes, 1200),
+        notes: defaultDescription,
+        images: orderedImages,
+      });
+    }
+
+    const looseImages = [];
+    entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    for (const entry of entries) {
+      if (!entry.isFile() || !IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+        continue;
+      }
+
+      const relativePath = sanitizeRelativePath(path.posix.join(shopRootRelative, entry.name));
+      const imageKey = buildImageKey(relativePath);
+      const imageUrl = buildSignedImageUrl(imageKey, undefined, relativePath);
+      const catalogRecord = catalogByPath.get(relativePath);
+      const metadata = metadataByPath.get(relativePath);
+      looseImages.push({
+        fileName: entry.name,
+        path: relativePath,
+        imageCode: metadata?.imageCode || catalogRecord?.code || path.parse(entry.name).name,
+        title: metadata?.title || '',
+        description: metadata?.description || '',
+        rarity: metadata?.rarity || null,
+        seriesName: metadata?.seriesName || '',
+        editionSize: metadata?.editionSize ?? null,
+        reviewStatus: metadata?.reviewStatus || 'untagged',
+        attributes: metadata?.attributes || [],
+        sourceTitle: catalogRecord?.title || '',
+        sourceTags: catalogRecord?.tags || [],
+        imageUrl,
+        thumbUrl: `${imageUrl}&size=300`,
+      });
+    }
+
+    if (looseImages.length > 0) {
+      const type = getShopLabType('miscellany');
+      const groupMetadata = metadata.groups?.miscellany || {};
+      const defaultDescription = getShopLabNotes(type);
+      const orderedImages = orderedShopLabImages(looseImages, groupMetadata.imageOrder);
+      groups.push({
+        id: 'miscellany',
+        title: cleanLogText(groupMetadata.title, 160) || 'Miscellany',
+        type: cleanLogText(groupMetadata.type, 80) || getDefaultShopLabTypeLabel(type),
+        status: cleanLogText(groupMetadata.status, 80) || options.statuses[0] || 'draft',
+        fulfillment: cleanLogText(groupMetadata.fulfillment, 160) || getShopLabFulfillment(type),
+        sourceFolder: shopRootRelative,
+        imageCount: orderedImages.length,
+        description: cleanLogText(groupMetadata.description, 1200) || defaultDescription,
+        productionNotes: cleanLogText(groupMetadata.productionNotes, 1600),
+        pricingNotes: cleanLogText(groupMetadata.pricingNotes, 1200),
+        sampleNotes: cleanLogText(groupMetadata.sampleNotes, 1200),
+        notes: defaultDescription,
+        images: orderedImages,
+      });
+    }
+
+    return {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      sourceRoot: shopRootRelative,
+      options,
+      groups,
+    };
   }
 
   async function getHealthSnapshot() {
@@ -1320,6 +1636,150 @@ async function startServer() {
     }
   });
 
+  app.get('/api/admin/shop-lab', async (_req, res) => {
+    try {
+      res.json(await buildShopLabGroups());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Shop Lab error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.post('/api/admin/shop-lab/:groupId', async (req, res) => {
+    try {
+      const groupId = cleanLogText(req.params.groupId, 120);
+      if (!/^[a-z0-9-]+$/.test(groupId)) {
+        res.status(400).json({ ok: false, error: 'Invalid Shop Lab group.' });
+        return;
+      }
+
+      const title = cleanLogText(req.body?.title, 160);
+      const description = cleanLogText(req.body?.description, 1200);
+      const type = cleanLogText(req.body?.type, 80);
+      const status = cleanLogText(req.body?.status, 80);
+      const fulfillment = cleanLogText(req.body?.fulfillment, 160);
+      const productionNotes = cleanLogText(req.body?.productionNotes, 1600);
+      const pricingNotes = cleanLogText(req.body?.pricingNotes, 1200);
+      const sampleNotes = cleanLogText(req.body?.sampleNotes, 1200);
+      const imageOrder = Array.isArray(req.body?.imageOrder)
+        ? req.body.imageOrder.map((item: unknown) => cleanLogText(item, 1200)).filter(Boolean)
+        : [];
+      const metadata = await readShopLabMetadata();
+      const groups = metadata.groups || {};
+      groups[groupId] = {
+        title,
+        description,
+        type,
+        status,
+        fulfillment,
+        productionNotes,
+        pricingNotes,
+        sampleNotes,
+        imageOrder,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await writeShopLabMetadata({ ...metadata, groups });
+      res.json(await buildShopLabGroups());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Shop Lab save error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.get('/api/admin/shop-lab/exports/:kind', async (req, res) => {
+    try {
+      const kind = cleanLogText(req.params.kind, 20);
+      const payload = await buildShopLabGroups();
+      const timestamp = new Date();
+
+      if (kind === 'csv') {
+        const rows = [[
+          'group_id',
+          'group_title',
+          'product_type',
+          'status',
+          'fulfillment',
+          'image_count',
+          'source_folder',
+          'description',
+          'production_notes',
+          'pricing_notes',
+          'sample_notes',
+          'position',
+          'image_code',
+          'file_name',
+          'image_path',
+          'image_title',
+          'image_description',
+          'rarity',
+          'series',
+          'attributes',
+        ]];
+
+        for (const group of payload.groups) {
+          group.images.forEach((image, index) => {
+            rows.push([
+              group.id,
+              group.title,
+              group.type,
+              group.status,
+              group.fulfillment,
+              String(group.imageCount),
+              group.sourceFolder,
+              group.description,
+              group.productionNotes,
+              group.pricingNotes,
+              group.sampleNotes,
+              String(index + 1),
+              image.imageCode,
+              image.fileName,
+              image.path,
+              image.title || image.sourceTitle || '',
+              image.description,
+              image.rarity || '',
+              image.seriesName,
+              image.attributes.join(', '),
+            ]);
+          });
+        }
+
+        const csv = `${rows.map((row) => row.map(csvCell).join(',')).join('\n')}\n`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="aphelion-shop-lab-${timestamp.toISOString().slice(0, 10)}.csv"`);
+        res.send(csv);
+        return;
+      }
+
+      res.setHeader('Content-Disposition', `attachment; filename="aphelion-shop-lab-${timestamp.toISOString().slice(0, 10)}.json"`);
+      res.json({
+        ...payload,
+        exportType: 'shop-lab',
+        createdAt: timestamp.toISOString(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Shop Lab export error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.post('/api/admin/shop-lab/options', async (req, res) => {
+    try {
+      const metadata = await readShopLabMetadata();
+      const options = {
+        types: saveableShopLabOptions(req.body?.types, DEFAULT_SHOP_LAB_TYPES),
+        statuses: saveableShopLabOptions(req.body?.statuses, DEFAULT_SHOP_LAB_STATUSES),
+        fulfillments: saveableShopLabOptions(req.body?.fulfillments, DEFAULT_SHOP_LAB_FULFILLMENTS),
+      };
+
+      await writeShopLabMetadata({ ...metadata, options });
+      res.json(await buildShopLabGroups());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Shop Lab options save error';
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
   app.post('/api/admin/cards', async (req, res) => {
     try {
       const payload = req.body as SaveCardPayload;
@@ -1430,6 +1890,7 @@ async function startServer() {
       const imageKey = cleanLogText(req.query.key, 120);
       const expiresAt = Number.parseInt(String(req.query.exp || ''), 10);
       const signature = cleanLogText(req.query.sig, 200);
+      const signedPath = sanitizeRelativePath(cleanLogText(req.query.signedPath, 1200));
 
       if (String(req.query.path || '').trim()) {
         res.status(403).json({ error: 'Direct path requests are not allowed.' });
@@ -1442,7 +1903,7 @@ async function startServer() {
       }
 
       const record = await findCatalogImageByKey(imageKey);
-      if (!record) {
+      if (!record && (!signedPath || buildImageKey(signedPath) !== imageKey)) {
         res.status(404).json({ error: 'Image not found.' });
         return;
       }
@@ -1454,7 +1915,7 @@ async function startServer() {
         return;
       }
 
-      const filePath = await resolveSafePath(record.relativePath);
+      const filePath = await resolveSafePath(record?.relativePath || signedPath);
       await access(filePath);
 
       const imageBuffer = await sharp(filePath, { animated: false })

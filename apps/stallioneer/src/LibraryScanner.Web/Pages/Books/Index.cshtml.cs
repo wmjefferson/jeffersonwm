@@ -17,6 +17,17 @@ public class IndexModel(
 {
     private static readonly int[] AllowedPageSizes = [25, 50, 100, 200];
 
+    private static readonly string[] SharedStatuses =
+    [
+        "Owned",
+        "Reading",
+        "Loaned",
+        "Wishlist",
+        "Archived",
+        "Sold",
+        "Disposed"
+    ];
+
     public List<Book> Books { get; private set; } = [];
 
     [BindProperty(SupportsGet = true)]
@@ -27,6 +38,9 @@ public class IndexModel(
 
     [BindProperty(SupportsGet = true)]
     public List<int> TagIds { get; set; } = [];
+
+    [BindProperty(SupportsGet = true)]
+    public string TagMode { get; set; } = "and";
 
     [BindProperty(SupportsGet = true)]
     public List<int> LocationIds { get; set; } = [];
@@ -49,6 +63,12 @@ public class IndexModel(
     [BindProperty]
     public int? SelectedCollectionId { get; set; }
 
+    [BindProperty]
+    public int? SelectedLocationId { get; set; }
+
+    [BindProperty]
+    public string? SelectedStatus { get; set; }
+
     public int TotalTitles { get; private set; }
 
     public int TotalQuantity { get; private set; }
@@ -64,6 +84,15 @@ public class IndexModel(
     public List<SelectListItem> CollectionOptions { get; private set; } = [];
 
     public List<SelectListItem> TagOptions { get; private set; } = [];
+
+    public List<SelectListItem> LocationOptions { get; private set; } = [];
+
+    public List<SelectListItem> StatusOptions { get; } =
+        SharedStatuses.Select(status => new SelectListItem(status, status)).ToList();
+
+    public List<InventoryTag> AvailableTags { get; private set; } = [];
+
+    public List<InventoryBook> SelectableBooks { get; private set; } = [];
 
     public List<InventoryFilterOption> CollectionFilters { get; private set; } = [];
 
@@ -104,24 +133,7 @@ public class IndexModel(
         await LoadInventoryAsync();
 
         return new JsonResult(new InventoryResponse(
-            Books.Select(book => new InventoryBook(
-                book.Id,
-                book.Title,
-                book.Authors,
-                book.Publisher,
-                book.PublishedDate,
-                book.Isbn13,
-                book.EffectiveQuantity,
-                book.Status,
-                book.CoverImageUrl,
-                book.CollectionBooks
-                    .OrderBy(item => item.Collection.Name)
-                    .Select(item => item.Collection.Name)
-                    .ToList(),
-                book.BookTags
-                    .OrderBy(item => item.Tag.Name)
-                    .Select(item => new InventoryTag(item.Tag.Name, item.Tag.Color))
-                    .ToList())),
+            Books.Select(ToInventoryBook),
             FilteredCount,
             PageNumber,
             TotalPages));
@@ -132,7 +144,7 @@ public class IndexModel(
         if (SelectedBookIds.Count == 0)
         {
             StatusMessage = "Select at least one book first.";
-            return RedirectToPage(new { Query, CollectionIds, TagIds, LocationIds, Statuses, Sort, PageSize, PageNumber });
+            return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
         }
 
         var books = await inventoryAccess.ScopeBooks(dbContext.Books, User)
@@ -142,7 +154,7 @@ public class IndexModel(
         if (books.Count == 0)
         {
             StatusMessage = "Those books were already removed.";
-            return RedirectToPage(new { Query, CollectionIds, TagIds, LocationIds, Statuses, Sort, PageSize, PageNumber });
+            return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
         }
 
         dbContext.Books.RemoveRange(books);
@@ -154,7 +166,7 @@ public class IndexModel(
             titles = books.Select(book => book.Title).Take(12).ToArray()
         });
         StatusMessage = books.Count == 1 ? "Deleted 1 book." : $"Deleted {books.Count} books.";
-        return RedirectToPage(new { Query, CollectionIds, TagIds, LocationIds, Statuses, Sort, PageSize, PageNumber });
+        return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
     }
 
     public async Task<IActionResult> OnPostAddToCollectionAsync()
@@ -162,13 +174,13 @@ public class IndexModel(
         if (SelectedBookIds.Count == 0)
         {
             StatusMessage = "Select at least one book first.";
-            return RedirectToPage(new { Query, CollectionIds, TagIds, LocationIds, Statuses, Sort, PageSize, PageNumber });
+            return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
         }
 
         if (SelectedCollectionId is null)
         {
             StatusMessage = "Choose a collection first.";
-            return RedirectToPage(new { Query, CollectionIds, TagIds, LocationIds, Statuses, Sort, PageSize, PageNumber });
+            return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
         }
 
         var collection = await inventoryAccess.ScopeCollections(dbContext.Collections, User)
@@ -178,7 +190,7 @@ public class IndexModel(
         if (collection is null)
         {
             StatusMessage = "That collection was not found.";
-            return RedirectToPage(new { Query, CollectionIds, TagIds, LocationIds, Statuses, Sort, PageSize, PageNumber });
+            return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
         }
 
         var selectedIds = await inventoryAccess.ScopeBooks(dbContext.Books, User)
@@ -216,7 +228,135 @@ public class IndexModel(
             StatusMessage = "Those books are already in that collection.";
         }
 
-        return RedirectToPage(new { Query, CollectionIds, TagIds, LocationIds, Statuses, Sort, PageSize, PageNumber });
+        return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
+    }
+
+    public async Task<IActionResult> OnPostApplySelectedFieldsAsync()
+    {
+        if (SelectedBookIds.Count == 0)
+        {
+            StatusMessage = "Select at least one book first.";
+            return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
+        }
+
+        if (SelectedCollectionId is null && SelectedLocationId is null && string.IsNullOrWhiteSpace(SelectedStatus))
+        {
+            StatusMessage = "Choose a collection, availability, or location first.";
+            return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
+        }
+
+        var books = await inventoryAccess.ScopeBooks(dbContext.Books, User)
+            .Include(book => book.CollectionBooks)
+            .Include(book => book.Copies)
+            .Where(book => SelectedBookIds.Contains(book.Id))
+            .ToListAsync();
+
+        Collection? collection = null;
+        if (SelectedCollectionId is not null)
+        {
+            collection = await inventoryAccess.ScopeCollections(dbContext.Collections, User)
+                .FirstOrDefaultAsync(item => item.Id == SelectedCollectionId);
+            if (collection is null)
+            {
+                StatusMessage = "That collection was not found.";
+                return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
+            }
+        }
+
+        Location? location = null;
+        if (SelectedLocationId is not null)
+        {
+            location = await inventoryAccess.ScopeLocations(dbContext.Locations, User)
+                .FirstOrDefaultAsync(item => item.Id == SelectedLocationId);
+            if (location is null)
+            {
+                StatusMessage = "That location was not found.";
+                return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
+            }
+        }
+
+        var status = string.IsNullOrWhiteSpace(SelectedStatus) ? null : SelectedStatus.Trim();
+        var now = DateTimeOffset.UtcNow;
+        var changedBooks = 0;
+        foreach (var book in books)
+        {
+            var bookChanged = false;
+
+            if (collection is not null && book.CollectionBooks.All(item => item.CollectionId != collection.Id))
+            {
+                book.CollectionBooks.Add(new CollectionBook
+                {
+                    Book = book,
+                    Collection = collection
+                });
+                bookChanged = true;
+            }
+
+            if (status is not null)
+            {
+                var statusChanged = !string.Equals(book.Status, status, StringComparison.Ordinal);
+                book.Status = status;
+                foreach (var copy in book.Copies)
+                {
+                    if (string.Equals(copy.Status, status, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    copy.Status = status;
+                    copy.UpdatedAt = now;
+                    statusChanged = true;
+                }
+
+                bookChanged |= statusChanged;
+            }
+
+            if (location is not null)
+            {
+                var locationChanged = false;
+                if (book.LocationId != location.Id)
+                {
+                    book.Location = location;
+                    book.LocationId = location.Id;
+                    locationChanged = true;
+                }
+
+                foreach (var copy in book.Copies)
+                {
+                    if (copy.LocationId == location.Id)
+                    {
+                        continue;
+                    }
+
+                    copy.Location = location;
+                    copy.LocationId = location.Id;
+                    copy.UpdatedAt = now;
+                    locationChanged = true;
+                }
+
+                bookChanged |= locationChanged;
+            }
+
+            if (!bookChanged)
+            {
+                continue;
+            }
+
+            book.UpdatedAt = now;
+            changedBooks++;
+        }
+
+        if (changedBooks > 0)
+        {
+            await dbContext.SaveChangesAsync();
+        }
+
+        StatusMessage = changedBooks == 0
+            ? "No selected books needed those changes."
+            : changedBooks == 1
+                ? "Applied selected changes to 1 book."
+                : $"Applied selected changes to {changedBooks} books.";
+        return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
     }
 
     private async Task LoadInventoryAsync()
@@ -274,6 +414,9 @@ public class IndexModel(
                 tag.Name,
                 tagCounts.GetValueOrDefault(tag.Id)))
             .ToList();
+        AvailableTags = tags
+            .Select(tag => new InventoryTag(tag.Id, tag.Name, tag.Description, tag.Color))
+            .ToList();
 
         TagOptions = TagFilters
             .Select(tag => new SelectListItem(tag.Name, tag.Id.ToString()))
@@ -310,6 +453,10 @@ public class IndexModel(
                 location.Name,
                 locationCounts.GetValueOrDefault(location.Id)))
             .ToList();
+        LocationOptions = locations
+            .Select(location => new SelectListItem(location.Name, location.Id.ToString()))
+            .Prepend(new SelectListItem("Move to location", string.Empty))
+            .ToList();
 
         var statusRows = await inventoryAccess.ScopeBooks(dbContext.Books, User)
             .AsNoTracking()
@@ -339,6 +486,30 @@ public class IndexModel(
             .Skip((PageNumber - 1) * PageSize)
             .Take(PageSize)
             .ToList();
+        SelectableBooks = Books.Select(ToInventoryBook).ToList();
+    }
+
+    private static InventoryBook ToInventoryBook(Book book)
+    {
+        return new InventoryBook(
+            book.Id,
+            book.Title,
+            book.Authors,
+            book.Publisher,
+            book.PublishedDate,
+            book.Isbn13,
+            book.EffectiveQuantity,
+            book.Status,
+            book.Copies.Select(copy => copy.Location?.Name).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? book.Location?.Name,
+            book.CoverImageUrl,
+            book.CollectionBooks
+                .OrderBy(item => item.Collection.Name)
+                .Select(item => new InventoryCollection(item.CollectionId, item.Collection.Name, item.Collection.Description))
+                .ToList(),
+            book.BookTags
+                .OrderBy(item => item.Tag.Name)
+                .Select(item => new InventoryTag(item.TagId, item.Tag.Name, item.Tag.Description, item.Tag.Color))
+                .ToList());
     }
 
     private async Task<List<Book>> GetFilteredBooksAsync()
@@ -361,7 +532,10 @@ public class IndexModel(
 
         if (TagIds.Count > 0)
         {
-            booksQuery = booksQuery.Where(book => book.BookTags.Any(bookTag => TagIds.Contains(bookTag.TagId)));
+            var distinctTagIds = TagIds.Distinct().ToList();
+            booksQuery = string.Equals(TagMode, "or", StringComparison.OrdinalIgnoreCase)
+                ? booksQuery.Where(book => book.BookTags.Any(bookTag => distinctTagIds.Contains(bookTag.TagId)))
+                : booksQuery.Where(book => book.BookTags.Count(bookTag => distinctTagIds.Contains(bookTag.TagId)) == distinctTagIds.Count);
         }
 
         if (LocationIds.Count > 0)
@@ -555,11 +729,14 @@ public class IndexModel(
         string Isbn13,
         int Quantity,
         string Status,
+        string? LocationName,
         string? CoverImageUrl,
-        IReadOnlyList<string> Collections,
+        IReadOnlyList<InventoryCollection> Collections,
         IReadOnlyList<InventoryTag> Tags);
 
-    public sealed record InventoryTag(string Name, string Color);
+    public sealed record InventoryTag(int Id, string Name, string? Description, string Color);
+
+    public sealed record InventoryCollection(int Id, string Name, string? Description);
 
     public sealed record InventoryFilterOption(int Id, string Name, int Count);
 

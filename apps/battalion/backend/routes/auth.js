@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
 
     // Prevent direct password login to the master template
     if (player.is_master_template) {
-      return res.status(403).json({ error: 'Direct login to master template is disabled. Use Preferred Admin switcher.' });
+      return res.status(403).json({ error: 'Direct login to master template is disabled.' });
     }
 
     if (!player.password_hash) {
@@ -79,22 +79,59 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/auth/logout
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req, res) => {
   try {
     const isProd = process.env.NODE_ENV === 'production';
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ error: 'Failed to logout' });
-      }
-      // Clear cookie explicitly with matching config
-      res.clearCookie('connect.sid', {
+    const authBaseUrl = (process.env.AUTH_BASE_URL || 'https://auth.jeffersonwm.com').replace(/\/$/, '');
+
+    // Forward logout to Central Auth server if cookies were provided
+    if (req.headers && req.headers.cookie) {
+      try {
+        await fetch(`${authBaseUrl}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            cookie: req.headers.cookie
+          },
+          body: JSON.stringify({ siteContext: 'https://jeffersonwm.com/battalion/' })
+        });
+      } catch (_) {}
+    }
+
+    // Clear Central Auth session cookie across .jeffersonwm.com
+    if (isProd) {
+      res.clearCookie('auth_jeffersonwm_session', {
         path: '/',
-        sameSite: isProd ? 'none' : 'lax',
-        secure: isProd,
+        domain: '.jeffersonwm.com',
+        sameSite: 'lax',
+        secure: true,
         httpOnly: true
       });
-      res.json({ success: true });
+    }
+
+    // Also clear without domain in case set host-only
+    res.clearCookie('auth_jeffersonwm_session', {
+      path: '/',
+      sameSite: isProd ? 'lax' : 'lax',
+      secure: isProd,
+      httpOnly: true
     });
+
+    // Clear local session cookie
+    res.clearCookie('connect.sid', {
+      path: '/',
+      sameSite: isProd ? 'none' : 'lax',
+      secure: isProd,
+      httpOnly: true
+    });
+
+    if (req.session) {
+      req.session.destroy(() => {
+        res.json({ success: true });
+      });
+    } else {
+      res.json({ success: true });
+    }
   } catch (err) {
     console.error('Logout error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -105,6 +142,15 @@ router.post('/logout', (req, res) => {
 router.get('/check', async (req, res) => {
   try {
     const resolved = await resolveSessionPlayer(req);
+    if (resolved && resolved.accessDenied) {
+      return res.json({
+        authenticated: false,
+        accessDenied: true,
+        message: resolved.message || 'Access to Battalion has not been granted for your Central Auth account.',
+        authUser: resolved.authUser || null,
+        authBaseUrl: 'https://auth.jeffersonwm.com'
+      });
+    }
     if (resolved && resolved.player) {
       const { player, actingPlayer, isOwner } = resolved;
       res.json({
@@ -147,7 +193,7 @@ router.get('/check', async (req, res) => {
   }
 });
 
-// GET /api/auth/users - List accounts for Preferred Admin switcher
+// GET /api/auth/users - List accounts for Owner switcher
 router.get('/users', requireAuth, requireOwner, async (req, res) => {
   try {
     const [users] = await db.execute(`
@@ -162,7 +208,7 @@ router.get('/users', requireAuth, requireOwner, async (req, res) => {
   }
 });
 
-// POST /api/auth/switch-user - Preferred Admin switches active inspection context
+// POST /api/auth/switch-user - Owner switches active inspection context
 router.post('/switch-user', requireAuth, requireOwner, async (req, res) => {
   try {
     const { userId } = req.body;

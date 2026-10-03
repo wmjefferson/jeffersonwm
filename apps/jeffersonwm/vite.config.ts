@@ -24,6 +24,7 @@ function copyStaticRuntimeFilesToDist() {
         resolve(distDir, 'account', 'widget', 'index.html'),
         resolve(distDir, 'development', 'index.html'),
         resolve(distDir, 'project-activity', 'index.html'),
+        resolve(distDir, 'scholarship', 'index.html'),
         resolve(distDir, 'status', 'index.html'),
       ]
 
@@ -87,6 +88,8 @@ function prettyRootPagesInDev() {
     ['/account/widget/', '/account/widget/index.html'],
     ['/project-activity', '/project-activity/index.html'],
     ['/project-activity/', '/project-activity/index.html'],
+    ['/scholarship', '/scholarship/index.html'],
+    ['/scholarship/', '/scholarship/index.html'],
     ['/status', '/status/index.html'],
     ['/status/', '/status/index.html'],
     ['/development', '/development/index.html'],

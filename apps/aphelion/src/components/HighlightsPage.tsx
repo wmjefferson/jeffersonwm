@@ -88,6 +88,11 @@ export function HighlightsPage({
     };
   }, [apiBaseUrl]);
 
+  // Removed prototype note: this page briefly exposed an admin-only isometric
+  // highlight map where x/y mirrored the weekly shuffled grid and z/height
+  // represented highlight count. Revisit after more highlight/download history
+  // exists so the visualization has enough data to fit the site experience.
+
   return (
     <div className="relative z-10 flex min-h-screen flex-col bg-transparent text-gray-950">
       <header className="h-[36px] px-6 bg-[#FAFAFA]/95 flex items-center justify-between border-b border-[#e5e5e5]">

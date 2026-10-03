@@ -7,6 +7,14 @@
     <link rel="icon" type="image/svg+xml" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
     <link rel="shortcut icon" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-V3NQ37RBWY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-V3NQ37RBWY');
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -637,7 +645,6 @@
     <div class="bottom-links" aria-label="Site links">
       <a class="personal-link" href="/">Home</a>
       <a class="personal-link" href="/status/">Status</a>
-      <a class="personal-link" href="/project-activity/">Project Activity</a>
       <a class="personal-link" href="/account/">Account</a>
       <a class="personal-link" href="https://wmjefferson.com" target="_blank" rel="noopener noreferrer">William Jefferson</a>
     </div>
@@ -668,6 +675,8 @@
       const timelineWrap = document.getElementById("timeline-wrap");
       const metaLine = document.getElementById("meta-line");
       const REPORTS = [
+        { title: "Codex - September 2026 - Thread Report", path: "reports/2026-09-codex-report.md" },
+        { title: "Antigravity - September 2026 - Platform Development Report", path: "reports/2026-09-antigravity-report.md" },
         { title: "Codex - August 2026 - Thread Report", path: "reports/2026-08-codex-report.md" },
         { title: "Antigravity - August 2026 - Platform Development Report", path: "reports/2026-08-antigravity-report.md" },
         { title: "Codex - July 2026 - Thread Report", path: "reports/2026-07-codex-report.md" },

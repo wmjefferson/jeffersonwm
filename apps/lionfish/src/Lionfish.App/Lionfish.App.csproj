@@ -11,7 +11,13 @@
     <Description>Lionfish — USB Keypad Macro Interceptor</Description>
     <!-- Windows 10 1607+ compatibility -->
     <SupportedOSPlatformVersion>10.0.14393.0</SupportedOSPlatformVersion>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\logo.png" />
+    <Resource Include="Assets\icon.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="InputInterceptor" Version="*" />

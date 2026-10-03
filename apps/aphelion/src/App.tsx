@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { GridConfig, GridOverlayMode, HoverState, ImageItem } from './types';
-import { calculateFrameGrid, evictLayoutCache } from './utils/gridCalculator';
+import { calculateFrameGrid, evictLayoutCache, getCoordsFromIndex } from './utils/gridCalculator';
 import { DEFAULT_TARGET_COUNT } from './config';
 import {
   clearCustomImages,
@@ -53,6 +53,50 @@ function extractImagePathFromUrl(imageUrl: string) {
   }
 }
 
+function findDirectionalBlockIndex(currentIndex: number, direction: 'up' | 'down' | 'left' | 'right', config: GridConfig) {
+  const currentCoords = getCoordsFromIndex(currentIndex, config) || getCoordsFromIndex(0, config);
+  if (!currentCoords) {
+    return Math.min(Math.max(currentIndex, 0), Math.max(0, config.totalBlocks - 1));
+  }
+
+  const currentCenterX = currentCoords.x + currentCoords.width / 2;
+  const currentCenterY = currentCoords.y + currentCoords.height / 2;
+  let best: { index: number; primary: number; secondary: number } | null = null;
+
+  for (let index = 0; index < config.totalBlocks; index += 1) {
+    if (index === currentIndex) {
+      continue;
+    }
+
+    const coords = getCoordsFromIndex(index, config);
+    if (!coords) {
+      continue;
+    }
+
+    const centerX = coords.x + coords.width / 2;
+    const centerY = coords.y + coords.height / 2;
+    const dx = centerX - currentCenterX;
+    const dy = centerY - currentCenterY;
+    const primary = direction === 'left' ? -dx : direction === 'right' ? dx : direction === 'up' ? -dy : dy;
+
+    if (primary <= 0) {
+      continue;
+    }
+
+    const secondary = direction === 'left' || direction === 'right' ? Math.abs(dy) : Math.abs(dx);
+    if (
+      !best
+      || secondary < best.secondary
+      || (secondary === best.secondary && primary < best.primary)
+      || (secondary === best.secondary && primary === best.primary && index < best.index)
+    ) {
+      best = { index, primary, secondary };
+    }
+  }
+
+  return best?.index ?? currentIndex;
+}
+
 type AuthStatus = {
   ok: boolean;
   requireAuth: boolean;
@@ -72,7 +116,7 @@ export default function App() {
   const apiBaseUrl = import.meta.env.VITE_APHELION_API_BASE_URL || '';
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const isHighlightsPage = currentHash === '#highlights';
-  const isAdminPage = currentHash === '#admin' || currentHash === '#options' || currentHash === '#admin-highlights' || currentHash === '#curation';
+  const isAdminPage = currentHash === '#admin' || currentHash === '#options' || currentHash === '#admin-highlights' || currentHash === '#curation' || currentHash === '#shop-lab';
   const [viewport, setViewport] = useState({
     width: Math.max(100, window.innerWidth - TOTAL_SIDE_GUTTER),
     height: Math.max(100, window.innerHeight - TOTAL_BANNER_HEIGHT),
@@ -216,6 +260,7 @@ export default function App() {
       || currentHash === '#options'
       || currentHash === '#admin-highlights'
       || currentHash === '#curation'
+      || currentHash === '#shop-lab'
     );
 
     if (!isHomeRoute && !isHighlightsRoute && !isAdminRoute) {
@@ -415,6 +460,55 @@ export default function App() {
     });
     setSelectedImage(image);
   }, [isGeneralPublic, logHighlightEvent]);
+
+  const setActiveBlock = useCallback((blockIndex: number, pinned = true) => {
+    const coords = getCoordsFromIndex(blockIndex, config);
+    const img = getImageByIndex(blockIndex);
+    setHoverState({
+      index: blockIndex,
+      x: coords ? coords.x + coords.width / 2 + SIDE_GUTTER : window.innerWidth / 2,
+      y: coords ? coords.y + coords.height / 2 + TOP_BANNER_HEIGHT : window.innerHeight / 2,
+      col: coords?.col ?? blockIndex % config.cols,
+      row: coords?.row ?? Math.floor(blockIndex / config.cols),
+      image: img,
+      pinned,
+    });
+  }, [config]);
+
+  useEffect(() => {
+    const handleGridNavigation = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement
+        || e.target instanceof HTMLTextAreaElement
+        || e.target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      const directionByKey: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+        ArrowUp: 'up',
+        ArrowDown: 'down',
+        ArrowLeft: 'left',
+        ArrowRight: 'right',
+      };
+      const direction = directionByKey[e.key];
+
+      if (direction) {
+        e.preventDefault();
+        const currentIndex = hoverState?.index ?? 0;
+        setActiveBlock(findDirectionalBlockIndex(currentIndex, direction, config), true);
+        return;
+      }
+
+      if (e.key === 'Enter' && hoverState) {
+        e.preventDefault();
+        handleBlockClick(hoverState.image, hoverState.index);
+      }
+    };
+
+    window.addEventListener('keydown', handleGridNavigation);
+    return () => window.removeEventListener('keydown', handleGridNavigation);
+  }, [config, handleBlockClick, hoverState, setActiveBlock]);
 
   const selectedImages = useMemo(() => {
     if (page !== 'selected') {

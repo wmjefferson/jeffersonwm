@@ -7,6 +7,7 @@
         mc:Ignorable="d"
         Title="Lionfish" Height="650" Width="900" MinHeight="500" MinWidth="700"
         WindowStartupLocation="CenterScreen"
+        Icon="/Assets/logo.png"
         Closing="Window_Closing">
     <Grid>
         <Grid.RowDefinitions>
@@ -24,7 +25,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="🦁" FontSize="22" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <Image Source="/Assets/logo.png" Width="30" Height="30" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Lionfish" FontSize="18" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system, sans-serif" Foreground="{DynamicResource PrimaryAccentBrush}"/>
                         <TextBlock Text="USB Keypad Interceptor" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>

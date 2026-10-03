@@ -11,12 +11,31 @@ namespace Lionfish.App;
 public partial class MainWindow : Window
 {
     private readonly RawInputReceiver _rawInputReceiver = new();
+    private readonly System.Windows.Threading.DispatcherTimer _pnpDebounceTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(400)
+    };
     private HwndSource? _hwndSource;
 
     public MainWindow()
     {
         InitializeComponent();
-        DataContext = new MainViewModel();
+        var mainVm = new MainViewModel();
+        DataContext = mainVm;
+
+        if (Application.Current is App app)
+        {
+            app.TrayService.Attach(mainVm);
+        }
+
+        _pnpDebounceTimer.Tick += (s, e) =>
+        {
+            _pnpDebounceTimer.Stop();
+            if (DataContext is MainViewModel vm)
+            {
+                _ = vm.DevicesVM.RefreshDevicesAsync();
+            }
+        };
 
         Loaded += MainWindow_Loaded;
         Closing += Window_Closing;
@@ -39,6 +58,15 @@ public partial class MainWindow : Window
                 }
             };
 
+            _rawInputReceiver.DeviceConnectionChanged += () =>
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    _pnpDebounceTimer.Stop();
+                    _pnpDebounceTimer.Start();
+                });
+            };
+
             _rawInputReceiver.Register(helper.Handle);
         }
         catch (Exception ex)
@@ -49,6 +77,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        _pnpDebounceTimer.Stop();
         _hwndSource?.RemoveHook(_rawInputReceiver.Hook);
         _rawInputReceiver.Dispose();
         if (DataContext is MainViewModel mainVm)

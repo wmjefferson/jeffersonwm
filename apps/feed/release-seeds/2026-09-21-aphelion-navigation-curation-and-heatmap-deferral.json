@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Aphelion navigation, curation folders, and heatmap deferral",
+  "content": "<p>Aphelion had a practical pause-point pass focused on how the image wall is navigated, how curation folders resolve, and when a visualization idea should wait for better data.</p><p><strong>What changed:</strong></p><ul><li><strong>Keyboard navigation:</strong> the public grid now supports arrow-key movement through blocks, and Enter selects or clears the active block through the same path as a mouse click.</li><li><strong>Nested curation folders:</strong> the admin catalog now sends real relative folder paths instead of display-style folder labels, so final subfolders under groups like <code>00 - Aphelion</code> and <code>00 - AI</code> should show their contained images correctly in the curation browser.</li><li><strong>Weekly shuffle clarified:</strong> the current block refresh is automatic. Aphelion derives its grid order from the current ISO week seed and writes the matching weeklog file when that week first loads.</li><li><strong>Heatmap deferred:</strong> we explored an isometric/3D-style map where x/y mirrored the weekly shuffled grid and z/height represented highlight count, then removed it from the live UI. The idea is worth revisiting later, but it will fit better once Aphelion has more highlight and download history.</li></ul><p>The important decision was restraint. Keyboard browsing and correct folder filtering help the current workflow immediately; the heatmap should wait until there is enough real activity data for it to feel meaningful instead of decorative.</p>",
+  "url": "https://jeffersonwm.com/aphelion/",
+  "source": "manual",
+  "external_id": "aphelion-navigation-curation-heatmap-deferral-2026-09-21",
+  "created_at": "2026-09-21 20:55:00"
+}

@@ -12,14 +12,18 @@ namespace Lionfish.App.Services;
 public class RawInputReceiver : IDisposable
 {
     public event Action<string /*devicePath*/, ushort /*vKey*/, string /*keyName*/>? KeyDetected;
+    public event Action? DeviceConnectionChanged;
 
     private IntPtr _hwnd = IntPtr.Zero;
     private bool _isRegistered;
 
     private const int WM_INPUT = 0x00FF;
+    private const int WM_INPUT_DEVICE_CHANGE = 0x00FE;
+    private const int WM_DEVICECHANGE = 0x0219;
     private const uint RID_INPUT = 0x10000003;
     private const uint RIDI_DEVICENAME = 0x20000007;
     private const uint RIDEV_INPUTSINK = 0x00000100;
+    private const uint RIDEV_DEVNOTIFY = 0x00002000;
     private const uint RIDEV_REMOVE = 0x00000001;
 
     private const uint WM_KEYDOWN = 0x0100;
@@ -74,7 +78,7 @@ public class RawInputReceiver : IDisposable
         {
             usUsagePage = 0x01, // Generic Desktop Controls
             usUsage = 0x06,     // Keyboard
-            dwFlags = RIDEV_INPUTSINK,
+            dwFlags = RIDEV_INPUTSINK | RIDEV_DEVNOTIFY,
             hwndTarget = hwnd
         };
 
@@ -87,13 +91,17 @@ public class RawInputReceiver : IDisposable
     }
 
     /// <summary>
-    /// Window procedure hook to process WM_INPUT messages.
+    /// Window procedure hook to process WM_INPUT and PnP device change messages.
     /// </summary>
     public IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WM_INPUT)
         {
             ProcessWmInput(lParam);
+        }
+        else if (msg == WM_INPUT_DEVICE_CHANGE || msg == WM_DEVICECHANGE)
+        {
+            DeviceConnectionChanged?.Invoke();
         }
         return IntPtr.Zero;
     }

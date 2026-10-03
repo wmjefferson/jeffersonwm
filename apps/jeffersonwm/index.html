@@ -11,6 +11,26 @@
     <!-- Bookmark/share preview image: keep bookmark-preview.png in public/ if you want richer browser/share previews. -->
     <meta property="og:image" content="https://jeffersonwm.com/bookmark-preview.jpg" />
     <meta name="twitter:image" content="https://jeffersonwm.com/bookmark-preview.jpg" />
+    <!-- Google Analytics: set VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX to enable. -->
+    <script>
+      (() => {
+        const measurementId = '%VITE_GA_MEASUREMENT_ID%';
+        if (!measurementId || !measurementId.startsWith('G-')) {
+          return;
+        }
+
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = window.gtag || function gtag(){ window.dataLayer.push(arguments); };
+
+        const script = document.createElement('script');
+        script.async = true;
+        script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
+        document.head.appendChild(script);
+
+        window.gtag('js', new Date());
+        window.gtag('config', measurementId);
+      })();
+    </script>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

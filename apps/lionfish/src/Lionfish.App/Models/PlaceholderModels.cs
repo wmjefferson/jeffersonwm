@@ -35,13 +35,21 @@ public partial class DeviceInfo : ObservableObject
     public string DisplayTitle => IsMacroPad ? $"⚡ {FriendlyName}" : FriendlyName;
 }
 
+public partial class WebStepModel : ObservableObject
+{
+    [ObservableProperty] private string _type = "click";
+    [ObservableProperty] private string _selector = string.Empty;
+    [ObservableProperty] private string _description = string.Empty;
+    [ObservableProperty] private int _delayMs = 100;
+}
+
 public partial class KeyMapping : ObservableObject
 {
     [ObservableProperty] private ushort _scanCode;
     [ObservableProperty] private bool _isE0;
     [ObservableProperty] private string _keyName = string.Empty;
     [ObservableProperty] private string _actionAssignment = "Not assigned";
-    [ObservableProperty] private string _actionType = "Keystroke"; // "Keystroke", "Text", "Launch", "Media", "Macro"
+    [ObservableProperty] private string _actionType = "Keystroke"; // "Keystroke", "Text", "Launch", "Media", "Macro", "Web", "GoogleDocsHighlight", "Sequence"
 
     // Keystroke properties
     [ObservableProperty] private bool _isCtrl;
@@ -65,6 +73,18 @@ public partial class KeyMapping : ObservableObject
     // Macro properties
     [ObservableProperty] private string _selectedMacroName = string.Empty;
 
+    // Web properties
+    [ObservableProperty] private string _webUrlMatch = "*";
+    [ObservableProperty] private ObservableCollection<WebStepModel> _webSteps = new();
+
+    // Google Docs Highlight properties
+    [ObservableProperty] private string _googleDocsHighlightColor = "Yellow";
+
+    partial void OnGoogleDocsHighlightColorChanged(string value)
+    {
+        UpdateActionAssignment();
+    }
+
     public void UpdateActionAssignment()
     {
         ActionAssignment = ActionType switch
@@ -74,6 +94,13 @@ public partial class KeyMapping : ObservableObject
             "Launch" => string.IsNullOrEmpty(LaunchTarget) ? "Launch: (Not set)" : $"Launch: {System.IO.Path.GetFileName(LaunchTarget)}",
             "Media" => $"Media: {MediaCommand}",
             "Macro" => string.IsNullOrEmpty(SelectedMacroName) ? "Macro: (None)" : $"Macro: {SelectedMacroName}",
+            "Web" => WebSteps.Count switch
+            {
+                0 => "Web: (No steps)",
+                1 => $"Web: {WebSteps[0].Description}",
+                _ => $"Web: {WebSteps[0].Description} (+{WebSteps.Count - 1} steps)"
+            },
+            "GoogleDocsHighlight" => $"🎨 Highlight: {GoogleDocsHighlightColor}",
             _ => "Not assigned"
         };
     }
@@ -123,7 +150,20 @@ public partial class KeyMapping : ObservableObject
                 {
                     Macro = new CoreMacro { Name = SelectedMacroName }
                 },
+                "Web" => new WebAction
+                {
+                    UrlMatch = WebUrlMatch,
+                    Steps = WebSteps.Select(s => new WebStep
+                    {
+                        Type = s.Type,
+                        Selector = s.Selector,
+                        Description = s.Description,
+                        DelayMs = s.DelayMs
+                    }).ToList()
+                },
+                "GoogleDocsHighlight" => SequenceAction.GoogleDocsHighlightColor(GoogleDocsHighlightColor),
                 _ => null
+
             };
         }
         catch { }
@@ -179,17 +219,78 @@ public partial class KeyMapping : ObservableObject
             model.ActionType = "Macro";
             model.SelectedMacroName = mca.Macro.Name;
         }
+        else if (core.Action is WebAction wa)
+        {
+            model.ActionType = "Web";
+            model.WebUrlMatch = wa.UrlMatch;
+            foreach (var s in wa.Steps)
+            {
+                model.WebSteps.Add(new WebStepModel
+                {
+                    Type = s.Type,
+                    Selector = s.Selector,
+                    Description = s.Description,
+                    DelayMs = s.DelayMs
+                });
+            }
+        }
+        else if (core.Action is SequenceAction seq)
+        {
+            // Loaded from a previously saved GoogleDocsHighlight action
+            model.ActionType = "GoogleDocsHighlight";
+            if (!string.IsNullOrEmpty(seq.DocsHighlightColor))
+            {
+                model.GoogleDocsHighlightColor = seq.DocsHighlightColor;
+            }
+            else
+            {
+                int rightArrows = seq.Steps.Count(s => s.Key == VirtualKeyCode.Right);
+                model.GoogleDocsHighlightColor = GoogleDocsColorFromIndex(rightArrows);
+            }
+        }
 
         model.UpdateActionAssignment();
         return model;
     }
+
+    // Maps color name → the exact right-arrow count in the Google Docs pastel highlighter row
+    // (None=0, Red=1, Orange=3, Yellow=4, Green=5, Cyan=6, Blue=8, Purple=9, Magenta=10)
+    public static int GoogleDocsHighlightColorIndex(string colorName) => colorName switch
+    {
+        "None"    => 0,
+        "Red"     => 1,
+        "Orange"  => 3,
+        "Yellow"  => 4,
+        "Green"   => 5,
+        "Cyan"    => 6,
+        "Blue"    => 8,
+        "Purple"  => 9,
+        "Magenta" => 10,
+        _         => 4  // default Yellow
+    };
+
+    public static string GoogleDocsColorFromIndex(int index) => index switch
+    {
+        0 => "None",
+        1 => "Red",
+        3 => "Orange",
+        4 => "Yellow",
+        5 => "Green",
+        6 => "Cyan",
+        8 => "Blue",
+        9 => "Purple",
+        10 => "Magenta",
+        _ => "Yellow"
+    };
 }
+
 
 public partial class Profile : ObservableObject
 {
     [ObservableProperty] private string _id = Guid.NewGuid().ToString();
     [ObservableProperty] private string _name = "New Profile";
     [ObservableProperty] private string? _deviceHardwareId;
+    [ObservableProperty] private string? _targetProcessName;
     [ObservableProperty] private ObservableCollection<KeyMapping> _mappings = new();
 
     public CoreProfile ToCoreProfile()
@@ -199,6 +300,7 @@ public partial class Profile : ObservableObject
             Id = Id,
             Name = Name,
             DeviceHardwareId = DeviceHardwareId,
+            TargetProcessName = TargetProcessName,
             Mappings = Mappings.Select(m => m.ToCoreMapping()).ToList(),
             ModifiedAt = DateTime.UtcNow
         };
@@ -210,7 +312,8 @@ public partial class Profile : ObservableObject
         {
             Id = core.Id,
             Name = core.Name,
-            DeviceHardwareId = core.DeviceHardwareId
+            DeviceHardwareId = core.DeviceHardwareId,
+            TargetProcessName = core.TargetProcessName
         };
         foreach (var m in core.Mappings)
         {

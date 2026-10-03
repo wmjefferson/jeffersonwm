@@ -62,9 +62,9 @@ export async function renderSettings(container) {
         <div class="status-bar__mood" id="sb-mood">😐</div>
 
         <div class="status-bar__actions">
-          <button class="btn btn--ghost btn--sm" id="btn-admin-hub" title="Admin Hub">⚔️ Admin Hub</button>
+          <button class="btn btn--ghost btn--sm" id="btn-admin-hub" title="Dashboard">⚔️ Dashboard</button>
           <button class="btn btn--ghost btn--sm" id="btn-public" title="Public View">🌍 Public</button>
-          <button class="btn btn--ghost btn--sm" id="btn-logout" title="Logout">🚪</button>
+          <button class="btn btn--ghost btn--sm" id="btn-logout" title="Sign Out">Sign Out</button>
         </div>
       </div>
     </div>
@@ -151,7 +151,7 @@ export async function renderSettings(container) {
             <div id="settings-editor-container"></div>
           </div>
 
-          <!-- Master Template Pane (Preferred Admin Only) -->
+          <!-- Master Template Pane (Owner Only) -->
           <div class="settings-pane" id="pane-template" style="display:none;">
             <div id="settings-template-container"></div>
           </div>
@@ -168,7 +168,7 @@ export async function renderSettings(container) {
     navigate('#login');
   });
 
-  // Check auth level for Preferred Admin tab
+  // Check auth level for Owner tab
   try {
     const authCheck = await auth.check();
     if (authCheck?.isOwner) {
@@ -452,7 +452,7 @@ function updateStatusBar() {
   if (xpText) xpText.textContent = `${xp}/${xpNext}`;
 }
 
-// ─── Master Startup Template Manager (Preferred Admin) ──────────────
+// ─── Master Startup Template Manager (Owner) ──────────────
 
 async function renderTemplateManager(container) {
   container.innerHTML = '<div style="padding:20px; opacity:0.6;">Loading Master Startup Template data...</div>';

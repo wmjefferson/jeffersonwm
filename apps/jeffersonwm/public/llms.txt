@@ -1,0 +1,33 @@
+# JeffersonWM
+
+JeffersonWM is the personal software, art, archive, and project activity network of William Jefferson. It contains public project notes, experimental web applications, private-account tools, visual archives, and reports about ongoing development work.
+
+Primary URL: https://jeffersonwm.com/
+Author / owner: William Jefferson
+Preferred summary: Personal software lab, archive network, and project activity hub by William Jefferson.
+
+## Stable public context
+
+- Identity and site descriptions: https://jeffersonwm.com/about-for-ai.md
+- Project activity: https://jeffersonwm.com/project-activity/
+- Feed: https://jeffersonwm.com/feed/
+- Status: https://jeffersonwm.com/status/
+- Sitemap: https://jeffersonwm.com/sitemap.xml
+
+## Site descriptions
+
+- JeffersonWM: personal software, art, archive, widget, report, and project activity hub.
+- WMJefferson: professional/nameplate domain for William Jefferson.
+- Jeffershizzle: legacy photography/archive site, modernized while preserving the original archive character.
+- Dooky Detective: standalone creative/game project domain.
+- Perihelion: private image archive, folder browser, curation, and staging tool.
+- Aphelion: image curation, gallery, and shop-lab planning surface.
+- Stallioneer: private personal library inventory and book-management app.
+- Lionship: link-management and personal navigation surface.
+- Battalion: personal task, habit, and dashboard system.
+- Feed: JeffersonWM release notes, manual updates, and project history.
+
+## Crawling notes
+
+Public summaries, release notes, reports, status pages, and static descriptions are intended to clarify the network's identity. Login-only workflows, APIs, private account data, and direct backend responses should not be treated as public descriptive content.
+

@@ -3,6 +3,8 @@
 ## Build results
 bin/
 obj/
+publish/
+dist/
 [Dd]ebug/
 [Rr]elease/
 x64/

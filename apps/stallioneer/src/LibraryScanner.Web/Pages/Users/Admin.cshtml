@@ -1,7 +1,7 @@
-@page "/Options"
+@page "/Control"
 @model LibraryScanner.Web.Pages.Users.AdminModel
 @{
-    ViewData["Title"] = "Options";
+    ViewData["Title"] = "Control";
 }
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -9,12 +9,19 @@
     <div class="alert alert-success">@Model.StatusMessage</div>
 }
 
-<p class="options-status-row" aria-label="Library status">
-    <span><strong>@Model.Snapshot.TotalBooks</strong> Books</span>
-    <span><strong>@Model.Snapshot.TotalItems</strong> Items</span>
-    <span><strong>@Model.Snapshot.TotalTags</strong> Tags</span>
-    <span><strong>@Model.Snapshot.TotalCollections</strong> Collections</span>
-</p>
+<section class="peri-page-shell" data-page-tabs>
+    <header class="peri-page-header">
+        <div>
+            <h1>Control</h1>
+            <p>Manage inventory labels, groupings, and physical locations</p>
+        </div>
+    </header>
+
+    <nav class="peri-page-tabs" aria-label="Control sections">
+        <button type="button" class="peri-page-tab is-active" data-page-tab="tags" aria-pressed="true">Tags (@Model.Tags.Count)</button>
+        <button type="button" class="peri-page-tab" data-page-tab="collections" aria-pressed="false">Collections (@Model.Collections.Count)</button>
+        <button type="button" class="peri-page-tab" data-page-tab="locations" aria-pressed="false">Locations (@Model.Locations.Count)</button>
+    </nav>
 
 @* App snapshot is intentionally retained for a future Options pass.
 <section class="entry-grid">
@@ -47,12 +54,12 @@
 </section>
 *@
 
-<section class="bulk-admin-grid">
-    <details class="details-accordion panel options-panel">
-        <summary class="details-accordion__summary">
-            <h2>Tags</h2>
-        </summary>
-        <div class="details-accordion__body">
+    <section class="peri-tab-panel is-active" data-page-tab-panel="tags">
+        <div class="peri-section-heading">
+            <h2>Tag Management</h2>
+            <p>Create, rename, color, or remove tags across your visible library.</p>
+        </div>
+        <div class="panel options-panel">
             <form method="post" class="tag-admin-form">
                 <input asp-for="NewTag.Name" class="form-control" placeholder="paper | paperback, hard | hardcover" autocomplete="off" />
                 <input asp-for="NewTag.Description" class="form-control" placeholder="Optional tag note or meaning" />
@@ -104,13 +111,14 @@
                 </table>
             </div>
         </div>
-    </details>
+    </section>
 
-    <details class="details-accordion panel options-panel">
-        <summary class="details-accordion__summary">
+    <section class="peri-tab-panel" data-page-tab-panel="collections" hidden>
+        <div class="peri-section-heading">
             <h2>Collections</h2>
-        </summary>
-        <div class="details-accordion__body">
+            <p>Create and edit curated groupings that can be opened from Inventory.</p>
+        </div>
+        <div class="panel options-panel">
             <form method="post" asp-page-handler="CreateCollection" class="inline-form wide-inline-form">
                 <input asp-for="NewCollection.Name" class="form-control" placeholder="Collection name" />
                 <input asp-for="NewCollection.Description" class="form-control" placeholder="Optional note" />
@@ -164,13 +172,14 @@
                 </table>
             </div>
         </div>
-    </details>
+    </section>
 
-    <details class="details-accordion panel options-panel">
-        <summary class="details-accordion__summary">
+    <section class="peri-tab-panel" data-page-tab-panel="locations" hidden>
+        <div class="peri-section-heading">
             <h2>Locations</h2>
-        </summary>
-        <div class="details-accordion__body">
+            <p>Maintain shelf, box, room, or other location names used by book entries and copies.</p>
+        </div>
+        <div class="panel options-panel">
             <form method="post" asp-page-handler="CreateLocation" class="inline-form wide-inline-form">
                 <input asp-for="NewLocation.Name" class="form-control" placeholder="Location name" />
                 <input asp-for="NewLocation.Description" class="form-control" placeholder="Optional note" />
@@ -220,67 +229,7 @@
                 </table>
             </div>
         </div>
-    </details>
-</section>
-
-<section class="bulk-admin-grid">
-    <details class="details-accordion panel options-panel" open>
-        <summary class="details-accordion__summary">
-            <h2>Export</h2>
-        </summary>
-        <div class="details-accordion__body">
-            <div class="options-export-grid">
-                <form method="post" asp-page-handler="Export" class="inline-form export-form export-form--simple">
-                    <div class="field-stack">
-                        <label>Full export</label>
-                    </div>
-                    <button type="submit" class="btn btn-outline-secondary">Export CSV</button>
-                </form>
-
-                <form method="post" asp-page-handler="ExportPdf" class="pdf-export-form export-form options-export-grid__pdf">
-                    <div class="field-stack">
-                        <label>Export PDF</label>
-                        <div class="export-field-list">
-                            @foreach (var field in Model.ExportFields)
-                            {
-                                var isChecked = LibraryScanner.Web.Services.InventoryExportField.DefaultPdfKeys.Contains(field.Key);
-                                <label class="checkbox-pill checkbox-pill--toggle">
-                                    <input type="checkbox" name="PdfFieldKeys" value="@field.Key" checked="@isChecked" />
-                                    <span>@field.Label</span>
-                                </label>
-                            }
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-outline-secondary">Export PDF</button>
-                </form>
-
-                @*
-                <form method="post" asp-page-handler="ExportLog" class="export-log-form export-form">
-                    <div class="field-stack">
-                        <label>Export log</label>
-                        <span class="form-hint">Downloads inventory actions over a custom date range.</span>
-                        <div class="field-grid export-log-range">
-                            <div>
-                                <label asp-for="LogStartDate">From</label>
-                                <input asp-for="LogStartDate" type="date" class="form-control" />
-                            </div>
-                            <div>
-                                <label asp-for="LogEndDate">To</label>
-                                <input asp-for="LogEndDate" type="date" class="form-control" />
-                            </div>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-outline-secondary">Export log CSV</button>
-                </form>
-                *@
-
-                @*
-                Import is paused while account-level inventory separation is settling.
-                Keep this form here so it can be restored without rebuilding the import handler.
-                *@
-            </div>
-        </div>
-    </details>
+    </section>
 </section>
 
 @section Scripts {

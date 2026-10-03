@@ -21,14 +21,32 @@ async function resolveTargetUserId(req) {
   return 1;
 }
 
-// GET /api/actions — list all actions, optionally filtered (taxonomy is global)
+// GET /api/actions — list all actions, optionally filtered (master + user-scoped)
 router.get('/', async (req, res) => {
   try {
     const { category, time } = req.query;
+    const targetUserId = await resolveTargetUserId(req);
+
     let query = 'SELECT * FROM actions WHERE is_active = 1';
     const params = [];
-    if (category) { query += ' AND category = ?'; params.push(category); }
-    const [actions] = await db.execute(query + ' ORDER BY category, label', params);
+
+    if (targetUserId === 2) {
+      // Master Template: only global master actions
+      query += ' AND user_id IS NULL';
+    } else if (targetUserId) {
+      // Specific user: global master actions PLUS their personal actions
+      query += ' AND (user_id IS NULL OR user_id = ?)';
+      params.push(targetUserId);
+    } else {
+      query += ' AND user_id IS NULL';
+    }
+
+    if (category) {
+      query += ' AND category = ?';
+      params.push(category);
+    }
+
+    const [actions] = await db.execute(query + ' ORDER BY (category = \'personal\') DESC, category, label', params);
     let filtered = actions;
     if (time) {
       filtered = actions.filter(a => {
@@ -612,11 +630,13 @@ router.post('/', requireAuth, async (req, res) => {
     const action_id = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
     const [[existing]] = await db.execute('SELECT action_id FROM actions WHERE action_id = ?', [action_id]);
     if (existing) return res.status(409).json({ error: 'Action with this ID already exists' });
+    const isGlobal = Boolean(req.body.is_global && req.isOwner);
+    const assignedUserId = isGlobal ? null : req.userId;
     await db.execute(
-      `INSERT INTO actions (action_id, label, category, energy_delta, stress_delta, money_delta, social_delta, health_delta, hygiene_delta, fun_delta, discipline_delta, time_minutes, location, time_of_day, repeatable, related_motives, needs, prerequisites)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO actions (user_id, action_id, label, category, energy_delta, stress_delta, money_delta, social_delta, health_delta, hygiene_delta, fun_delta, discipline_delta, time_minutes, location, time_of_day, repeatable, related_motives, needs, prerequisites)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        action_id, label, category, energy_delta||0, stress_delta||0, money_delta||0, social_delta||0, health_delta||0, hygiene_delta||0, fun_delta||0, discipline_delta||0,
+        assignedUserId, action_id, label, category, energy_delta||0, stress_delta||0, money_delta||0, social_delta||0, health_delta||0, hygiene_delta||0, fun_delta||0, discipline_delta||0,
         time_minutes||5, location||'any', JSON.stringify(time_of_day||['any']), repeatable?1:0, JSON.stringify(related_motives||[]), JSON.stringify(needs||[]), JSON.stringify(prerequisites||[])
       ]
     );

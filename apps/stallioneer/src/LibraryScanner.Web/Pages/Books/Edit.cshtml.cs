@@ -97,7 +97,7 @@ public class EditModel(
         book.InfoUrl = Input.InfoUrl;
         book.UpdatedAt = DateTimeOffset.UtcNow;
 
-        var account = new InventoryAccount(book.OwnerAuthId, book.OwnerUsername, inventoryAccess.GetAccount(User).IsPreferredAdmin);
+        var account = new InventoryAccount(book.OwnerAuthId, book.OwnerUsername, inventoryAccess.GetAccount(User).IsOwner);
         await SyncCopiesAsync(book);
         await SyncBookTagsAsync(book, Input.TagNames, account);
         SyncAdditionalInfos(book);
@@ -207,7 +207,7 @@ public class EditModel(
             copy.Status = inputCopy.Status;
             copy.Notes = string.IsNullOrWhiteSpace(inputCopy.Notes) ? null : inputCopy.Notes.Trim();
             copy.UpdatedAt = DateTimeOffset.UtcNow;
-            var account = new InventoryAccount(book.OwnerAuthId, book.OwnerUsername, inventoryAccess.GetAccount(User).IsPreferredAdmin);
+            var account = new InventoryAccount(book.OwnerAuthId, book.OwnerUsername, inventoryAccess.GetAccount(User).IsOwner);
             await SyncCopyTagsAsync(copy, inputCopy.TagNames, account);
         }
 
@@ -228,7 +228,7 @@ public class EditModel(
                 BookCopyTags = []
             };
             book.Copies.Add(newCopy);
-            var account = new InventoryAccount(book.OwnerAuthId, book.OwnerUsername, inventoryAccess.GetAccount(User).IsPreferredAdmin);
+            var account = new InventoryAccount(book.OwnerAuthId, book.OwnerUsername, inventoryAccess.GetAccount(User).IsOwner);
             await SyncCopyTagsAsync(newCopy, source.TagNames, account);
         }
 

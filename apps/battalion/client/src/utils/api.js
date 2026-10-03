@@ -60,8 +60,17 @@ export const auth = {
     });
   },
 
-  logout() {
+  async logout() {
     localStorage.removeItem('battalion_acting_user_id');
+    sessionStorage.setItem('battalion_logged_out', 'true');
+    try {
+      await fetch('https://auth.jeffersonwm.com/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteContext: 'https://jeffersonwm.com/battalion/' })
+      });
+    } catch (_) {}
     return api('/auth/logout', { method: 'POST' });
   },
 

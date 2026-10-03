@@ -18,8 +18,8 @@
     <div class="alert alert-info">@Model.StatusMessage</div>
 }
 
-<section class="bulk-manage-grid">
-    <section class="panel bulk-manage-panel">
+<section class="options-manage-grid">
+    <section class="panel options-manage-panel">
         <h2>Tags</h2>
         <form method="post" class="tag-admin-form" id="tag-create-form">
             <div class="tag-input-stack">
@@ -80,7 +80,7 @@
         </div>
     </section>
 
-    <section class="panel bulk-manage-panel">
+    <section class="panel options-manage-panel">
         <h2>Collections</h2>
         <form method="post" asp-page-handler="CreateCollection" class="inline-form wide-inline-form">
             <input asp-for="NewCollection.Name" class="form-control" placeholder="Collection name" />

@@ -28,6 +28,239 @@
                 </Grid>
             </GroupBox>
 
+            <!-- Keypads & Devices Overview -->
+            <GroupBox Header="Keypads &amp; Devices Overview">
+                <StackPanel>
+                    <TextBlock Text="Manage and inspect all connected keyboards and keypads, view hardware properties, toggle visibility in the Devices tab, and view any mapped key actions."
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,10"/>
+
+                    <!-- Device Selector Dropdown -->
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Select Device:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,12,0"/>
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding DeviceOverviews}" SelectedItem="{Binding SelectedDeviceOverview}" DisplayMemberPath="DisplayTitle"/>
+                        <Button Grid.Column="2" Content="🔄 Rescan Devices" Command="{Binding RefreshConfigOverviewCommand}" Style="{StaticResource SecondaryButton}" Margin="10,0,0,0"/>
+                    </Grid>
+
+                    <!-- Selected Device Properties Card -->
+                    <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="14,12" Margin="0,0,0,10"
+                            Visibility="{Binding SelectedDeviceOverview, Converter={StaticResource BoolToVis}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <!-- Device Friendly Name and Status Badges -->
+                                <WrapPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="{Binding SelectedDeviceOverview.CategoryIcon}" FontSize="15" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding SelectedDeviceOverview.FriendlyName}" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                                    <!-- Master Keyboard Badge -->
+                                    <Border Background="{DynamicResource InfoBrush}" CornerRadius="3" Padding="6,2" Margin="0,0,6,0" VerticalAlignment="Center"
+                                            Visibility="{Binding SelectedDeviceOverview.IsMaster, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="🛡️ Master Keyboard" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                                    </Border>
+
+                                    <!-- Activated Keypad Badge -->
+                                    <Border Background="{DynamicResource PrimaryAccentBrush}" CornerRadius="3" Padding="6,2" Margin="0,0,6,0" VerticalAlignment="Center"
+                                            Visibility="{Binding SelectedDeviceOverview.IsMacroPad, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="⚡ Activated Keypad" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                                    </Border>
+
+                                    <!-- Inactive Standard Keyboard Badge -->
+                                    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="3" Padding="6,2" Margin="0,0,6,0" VerticalAlignment="Center"
+                                            Visibility="{Binding SelectedDeviceOverview.IsInactive, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="⌨ Standard Typing (Inactive)" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                                    </Border>
+
+                                    <!-- Hidden Badge -->
+                                    <Border Background="{DynamicResource WarningBrush}" CornerRadius="3" Padding="6,2" Margin="0,0,6,0" VerticalAlignment="Center"
+                                            Visibility="{Binding SelectedDeviceOverview.IsDeviceHidden, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="🚫 Hidden from Devices Tab" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                                    </Border>
+                                </WrapPanel>
+
+                                <!-- Hardware ID -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="Hardware ID: " Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
+                                    <TextBlock Text="{Binding SelectedDeviceOverview.HardwareId, TargetNullValue='(Global / Not locked to specific hardware)'}" 
+                                               FontFamily="Consolas, Segoe UI Mono, monospace" FontSize="11" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <!-- Connection & Category -->
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Connection: " Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
+                                    <TextBlock Text="{Binding SelectedDeviceOverview.ConnectionType}" FontSize="12" Margin="0,0,16,0"/>
+                                    <TextBlock Text="Category: " Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
+                                    <TextBlock Text="{Binding SelectedDeviceOverview.DeviceCategory}" FontSize="12"/>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Mappings Count Badge if has mappings -->
+                                <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="10,6" Margin="0,0,10,0"
+                                        Visibility="{Binding SelectedDeviceOverview.HasMappings, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding SelectedDeviceOverview.MappingsCount, StringFormat='{}{0} Mapped Action(s)'}" FontWeight="Bold" Foreground="{DynamicResource PrimaryAccentBrush}"/>
+                                </Border>
+
+                                <!-- Hide/Unhide Button -->
+                                <Button Command="{Binding ToggleHideCurrentDeviceCommand}" Style="{StaticResource SecondaryButton}" Padding="12,6"
+                                        Visibility="{Binding SelectedDeviceOverview.CanHide, Converter={StaticResource BoolToVis}}">
+                                    <Button.Content>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="👁️‍🗨️ Unhide in Devices Tab" Foreground="{DynamicResource PrimaryAccentBrush}" FontWeight="SemiBold"
+                                                       Visibility="{Binding SelectedDeviceOverview.IsDeviceHidden, Converter={StaticResource BoolToVis}}"/>
+                                            <TextBlock Text="👁 Hide from Devices Tab" Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Visibility="{Binding SelectedDeviceOverview.IsDeviceHidden, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
+                                        </StackPanel>
+                                    </Button.Content>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Informational Card: Master Keyboard -->
+                    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,10"
+                            Visibility="{Binding SelectedDeviceOverview.IsMaster, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🛡️" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Master Laptop / Primary Typing Keyboard" FontWeight="Bold" FontSize="12" Margin="0,0,0,2"/>
+                                <TextBlock Text="This keyboard is protected from raw input interception to guarantee you never lose control of Windows. Keystrokes pass through natively." 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Informational Card: Inactive Standard Keyboard -->
+                    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,10"
+                            Visibility="{Binding SelectedDeviceOverview.IsInactive, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⌨️" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Standard Typing Device (Not Intercepted)" FontWeight="Bold" FontSize="12" Margin="0,0,0,2"/>
+                                <TextBlock Text="This device functions as a standard typing keyboard. To turn it into an independent macro pad with custom shortcuts, go to the Devices tab and click 'Make Active'." 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Informational Card: Activated Macro Pad with no keys mapped yet -->
+                    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,10"
+                            Visibility="{Binding SelectedDeviceOverview.ShowEmptyMacroPadNotice, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚡" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Activated Macro Pad (No Keys Mapped Yet)" FontWeight="Bold" FontSize="12" Margin="0,0,0,2"/>
+                                <TextBlock Text="This keypad is active and intercepted! Go to the 'Key Map' tab to assign hotkeys, text typing, macros, or web actions to its keys." 
+                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Mappings Table / List (Visible if HasMappings) -->
+                    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10"
+                            Visibility="{Binding SelectedDeviceOverview.HasMappings, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <!-- Profile Title if assigned -->
+                            <StackPanel Orientation="Horizontal" Margin="4,0,0,8">
+                                <TextBlock Text="Active Profile: " Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
+                                <TextBlock Text="{Binding SelectedDeviceOverview.ProfileName, TargetNullValue='(Default Profile)'}" FontWeight="Bold" FontSize="12"/>
+                            </StackPanel>
+
+                            <!-- Column Headers -->
+                            <Grid Margin="6,0,6,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140"/>
+                                    <ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Physical Key" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Grid.Column="1" Text="Scan Code" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Grid.Column="2" Text="Type" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Grid.Column="3" Text="Assigned Keystroke / Macro / Action" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </Grid>
+
+                            <!-- Items List -->
+                            <ItemsControl ItemsSource="{Binding SelectedDeviceOverview.Mappings}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="8,6" Margin="0,0,0,4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="140"/>
+                                                    <ColumnDefinition Width="90"/>
+                                                    <ColumnDefinition Width="100"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <!-- Key Name -->
+                                                <TextBlock Text="{Binding KeyName}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                <!-- Scan Code -->
+                                                <TextBlock Grid.Column="1" Text="{Binding ScanCodeHex}" FontFamily="Consolas, Segoe UI Mono, monospace" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                                <!-- Action Type Badge -->
+                                                <Border Grid.Column="2" CornerRadius="3" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center" Background="{DynamicResource SurfaceBrush}">
+                                                    <TextBlock Text="{Binding ActionType}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryAccentBrush}"/>
+                                                </Border>
+                                                <!-- Action Summary -->
+                                                <TextBlock Grid.Column="3" Text="{Binding ActionSummary}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Hidden Keyboards List Drawer -->
+                    <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,10,0,0"
+                            Visibility="{Binding HasHiddenDevices, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="🚫 Hidden Keyboards (Excluded from Devices tab):" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
+                            <ItemsControl ItemsSource="{Binding HiddenDevices}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="8,6" Margin="0,0,0,4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="⌨" FontSize="13" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding FriendlyName}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                    <TextBlock Text="{Binding HardwareId}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" FontFamily="Consolas, monospace" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Unhide" Command="{Binding DataContext.UnhideDeviceCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding HardwareId}"
+                                                        Style="{StaticResource SecondaryButton}" Padding="10,3" FontSize="11"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Automation & Display Settings -->
+            <GroupBox Header="Automation &amp; On-Screen Display (OSD)">
+                <StackPanel>
+                    <CheckBox Content="Automatic Profile Switching (app detection)" IsChecked="{Binding AutoProfileSwitching}" FontWeight="SemiBold"/>
+                    <TextBlock Text="Instantly switches the active profile based on the foreground application (sub-millisecond latency with 0% CPU). Set the target application for each profile in the Key Map tab." 
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="22,2,0,12"/>
+
+                    <CheckBox Content="Show On-Screen Display (OSD) overlay panel" IsChecked="{Binding ShowOsdOverlay}" FontWeight="SemiBold"/>
+                    <TextBlock Text="Displays a compact floating HUD in the corner showing the active profile and last button pressed. Never steals keyboard focus. Can also be toggled from the notification tray." 
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="22,2,0,4"/>
+                </StackPanel>
+            </GroupBox>
+
             <!-- General Settings -->
             <GroupBox Header="General">
                 <StackPanel>
@@ -59,6 +292,36 @@
                         <Slider Minimum="0" Maximum="10" Value="{Binding StartupDelaySeconds}" Width="200" VerticalAlignment="Center" Margin="0,0,10,0" TickFrequency="1" IsSnapToTickEnabled="True"/>
                         <TextBlock Text="{Binding StartupDelaySeconds, StringFormat='{}{0} seconds'}" VerticalAlignment="Center"/>
                     </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <!-- Browser Companion Extension -->
+            <GroupBox Header="Browser Companion Extension">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Grid.Column="0">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <TextBlock Text="Status: " FontWeight="Bold"/>
+                            <TextBlock Text="🟢 Connected" Foreground="{DynamicResource SuccessBrush}" FontWeight="Bold" Visibility="{Binding IsBrowserConnected, Converter={StaticResource BoolToVis}}"/>
+                            <TextBlock Text="🔴 Disconnected" Foreground="{DynamicResource ErrorBrush}" FontWeight="Bold" Visibility="{Binding IsBrowserConnected, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
+                        </StackPanel>
+                        <TextBlock Text="The Lionfish Companion Extension connects your keypad directly to Chrome or Edge for 1-click web automation (e.g. Google Docs highlighting)." TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6"/>
+                        <TextBlock Text="To install: Open chrome://extensions or edge://extensions, enable 'Developer mode', and click 'Load unpacked' selecting the folder below." TextWrapping="Wrap" Foreground="{DynamicResource PrimaryAccentBrush}" FontSize="12"/>
+                    </StackPanel>
+
+                    <Button Grid.Row="0" Grid.Column="1" Content="Open Folder" Command="{Binding OpenExtensionFolderCommand}" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+
+                    <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,8,0,0">
+                        <TextBlock Text="{Binding ExtensionFolderPath}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                    </Border>
                 </Grid>
             </GroupBox>
 

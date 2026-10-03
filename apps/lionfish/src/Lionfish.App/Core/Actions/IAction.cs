@@ -13,7 +13,9 @@ public enum ActionType
     Media,
     Macro,
     Shell,
-    Multi
+    Multi,
+    Web,
+    Sequence
 }
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
@@ -22,6 +24,8 @@ public enum ActionType
 [JsonDerivedType(typeof(LaunchAction), "launch")]
 [JsonDerivedType(typeof(MediaAction), "media")]
 [JsonDerivedType(typeof(Lionfish.Core.Macros.MacroAction), "macro")]
+[JsonDerivedType(typeof(WebAction), "web")]
+[JsonDerivedType(typeof(SequenceAction), "sequence")]
 public interface IAction
 {
     string DisplayName { get; }

@@ -6,6 +6,84 @@ document.addEventListener("DOMContentLoaded", () => {
     const returnTo = `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
     let authPopupPoll = null;
 
+    const applyThemePreference = (theme) => {
+        const normalizedTheme = ["light", "dark", "system"].includes(theme) ? theme : "system";
+        document.documentElement.dataset.theme = normalizedTheme;
+        localStorage.setItem("stallioneer-theme", normalizedTheme);
+        document.querySelectorAll("[data-theme-choice]").forEach((button) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            const isActive = button.dataset.themeChoice === normalizedTheme;
+            button.classList.toggle("is-active", isActive);
+            button.setAttribute("aria-pressed", String(isActive));
+        });
+    };
+
+    applyThemePreference(localStorage.getItem("stallioneer-theme") || document.documentElement.dataset.theme || "system");
+
+    document.querySelectorAll("[data-theme-choice]").forEach((button) => {
+        button.addEventListener("click", () => {
+            if (button instanceof HTMLButtonElement) {
+                applyThemePreference(button.dataset.themeChoice || "system");
+            }
+        });
+    });
+
+    document.querySelectorAll("[data-page-tabs]").forEach((tabRoot) => {
+        if (!(tabRoot instanceof HTMLElement)) {
+            return;
+        }
+
+        const tabButtons = Array.from(tabRoot.querySelectorAll("[data-page-tab]"))
+            .filter((button) => button instanceof HTMLButtonElement);
+        const panels = Array.from(tabRoot.querySelectorAll("[data-page-tab-panel]"))
+            .filter((panel) => panel instanceof HTMLElement);
+        const availableTabs = tabButtons.map((button) => button.dataset.pageTab).filter(Boolean);
+
+        const activateTab = (tabName, updateHash = true) => {
+            const nextTab = availableTabs.includes(tabName) ? tabName : availableTabs[0];
+            if (!nextTab) {
+                return;
+            }
+
+            tabButtons.forEach((button) => {
+                const isActive = button.dataset.pageTab === nextTab;
+                button.classList.toggle("is-active", isActive);
+                button.setAttribute("aria-pressed", String(isActive));
+            });
+
+            panels.forEach((panel) => {
+                const isActive = panel.dataset.pageTabPanel === nextTab;
+                panel.classList.toggle("is-active", isActive);
+                panel.hidden = !isActive;
+            });
+
+            if (updateHash) {
+                window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}#${nextTab}`);
+            }
+        };
+
+        tabButtons.forEach((button) => {
+            button.addEventListener("click", () => activateTab(button.dataset.pageTab || ""));
+        });
+
+        activateTab(window.location.hash.replace(/^#/, ""), false);
+    });
+
+    document.querySelector("[data-delete-library-form]")?.addEventListener("submit", (event) => {
+        const form = event.currentTarget;
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const deleteCount = form.getAttribute("data-delete-count") || "0";
+        if (!window.confirm(`Delete ${deleteCount} library entries? This cannot be undone.`)) {
+            event.preventDefault();
+        }
+    });
+
     const stopAuthPopupPoll = () => {
         if (authPopupPoll !== null) {
             window.clearInterval(authPopupPoll);
@@ -429,7 +507,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const selectAll = document.querySelector("[data-select-all]");
     if (selectAll instanceof HTMLInputElement) {
         const getItems = () => Array.from(document.querySelectorAll("[data-select-item]"))
-            .filter((item) => item instanceof HTMLInputElement);
+            .filter((item) => {
+                if (!(item instanceof HTMLInputElement)) {
+                    return false;
+                }
+
+                const row = item.closest("tr");
+                return !(row instanceof HTMLTableRowElement) || !row.hidden;
+            });
 
         const syncSelectAllState = () => {
             const items = getItems();
@@ -461,6 +546,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const sortInput = document.querySelector("[data-inventory-sort-value]");
         const pageNumberInput = document.querySelector("[data-inventory-page-number]");
         const pageSizeInput = document.querySelector("[data-inventory-page-size]");
+        const tagModeInput = document.querySelector("[data-inventory-tag-mode-value]");
         const queryInput = document.querySelector("[data-inventory-query]");
         const clearButton = document.querySelector("[data-inventory-filter-clear]");
         const pager = document.querySelector("[data-inventory-pager]");
@@ -491,6 +577,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const query = queryInput instanceof HTMLInputElement ? queryInput.value.trim() : "";
             const sort = sortInput instanceof HTMLInputElement ? sortInput.value || "title" : "title";
             const pageSize = pageSizeInput instanceof HTMLSelectElement ? pageSizeInput.value : "50";
+            const tagMode = tagModeInput instanceof HTMLInputElement ? tagModeInput.value || "and" : "and";
 
             if (includeHandler) {
                 params.set("handler", "InventoryData");
@@ -501,6 +588,7 @@ document.addEventListener("DOMContentLoaded", () => {
             params.set("sort", sort);
             params.set("pageSize", pageSize);
             params.set("pageNumber", String(pageNumber));
+            params.set("tagMode", tagMode);
             selectedValues("TagIds").forEach((value) => params.append("tagIds", value));
             selectedValues("CollectionIds").forEach((value) => params.append("collectionIds", value));
             selectedValues("LocationIds").forEach((value) => params.append("locationIds", value));
@@ -559,17 +647,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     ? `<img src="${escapeHtml(book.coverImageUrl)}" alt="" />`
                     : '<div class="cover-placeholder"></div>';
                 const collections = (book.collections ?? [])
-                    .map((collection) => `<span class="collection-pill">${escapeHtml(collection)}</span>`)
+                    .map((collection) => `<span class="collection-pill">${escapeHtml(collection.name ?? collection.Name ?? collection)}</span>`)
                     .join("");
                 const tags = (book.tags ?? [])
                     .map((tag) => {
                         const color = /^#[0-9a-f]{3,8}$/i.test(tag.color ?? "") ? tag.color : "#60708b";
-                        return `<span class="tag-pill" style="--tag-color:${color}">${escapeHtml(tag.name)}</span>`;
+                        return `<span class="tag-pill" style="--tag-color:${color}">${escapeHtml(tag.name ?? tag.Name ?? "")}</span>`;
                     })
                     .join("");
 
                 return `<tr>
-                    <td class="selection-column"><input type="checkbox" name="SelectedBookIds" value="${book.id}" data-select-item aria-label="Select ${title}" /></td>
+                    <td class="selection-column"><input type="checkbox" name="SelectedBookIds" value="${book.id}" data-select-item data-book-id="${book.id}" aria-label="Select ${title}" /></td>
                     <td><div class="book-cell">${cover}<div><div class="copy-line"><a class="book-title-link" href="/Books/Edit?id=${book.id}"><strong>${title}</strong></a><button type="button" class="copy-button" data-copy-text="${escapeHtml(titleAuthor)}" title="Copy title and author" aria-label="Copy title and author"><span class="copy-icon" aria-hidden="true"></span></button></div><span>${authors}</span>${publisherLine}</div></div></td>
                     <td><div class="copy-line"><span>${escapeHtml(book.isbn13)}</span><button type="button" class="copy-button" data-copy-text="${escapeHtml(book.isbn13)}" title="Copy ISBN" aria-label="Copy ISBN"><span class="copy-icon" aria-hidden="true"></span></button></div></td>
                     <td>${escapeHtml(book.quantity)}</td>
@@ -629,6 +717,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const data = await response.json();
                 renderBooks(data.books);
+                document.dispatchEvent(new CustomEvent("inventory:books-rendered", {
+                    detail: {
+                        books: data.books,
+                        filteredCount: data.filteredCount
+                    }
+                }));
                 renderPager(data);
                 updateFilterLabel();
                 updateBrowserUrl();
@@ -698,6 +792,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (sortInput instanceof HTMLInputElement) {
                 sortInput.value = "title";
+            }
+            if (tagModeInput instanceof HTMLInputElement) {
+                tagModeInput.value = "and";
             }
             inventoryFilterForm.querySelectorAll('input[name="TagIds"], input[name="CollectionIds"], input[name="LocationIds"], input[name="Statuses"]').forEach((input) => {
                 if (input instanceof HTMLInputElement) {
@@ -897,21 +994,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
     initializeLiveTagEditors(document);
 
-    const bulkSelectionPanel = document.querySelector("[data-bulk-selection-panel]");
-    if (bulkSelectionPanel instanceof HTMLElement) {
-        const rawBulkSelectionData = document.getElementById("bulk-selection-data")?.textContent ?? "[]";
-        const bulkBooks = JSON.parse(rawBulkSelectionData);
-        const bulkBookMap = new Map(bulkBooks.map((book) => [String(book.id ?? book.Id), book]));
-        const selectedCountText = bulkSelectionPanel.querySelector("[data-selected-count-text]");
-        const emptyState = bulkSelectionPanel.querySelector("[data-bulk-empty-state]");
-        const sharedSection = bulkSelectionPanel.querySelector("[data-bulk-shared]");
-        const sharedTags = bulkSelectionPanel.querySelector("[data-shared-tags]");
-        const sharedCollections = bulkSelectionPanel.querySelector("[data-shared-collections]");
-        const sharedStatus = bulkSelectionPanel.querySelector("[data-shared-status]");
-        const sharedLocation = bulkSelectionPanel.querySelector("[data-shared-location]");
-        const selectionInputs = Array.from(document.querySelectorAll("[data-select-item]"))
-            .filter((item) => item instanceof HTMLInputElement);
+    const inventorySelectionPanel = document.querySelector("[data-inventory-selection-panel]");
+    if (inventorySelectionPanel instanceof HTMLElement) {
+        const rawInventorySelectionData = document.getElementById("inventory-selection-data")?.textContent ?? "[]";
+        let inventoryBooks = JSON.parse(rawInventorySelectionData);
+        let inventoryBookMap = new Map(inventoryBooks.map((book) => [String(book.id ?? book.Id), book]));
+        const selectedCountText = inventorySelectionPanel.querySelector("[data-inventory-selected-count]");
+        const visibleCountText = inventorySelectionPanel.querySelector("[data-inventory-visible-count]");
+        const emptyState = inventorySelectionPanel.querySelector("[data-inventory-empty-state]");
+        const sharedSection = inventorySelectionPanel.querySelector("[data-inventory-selection-shared]");
+        const sharedTags = inventorySelectionPanel.querySelector("[data-inventory-shared-tags]");
+        const sharedCollections = inventorySelectionPanel.querySelector("[data-inventory-shared-collections]");
+        const sharedStatus = inventorySelectionPanel.querySelector("[data-inventory-shared-status]");
+        const sharedLocation = inventorySelectionPanel.querySelector("[data-inventory-shared-location]");
+        const tagModeInput = document.querySelector("[data-inventory-tag-mode-value]");
+        const inventoryFilterForm = document.querySelector("[data-inventory-filter-form]");
+        const tagModeButtons = Array.from(document.querySelectorAll("[data-inventory-tag-mode]"))
+            .filter((button) => button instanceof HTMLButtonElement);
 
+        const getSelectionInputs = () => Array.from(document.querySelectorAll("[data-select-item]"))
+            .filter((item) => item instanceof HTMLInputElement);
+        const selectedTagIds = () => Array.from(document.querySelectorAll('input[name="TagIds"]:checked'))
+            .filter((input) => input instanceof HTMLInputElement)
+            .map((input) => input.value);
         const distinctValues = (values) => Array.from(new Set(values.filter((value) => value && value.length > 0)));
         const getIntersection = (lists, keySelector) => {
             if (lists.length === 0) {
@@ -925,11 +1030,9 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         };
         const renderEmpty = (container, message) => {
-            if (!(container instanceof HTMLElement)) {
-                return;
+            if (container instanceof HTMLElement) {
+                container.innerHTML = `<span class="form-hint">${escapeTagHtml(message)}</span>`;
             }
-
-            container.innerHTML = `<span class="form-hint">${escapeTagHtml(message)}</span>`;
         };
         const renderPills = (container, items, className, emptyMessage, titleSelector) => {
             if (!(container instanceof HTMLElement)) {
@@ -961,10 +1064,65 @@ document.addEventListener("DOMContentLoaded", () => {
                 .map((value) => `<span class="${className}">${escapeTagHtml(value)}</span>`)
                 .join("");
         };
-        const updateBulkSelectionSummary = () => {
-            const selectedBooks = selectionInputs
+        const syncTagModeButtons = () => {
+            const activeMode = tagModeInput instanceof HTMLInputElement && tagModeInput.value === "or" ? "or" : "and";
+            tagModeButtons.forEach((button) => {
+                const isActive = button.dataset.inventoryTagMode === activeMode;
+                button.classList.toggle("is-active", isActive);
+                button.setAttribute("aria-pressed", String(isActive));
+            });
+        };
+        const submitInventoryFilters = () => {
+            if (inventoryFilterForm instanceof HTMLFormElement) {
+                inventoryFilterForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+            }
+        };
+        const renderTagToggles = (selectedBooks) => {
+            if (!(sharedTags instanceof HTMLElement)) {
+                return;
+            }
+
+            if (availableTags.length === 0) {
+                renderEmpty(sharedTags, "No tags yet");
+                return;
+            }
+
+            const activeTagIds = selectedTagIds();
+            const activeMode = tagModeInput instanceof HTMLInputElement && tagModeInput.value === "or" ? "OR" : "AND";
+            const selectedTotal = selectedBooks.length;
+            sharedTags.innerHTML = availableTags.map((tag) => {
+                const id = String(tag.id ?? tag.Id);
+                const label = tag.name ?? tag.Name ?? "";
+                const description = tag.description ?? tag.Description ?? "";
+                const color = tag.color ?? tag.Color ?? "#2563eb";
+                const appliedCount = selectedBooks.filter((book) => {
+                    const bookTags = book.tags ?? book.Tags ?? [];
+                    return bookTags.some((bookTag) => String(bookTag.id ?? bookTag.Id) === id);
+                }).length;
+                const hasSelection = selectedTotal > 0;
+                const isFilterActive = !hasSelection && activeTagIds.includes(id);
+                const isActive = hasSelection && appliedCount === selectedTotal;
+                const isMixed = appliedCount > 0 && appliedCount < selectedTotal;
+                const stateLabel = !hasSelection
+                    ? isFilterActive ? `filtering visible books by this tag (${activeMode})` : "click to filter visible books by this tag"
+                    : isActive ? "on all selected books" : isMixed ? "on some selected books" : "off";
+                const classes = [
+                    "tag-pill",
+                    "tag-toggle-button",
+                    !hasSelection ? "is-filter-toggle" : "",
+                    isFilterActive ? "is-filter-active" : "",
+                    isFilterActive && activeTagIds.length > 1 ? "is-filter-combined" : "",
+                    isActive ? "is-active" : "",
+                    isMixed ? "is-mixed" : ""
+                ].filter(Boolean).join(" ");
+
+                return `<button type="button" class="${classes}" style="--tag-color:${escapeTagHtml(color)}" data-inventory-tag-toggle="${escapeTagHtml(id)}" title="${escapeTagHtml(description || `${label} is ${stateLabel}`)}">${escapeTagHtml(label)}</button>`;
+            }).join("");
+        };
+        const updateInventorySelectionSummary = () => {
+            const selectedBooks = getSelectionInputs()
                 .filter((input) => input.checked)
-                .map((input) => bulkBookMap.get(input.dataset.bookId ?? input.value))
+                .map((input) => inventoryBookMap.get(input.dataset.bookId ?? input.value))
                 .filter(Boolean);
 
             if (selectedCountText instanceof HTMLElement) {
@@ -972,6 +1130,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     ? "No books selected yet."
                     : `${selectedBooks.length} book${selectedBooks.length === 1 ? "" : "s"} selected.`;
             }
+
+            renderTagToggles(selectedBooks);
+            syncTagModeButtons();
 
             if (!(sharedSection instanceof HTMLElement) || !(emptyState instanceof HTMLElement)) {
                 return;
@@ -983,14 +1144,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            const tagLists = selectedBooks.map((book) => book.tags ?? book.Tags ?? []);
             const collectionLists = selectedBooks.map((book) => book.collections ?? book.Collections ?? []);
-            const sharedTagItems = getIntersection(tagLists, (tag) => String(tag.id ?? tag.Id ?? tag.name ?? tag.Name));
             const sharedCollectionItems = getIntersection(collectionLists, (collection) => String(collection.id ?? collection.Id ?? collection.name ?? collection.Name));
             const statusValues = distinctValues(selectedBooks.map((book) => book.status ?? book.Status ?? ""));
             const locationValues = distinctValues(selectedBooks.map((book) => book.locationName ?? book.LocationName ?? "No location"));
 
-            renderPills(sharedTags, sharedTagItems, "tag-pill", "No shared tags", (tag) => tag.description ?? tag.Description ?? "");
             renderPills(sharedCollections, sharedCollectionItems, "status-pill collection-pill", "No shared collections", (collection) => collection.description ?? collection.Description ?? "");
             renderTextPills(sharedStatus, statusValues, "status-pill", "No availability set");
             renderTextPills(sharedLocation, locationValues, "status-pill", "No location");
@@ -999,11 +1157,74 @@ document.addEventListener("DOMContentLoaded", () => {
             emptyState.hidden = true;
         };
 
-        selectionInputs.forEach((input) => {
-            input.addEventListener("change", updateBulkSelectionSummary);
+        document.addEventListener("change", (event) => {
+            if (event.target instanceof HTMLInputElement && event.target.matches("[data-select-item], input[name='TagIds']")) {
+                updateInventorySelectionSummary();
+            }
         });
 
-        updateBulkSelectionSummary();
+        document.addEventListener("inventory:books-rendered", (event) => {
+            const detail = event instanceof CustomEvent ? event.detail : {};
+            inventoryBooks = Array.isArray(detail.books) ? detail.books : [];
+            inventoryBookMap = new Map(inventoryBooks.map((book) => [String(book.id ?? book.Id), book]));
+            if (visibleCountText instanceof HTMLElement) {
+                visibleCountText.textContent = String(inventoryBooks.length);
+            }
+            updateInventorySelectionSummary();
+        });
+
+        tagModeButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+                if (tagModeInput instanceof HTMLInputElement) {
+                    tagModeInput.value = button.dataset.inventoryTagMode === "or" ? "or" : "and";
+                }
+                syncTagModeButtons();
+                if (selectedTagIds().length > 0) {
+                    submitInventoryFilters();
+                } else {
+                    updateInventorySelectionSummary();
+                }
+            });
+        });
+
+        if (sharedTags instanceof HTMLElement) {
+            sharedTags.addEventListener("click", (event) => {
+                const button = event.target instanceof Element
+                    ? event.target.closest("[data-inventory-tag-toggle]")
+                    : null;
+                if (!(button instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                const hasSelection = getSelectionInputs().some((input) => input.checked);
+                if (hasSelection) {
+                    return;
+                }
+
+                const tagId = button.dataset.inventoryTagToggle ?? "";
+                const tagInputs = Array.from(document.querySelectorAll('input[name="TagIds"]'))
+                    .filter((input) => input instanceof HTMLInputElement);
+                const targetInput = tagInputs.find((input) => input.value === tagId);
+                if (!(targetInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                if (event instanceof MouseEvent && (event.ctrlKey || event.metaKey)) {
+                    targetInput.checked = !targetInput.checked;
+                } else {
+                    const onlyActiveTag = selectedTagIds().length === 1 && targetInput.checked;
+                    tagInputs.forEach((input) => {
+                        input.checked = false;
+                    });
+                    targetInput.checked = !onlyActiveTag;
+                }
+
+                updateInventorySelectionSummary();
+                submitInventoryFilters();
+            });
+        }
+
+        updateInventorySelectionSummary();
     }
 
     const editInventory = document.querySelector("[data-edit-inventory]");
