@@ -20,12 +20,16 @@ const appRegistry = {
   lionship: app('Lionship', 'lionship', 'lionship'),
   millionfold: app('Millionfold', 'millionfold', 'millionfold'),
   mill: app('Millionfold', 'millionfold', 'millionfold'),
+  'stallioneer-site': app('Stallioneer Site', 'stallioneer-site', 'stallioneer'),
+  'stall-site': app('Stallioneer Site', 'stallioneer-site', 'stallioneer'),
   perihelion: app('Perihelion', 'perihelion', 'perihelion'),
   peri: app('Perihelion', 'perihelion', 'perihelion'),
   tourbillion: app('Tourbillion', 'tourbillion', 'tourbillion'),
   tourb: app('Tourbillion', 'tourbillion', 'tourbillion'),
   vermilion: app('Vermilion', 'vermilion', 'vermilion'),
   verm: app('Vermilion', 'vermilion', 'vermilion'),
+  iwenttocity: app('I Went to City', 'iwenttocity', 'iwenttocity'),
+  city: app('I Went to City', 'iwenttocity', 'iwenttocity'),
 };
 
 function app(label, slug, remotePath, distSubdir = 'dist') {

@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "I Went to City enrollment microsite plan",
+  "content": "<p><strong>I Went to City</strong> is being shaped as a focused, standalone microsite for City College of San Francisco: small enough to finish quickly, but useful enough to help real people move from curiosity toward enrollment.</p><p>The trajectory is straightforward. First, establish the base: a clean Vite/React app with a lightweight backend path that fits the existing JeffersonWM workflow. Next, add an email capture path for visitors who want more information. After that, connect those submissions to automatic trigger/response behavior so interested people can receive useful follow-up without needing an account or full app workspace.</p><p>The brand direction should be on key with CCSF and City College of San Francisco while remaining clearly unofficial. The goal is not to impersonate an institutional site; it is to make a persuasive, civic-minded companion microsite that feels aligned with the school's public spirit, speaks plainly to prospective students, and gives people a reason to take the next step.</p><p>The intended audience is twofold: people already considering enrollment who need a clear nudge, and people who may not have been thinking about City College yet but could be inspired to consider it. The site should convert the first group and invite the second group into the possibility.</p><p>Target: have this microsite done by Sunday night, October 11, 2026.</p>",
+  "url": "https://jeffersonwm.com/iwenttocity/",
+  "source": "manual",
+  "external_id": "iwenttocity-ccsf-enrollment-microsite-plan-2026-10-08",
+  "created_at": "2026-10-08 21:35:00"
+}

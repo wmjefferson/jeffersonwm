@@ -219,6 +219,18 @@
     "fonts:r7": "node scripts/list-fonts.mjs 7 && node scripts\\finish-stamp.mjs --label \"fonts:r7\"",
     "fonts:r8": "node scripts/list-fonts.mjs 8 && node scripts\\finish-stamp.mjs --label \"fonts:r8\"",
     "verify": "npm run install:all && npm run build && node scripts\\finish-stamp.mjs --label \"verify\"",
-    "deploy:prepare": "npm run build && node scripts\\finish-stamp.mjs --label \"deploy:prepare\""
+    "deploy:prepare": "npm run build && node scripts\\finish-stamp.mjs --label \"deploy:prepare\"",
+    "install:iwenttocity": "npm --prefix apps/iwenttocity install && node scripts\\finish-stamp.mjs --label \"install:iwenttocity\"",
+    "build:iwenttocity": "npm --prefix apps/iwenttocity run build && node scripts\\finish-stamp.mjs --label \"build:iwenttocity\"",
+    "publish:iwenttocity": "node scripts/publish-iwenttocity.mjs && node scripts\\finish-stamp.mjs --label \"publish:iwenttocity\"",
+    "publish:city": "node scripts/publish-iwenttocity.mjs && node scripts\\finish-stamp.mjs --label \"publish:city\"",
+    "buildlog:iwenttocity": "node scripts/logged-build.mjs --app iwenttocity && node scripts\\finish-stamp.mjs --label \"buildlog:iwenttocity\"",
+    "buildlog:city": "node scripts/logged-build.mjs --app city && node scripts\\finish-stamp.mjs --label \"buildlog:city\"",
+    "version:patch:iwenttocity": "node scripts/version-and-log.mjs --app iwenttocity --type patch && node scripts\\finish-stamp.mjs --label \"version:patch:iwenttocity\"",
+    "version:patch:city": "node scripts/version-and-log.mjs --app city --type patch && node scripts\\finish-stamp.mjs --label \"version:patch:city\"",
+    "version:minor:iwenttocity": "node scripts/version-and-log.mjs --app iwenttocity --type minor && node scripts\\finish-stamp.mjs --label \"version:minor:iwenttocity\"",
+    "version:minor:city": "node scripts/version-and-log.mjs --app city --type minor && node scripts\\finish-stamp.mjs --label \"version:minor:city\"",
+    "version:major:iwenttocity": "node scripts/version-and-log.mjs --app iwenttocity --type major && node scripts\\finish-stamp.mjs --label \"version:major:iwenttocity\"",
+    "version:major:city": "node scripts/version-and-log.mjs --app city --type major && node scripts\\finish-stamp.mjs --label \"version:major:city\""
   }
 }
