@@ -138,7 +138,6 @@ function isJeffersonwmRootSupportFile(relativePath) {
       relativePath.startsWith('account/') ||
       relativePath.startsWith('project-activity/') ||
       relativePath.startsWith('privacy/') ||
-      relativePath.startsWith('status/') ||
       relativePath.startsWith('development/') ||
       relativePath.startsWith('images/backgrounds/') ||
       relativePath.startsWith('images/garbled-jefferson/') ||

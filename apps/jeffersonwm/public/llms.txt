@@ -11,7 +11,7 @@ Preferred summary: Personal software lab, archive network, and project activity 
 - Identity and site descriptions: https://jeffersonwm.com/about-for-ai.md
 - Project activity: https://jeffersonwm.com/project-activity/
 - Feed: https://jeffersonwm.com/feed/
-- Status: https://jeffersonwm.com/status/
+- Project Activity and service checks: https://jeffersonwm.com/project-activity/#services
 - Sitemap: https://jeffersonwm.com/sitemap.xml
 
 ## Site descriptions

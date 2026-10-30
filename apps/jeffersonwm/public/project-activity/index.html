@@ -497,6 +497,163 @@
         background: rgba(220, 252, 231, 0.78);
       }
 
+      .services-panel {
+        scroll-margin-top: 1.5rem;
+      }
+
+      .widget-source-accordion {
+        margin: 1rem;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.52);
+      }
+
+      .widget-source-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        list-style: none;
+        cursor: pointer;
+        padding: 0.9rem 1rem;
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .widget-source-summary::-webkit-details-marker { display: none; }
+      .widget-source-summary::after { content: "+"; font-size: 1rem; }
+      .widget-source-accordion[open] .widget-source-summary::after { content: "\2212"; }
+
+      .widget-source-body {
+        border-top: 1px solid var(--line);
+        padding: 0.95rem 1rem 1rem;
+      }
+
+      .widget-source-meta,
+      .widget-source-note {
+        color: var(--muted);
+        font-size: 0.84rem;
+        line-height: 1.45;
+      }
+
+      .widget-source-meta { margin: 0 0 0.9rem; }
+      .widget-source-list { display: grid; gap: 0.8rem; margin: 0; padding: 0; list-style: none; }
+      .widget-source-item { display: grid; gap: 0.2rem; }
+      .widget-source-topline { display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem; }
+      .widget-source-label { font-size: 0.92rem; font-weight: 700; }
+      .widget-source-word { color: var(--muted); font-size: 0.92rem; }
+
+      .service-table-wrap { overflow-x: auto; }
+
+      .service-table {
+        min-width: 720px;
+        table-layout: fixed;
+      }
+
+      .service-table .service-column {
+        width: 38%;
+      }
+
+      .service-table .service-status-column {
+        width: 12%;
+      }
+
+      .timeline-search {
+        flex: 0 1 20rem;
+      }
+
+      .service-name {
+        display: inline-block;
+        margin: 0;
+        color: var(--ink);
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: 1.05rem;
+        font-weight: 400;
+        outline-offset: 0.25rem;
+      }
+
+      .service-name-cell { position: relative; }
+
+      .service-details {
+        position: absolute;
+        z-index: 5;
+        left: 0.9rem;
+        bottom: calc(100% + 0.5rem);
+        display: grid;
+        gap: 0.35rem;
+        width: max-content;
+        max-width: min(30rem, calc(100vw - 4rem));
+        padding: 0.7rem 0.8rem;
+        border: 1px solid var(--line);
+        background: var(--paper-strong);
+        box-shadow: 0 6px 18px rgba(17, 24, 39, 0.12);
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.35;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(0.25rem);
+        transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+      }
+
+      .service-name-cell:hover .service-details,
+      .service-name:focus-visible + .service-details {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .service-detail-row { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: 0.5rem; }
+      .service-detail-label { color: var(--ink); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+      .service-detail-value { overflow-wrap: anywhere; }
+
+      .service-status {
+        display: inline-flex;
+        min-width: 5.7rem;
+        justify-content: center;
+        color: var(--ink);
+        background: #f4f4f1;
+      }
+
+      .service-status.status-online { background: #e4efe8; }
+      .service-status.status-protected { background: #e8edf5; }
+      .service-status.status-reachable { background: #f3eadb; }
+      .service-status.status-degraded { background: #f6e6db; }
+      .service-status.status-offline { background: #f3dddd; }
+
+      .checked-at {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.86rem;
+      }
+
+      .refresh-link {
+        margin-left: 0.55rem;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        font-size: inherit;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-decoration: underline;
+        text-underline-offset: 0.18rem;
+        cursor: pointer;
+      }
+
+      .refresh-link:disabled { cursor: wait; opacity: 0.48; }
+
+      .service-toolbar {
+        display: flex;
+        justify-content: flex-start;
+        margin: 0 1.25rem 1.25rem;
+      }
+
+      .services-panel .service-table-wrap {
+        padding: 1.25rem;
+      }
+
       .bottom-links {
         margin-top: 1.5rem;
         display: flex;
@@ -553,6 +710,10 @@
           width: 100%;
         }
 
+        .timeline-search {
+          flex-basis: 100%;
+        }
+
         .panel-header {
           flex-direction: column;
           align-items: flex-start;
@@ -592,6 +753,43 @@
         <p class="note">
           This page tracks public GitHub project issue activity across JeffersonWM repos. It updates automatically from the JeffersonWM API and excludes private and archived repositories before anything is sent to the browser.
         </p>
+
+        <section class="panel services-panel" id="services" aria-label="Services">
+          <div class="panel-body service-table-wrap">
+            <table class="service-table" aria-label="API and tunnel statuses">
+              <colgroup>
+                <col class="service-column" />
+                <col class="service-status-column" />
+                <col class="service-column" />
+                <col class="service-status-column" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Status</th>
+                  <th>Service</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="service-table-body"></tbody>
+            </table>
+          </div>
+          <details class="widget-source-accordion">
+            <summary class="widget-source-summary">Widget discovery sources</summary>
+            <div class="widget-source-body">
+              <p class="widget-source-meta" id="widget-source-meta">Checking widget discovery sources...</p>
+              <ul class="widget-source-list" id="widget-source-list">
+                <li class="widget-source-note">Loading source notes...</li>
+              </ul>
+            </div>
+          </details>
+          <div class="service-toolbar">
+            <p class="checked-at">
+              <span id="checked-at">Not checked yet.</span>
+              <button class="refresh-link" id="refresh-services" type="button">Refresh</button>
+            </p>
+          </div>
+        </section>
         <p class="meta-line" id="meta-line">Loading project activity...</p>
 
         <ul class="issue-state-list" aria-label="Project activity issue states">
@@ -604,12 +802,6 @@
             </span>
           </li>
         </ul>
-
-        <section class="control-row" aria-label="Issue controls">
-          <div class="search-wrap">
-            <input id="search-input" class="search-input" type="search" placeholder="Search title or issue number" />
-          </div>
-        </section>
 
         <section class="panel" aria-labelledby="timeline-title">
           <div class="panel-header">
@@ -628,6 +820,9 @@
                 </div>
                 <button id="sort-direction-trigger" class="sort-trigger" type="button">Descending</button>
               </div>
+            </div>
+            <div class="search-wrap timeline-search">
+              <input id="search-input" class="search-input" type="search" placeholder="Search title or issue number" />
             </div>
           </div>
           <div class="panel-body timeline-wrap" id="timeline-wrap">
@@ -670,7 +865,6 @@
 
     <div class="bottom-links" aria-label="Site links">
       <a class="personal-link" href="/">Home</a>
-      <a class="personal-link" href="/status/">Status</a>
       <a class="personal-link" href="/account/">Account</a>
       <a class="personal-link" href="https://wmjefferson.com" target="_blank" rel="noopener noreferrer">William Jefferson</a>
     </div>
@@ -700,6 +894,12 @@
       const pageTitle = document.getElementById("page-title");
       const timelineWrap = document.getElementById("timeline-wrap");
       const metaLine = document.getElementById("meta-line");
+      const serviceTableBody = document.getElementById("service-table-body");
+      const refreshServicesButton = document.getElementById("refresh-services");
+      const checkedAt = document.getElementById("checked-at");
+      const servicesPanel = document.getElementById("services");
+      const widgetSourceMeta = document.getElementById("widget-source-meta");
+      const widgetSourceList = document.getElementById("widget-source-list");
       const REPORTS = [
         { title: "Codex - September 2026 - Thread Report", path: "reports/2026-09-codex-report.md" },
         { title: "Antigravity - September 2026 - Platform Development Report", path: "reports/2026-09-antigravity-report.md" },
@@ -720,6 +920,26 @@
         desc: "Descending",
         asc: "Ascending",
       };
+      const CHECK_TIMEOUT_MS = 8000;
+      const services = [
+        { name: "JeffersonWM", tunnel: "api-jeffersonwm", origin: "127.0.0.1:8110", url: "https://api-jeffersonwm.jeffersonwm.com/health", fallbackUrl: "https://api-jeffersonwm.jeffersonwm.com/api/widget/resolved" },
+        { name: "Auth / Multimillion", tunnel: "api-auth-jeffersonwm", origin: "127.0.0.1:8060", url: "https://auth.jeffersonwm.com/health", fallbackUrl: "https://auth.jeffersonwm.com/api/auth/status" },
+        { name: "Perihelion", tunnel: "api-perihelion", origin: "127.0.0.1:8010", url: "https://api.jeffersonwm.com/api/auth/status", fallbackUrl: "https://api.jeffersonwm.com/" },
+        { name: "Feed", tunnel: "api-feed", origin: "127.0.0.1:8050", url: "https://api-feed.jeffersonwm.com/health", fallbackUrl: "https://api-feed.jeffersonwm.com/api/feed?limit=1" },
+        { name: "Lionship", tunnel: "api-lionship", origin: "127.0.0.1:8040", url: "https://api-lionship.jeffersonwm.com/health", fallbackUrl: "https://api-lionship.jeffersonwm.com/api/links" },
+        { name: "Dooky Detective", tunnel: "api-dookydetective", origin: "127.0.0.1:8020", url: "https://api.dookydetective.com/health", fallbackUrl: "https://api.dookydetective.com/" },
+        { name: "Jeffershizzle", tunnel: "api-jeffershizzle", origin: "127.0.0.1:8030", url: "https://api.jeffershizzle.com/health", fallbackUrl: "https://api.jeffershizzle.com/" },
+        { name: "Battalion", tunnel: "api-battalion", origin: "127.0.0.1:8070", url: "https://api-battalion.jeffersonwm.com/api/public/dashboard", fallbackUrl: "https://api-battalion.jeffersonwm.com/api/auth/check" },
+        { name: "Aphelion", tunnel: "api-aphelion", origin: "127.0.0.1:8120", url: "https://api-aphelion.jeffersonwm.com/health", fallbackUrl: "https://api-aphelion.jeffersonwm.com/api/health" },
+        { name: "Millionfold", tunnel: "api-millionfold", origin: "127.0.0.1:8090", url: "https://api-millionfold.jeffersonwm.com/api/health", fallbackUrl: "https://api-millionfold.jeffersonwm.com/" },
+        { name: "Vermilion", tunnel: "api-vermilion", origin: "127.0.0.1:8100", url: "https://api-vermilion.jeffersonwm.com/api/health", fallbackUrl: "https://api-vermilion.jeffersonwm.com/" },
+      ];
+      const fallbackWordSources = [
+        { key: "dictionary", label: "Dictionary.com", fallbackHref: "https://www.dictionary.com/word-of-the-day" },
+        { key: "merriam", label: "Merriam-Webster", fallbackHref: "https://www.merriam-webster.com/word-of-the-day" },
+        { key: "wiktionary", label: "Wiktionary", fallbackHref: "https://en.wiktionary.org/wiki/Wiktionary:Word_of_the_day" },
+        { key: "vocabulary", label: "Vocabulary.com", fallbackHref: "https://www.vocabulary.com/word-of-the-day/" },
+      ];
 
       function apiUrl(path) {
         return `${API_ORIGIN}${path}`;
@@ -880,6 +1100,9 @@
           return;
         }
         showProjectActivity(false);
+        if (hash === "services") {
+          requestAnimationFrame(() => servicesPanel?.scrollIntoView({ block: "start" }));
+        }
       }
 
       function formatDate(value) {
@@ -1104,6 +1327,117 @@
         renderTimeline();
       }
 
+      function renderServiceTable() {
+        const renderServiceCells = (service, index) => {
+          if (!service) {
+            return '<td colspan="2"></td>';
+          }
+          return `
+            <td class="service-name-cell">
+              <span class="service-name" tabindex="0" aria-describedby="service-details-${index}">${escapeHtml(service.name)}</span>
+              <span class="service-details" id="service-details-${index}" role="tooltip">
+                <span class="service-detail-row"><span class="service-detail-label">API</span><span class="service-detail-value">${escapeHtml(new URL(service.url).hostname)}</span></span>
+                <span class="service-detail-row"><span class="service-detail-label">Tunnel</span><span class="service-detail-value">${escapeHtml(service.tunnel)}</span></span>
+                <span class="service-detail-row"><span class="service-detail-label">Origin</span><span class="service-detail-value">${escapeHtml(service.origin)}</span></span>
+              </span>
+            </td>
+            <td><span class="status-pill service-status status-checking" data-service-index="${index}">Checking</span></td>
+          `;
+        };
+
+        const rows = [];
+        for (let index = 0; index < services.length; index += 2) {
+          rows.push(`<tr>${renderServiceCells(services[index], index)}${renderServiceCells(services[index + 1], index + 1)}</tr>`);
+        }
+        serviceTableBody.innerHTML = rows.join("");
+      }
+
+      function setServiceResult(index, result) {
+        const pill = serviceTableBody.querySelector(`[data-service-index="${index}"]`);
+        if (!pill) return;
+        pill.className = `status-pill service-status status-${result.state}`;
+        pill.textContent = result.label;
+      }
+
+      async function fetchWithTimeout(url, options = {}) {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+        try {
+          return await fetch(url, { cache: "no-store", credentials: "omit", ...options, signal: controller.signal });
+        } finally {
+          window.clearTimeout(timeout);
+        }
+      }
+
+      async function checkReadable(url) {
+        const response = await fetchWithTimeout(url);
+        if (response.ok) return { state: "online", label: "Online" };
+        if (response.status === 401 || response.status === 403) return { state: "protected", label: "Protected" };
+        if (response.status >= 500) return { state: "degraded", label: "Degraded" };
+        return { state: "reachable", label: "Reachable" };
+      }
+
+      async function checkService(service) {
+        try {
+          return await checkReadable(service.url);
+        } catch (_primaryError) {
+          try {
+            return await checkReadable(service.fallbackUrl || service.url);
+          } catch (_fallbackError) {
+            try {
+              await fetchWithTimeout(service.fallbackUrl || service.url, { mode: "no-cors" });
+              return { state: "reachable", label: "Reachable" };
+            } catch (_opaqueError) {
+              return { state: "offline", label: "Offline" };
+            }
+          }
+        }
+      }
+
+      function normalizeWordPayload(payload) {
+        if (payload && Array.isArray(payload.sources)) return payload;
+        return {
+          pacificDateKey: "unknown",
+          generatedAt: new Date().toISOString(),
+          sources: fallbackWordSources.map((source) => ({ ...source, display: source.label, ok: false, note: "No widget word data available." })),
+        };
+      }
+
+      function renderWidgetWordSources(payload) {
+        const normalized = normalizeWordPayload(payload);
+        widgetSourceMeta.textContent = `Pacific day ${normalized.pacificDateKey}. Updated ${new Date(normalized.generatedAt || Date.now()).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}.`;
+        widgetSourceList.innerHTML = normalized.sources.map((source) => `
+          <li class="widget-source-item">
+            <div class="widget-source-topline">
+              <a class="widget-source-label" href="${escapeHtml(source.href || source.fallbackHref || "#")}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label)}</a>
+              <span class="status-pill service-status status-${source.ok ? "online" : "reachable"}">${source.ok ? "Live" : "Fallback"}</span>
+              <span class="widget-source-word">${escapeHtml(source.display || source.label)}</span>
+            </div>
+            <div class="widget-source-note">${escapeHtml(source.note || "No source note available.")}</div>
+          </li>
+        `).join("");
+      }
+
+      async function loadWidgetWordSources() {
+        try {
+          const response = await fetchWithTimeout("https://api-jeffersonwm.jeffersonwm.com/api/widget/wotd");
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          renderWidgetWordSources(await response.json());
+        } catch (_error) {
+          renderWidgetWordSources(null);
+          widgetSourceMeta.textContent = "Widget discovery sources could not be loaded from the public JeffersonWM API.";
+        }
+      }
+
+      async function runServiceChecks() {
+        refreshServicesButton.disabled = true;
+        checkedAt.textContent = "Checking services...";
+        services.forEach((_service, index) => setServiceResult(index, { state: "checking", label: "Checking" }));
+        await Promise.all(services.map(async (service, index) => setServiceResult(index, await checkService(service))));
+        checkedAt.textContent = `Last checked ${new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "medium" })}.`;
+        refreshServicesButton.disabled = false;
+      }
+
       async function loadProjectActivity() {
         try {
           const response = await fetch(apiUrl("/api/project-activity"), { cache: "no-store" });
@@ -1184,9 +1518,14 @@
 
       window.addEventListener("popstate", syncRouteFromHash);
       window.addEventListener("hashchange", syncRouteFromHash);
+      refreshServicesButton.addEventListener("click", async () => {
+        await Promise.all([runServiceChecks(), loadWidgetWordSources()]);
+      });
       renderReportList();
+      renderServiceTable();
       syncRouteFromHash();
       loadProjectActivity();
+      Promise.all([runServiceChecks(), loadWidgetWordSources()]);
       syncSortControls();
       window.addEventListener("resize", () => {
         if (state.payload) {

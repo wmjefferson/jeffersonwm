@@ -91,8 +91,6 @@ function prettyRootPagesInDev() {
     ['/project-activity/', '/project-activity/index.html'],
     ['/privacy', '/privacy/index.html'],
     ['/privacy/', '/privacy/index.html'],
-    ['/status', '/status/index.html'],
-    ['/status/', '/status/index.html'],
     ['/development', '/development/index.html'],
     ['/development/', '/development/index.html'],
   ])
