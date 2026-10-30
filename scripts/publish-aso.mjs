@@ -30,6 +30,9 @@ const appRegistry = {
   verm: app('Vermilion', 'vermilion', 'vermilion'),
   iwenttocity: app('I Went to City', 'iwenttocity', 'iwenttocity'),
   city: app('I Went to City', 'iwenttocity', 'iwenttocity'),
+  scallions: app('Scallions', 'scallions', 'scallions'),
+  scallion: app('Scallions', 'scallions', 'scallions'),
+  scall: app('Scallions', 'scallions', 'scallions'),
 };
 
 function app(label, slug, remotePath, distSubdir = 'dist') {
@@ -129,10 +132,12 @@ function isJeffersonwmRootSupportFile(relativePath) {
       relativePath === 'robots.txt' ||
       relativePath === 'sitemap.xml' ||
       relativePath === 'versions.json' ||
+      relativePath === 'singles.json' ||
+      relativePath === 'single-page.html' ||
       relativePath === 'underconstruction.html' ||
       relativePath.startsWith('account/') ||
       relativePath.startsWith('project-activity/') ||
-      relativePath.startsWith('scholarship/') ||
+      relativePath.startsWith('privacy/') ||
       relativePath.startsWith('status/') ||
       relativePath.startsWith('development/') ||
       relativePath.startsWith('images/backgrounds/') ||

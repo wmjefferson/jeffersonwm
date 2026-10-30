@@ -13,6 +13,12 @@ dotenv.config({ path: path.join(process.cwd(), envFile) })
 const PORT = Number(process.env.PORT || process.env.IWENTTOCITY_PORT || '8150')
 const HOST = process.env.HOST || '0.0.0.0'
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`
+const AUTH_BASE_URL = (process.env.IWENTTOCITY_AUTH_BASE_URL || process.env.AUTH_BASE_URL || 'https://auth.jeffersonwm.com').replace(/\/$/, '')
+const AUTH_INTERNAL_LOG_TOKEN = (
+  process.env.IWENTTOCITY_AUTH_INTERNAL_LOG_TOKEN ||
+  process.env.AUTH_INTERNAL_LOG_TOKEN ||
+  ''
+).trim()
 const DATA_DIR = path.resolve(process.cwd(), process.env.DATA_DIR || './data')
 const SUBMISSIONS_PATH = path.join(DATA_DIR, 'email-interest.jsonl')
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
@@ -23,6 +29,30 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
 const app = express()
 
 fs.mkdirSync(DATA_DIR, { recursive: true })
+
+async function logAuthHistory(action: string, target: string | Record<string, unknown>) {
+  const targetStr = typeof target === 'string' ? target : JSON.stringify(target)
+
+  try {
+    await fetch(`${AUTH_BASE_URL}/api/history/log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(AUTH_INTERNAL_LOG_TOKEN ? { 'x-auth-internal-token': AUTH_INTERNAL_LOG_TOKEN } : {}),
+      },
+      body: JSON.stringify({
+        action,
+        site: 'iwenttocity',
+        target: targetStr,
+        userId: null,
+        username: 'visitor',
+        internalToken: AUTH_INTERNAL_LOG_TOKEN,
+      }),
+    })
+  } catch (error) {
+    console.warn('I Went to City could not log to Auth history:', error)
+  }
+}
 
 app.use(express.json({ limit: '32kb' }))
 app.use(
@@ -58,6 +88,11 @@ app.post('/api/interest', (req, res) => {
   }
 
   fs.appendFileSync(SUBMISSIONS_PATH, `${JSON.stringify(entry)}\n`, 'utf8')
+  void logAuthHistory('iwenttocity.email_submitted', {
+    email,
+    source: entry.source,
+    createdAt: entry.createdAt,
+  })
   res.status(201).json({ ok: true })
 })
 

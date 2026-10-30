@@ -57,9 +57,20 @@ if ($cert) {
     Set-AuthenticodeSignature -FilePath $publishExe -Certificate $cert -ErrorAction SilentlyContinue | Out-Null
 }
 
-Write-Host ""
-Write-Host "Launching Lionfish..." -ForegroundColor Green
+# If the application is installed in %LOCALAPPDATA%\Programs\Lionfish, keep it synced so Desktop shortcut has latest updates
+$installedDir = "$env:LOCALAPPDATA\Programs\Lionfish"
+$installedExe = Join-Path $installedDir "Lionfish.exe"
+if (Test-Path $installedDir) {
+    Copy-Item $publishExe -Destination $installedExe -Force -ErrorAction SilentlyContinue
+    Unblock-File -Path $installedExe -ErrorAction SilentlyContinue
+}
 
-Start-Process -FilePath $publishExe -WorkingDirectory $publishDir
+$exeToLaunch = if (Test-Path $installedExe) { $installedExe } else { $publishExe }
+$workDir = Split-Path -Parent $exeToLaunch
+
+Write-Host ""
+Write-Host "Launching Lionfish ($exeToLaunch)..." -ForegroundColor Green
+
+Start-Process -FilePath $exeToLaunch -WorkingDirectory $workDir
 
 Write-Host "Lionfish started! Look for the window or the tray icon in your taskbar." -ForegroundColor Cyan

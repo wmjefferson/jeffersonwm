@@ -8,8 +8,10 @@
         Title="Lionfish" Height="650" Width="900" MinHeight="500" MinWidth="700"
         WindowStartupLocation="CenterScreen"
         Icon="/Assets/logo.png"
-        Closing="Window_Closing">
-    <Grid>
+        Closing="Window_Closing"
+        Background="{DynamicResource BgBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}">
+    <Grid Background="{DynamicResource BgBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>

@@ -47,12 +47,14 @@ export function HighlightsPage({
   apiBaseUrl,
   authStatus,
   authLoading,
+  accountLink,
   onSignIn,
   onSignOut,
 }: {
   apiBaseUrl: string;
   authStatus: AuthStatus | null;
   authLoading: boolean;
+  accountLink: string | null;
   onSignIn: () => void;
   onSignOut: () => void;
 }) {
@@ -105,9 +107,19 @@ export function HighlightsPage({
           </a>
           {!authLoading && (
             authStatus?.user ? (
-              <button type="button" onClick={onSignOut} className="font-semibold hover:text-[#de8bf7]">
-                Sign Out
-              </button>
+              <>
+                <a
+                  href={accountLink || 'https://jeffersonwm.com/account/'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold hover:text-[#de8bf7]"
+                >
+                  {authStatus.user.username}
+                </a>
+                <button type="button" onClick={onSignOut} className="font-semibold hover:text-[#de8bf7]">
+                  Sign Out
+                </button>
+              </>
             ) : (
               <button type="button" onClick={onSignIn} className="font-semibold hover:text-[#de8bf7]">
                 Sign In

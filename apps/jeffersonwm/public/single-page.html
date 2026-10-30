@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Single</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-V3NQ37RBWY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-V3NQ37RBWY');
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Young+Serif&family=IBM+Plex+Sans+Condensed:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --frame: 42px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: var(--frame);
+        background: #fdfdfd;
+        color: #111827;
+        font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        position: relative;
+        isolation: isolate;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("/images/backgrounds/jeffwm-feed-lion-pattern-20260627.jpeg");
+        background-repeat: repeat;
+        background-size: 900px auto;
+        opacity: 0.05;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .layout {
+        position: relative;
+        z-index: 1;
+      }
+
+      .page {
+        max-width: min(640px, 100%);
+      }
+
+      .logo-wrapper {
+        margin-bottom: 0.75rem;
+      }
+
+      .logo-link {
+        display: inline-block;
+      }
+
+      .logo {
+        display: block;
+        height: 84px;
+        width: 84px;
+      }
+
+      h1 {
+        margin: 0 0 1.75rem 0;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-size: clamp(2rem, 3vw, 2.4rem);
+        font-weight: 400;
+      }
+
+      .body-text {
+        color: #5f665f;
+        font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1rem;
+        line-height: 1.6;
+        margin: 0 0 1.75rem 0;
+      }
+
+      .body-text p {
+        margin: 0 0 1rem;
+      }
+
+      .body-text p:last-child,
+      .body-text ul:last-child,
+      .body-text ol:last-child,
+      .body-text blockquote:last-child {
+        margin-bottom: 0;
+      }
+
+      .body-text a {
+        color: #1f4fd6;
+        text-decoration: underline;
+        transition: color 160ms ease;
+      }
+
+      .body-text a:hover {
+        color: #111827;
+      }
+
+      .body-text ul,
+      .body-text ol {
+        margin: 0.4rem 0 1rem;
+        padding-left: 1.4rem;
+      }
+
+      .body-text li {
+        margin-bottom: 0.35rem;
+      }
+
+      .body-text h2,
+      .body-text h3,
+      .body-text h4,
+      .body-text h5 {
+        margin: 1.5rem 0 0.5rem;
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-weight: 400;
+        color: #111827;
+      }
+
+      .body-text h2 {
+        font-size: 1.4rem;
+      }
+
+      .body-text h3 {
+        font-size: 1.2rem;
+      }
+
+      .body-text h4,
+      .body-text h5 {
+        font-size: 1.05rem;
+      }
+
+      .body-text blockquote {
+        margin: 1rem 0;
+        padding-left: 1rem;
+        border-left: 3px solid rgba(17, 24, 39, 0.2);
+        color: rgba(17, 24, 39, 0.7);
+        font-style: italic;
+      }
+
+      .body-text code {
+        padding: 0.1rem 0.3rem;
+        background: rgba(17, 24, 39, 0.07);
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.9em;
+        border-radius: 2px;
+      }
+
+      .bottom-links {
+        position: fixed;
+        left: var(--frame);
+        bottom: var(--frame);
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+      }
+
+      .personal-link {
+        position: relative;
+        color: #111827;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        font-family: inherit;
+        font-size: 0.92rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .personal-link::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.1rem;
+        width: 100%;
+        height: 1px;
+        background: #d4d4d4;
+        transform-origin: left;
+        transform: scaleX(0);
+        transition: transform 0.15s ease-out;
+      }
+
+      .personal-link:hover::after {
+        transform: scaleX(1);
+      }
+
+      @media (max-width: 980px) {
+        .bottom-links {
+          position: static;
+          margin-top: 2.5rem;
+        }
+      }
+      /* Invisible until status verified to prevent flash of content */
+      html {
+        visibility: hidden;
+        opacity: 0;
+      }
+
+      html.page-ready {
+        visibility: visible;
+        opacity: 1;
+        transition: opacity 0.1s ease-in;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <main class="page" aria-label="Single Page">
+        <div class="logo-wrapper">
+          <a class="logo-link" href="/" aria-label="Return to JeffersonWM home">
+            <img src="/favicon.svg" alt="" class="logo" />
+          </a>
+        </div>
+        <div class="identity-block">
+          <h1 id="page-title"></h1>
+          <div class="body-text" id="page-body"></div>
+        </div>
+      </main>
+
+      <div class="bottom-links" aria-label="Site links" style="display: none;">
+        <a class="personal-link" href="/">Home</a>
+        <a class="personal-link" href="/status/">Status</a>
+        <a class="personal-link" href="/project-activity/">Project Activity</a>
+        <a class="personal-link" href="/account/">Account</a>
+        <a
+          class="personal-link"
+          href="https://wmjefferson.com"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          William Jefferson
+        </a>
+      </div>
+    </div>
+
+    <script>
+      function escapeHtml(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function isSafeRichUrl(value) {
+        if (!value) return false;
+        if (value.startsWith('/') || value.startsWith('#')) return true;
+        try {
+          const parsed = new URL(value, window.location.origin);
+          return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);
+        } catch (_e) {
+          return false;
+        }
+      }
+
+      function formatInlineMarkdown(value) {
+        let html = escapeHtml(value);
+        const protectedSegments = [];
+        const protectSegment = (segment) => {
+          const token = `@@PROTECTED${protectedSegments.length}@@`;
+          protectedSegments.push(segment);
+          return token;
+        };
+
+        html = html.replace(/`([^`]+)`/g, (_match, code) => {
+          return protectSegment(`<code>${code}</code>`);
+        });
+
+        html = html.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, alt, url) => {
+          if (!isSafeRichUrl(url)) return '';
+          return protectSegment(`<figure><img src="${url}" alt="${alt}" loading="lazy" /><figcaption>${alt}</figcaption></figure>`);
+        });
+
+        html = html.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_match, label, url) => {
+          if (!isSafeRichUrl(url)) return label;
+          return protectSegment(`<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+        });
+
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+        html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+        html = html.replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
+
+        protectedSegments.forEach((segment, index) => {
+          html = html.replace(`@@PROTECTED${index}@@`, segment);
+        });
+
+        return html;
+      }
+
+      function formatMarkdownHtml(value) {
+        if (!value) return '';
+        const lines = String(value).replace(/\r\n/g, '\n').split('\n');
+        const html = [];
+        let paragraph = [];
+        let listType = null;
+        let blockquote = [];
+
+        const flushParagraph = () => {
+          if (paragraph.length === 0) return;
+          html.push(`<p>${paragraph.map(formatInlineMarkdown).join('<br />')}</p>`);
+          paragraph = [];
+        };
+
+        const closeList = () => {
+          if (!listType) return;
+          html.push(`</${listType}>`);
+          listType = null;
+        };
+
+        const flushBlockquote = () => {
+          if (blockquote.length === 0) return;
+          html.push(`<blockquote><p>${blockquote.map(formatInlineMarkdown).join('<br />')}</p></blockquote>`);
+          blockquote = [];
+        };
+
+        lines.forEach((line) => {
+          const trimmed = line.trim();
+
+          if (!trimmed) {
+            flushParagraph();
+            closeList();
+            flushBlockquote();
+            return;
+          }
+
+          if (/^!\[[^\]]*\]\([^)]+\)$/.test(trimmed)) {
+            flushParagraph();
+            closeList();
+            flushBlockquote();
+            html.push(formatInlineMarkdown(trimmed));
+            return;
+          }
+
+          const headingMatch = trimmed.match(/^(#{1,4})\s+(.+)$/);
+          if (headingMatch) {
+            flushParagraph();
+            closeList();
+            flushBlockquote();
+            const level = Math.min(6, headingMatch[1].length + 1);
+            html.push(`<h${level}>${formatInlineMarkdown(headingMatch[2])}</h${level}>`);
+            return;
+          }
+
+          const blockquoteMatch = trimmed.match(/^>\s?(.*)$/);
+          if (blockquoteMatch) {
+            flushParagraph();
+            closeList();
+            blockquote.push(blockquoteMatch[1]);
+            return;
+          }
+
+          const unorderedMatch = trimmed.match(/^[-*]\s+(.+)$/);
+          const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+          if (unorderedMatch || orderedMatch) {
+            flushParagraph();
+            flushBlockquote();
+            const nextType = unorderedMatch ? 'ul' : 'ol';
+            if (listType && listType !== nextType) {
+              closeList();
+            }
+            if (!listType) {
+              listType = nextType;
+              html.push(`<${listType}>`);
+            }
+            html.push(`<li>${formatInlineMarkdown((unorderedMatch || orderedMatch)?.[1] || '')}</li>`);
+            return;
+          }
+
+          closeList();
+          flushBlockquote();
+          paragraph.push(trimmed);
+        });
+
+        flushParagraph();
+        closeList();
+        flushBlockquote();
+
+        return html.join('');
+      }
+
+      (async function() {
+        const pathSegments = window.location.pathname.split('/').filter(Boolean);
+        const targetSlug = pathSegments.length > 0 ? pathSegments[0].toLowerCase() : '';
+
+        const API_ORIGIN = (() => {
+          const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
+          if (localHosts.has(window.location.hostname)) return "";
+          return "https://api-jeffersonwm.jeffersonwm.com";
+        })();
+
+        let singleData = null;
+
+        try {
+          const res = await fetch(`${API_ORIGIN}/api/widget/singles/${encodeURIComponent(targetSlug)}`);
+          if (res.ok) {
+            singleData = await res.json();
+          }
+        } catch (_err) {
+          // fallback to local cache or static
+        }
+
+        if (!singleData && typeof localStorage !== 'undefined') {
+          try {
+            const cached = JSON.parse(localStorage.getItem('jeffersonwm_singles') || '[]');
+            if (Array.isArray(cached)) {
+              singleData = cached.find((s) => (s.slug && s.slug.toLowerCase() === targetSlug) || (s.id && s.id.toLowerCase() === targetSlug));
+            }
+          } catch (_err) {}
+        }
+
+        if (!singleData) {
+          try {
+            const staticRes = await fetch('/singles.json');
+            if (staticRes.ok) {
+              const list = await staticRes.json();
+              if (Array.isArray(list)) {
+                singleData = list.find((s) => (s.slug && s.slug.toLowerCase() === targetSlug) || (s.id && s.id.toLowerCase() === targetSlug));
+              }
+            }
+          } catch (_err) {}
+        }
+
+        if (singleData) {
+          const isActive = singleData.is_active === undefined || singleData.is_active === 1 || singleData.is_active === true || singleData.is_active === '1';
+          if (!isActive) {
+            window.location.replace('/404.html');
+            return;
+          }
+
+          if (singleData.title) {
+            document.title = singleData.title;
+            const h1 = document.getElementById('page-title') || document.querySelector('h1');
+            if (h1) h1.textContent = singleData.title;
+          }
+          if (singleData.body_text !== undefined) {
+            const bodyContainer = document.getElementById('page-body') || document.querySelector('.body-text');
+            if (bodyContainer) bodyContainer.innerHTML = formatMarkdownHtml(singleData.body_text || '');
+          }
+          const bottomLinks = document.querySelector('.bottom-links');
+          if (bottomLinks) {
+            const showLinks = singleData.show_bottom_links === 1 || singleData.show_bottom_links === true || singleData.show_bottom_links === '1';
+            bottomLinks.style.display = showLinks ? '' : 'none';
+          }
+
+          // Status verified and content populated: reveal page cleanly
+          document.documentElement.classList.add('page-ready');
+        } else {
+          window.location.replace('/404.html');
+        }
+      })();
+    </script>
+  </body>
+</html>

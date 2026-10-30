@@ -9,14 +9,18 @@ const AUTH_BASE_URL = 'https://auth.jeffersonwm.com';
  * 
  * @param {Function} [onSuccess] Callback invoked when authentication succeeds
  * @param {Function} [onError] Callback invoked when authentication fails or access is denied
+ * @param {Object} [options] Optional configuration options (e.g., { prompt: 'login' })
  */
-export function openCentralAuth(onSuccess, onError) {
+export function openCentralAuth(onSuccess, onError, options = {}) {
   // Clear any explicit logout flag so subsequent checks can proceed
   sessionStorage.removeItem('battalion_logged_out');
 
   const url = new URL(AUTH_BASE_URL);
   url.searchParams.set('returnTo', window.location.href);
   url.searchParams.set('popup', '1');
+  if (options && options.prompt) {
+    url.searchParams.set('prompt', options.prompt);
+  }
 
   const width = 440;
   const height = 620;
@@ -70,7 +74,7 @@ export function openCentralAuth(onSuccess, onError) {
           if (popup && !popup.closed) popup.close();
         } catch (_) {}
         if (typeof onError === 'function') {
-          onError(checkRes.message || 'Access to Battalion has not been granted for your account.');
+          onError(checkRes.message || 'Access to Battalion has not been granted for your account.', checkRes.authUser);
         }
       }
     } catch (_) {}

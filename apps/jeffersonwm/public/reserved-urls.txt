@@ -1,0 +1,58 @@
+# JeffersonWM - Reserved URLs / Protected Slugs
+# Any slug listed here cannot be used by Singles pages to prevent routing collisions.
+# You can edit this file in VS Code anytime to add or remove reserved URLs.
+
+# Applications (Active & Staged)
+feed
+aphelion
+tourbillion
+battalion
+perihelion
+lionship
+scallions
+dookydetective
+jeffershizzle
+bullion
+vermilion
+millionfold
+iwenttocity
+stallioneer
+wmjefferson
+copy
+auth
+multimillion
+
+# Public Pages & Sections
+account
+status
+project-activity
+development
+privacy
+underconstruction
+widget
+home
+
+# System & API Endpoints
+api
+admin
+auth
+login
+logout
+signup
+register
+oauth
+callback
+
+# Static Assets & System Files
+assets
+images
+dist
+src
+docs
+scripts
+favicon
+robots
+sitemap
+404
+500
+index

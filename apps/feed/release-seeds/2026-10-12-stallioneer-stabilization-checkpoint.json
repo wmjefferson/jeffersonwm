@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Stallioneer — stabilization checkpoint",
+  "content": "<p>Stallioneer has reached a calmer place after several rounds of inventory, control, options, theme, export, and deployment work. The app is not finished in the permanent sense, but it no longer feels like it needs constant structural development before it can be useful.</p><p>Recent work folded the old Bulk direction back into Inventory, clarified Control as the home for tags, collections, and locations, narrowed Options around appearance, export, and delete-library safety, and aligned the app more closely with the Perihelion page structure. Dark mode now reaches the main shell and control blocks more consistently, tags read more clearly, missing book covers have a reusable placeholder image, and the publish/copy path is safer around the live SQLite database.</p><p>The important shift is that Stallioneer has moved from active construction into a steadier maintenance-and-polish phase. Future work can be smaller and more targeted: testing real catalog entry, refining Android and Windows 98 paths, improving edge cases, and adding only the tools that actual library use proves are needed.</p>",
+  "url": "https://stallioneer.jeffersonwm.com",
+  "source": "manual",
+  "external_id": "stallioneer-stabilization-checkpoint-2026-10-12",
+  "created_at": "2026-10-12 20:47:40"
+}

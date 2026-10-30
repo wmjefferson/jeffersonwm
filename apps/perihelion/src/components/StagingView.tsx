@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Download, GripVertical, X, Settings2, Image as ImageIcon, FileImage, Check, Share } from 'lucide-react';
+import { Download, GripVertical, X, Settings2, Image as ImageIcon, FileImage, Check, Share, Tag, List, Plus, Minus } from 'lucide-react';
 
 const APIBASE = 'https://api.jeffersonwm.com';
 const THUMB_PATH = `${APIBASE}/thumbs`;
@@ -179,6 +179,19 @@ interface StagingViewProps {
   isLocalMode?: boolean;
   getPreviewUrl?: (path: string, height: number, width?: number, cacheBust?: number) => string;
   getOriginalUrl?: (path: string, cacheBust?: number) => string;
+  tagOptions?: string[];
+  listOptions?: {
+    id: string;
+    title: string;
+    images: string[];
+    itemCount?: number;
+  }[];
+  onToggleTag?: (tagName: string, paths: string[]) => void | Promise<void>;
+  onCreateTag?: (tagName: string, paths: string[]) => void | Promise<void>;
+  onDeleteTag?: (tagName: string) => void | Promise<void>;
+  onToggleList?: (shareId: string, paths: string[]) => void | Promise<void>;
+  onCreateList?: (title: string, paths: string[]) => void | Promise<void>;
+  onDeleteList?: (shareId: string, title: string) => void | Promise<void>;
 }
 
 export interface DownloadOptions {
@@ -208,6 +221,14 @@ export default function StagingView({
   isLocalMode = false,
   getPreviewUrl,
   getOriginalUrl,
+  tagOptions = [],
+  listOptions = [],
+  onToggleTag,
+  onCreateTag,
+  onDeleteTag,
+  onToggleList,
+  onCreateList,
+  onDeleteList,
 }: StagingViewProps) {
   const [rules, setRules] = useState<Rule[]>([{ id: '1', type: 'original', value: '' }]);
   const [enableRenaming, setEnableRenaming] = useState<boolean>(false);
@@ -227,6 +248,10 @@ export default function StagingView({
   const [pageDescription, setPageDescription] = useState<string>('');
   const [previewRetryTokens, setPreviewRetryTokens] = useState<Record<string, number>>({});
   const [generateError, setGenerateError] = useState<string>('');
+  const [showTagTools, setShowTagTools] = useState<boolean>(false);
+  const [showListTools, setShowListTools] = useState<boolean>(false);
+  const [tagToolSearch, setTagToolSearch] = useState<string>('');
+  const [listToolSearch, setListToolSearch] = useState<string>('');
 
   const addRule = (type: RuleType) => {
     const newRule: Rule = {
@@ -313,6 +338,46 @@ export default function StagingView({
       itemsWithSize,
     };
   }, [selectedForDownload, selectedImages, selectedMetadata]);
+
+  const selectedDownloadPaths = useMemo(
+    () => selectedImages.filter(path => selectedForDownload.has(path)),
+    [selectedForDownload, selectedImages]
+  );
+
+  const filteredTagOptions = useMemo(
+    () => tagOptions.filter(tag => tag.includes(tagToolSearch.trim().toLowerCase())),
+    [tagOptions, tagToolSearch]
+  );
+
+  const filteredListOptions = useMemo(
+    () => listOptions.filter(list => (list.title || list.id).toLowerCase().includes(listToolSearch.trim().toLowerCase())),
+    [listOptions, listToolSearch]
+  );
+
+  const createTagCandidate = tagToolSearch.trim().toLowerCase();
+  const createListCandidate = listToolSearch.trim();
+  const canCreateTagCandidate = Boolean(createTagCandidate) && !tagOptions.includes(createTagCandidate);
+  const canCreateListCandidate = Boolean(createListCandidate) && !listOptions.some(list => (list.title || '').toLowerCase() === createListCandidate.toLowerCase());
+
+  const getStagingTagState = (tagName: string) => {
+    if (selectedDownloadPaths.length === 0) return { checked: false, indeterminate: false };
+    const count = selectedDownloadPaths.filter(path => selectedMetadata?.[path]?.tags?.includes(tagName)).length;
+    return {
+      checked: count === selectedDownloadPaths.length,
+      indeterminate: count > 0 && count < selectedDownloadPaths.length,
+    };
+  };
+
+  const getStagingListState = (shareId: string) => {
+    const list = listOptions.find(item => item.id === shareId);
+    if (!list || selectedDownloadPaths.length === 0) return { checked: false, indeterminate: false };
+    const count = selectedDownloadPaths.filter(path => list.images.includes(path)).length;
+    return {
+      checked: count === selectedDownloadPaths.length,
+      indeterminate: count > 0 && count < selectedDownloadPaths.length,
+    };
+  };
+
   const secondaryButtonClass = 'peri-button--secondary px-3 py-1.5 min-h-[32px] flex items-center gap-2 disabled:opacity-50 transition-colors text-xs uppercase tracking-wider font-bold';
   const primaryButtonClass = 'peri-button px-3 py-1.5 min-h-[32px] flex items-center gap-2 disabled:opacity-50 transition-colors text-xs uppercase tracking-wider font-bold';
 
@@ -356,12 +421,17 @@ export default function StagingView({
       });
       const data = await res.json();
       if (data.id) {
-        setShowTitlePopup(false);
-        setPageTitle('');
-        setPageDescription('');
-        setGenerateError('');
         const shareUrl = buildSharePageUrl(data.id);
-        window.location.assign(shareUrl);
+        const opened = window.open(shareUrl, '_blank');
+        if (opened) {
+          opened.opener = null;
+          setShowTitlePopup(false);
+          setPageTitle('');
+          setPageDescription('');
+          setGenerateError('');
+        } else {
+          setGenerateError('Share page created, but the browser blocked the new tab.');
+        }
       } else {
         setGenerateError(data.error || 'Failed to create share page');
       }
@@ -385,7 +455,15 @@ export default function StagingView({
             Process, rename, and export staged items
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 relative">
+        <div className="flex flex-nowrap items-center gap-3 overflow-x-auto pb-1">
+          <button
+            onClick={() => setSelectedForDownload(new Set(selectedImages))}
+            disabled={selectedForDownload.size === selectedImages.length}
+            className={secondaryButtonClass}
+          >
+            <Check size={12} strokeWidth={2.5} />
+            Select All
+          </button>
           <button 
             onClick={() => setSelectedForDownload(new Set())}
             disabled={selectedForDownload.size === 0}
@@ -405,7 +483,7 @@ export default function StagingView({
                 {isGenerating ? 'Generating...' : 'Generate Page'}
               </button>
               {showTitlePopup && (
-                <div className="peri-card absolute top-full left-0 sm:left-auto sm:right-0 mt-2 w-[min(18rem,calc(100vw-4rem))] shadow-[0_18px_40px_rgba(15,23,42,0.14)] p-4 z-50 flex flex-col gap-3">
+                <div className="fixed left-1/2 top-24 z-[3000] flex w-[min(18rem,calc(100vw-4rem))] -translate-x-1/2 flex-col gap-3 border border-[#d4d4d8] bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.14)] dark:border-[#333a35] dark:bg-[#191d1a] sm:left-auto sm:right-8 sm:translate-x-0">
                   <label className="font-sans text-xs font-bold uppercase tracking-wider text-[#202522] dark:text-[#fafafa]">
                     Page Title (Optional)
                   </label>
@@ -486,6 +564,153 @@ export default function StagingView({
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Left Panel: Options */}
         <div className="w-full lg:w-[380px] bg-white dark:bg-[#191d1a] text-[#202522] dark:text-[#fafafa] border border-[#e5e5e5] dark:border-[#333a35] flex flex-col shrink-0">
+
+          {/* Tags & Lists Section */}
+          <div className="px-6 pt-6 pb-6 border-b border-[#e5e5e5] dark:border-[#333a35]">
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-sans font-bold uppercase tracking-widest text-sm text-[#202522] dark:text-[#fafafa]">
+                Tags + Lists
+              </span>
+              <span className="peri-chip text-[#202522] dark:text-[#fafafa] text-[11px] font-bold px-2 py-1 uppercase tracking-wider">
+                {selectedDownloadPaths.length} Active
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTagTools(prev => !prev);
+                  setShowListTools(false);
+                }}
+                disabled={selectedDownloadPaths.length === 0}
+                className={`peri-button--secondary text-[#202522] dark:text-[#fafafa] font-bold uppercase tracking-wider text-[11px] py-2 flex items-center justify-center gap-1 disabled:opacity-50 ${showTagTools ? 'is-active' : ''}`}
+              >
+                <Tag size={12} /> Tags
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowListTools(prev => !prev);
+                  setShowTagTools(false);
+                }}
+                disabled={selectedDownloadPaths.length === 0}
+                className={`peri-button--secondary text-[#202522] dark:text-[#fafafa] font-bold uppercase tracking-wider text-[11px] py-2 flex items-center justify-center gap-1 disabled:opacity-50 ${showListTools ? 'is-active' : ''}`}
+              >
+                <List size={12} /> Lists
+              </button>
+            </div>
+
+            {showTagTools && (
+              <div className="peri-card mt-3 bg-[#fafafa] dark:bg-[#202522] p-3">
+                <input
+                  value={tagToolSearch}
+                  onChange={event => setTagToolSearch(event.target.value)}
+                  className="peri-input w-full bg-white dark:bg-[#191d1a] text-[#202522] dark:text-[#fafafa] text-xs px-2 py-1.5 font-medium mb-2"
+                  placeholder="Find or create tag..."
+                />
+                <div className="max-h-44 overflow-y-auto divide-y divide-[#DDD] dark:divide-[#333a35] text-[10px] lowercase">
+                  {filteredTagOptions.map(tagName => {
+                    const { checked, indeterminate } = getStagingTagState(tagName);
+                    const tagCount = selectedMetadata
+                      ? Object.values(selectedMetadata).filter(entry => entry.tags?.includes(tagName)).length
+                      : 0;
+                    return (
+                      <div key={tagName} className="grid grid-cols-[minmax(0,1fr)_4.75rem_1.5rem_1.5rem] items-stretch hover:bg-black hover:text-white group">
+                        <button
+                          type="button"
+                          onClick={() => void onToggleTag?.(tagName, selectedDownloadPaths)}
+                          className="col-span-3 grid grid-cols-[minmax(0,1fr)_4.75rem_1.5rem] items-stretch text-left"
+                        >
+                          <span className="min-w-0 truncate px-2.5 py-2 text-left">#{tagName}</span>
+                          <span className="px-1 py-2 text-right text-[9px] text-gray-400 group-hover:text-gray-300">
+                            ({tagCount} items)
+                          </span>
+                          <span className="mx-auto my-2 flex h-4 w-4 items-center justify-center border border-[#DDD] group-hover:border-white">
+                            {checked ? <Check size={10} strokeWidth={3} /> : indeterminate ? <Minus size={10} strokeWidth={3} /> : null}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void onDeleteTag?.(tagName)}
+                          className="shrink-0 px-2 text-[#9f2f22] hover:bg-[#9f2f22] hover:text-white"
+                          title={`Delete tag ${tagName}`}
+                        >
+                          <X size={10} strokeWidth={3} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {canCreateTagCandidate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void (onCreateTag || onToggleTag)?.(createTagCandidate, selectedDownloadPaths);
+                        setTagToolSearch('');
+                      }}
+                      className="w-full text-left px-2.5 py-2 flex items-center gap-1.5 bg-[#FFFBEB] text-black font-bold hover:bg-black hover:text-white"
+                    >
+                      <Plus size={10} strokeWidth={3} />
+                      Create tag "{createTagCandidate}"
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showListTools && (
+              <div className="peri-card mt-3 bg-[#fafafa] dark:bg-[#202522] p-3">
+                <input
+                  value={listToolSearch}
+                  onChange={event => setListToolSearch(event.target.value)}
+                  className="peri-input w-full bg-white dark:bg-[#191d1a] text-[#202522] dark:text-[#fafafa] text-xs px-2 py-1.5 font-medium mb-2"
+                  placeholder="Find or create list..."
+                />
+                <div className="max-h-44 overflow-y-auto divide-y divide-[#DDD] dark:divide-[#333a35] text-[10px] uppercase">
+                  {filteredListOptions.map(list => {
+                    const { checked, indeterminate } = getStagingListState(list.id);
+                    return (
+                      <div key={list.id} className="grid grid-cols-[minmax(0,1fr)_4.75rem_1.5rem_1.5rem] items-stretch hover:bg-black hover:text-white group">
+                        <button
+                          type="button"
+                          onClick={() => void onToggleList?.(list.id, selectedDownloadPaths)}
+                          className="col-span-3 grid grid-cols-[minmax(0,1fr)_4.75rem_1.5rem] items-stretch text-left"
+                        >
+                          <span className="min-w-0 truncate px-2.5 py-2 text-left">{list.title || list.id}</span>
+                          <span className="px-1 py-2 text-right text-[9px] text-gray-400 group-hover:text-gray-300">
+                            ({list.itemCount ?? list.images.length} items)
+                          </span>
+                          <span className="mx-auto my-2 flex h-4 w-4 items-center justify-center border border-[#DDD] group-hover:border-white">
+                            {checked ? <Check size={10} strokeWidth={3} /> : indeterminate ? <Minus size={10} strokeWidth={3} /> : null}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void onDeleteList?.(list.id, list.title || list.id)}
+                          className="shrink-0 px-2 text-[#9f2f22] hover:bg-[#9f2f22] hover:text-white"
+                          title={`Delete list ${list.title || list.id}`}
+                        >
+                          <X size={10} strokeWidth={3} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {canCreateListCandidate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void onCreateList?.(createListCandidate, selectedDownloadPaths);
+                        setListToolSearch('');
+                      }}
+                      className="w-full text-left px-2.5 py-2 flex items-center gap-1.5 bg-[#FFFBEB] text-black font-bold hover:bg-black hover:text-white"
+                    >
+                      <Plus size={10} strokeWidth={3} />
+                      Create list "{createListCandidate}"
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           
           {/* Naming Rules Section */}
           <div className="px-6 pt-6 pb-6 border-b border-[#e5e5e5] dark:border-[#333a35]">

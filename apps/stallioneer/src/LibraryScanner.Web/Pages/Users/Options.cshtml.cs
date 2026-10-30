@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text;
+using System.Text.Json;
 using LibraryScanner.Web.Data;
 using LibraryScanner.Web.Models;
 using LibraryScanner.Web.Services;
@@ -21,11 +22,12 @@ public class OptionsModel(
     public IReadOnlyList<InventoryExportField> ExportFields => InventoryExportField.All;
 
     [BindProperty]
-    public List<string> PdfFieldKeys { get; set; } = [];
+    public List<string> ExportFieldKeys { get; set; } = [];
 
     [BindProperty]
-    [Range(0, int.MaxValue)]
-    public int? DeleteConfirmationCount { get; set; }
+    public string? DeleteConfirmationCount { get; set; }
+
+    public string DeleteConfirmationWord => NumberToWords(Snapshot.TotalBooks);
 
     [TempData]
     public string? StatusMessage { get; set; }
@@ -37,13 +39,15 @@ public class OptionsModel(
 
     public async Task<IActionResult> OnPostExportAsync()
     {
+        var fields = InventoryExportField.Select(ExportFieldKeys);
         var books = await GetInventoryBooksAsync();
-        var csv = InventoryCsv.ExportBooks(books);
+        var csv = InventoryCsv.ExportBooks(books, fields);
         var fileName = $"stallioneer-inventory-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
         await authHistoryLog.LogAsync(inventoryAccess.GetAccount(User), "stallioneer.exported", new
         {
             type = "inventory-csv",
             count = books.Count,
+            fields = fields.Select(field => field.Key).ToArray(),
             fileName,
             books = CreateExportElements(books)
         });
@@ -52,7 +56,7 @@ public class OptionsModel(
 
     public async Task<IActionResult> OnPostExportPdfAsync()
     {
-        var fields = InventoryExportField.Select(PdfFieldKeys);
+        var fields = InventoryExportField.Select(ExportFieldKeys);
         var books = await GetInventoryBooksAsync();
         var pdf = InventoryPdf.ExportBooks(books, fields);
         var fileName = $"stallioneer-inventory-{DateTime.UtcNow:yyyyMMdd-HHmmss}.pdf";
@@ -67,12 +71,42 @@ public class OptionsModel(
         return File(pdf, "application/pdf", fileName);
     }
 
+    public async Task<IActionResult> OnPostExportJsonAsync()
+    {
+        var fields = InventoryExportField.Select(ExportFieldKeys);
+        var books = await GetInventoryBooksAsync();
+        var fileName = $"stallioneer-inventory-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json";
+        var payload = new
+        {
+            exportedAt = DateTimeOffset.UtcNow,
+            type = "inventory-json",
+            count = books.Count,
+            fields = fields.Select(field => new { field.Key, field.Label }).ToArray(),
+            books = books.Select(book => new
+            {
+                book.Id,
+                values = fields.ToDictionary(field => field.Key, field => field.Value(book) ?? string.Empty)
+            }).ToArray()
+        };
+        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+        await authHistoryLog.LogAsync(inventoryAccess.GetAccount(User), "stallioneer.exported", new
+        {
+            type = "inventory-json",
+            count = books.Count,
+            fields = fields.Select(field => field.Key).ToArray(),
+            fileName,
+            books = CreateExportElements(books)
+        });
+        return File(Encoding.UTF8.GetBytes(json), "application/json", fileName);
+    }
+
     public async Task<IActionResult> OnPostDeleteLibraryAsync()
     {
         Snapshot = await LoadSnapshotAsync();
-        if (DeleteConfirmationCount != Snapshot.TotalBooks)
+        var expectedConfirmation = DeleteConfirmationWord;
+        if (!string.Equals(NormalizeConfirmation(DeleteConfirmationCount), NormalizeConfirmation(expectedConfirmation), StringComparison.OrdinalIgnoreCase))
         {
-            ModelState.AddModelError(nameof(DeleteConfirmationCount), $"Enter {Snapshot.TotalBooks} to confirm.");
+            ModelState.AddModelError(nameof(DeleteConfirmationCount), $"Enter {expectedConfirmation} to confirm.");
             return Page();
         }
 
@@ -164,6 +198,102 @@ public class OptionsModel(
             TotalCollections = await inventoryAccess.ScopeCollections(dbContext.Collections, User).CountAsync(),
             TotalLocations = await inventoryAccess.ScopeLocations(dbContext.Locations, User).CountAsync()
         };
+    }
+
+    private static string NormalizeConfirmation(string? value)
+    {
+        return string.Join(string.Empty, (value ?? string.Empty)
+            .Where(char.IsLetterOrDigit));
+    }
+
+    private static string NumberToWords(int number)
+    {
+        if (number == 0)
+        {
+            return "Zero";
+        }
+
+        if (number < 0)
+        {
+            return $"Negative {NumberToWords(Math.Abs(number))}";
+        }
+
+        return string.Join(" ", NumberToWordsParts(number));
+    }
+
+    private static IEnumerable<string> NumberToWordsParts(int number)
+    {
+        string[] smallNumbers =
+        [
+            "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+            "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+            "Seventeen", "Eighteen", "Nineteen"
+        ];
+        string[] tens =
+        [
+            string.Empty, string.Empty, "Twenty", "Thirty", "Forty", "Fifty",
+            "Sixty", "Seventy", "Eighty", "Ninety"
+        ];
+
+        if (number < 20)
+        {
+            yield return smallNumbers[number];
+            yield break;
+        }
+
+        if (number < 100)
+        {
+            yield return tens[number / 10];
+            if (number % 10 > 0)
+            {
+                yield return smallNumbers[number % 10];
+            }
+            yield break;
+        }
+
+        if (number < 1000)
+        {
+            yield return smallNumbers[number / 100];
+            yield return "Hundred";
+            if (number % 100 > 0)
+            {
+                foreach (var part in NumberToWordsParts(number % 100))
+                {
+                    yield return part;
+                }
+            }
+            yield break;
+        }
+
+        if (number < 1_000_000)
+        {
+            foreach (var part in NumberToWordsParts(number / 1000))
+            {
+                yield return part;
+            }
+            yield return "Thousand";
+            if (number % 1000 > 0)
+            {
+                foreach (var part in NumberToWordsParts(number % 1000))
+                {
+                    yield return part;
+                }
+            }
+            yield break;
+        }
+
+        foreach (var part in NumberToWordsParts(number / 1_000_000))
+        {
+            yield return part;
+        }
+        yield return "Million";
+        if (number % 1_000_000 > 0)
+        {
+            foreach (var part in NumberToWordsParts(number % 1_000_000))
+            {
+                yield return part;
+            }
+        }
     }
 
     public sealed class AppSnapshot

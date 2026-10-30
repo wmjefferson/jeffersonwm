@@ -97,6 +97,14 @@ public static class ThemeManager
             var brush = new SolidColorBrush(color);
             brush.Freeze();
             app.Resources[key] = brush;
+
+            foreach (var md in app.Resources.MergedDictionaries)
+            {
+                if (md.Contains(key))
+                {
+                    md[key] = brush;
+                }
+            }
         }
 
         if (isDark)
@@ -120,6 +128,10 @@ public static class ThemeManager
             UpdateBrush("TabContainerBrush", Color.FromRgb(0x28, 0x28, 0x28));
             UpdateBrush("TabHoverBrush", Color.FromRgb(0x3D, 0x3D, 0x5C));
             UpdateBrush("InputBgBrush", Color.FromRgb(0x20, 0x20, 0x20));
+            UpdateBrush("ScrollBarTrackBrush", Colors.Transparent);
+            UpdateBrush("ScrollBarThumbBrush", Color.FromRgb(0x55, 0x55, 0x55));
+            UpdateBrush("ScrollBarThumbHoverBrush", Color.FromRgb(0x75, 0x75, 0x75));
+            UpdateBrush("ScrollBarThumbDraggingBrush", Color.FromRgb(0x90, 0x90, 0x90));
         }
         else
         {
@@ -142,6 +154,10 @@ public static class ThemeManager
             UpdateBrush("TabContainerBrush", Color.FromRgb(0xEA, 0xEA, 0xEA));
             UpdateBrush("TabHoverBrush", Color.FromRgb(0xDC, 0xDC, 0xDC));
             UpdateBrush("InputBgBrush", Color.FromRgb(0xFF, 0xFF, 0xFF));
+            UpdateBrush("ScrollBarTrackBrush", Colors.Transparent);
+            UpdateBrush("ScrollBarThumbBrush", Color.FromRgb(0xC1, 0xC1, 0xC1));
+            UpdateBrush("ScrollBarThumbHoverBrush", Color.FromRgb(0x99, 0x99, 0x99));
+            UpdateBrush("ScrollBarThumbDraggingBrush", Color.FromRgb(0x77, 0x77, 0x77));
         }
 
         // Shared Accent Colors (Brand Orange preserved across Light & Dark)

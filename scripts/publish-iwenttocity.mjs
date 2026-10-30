@@ -12,13 +12,17 @@ const backendTarget = path.join(serverRootTarget, 'backend')
 
 const backendCopies = [
   '.env.example',
+  '.env.production',
   '.gitignore',
   'dist',
   'index.html',
   'package-lock.json',
   'package.json',
   'public',
+  'RUNBOOK.md',
   'server.ts',
+  'server-dist',
+  'start-tunnel-live.ps1',
   'src',
   'tsconfig.app.json',
   'tsconfig.json',
@@ -26,7 +30,7 @@ const backendCopies = [
   'vite.config.ts',
 ]
 
-const replaceBeforeCopy = ['dist', 'public', 'src']
+const replaceBeforeCopy = ['dist', 'public', 'server-dist', 'src']
 
 function parseArgs(argv) {
   const args = {}

@@ -56,7 +56,7 @@ public partial class KeyMapping : ObservableObject
     [ObservableProperty] private bool _isShift;
     [ObservableProperty] private bool _isAlt;
     [ObservableProperty] private bool _isWin;
-    [ObservableProperty] private string _targetKey = "C";
+    [ObservableProperty] private string _targetKey = "(None)";
 
     // Text properties
     [ObservableProperty] private string _textValue = string.Empty;
@@ -80,10 +80,20 @@ public partial class KeyMapping : ObservableObject
     // Google Docs Highlight properties
     [ObservableProperty] private string _googleDocsHighlightColor = "Yellow";
 
-    partial void OnGoogleDocsHighlightColorChanged(string value)
-    {
-        UpdateActionAssignment();
-    }
+    partial void OnTargetKeyChanged(string value) => UpdateActionAssignment();
+    partial void OnIsCtrlChanged(bool value) => UpdateActionAssignment();
+    partial void OnIsShiftChanged(bool value) => UpdateActionAssignment();
+    partial void OnIsAltChanged(bool value) => UpdateActionAssignment();
+    partial void OnIsWinChanged(bool value) => UpdateActionAssignment();
+    partial void OnActionTypeChanged(string value) => UpdateActionAssignment();
+    partial void OnTextValueChanged(string value) => UpdateActionAssignment();
+    partial void OnCharDelayMsChanged(int value) => UpdateActionAssignment();
+    partial void OnLaunchTargetChanged(string value) => UpdateActionAssignment();
+    partial void OnLaunchArgsChanged(string value) => UpdateActionAssignment();
+    partial void OnRunAsAdminChanged(bool value) => UpdateActionAssignment();
+    partial void OnMediaCommandChanged(string value) => UpdateActionAssignment();
+    partial void OnSelectedMacroNameChanged(string value) => UpdateActionAssignment();
+    partial void OnGoogleDocsHighlightColorChanged(string value) => UpdateActionAssignment();
 
     public void UpdateActionAssignment()
     {
@@ -112,7 +122,12 @@ public partial class KeyMapping : ObservableObject
         if (IsShift) parts.Add("Shift");
         if (IsAlt) parts.Add("Alt");
         if (IsWin) parts.Add("Win");
-        if (!string.IsNullOrEmpty(TargetKey)) parts.Add(TargetKey);
+        if (!string.IsNullOrEmpty(TargetKey) && 
+            !TargetKey.Equals("(None)", StringComparison.OrdinalIgnoreCase) && 
+            !TargetKey.Equals("None", StringComparison.OrdinalIgnoreCase))
+        {
+            parts.Add(TargetKey);
+        }
         return parts.Count > 0 ? $"Keystroke: {string.Join(" + ", parts)}" : "Keystroke: (None)";
     }
 
@@ -125,7 +140,11 @@ public partial class KeyMapping : ObservableObject
             {
                 "Keystroke" => new KeystrokeAction
                 {
-                    Key = Enum.TryParse<VirtualKeyCode>(TargetKey, true, out var vk) ? vk : VirtualKeyCode.None,
+                    Key = (string.IsNullOrEmpty(TargetKey) || 
+                           TargetKey.Equals("(None)", StringComparison.OrdinalIgnoreCase) || 
+                           TargetKey.Equals("None", StringComparison.OrdinalIgnoreCase))
+                        ? VirtualKeyCode.None 
+                        : (Enum.TryParse<VirtualKeyCode>(TargetKey, true, out var vk) ? vk : VirtualKeyCode.None),
                     Modifiers = (IsCtrl ? ModifierKeys.Ctrl : ModifierKeys.None) |
                                 (IsShift ? ModifierKeys.Shift : ModifierKeys.None) |
                                 (IsAlt ? ModifierKeys.Alt : ModifierKeys.None) |
@@ -194,7 +213,7 @@ public partial class KeyMapping : ObservableObject
             model.IsShift = ka.Modifiers.HasFlag(ModifierKeys.Shift);
             model.IsAlt = ka.Modifiers.HasFlag(ModifierKeys.Alt);
             model.IsWin = ka.Modifiers.HasFlag(ModifierKeys.Win);
-            model.TargetKey = ka.Key.ToString();
+            model.TargetKey = ka.Key == VirtualKeyCode.None ? "(None)" : ka.Key.ToString();
         }
         else if (core.Action is TextTypeAction ta)
         {

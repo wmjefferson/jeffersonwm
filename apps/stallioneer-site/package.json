@@ -1,0 +1,28 @@
+{
+  "name": "stallioneer-site",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node ..\\..\\scripts\\finish-stamp.mjs --label \"build\"",
+    "preview": "vite preview",
+    "publish": "node ..\\..\\scripts\\publish-aso.mjs --app stallioneer-site && node ..\\..\\scripts\\finish-stamp.mjs --label \"publish\"",
+    "buildlog": "node ..\\..\\scripts\\logged-build.mjs --app stallioneer-site && node ..\\..\\scripts\\finish-stamp.mjs --label \"buildlog\"",
+    "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",
+    "version:patch": "node ..\\..\\scripts\\version-and-log.mjs --app stallioneer-site --type patch && node ..\\..\\scripts\\finish-stamp.mjs --label \"version:patch\"",
+    "version:minor": "node ..\\..\\scripts\\version-and-log.mjs --app stallioneer-site --type minor && node ..\\..\\scripts\\finish-stamp.mjs --label \"version:minor\"",
+    "version:major": "node ..\\..\\scripts\\version-and-log.mjs --app stallioneer-site --type major && node ..\\..\\scripts\\finish-stamp.mjs --label \"version:major\""
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.4",
+    "vite": "^6.4.2",
+    "typescript": "~5.8.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2"
+  }
+}

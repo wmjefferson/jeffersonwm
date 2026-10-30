@@ -344,10 +344,12 @@ function formatActionTimestamp(timestamp: string) {
 export function AdminPage({
   apiBaseUrl,
   authStatus,
+  accountLink,
   onSignOut,
 }: {
   apiBaseUrl: string;
   authStatus: AuthStatus | null;
+  accountLink: string | null;
   onSignOut: () => void;
 }) {
   const [currentHash, setCurrentHash] = useState(window.location.hash);
@@ -1545,9 +1547,10 @@ export function AdminPage({
     return (
       <>
         <main className="h-[calc(100vh-72px)] overflow-y-auto px-[36px] py-[16px]">
-          <div className="mb-4 flex items-start justify-between gap-4 border-b border-[#e5e5e5] pb-2 font-sans text-sm text-gray-900">
+          <div className="mb-4 flex items-start justify-between gap-4 border-b border-[#e5e5e5] pb-3 font-sans text-sm text-gray-900">
             <div>
-              <span className="font-semibold">Shop Lab</span> - owner-only draft product grouping for Aph images. No checkout, public storefront, Shopify sync, or fulfillment automation yet.
+              <h1 className="m-0 mb-1 font-sans text-2xl font-bold uppercase tracking-tight text-gray-950">Shop Lab</h1>
+              <p className="m-0">Owner-only draft product grouping for Aph images. No checkout, public storefront, Shopify sync, or fulfillment automation yet.</p>
               {shopLab && (
                 <span className="ml-2 text-gray-500">
                   {shopLab.groups.length} draft group{shopLab.groups.length === 1 ? '' : 's'} from {shopLab.sourceRoot}.
@@ -1988,8 +1991,9 @@ export function AdminPage({
     return (
       <>
         <main className="h-[calc(100vh-72px)] overflow-y-auto px-[36px] py-[16px]">
-          <div className="mb-4 border-b border-[#e5e5e5] pb-2 font-sans text-sm text-gray-900">
-            <span className="font-semibold">Highlights</span> - review the current master highlight list with card identity details, download stats, and direct image links.
+          <div className="mb-4 border-b border-[#e5e5e5] pb-3 font-sans text-sm text-gray-900">
+            <h1 className="m-0 mb-1 font-sans text-2xl font-bold uppercase tracking-tight text-gray-950">Highlights</h1>
+            <p className="m-0">Review the current master highlight list with card identity details, download stats, and direct image links.</p>
             {highlightSummary && (
               <span className="ml-2 text-gray-500">
                 {highlightedCards.length} image{highlightedCards.length === 1 ? '' : 's'} tracked.
@@ -2204,6 +2208,16 @@ export function AdminPage({
           <a href="/aphelion/" className="text-red-600 hover:text-red-700 transition-colors duration-1000 hover:duration-150">
             Public
           </a>
+          {authStatus?.user && (
+            <a
+              href={accountLink || 'https://jeffersonwm.com/account/'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+            >
+              {authStatus.user.username}
+            </a>
+          )}
           <button
             type="button"
             onClick={onSignOut}
@@ -2220,8 +2234,9 @@ export function AdminPage({
         renderShopLabPage()
       ) : isOptionsPage ? (
         <main className="h-[calc(100vh-72px)] overflow-y-auto px-[36px] py-[16px]">
-          <div className="mb-4 border-b border-[#e5e5e5] pb-2 font-sans text-sm text-gray-900">
-            <span className="font-semibold">Admin</span> - edit card libraries, set labels, and the property standards used by curation.
+          <div className="mb-4 border-b border-[#e5e5e5] pb-3 font-sans text-sm text-gray-900">
+            <h1 className="m-0 mb-1 font-sans text-2xl font-bold uppercase tracking-tight text-gray-950">Options</h1>
+            <p className="m-0">Edit card libraries, set labels, and the property standards used by curation.</p>
             {authStatus?.user && (
               <span className="ml-2 text-gray-500">Signed in as {authStatus.user.displayName || authStatus.user.username}.</span>
             )}
@@ -2257,7 +2272,10 @@ export function AdminPage({
           </div>
         </main>
       ) : isCurationPage ? (
-      <main className="h-[calc(100vh-72px)] overflow-hidden px-[36px] py-[12px]">
+      <main className="h-[calc(100vh-72px)] overflow-hidden px-[36px] py-[16px]">
+        <div className="mb-3 border-b border-[#e5e5e5] pb-2">
+          <h1 className="m-0 font-sans text-2xl font-bold uppercase tracking-tight text-gray-950">Curation</h1>
+        </div>
         <div className="relative mb-1 grid grid-cols-6 border-b border-[#e5e5e5] pb-1 font-sans text-xs text-gray-900">
           <div className="min-w-0 text-center"><span className="font-semibold">Total</span> - {stats.total}</div>
           <div className="min-w-0 text-center"><span className="font-semibold">Reviewed</span> - {stats.reviewed}</div>

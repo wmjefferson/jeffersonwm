@@ -209,6 +209,35 @@ a {
   font-size: 0.72rem;
 }
 
+.pinned-arrange {
+  display: inline-flex;
+  gap: 0.15rem;
+  align-items: center;
+  margin-left: 0.1rem;
+}
+
+.pinned-arrange-button {
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 1px solid rgba(17, 24, 39, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: rgba(17, 24, 39, 0.56);
+  cursor: pointer;
+}
+
+.pinned-arrange-button:hover:not(:disabled),
+.pinned-arrange-button:focus-visible {
+  border-color: rgba(17, 24, 39, 0.3);
+  color: #1f4fd6;
+}
+
+.pinned-arrange-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
 .feed-weekbar,
 .feed-weekbar-head,
 .feed-weekbar-actions,
@@ -511,6 +540,30 @@ a {
 
 .subfeed-list {
   gap: 1.1rem;
+}
+
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 2.5rem;
+  color: rgba(17, 24, 39, 0.58);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.site-footer a {
+  color: rgba(17, 24, 39, 0.82);
+  font-weight: 700;
+}
+
+.site-footer a {
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
 }
 
 .form-row,

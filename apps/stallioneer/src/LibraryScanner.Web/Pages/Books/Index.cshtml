@@ -3,12 +3,40 @@
 @model LibraryScanner.Web.Pages.Books.IndexModel
 @{
     ViewData["Title"] = "Inventory";
+    var activeFilterLabels = new List<string>();
+    if (!string.IsNullOrWhiteSpace(Model.Query))
+    {
+        activeFilterLabels.Add($"Search: {Model.Query}");
+    }
+    activeFilterLabels.AddRange(Model.CollectionFilters
+        .Where(option => Model.CollectionIds.Contains(option.Id))
+        .Select(option => $"Collection: {option.Name}"));
+    activeFilterLabels.AddRange(Model.TagFilters
+        .Where(option => Model.TagIds.Contains(option.Id))
+        .Select(option => $"Tag: {option.Name}"));
+    activeFilterLabels.AddRange(Model.LocationFilters
+        .Where(option => Model.LocationIds.Contains(option.Id))
+        .Select(option => $"Location: {option.Name}"));
+    activeFilterLabels.AddRange(Model.StatusFilters
+        .Where(option => Model.Statuses.Contains(option.Id, StringComparer.OrdinalIgnoreCase))
+        .Select(option => $"Availability: {option.Name}"));
+    if (Model.TagIds.Count > 1)
+    {
+        activeFilterLabels.Add($"Tag mode: {Model.TagMode.ToUpperInvariant()}");
+    }
 }
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <div class="alert alert-success">@Model.StatusMessage</div>
 }
+
+<section class="peri-page-shell">
+    <header class="peri-page-header">
+        <div>
+            <h1>Inventory</h1>
+        </div>
+    </header>
 
 <p class="inventory-status-row" aria-label="Inventory status">
     <span><strong>@Model.TotalTitles</strong> Titles</span>
@@ -109,6 +137,24 @@
             <select asp-for="PageSize" asp-items="Model.PageSizeOptions" class="form-select" data-inventory-page-size></select>
         </label>
     </div>
+    <div class="active-filter-strip" aria-label="Active inventory filters" data-active-filter-strip>
+        <span class="active-filter-strip__label">Active filters</span>
+        @if (activeFilterLabels.Count > 0)
+        {
+            <div class="active-filter-strip__items" data-active-filter-items>
+                @foreach (var filter in activeFilterLabels)
+                {
+                    <span class="active-filter-chip">@filter</span>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="active-filter-strip__items" data-active-filter-items>
+                <span class="active-filter-strip__empty">None</span>
+            </div>
+        }
+    </div>
 </form>
 
 <form method="post" class="inventory-selection-form">
@@ -117,6 +163,7 @@
     <input asp-for="PageSize" type="hidden" />
     <input asp-for="PageNumber" type="hidden" />
     <input asp-for="TagMode" type="hidden" />
+    <div data-inventory-tag-mutations></div>
     @foreach (var id in Model.CollectionIds)
     {
         <input type="hidden" name="CollectionIds" value="@id" />
@@ -164,9 +211,9 @@
                 <option value="">Set availability</option>
             </select>
             <select asp-for="SelectedLocationId" asp-items="Model.LocationOptions" class="form-select"></select>
-            <button type="submit" asp-page-handler="ApplySelectedFields" class="btn btn-outline-secondary">Apply</button>
         </div>
     </div>
+    <button type="submit" asp-page-handler="ApplySelectedFields" class="btn btn-outline-secondary inventory-selection-apply">Apply</button>
 
     <div class="inventory-selection-shared" data-inventory-selection-shared hidden>
         <div>
@@ -227,7 +274,7 @@ else
                                 }
                                 else
                                 {
-                                    <div class="cover-placeholder"></div>
+                                    <img class="cover-placeholder" src="/images/cover-placeholder.svg" alt="No cover available" />
                                 }
                                 <div>
                                     <div class="copy-line">
@@ -278,6 +325,7 @@ else
 }
 
 </form>
+</section>
 
 <script id="inventory-selection-data" type="application/json">
 @Html.Raw(JsonSerializer.Serialize(Model.SelectableBooks))

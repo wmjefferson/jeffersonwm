@@ -52,6 +52,10 @@ interface FolderEntry {
     user: boolean;
     admin: boolean;
   };
+  defaultAccessMixed?: {
+    user: boolean;
+    admin: boolean;
+  };
 }
 
 interface FolderApiEntry {
@@ -132,6 +136,8 @@ interface ShareRecord extends ShareAccessRecord {
   images: string[];
   itemCount: number;
   created_at: string;
+  password_enabled?: boolean;
+  password_hint?: string;
 }
 
 interface FolderParentAccess {
@@ -811,6 +817,18 @@ export default function App() {
   const [folderQuickEditDescription, setFolderQuickEditDescription] = useState('');
   const [folderQuickVisibleToUsers, setFolderQuickVisibleToUsers] = useState(true);
   const [folderQuickVisibleToAdmins, setFolderQuickVisibleToAdmins] = useState(true);
+  const [currentFolderDefaultAccess, setCurrentFolderDefaultAccess] = useState<FolderEntry['defaultAccess']>({
+    user: 'allow',
+    admin: 'allow',
+  });
+  const [currentFolderDefaultAccessInherited, setCurrentFolderDefaultAccessInherited] = useState<FolderEntry['defaultAccessInherited']>({
+    user: false,
+    admin: false,
+  });
+  const [currentFolderDefaultAccessMixed, setCurrentFolderDefaultAccessMixed] = useState<FolderEntry['defaultAccessMixed']>({
+    user: false,
+    admin: false,
+  });
   const [folderQuickApprovedUsers, setFolderQuickApprovedUsers] = useState<AuthUser[]>([]);
   const [folderQuickAccountAccess, setFolderQuickAccountAccess] = useState<FolderAccountAccess>({});
   const [folderQuickParentAccess, setFolderQuickParentAccess] = useState<FolderParentAccess>({
@@ -873,6 +891,12 @@ export default function App() {
   const [sharedTitle, setSharedTitle] = useState<string>('');
   const [sharedDescription, setSharedDescription] = useState<string>('');
   const [sharedError, setSharedError] = useState('');
+  const [sharedPasswordRequired, setSharedPasswordRequired] = useState(false);
+  const [sharedPasswordHint, setSharedPasswordHint] = useState('');
+  const [sharedPasswordInput, setSharedPasswordInput] = useState('');
+  const [sharedPasswordError, setSharedPasswordError] = useState('');
+  const [sharedPasswordSubmitting, setSharedPasswordSubmitting] = useState(false);
+  const [limitSharedWidth, setLimitSharedWidth] = useState(false);
   const [previewRetryTokens, setPreviewRetryTokens] = useState<Record<string, number>>({});
   const [sourceMode, setSourceMode] = useState<PeriSourceMode>('server');
   const [localLibraryEntries, setLocalLibraryEntries] = useState<MediaEntry[]>([]);
@@ -921,6 +945,8 @@ export default function App() {
   const lastFolderPathRef = React.useRef<string>(loadLastFolderPath());
   const prewarmedPageKeysRef = React.useRef<Set<string>>(new Set());
   const prewarmImagesRef = React.useRef<HTMLImageElement[]>([]);
+  const tagMixedSnapshotsRef = React.useRef<Record<string, string[]>>({});
+  const listMixedSnapshotsRef = React.useRef<Record<string, string[]>>({});
   const isGlobalSearch = debouncedSearch.trim().length >= 4;
   const serverLibraryRequiresAuth = authStatus?.serverLibraryRequireAuth ?? authStatus?.requireAuth ?? false;
   const canUseLocalLibrary = authStatus?.requireAuth ? Boolean(authStatus?.user) : true;
@@ -1788,14 +1814,20 @@ export default function App() {
         signal: controller.signal,
         credentials: 'include',
       })
-        .then(res => {
-          if (!res.ok) throw new Error('Network response was not ok');
-          return res.json();
-        })
+        .then(res => res.json())
         .then(data => {
-          if (data.error) {
+          if (data.locked || data.passwordRequired) {
+            setSharedPasswordRequired(true);
+            setSharedPasswordHint(data.password_hint || '');
+            setSharedTitle(data.title || '');
+            setSharedDescription(data.description || '');
+            setSharedImages([]);
+            setSharedFiles([]);
+          } else if (data.error) {
             setSharedError(data.error);
           } else {
+            setSharedPasswordRequired(false);
+            setSharedPasswordError('');
             setSharedImages(data.images);
             if (data.files) setSharedFiles(data.files);
             if (data.title) setSharedTitle(data.title);
@@ -2124,6 +2156,9 @@ export default function App() {
       setFolderDescriptionInput('');
       setFolderQuickVisibleToUsers(true);
       setFolderQuickVisibleToAdmins(true);
+      setCurrentFolderDefaultAccess({ user: 'allow', admin: 'allow' });
+      setCurrentFolderDefaultAccessInherited({ user: false, admin: false });
+      setCurrentFolderDefaultAccessMixed({ user: false, admin: false });
       return;
     }
 
@@ -2134,6 +2169,18 @@ export default function App() {
         setFolderDescriptionInput(data?.description ?? '');
         setFolderQuickVisibleToUsers(data?.visibleToUsers ?? true);
         setFolderQuickVisibleToAdmins(data?.visibleToAdmins ?? true);
+        setCurrentFolderDefaultAccess({
+          user: data?.defaultAccess?.user ?? ((data?.visibleToUsers ?? true) ? 'allow' : 'block'),
+          admin: data?.defaultAccess?.admin ?? ((data?.visibleToAdmins ?? true) ? 'allow' : 'block'),
+        });
+        setCurrentFolderDefaultAccessInherited({
+          user: data?.defaultAccessInherited?.user ?? false,
+          admin: data?.defaultAccessInherited?.admin ?? false,
+        });
+        setCurrentFolderDefaultAccessMixed({
+          user: data?.defaultAccessMixed?.user ?? false,
+          admin: data?.defaultAccessMixed?.admin ?? false,
+        });
         setFolderCoverPaths({
           cover1Path: data?.cover1ImagePath ?? data?.coverImagePath ?? null,
           cover2Path: data?.cover2ImagePath ?? null,
@@ -2144,6 +2191,9 @@ export default function App() {
         setFolderDescriptionInput('');
         setFolderQuickVisibleToUsers(true);
         setFolderQuickVisibleToAdmins(true);
+        setCurrentFolderDefaultAccess({ user: 'allow', admin: 'allow' });
+        setCurrentFolderDefaultAccessInherited({ user: false, admin: false });
+        setCurrentFolderDefaultAccessMixed({ user: false, admin: false });
         setFolderCoverPaths({ cover1Path: null, cover2Path: null });
       });
   }, [sourceMode, currentPath, canEditServerFolders]);
@@ -2515,10 +2565,18 @@ export default function App() {
     setActiveTagInputIndex(0);
   }, [tagInput, editTags]);
 
+  const normalizeTargetPaths = (paths: string[]) => Array.from(new Set(paths.filter(Boolean)));
+
+  const getMixedSnapshotKey = (name: string, paths: string[]) =>
+    `${name}\u001e${[...paths].sort((a, b) => a.localeCompare(b)).join('\u001f')}`;
+
+  const getEntryForPath = (path: string, sourceEntries: MediaEntry[]) =>
+    sourceEntries.find(e => e.path === path) || selectedMetadata[path];
+
   const getTagState = (tagName: string) => {
     const selectedList = Array.from(selectedImages);
     const sourceEntries = sourceMode === 'local' ? localLibraryEntries : entries;
-    const visibleSelected = selectedList.filter(path => sourceEntries.some(e => e.path === path) || selectedMetadata[path]);
+    const visibleSelected = selectedList.filter(path => getEntryForPath(path, sourceEntries));
     
     if (visibleSelected.length === 0) return { checked: false, indeterminate: false };
     
@@ -2534,26 +2592,52 @@ export default function App() {
   };
 
   const handleToggleTagBulk = async (tagName: string) => {
+    await handleToggleTagForPaths(tagName, Array.from(selectedImages));
+  };
+
+  const handleToggleTagForPaths = async (tagName: string, paths: string[]) => {
     const tag = tagName.trim().toLowerCase();
-    if (!tag) return;
-    
-    const { checked } = getTagState(tag);
-    const action = checked ? 'remove' : 'add';
+    const targetPaths = normalizeTargetPaths(paths);
+    if (!tag || targetPaths.length === 0) return;
+
+    const targetSet = new Set(targetPaths);
+    const sourceEntries = sourceMode === 'local' ? localLibraryEntries : entries;
+    const snapshotKey = getMixedSnapshotKey(tag, targetPaths);
+    const currentTaggedPaths = targetPaths.filter(path => getEntryForPath(path, sourceEntries)?.tags?.includes(tag));
+    const snapshot = tagMixedSnapshotsRef.current[snapshotKey];
+    const isMixed = currentTaggedPaths.length > 0 && currentTaggedPaths.length < targetPaths.length;
+    const isAll = currentTaggedPaths.length === targetPaths.length;
+    let nextTaggedPaths: string[];
+
+    if (isMixed) {
+      tagMixedSnapshotsRef.current[snapshotKey] = currentTaggedPaths;
+      nextTaggedPaths = targetPaths;
+    } else if (isAll) {
+      nextTaggedPaths = [];
+    } else if (snapshot) {
+      nextTaggedPaths = snapshot;
+      delete tagMixedSnapshotsRef.current[snapshotKey];
+    } else {
+      nextTaggedPaths = targetPaths;
+    }
+
+    const nextTaggedSet = new Set(nextTaggedPaths);
     const updateEntryTags = (entry: MediaEntry) => {
-      if (!selectedImages.has(entry.path)) {
+      if (!targetSet.has(entry.path)) {
         return entry;
       }
 
       const tags = entry.tags || [];
-      if (action === 'add' && !tags.includes(tag)) {
+      const shouldHaveTag = nextTaggedSet.has(entry.path);
+      if (shouldHaveTag && !tags.includes(tag)) {
         return { ...entry, tags: [...tags, tag] };
       }
-      if (action === 'remove') {
+      if (!shouldHaveTag) {
         return { ...entry, tags: tags.filter(t => t !== tag) };
       }
       return entry;
     };
-    
+
     setEntries(prev => prev.map(updateEntryTags));
     setSelectedMetadata(prev => Object.fromEntries(
       Object.entries(prev).map(([path, entry]) => [path, updateEntryTags(entry)])
@@ -2563,24 +2647,36 @@ export default function App() {
       const nextLibraryEntries = localLibraryEntries.map(updateEntryTags);
       const nextTagSet = new Set<string>();
       nextLibraryEntries.forEach(entry => (entry.tags || []).forEach(entryTag => nextTagSet.add(entryTag)));
+      if (tagMixedSnapshotsRef.current[snapshotKey]) {
+        nextTagSet.add(tag);
+      }
       setLocalLibraryEntries(nextLibraryEntries);
       setAllTags(Array.from(nextTagSet).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })));
       return;
     }
-    
+
     try {
-      const res = await fetch(`${API_PATH}/bulk-tags`, {
+      const removeRes = await fetch(`${API_PATH}/bulk-tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          images: Array.from(selectedImages),
-          tag,
-          action
-        }),
+        body: JSON.stringify({ images: targetPaths, tag, action: 'remove' }),
         credentials: 'include'
       });
-      if (!res.ok) throw new Error('Bulk tag update failed');
-      fetchTags();
+      if (!removeRes.ok) throw new Error('Staging tag update failed');
+      if (nextTaggedPaths.length > 0) {
+        const addRes = await fetch(`${API_PATH}/bulk-tags`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ images: nextTaggedPaths, tag, action: 'add' }),
+          credentials: 'include'
+        });
+        if (!addRes.ok) throw new Error('Staging tag update failed');
+      }
+      setAllTags(prev => (
+        prev.includes(tag)
+          ? prev
+          : [...prev, tag].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+      ));
     } catch (err) {
       console.error(err);
       fetchImages(page, limit, currentPath, selectedTag);
@@ -2592,6 +2688,7 @@ export default function App() {
     if (!share) return { checked: false, indeterminate: false };
     
     const selectedList = Array.from(selectedImages);
+    if (selectedList.length === 0) return { checked: false, indeterminate: false };
     const count = selectedList.filter(path => share.images.includes(path)).length;
     
     return {
@@ -2601,34 +2698,48 @@ export default function App() {
   };
 
   const handleToggleListBulk = async (shareId: string) => {
+    await handleToggleListForPaths(shareId, Array.from(selectedImages));
+  };
+
+  const handleToggleListForPaths = async (shareId: string, paths: string[]) => {
     const share = allShares.find(s => s.id === shareId);
-    if (!share) return;
-    
-    const { checked } = getListState(shareId);
-    let nextImages = [...share.images];
-    
-    const selectedList = Array.from(selectedImages);
-    if (checked) {
-      nextImages = nextImages.filter(path => !selectedImages.has(path));
+    const targetPaths = normalizeTargetPaths(paths);
+    if (!share || targetPaths.length === 0) return;
+
+    const targetSet = new Set(targetPaths);
+    const snapshotKey = getMixedSnapshotKey(shareId, targetPaths);
+    const currentListPaths = targetPaths.filter(path => share.images.includes(path));
+    const snapshot = listMixedSnapshotsRef.current[snapshotKey];
+    const isMixed = currentListPaths.length > 0 && currentListPaths.length < targetPaths.length;
+    const isAll = currentListPaths.length === targetPaths.length;
+    let nextTargetPaths: string[];
+
+    if (isMixed) {
+      listMixedSnapshotsRef.current[snapshotKey] = currentListPaths;
+      nextTargetPaths = targetPaths;
+    } else if (isAll) {
+      nextTargetPaths = [];
+    } else if (snapshot) {
+      nextTargetPaths = snapshot;
+      delete listMixedSnapshotsRef.current[snapshotKey];
     } else {
-      selectedList.forEach(path => {
-        if (!nextImages.includes(path)) {
-          nextImages.push(path);
-        }
-      });
+      nextTargetPaths = targetPaths;
     }
-    
-    setAllShares(prev => prev.map(s => {
-      if (s.id === shareId) {
-        return { ...s, images: nextImages, itemCount: nextImages.length };
-      }
-      return s;
-    }));
+
+    const nextTargetSet = new Set(nextTargetPaths);
+    const nextImages = [
+      ...share.images.filter(path => !targetSet.has(path)),
+      ...targetPaths.filter(path => nextTargetSet.has(path))
+    ];
+
+    setAllShares(prev => prev.map(s => (
+      s.id === shareId ? { ...s, images: nextImages, itemCount: nextImages.length } : s
+    )));
 
     if (sourceMode === 'local') {
       return;
     }
-    
+
     try {
       const res = await fetch(`${API_PATH}/share/${shareId}`, {
         method: 'POST',
@@ -2636,7 +2747,7 @@ export default function App() {
         body: JSON.stringify({ images: nextImages }),
         credentials: 'include'
       });
-      if (!res.ok) throw new Error('Failed to update share list');
+      if (!res.ok) throw new Error('Failed to update staging share list');
     } catch (err) {
       console.error(err);
       fetchShares();
@@ -2645,15 +2756,11 @@ export default function App() {
 
   const handleCommitTagPopoverChoice = async (tagName: string) => {
     await handleToggleTagBulk(tagName);
-    setShowTagsPopover(false);
-    setTagSearch('');
     setActiveTagIndex(0);
   };
 
   const handleCommitListPopoverChoice = async (shareId: string) => {
     await handleToggleListBulk(shareId);
-    setShowListsPopover(false);
-    setListSearch('');
     setActiveListIndex(0);
   };
 
@@ -2704,6 +2811,45 @@ export default function App() {
       }
       setListSearch('');
       setShowListsPopover(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateListForPaths = async (title: string, paths: string[]) => {
+    const cleanTitle = title.trim();
+    const targetPaths = paths.filter(Boolean);
+    if (!cleanTitle || targetPaths.length === 0) return;
+
+    if (sourceMode === 'local') {
+      const localShare = {
+        id: `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        title: cleanTitle,
+        images: targetPaths,
+        itemCount: targetPaths.length,
+        created_at: new Date().toISOString(),
+      };
+      setAllShares(prev => sortSharesNewestFirst([localShare, ...prev]));
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_PATH}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: cleanTitle,
+          images: targetPaths
+        }),
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to create new staging share list');
+      const data = await res.json();
+      if (data.share) {
+        setAllShares(prev => sortSharesNewestFirst([data.share, ...prev.filter(share => share.id !== data.share.id)]));
+      } else {
+        fetchShares();
+      }
     } catch (err) {
       console.error(err);
     }
@@ -2845,6 +2991,74 @@ export default function App() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleUpdateListPassword = async (share: ShareRecord, enabled: boolean) => {
+    if (!authStatus?.user?.isOwner) return;
+    let password = '';
+    let passwordHint = share.password_hint || '';
+    if (enabled) {
+      const nextPassword = window.prompt(`Password for "${share.title || share.id}":`, '');
+      if (nextPassword === null) return;
+      password = nextPassword.trim();
+      if (!password && !share.password_enabled) {
+        window.alert('A password is required to protect this share.');
+        return;
+      }
+      const nextHint = window.prompt('Optional password hint:', passwordHint);
+      if (nextHint === null) return;
+      passwordHint = nextHint.trim();
+    }
+
+    try {
+      const res = await fetch(`${API_PATH}/share/${share.id}/password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, password, passwordHint }),
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to update share password');
+      const data = await res.json();
+      if (data.share) {
+        setAllShares(prev => sortSharesNewestFirst(prev.map(item => item.id === share.id ? data.share : item)));
+      } else {
+        fetchShares();
+      }
+    } catch (err) {
+      console.error(err);
+      window.alert('Could not update share password.');
+    }
+  };
+
+  const handleUnlockSharedPage = async () => {
+    const shareId = getShareIdFromLocation();
+    if (!shareId || !sharedPasswordInput.trim()) return;
+    setSharedPasswordSubmitting(true);
+    setSharedPasswordError('');
+    try {
+      const res = await fetch(`${API_PATH}/share/${encodeURIComponent(shareId)}/unlock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: sharedPasswordInput }),
+        credentials: 'include'
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Incorrect password');
+      }
+      const share = data.share || data;
+      setSharedPasswordRequired(false);
+      setSharedPasswordInput('');
+      setSharedPasswordError('');
+      setSharedImages(share.images || []);
+      setSharedFiles(share.files || []);
+      setSharedTitle(share.title || sharedTitle);
+      setSharedDescription(share.description || sharedDescription);
+    } catch (err) {
+      setSharedPasswordError(err instanceof Error ? err.message : 'Incorrect password');
+    } finally {
+      setSharedPasswordSubmitting(false);
     }
   };
 
@@ -3363,6 +3577,7 @@ export default function App() {
   if (isSharedView) {
     const shareIdForUrl = getShareIdFromLocation();
     const shareUrl = buildSharePageUrl(shareIdForUrl);
+    const sharedWidthClass = limitSharedWidth ? 'max-w-[1024px]' : 'max-w-none';
 
     return (
       <div className="min-h-screen bg-[#F0F0F0] p-[20px] flex flex-col items-center gap-10">
@@ -3394,9 +3609,60 @@ export default function App() {
                 )}
               </button>
               {copied && <span className="text-green-600 text-[10px] font-bold uppercase ml-1 animate-pulse">Copied!</span>}
+              <button
+                type="button"
+                onClick={() => setLimitSharedWidth(prev => !prev)}
+                className={`ml-2 border border-black px-2 py-1 text-[9px] font-black uppercase tracking-widest ${limitSharedWidth ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'}`}
+              >
+                {limitSharedWidth ? '1024 On' : 'Limit 1024'}
+              </button>
             </div>
+            {sharedPasswordRequired ? (
+              <div className={`w-full ${sharedWidthClass} border-[2px] border-black bg-white px-6 py-5 font-sans shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]`}>
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#888]">Protected Share</div>
+                <h1 className="mt-2 text-xl font-black uppercase tracking-tight text-black">
+                  {sharedTitle || 'Password Required'}
+                </h1>
+                {sharedDescription && (
+                  <p className="mt-2 text-xs leading-relaxed text-[#666] whitespace-pre-wrap">{sharedDescription}</p>
+                )}
+                {sharedPasswordHint && (
+                  <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-[#666]">Hint: {sharedPasswordHint}</p>
+                )}
+                <div className="mt-4 flex gap-2">
+                  <input
+                    type="password"
+                    value={sharedPasswordInput}
+                    onChange={event => {
+                      setSharedPasswordInput(event.target.value);
+                      setSharedPasswordError('');
+                    }}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter') {
+                        void handleUnlockSharedPage();
+                      }
+                    }}
+                    className="min-w-0 flex-1 border-[2px] border-black px-3 py-2 text-sm font-bold outline-none"
+                    placeholder="Password"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleUnlockSharedPage()}
+                    disabled={!sharedPasswordInput.trim() || sharedPasswordSubmitting}
+                    className="border-[2px] border-black bg-black px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+                  >
+                    {sharedPasswordSubmitting ? 'Checking' : 'Unlock'}
+                  </button>
+                </div>
+                {sharedPasswordError && (
+                  <div className="mt-3 text-[10px] font-bold uppercase tracking-wider text-red-600">{sharedPasswordError}</div>
+                )}
+              </div>
+            ) : (
+              <>
             {(sharedTitle || sharedDescription) && (
-              <div className="flex flex-col items-center text-center w-full max-w-4xl mt-8 mb-4">
+              <div className={`flex flex-col items-center text-center w-full ${sharedWidthClass} mt-8 mb-4`}>
                 {sharedTitle && (
                   <h1 className="text-2xl font-sans font-bold break-words">
                     {sharedTitle}
@@ -3410,7 +3676,7 @@ export default function App() {
               </div>
             )}
             {sharedNonRenderable.length > 0 && (
-              <div className="w-full max-w-4xl border-[2px] border-[#666] bg-white px-5 py-4 flex flex-col gap-2">
+              <div className={`w-full ${sharedWidthClass} border-[2px] border-[#666] bg-white px-5 py-4 flex flex-col gap-2`}>
                 {sharedNonRenderable.map(file => (
                   <div key={file} className="font-sans text-xs font-bold uppercase tracking-widest text-[#666] break-all">
                     {basename(file)}
@@ -3427,7 +3693,7 @@ export default function App() {
                 : buildImageUrl(file.path);
 
               return (
-                <div key={file.path} className="flex flex-col items-center justify-center w-full gap-2 relative">
+                <div key={file.path} className={`flex flex-col items-center justify-center w-full ${sharedWidthClass} gap-2 relative`}>
                   <div className="relative max-w-full">
                     <img
                       src={srcUrl}
@@ -3460,6 +3726,8 @@ export default function App() {
                 </div>
               );
             })}
+              </>
+            )}
           </>
         )}
       </div>
@@ -3790,6 +4058,14 @@ export default function App() {
                           <div className="flex items-center gap-4 uppercase font-sans text-xs font-bold shrink-0">
                             <button onClick={() => window.open(buildSharePageUrl(share.id), '_blank')} className="text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#fafafa] transition-colors cursor-pointer">Open</button>
                             <button onClick={() => handleRenameList(share.id, share.title)} className="text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#fafafa] transition-colors cursor-pointer">Rename</button>
+                            {authStatus?.user?.isOwner && (
+                              <button
+                                onClick={() => void handleUpdateListPassword(share, !share.password_enabled)}
+                                className={share.password_enabled ? 'text-[#1f5f8b] underline transition-colors cursor-pointer' : 'text-[#6a716b] dark:text-[#9da69e] hover:text-[#202522] dark:hover:text-[#fafafa] transition-colors cursor-pointer'}
+                              >
+                                {share.password_enabled ? 'Password On' : 'Password'}
+                              </button>
+                            )}
                             <button onClick={() => handleDeleteList(share.id, share.title)} className="text-[#6a716b] dark:text-[#9da69e] hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer">Delete</button>
                           </div>
                         </div>
@@ -3831,6 +4107,19 @@ export default function App() {
             isLocalMode={sourceMode === 'local'}
             getPreviewUrl={getResolvedThumbUrl}
             getOriginalUrl={getResolvedImageUrl}
+            tagOptions={allTags}
+            listOptions={allShares.map(share => ({
+              id: share.id,
+              title: share.title || share.id,
+              images: share.images || [],
+              itemCount: share.itemCount,
+            }))}
+            onToggleTag={handleToggleTagForPaths}
+            onCreateTag={handleToggleTagForPaths}
+            onDeleteTag={handleDeleteTag}
+            onToggleList={handleToggleListForPaths}
+            onCreateList={handleCreateListForPaths}
+            onDeleteList={handleDeleteList}
           />
         </main>
       ) : (
@@ -4107,20 +4396,34 @@ export default function App() {
                           {filteredTagOptions.map((tagName, index) => {
                               const { checked, indeterminate } = getTagState(tagName);
                               return (
-                                <button
+                                <div
                                   key={tagName}
-                                  onClick={() => void handleCommitTagPopoverChoice(tagName)}
-                                  className={`w-full text-left px-2.5 py-2 transition-colors flex items-center justify-between group ${activeTagIndex === index ? 'bg-black text-white' : 'hover:bg-black hover:text-white'}`}
+                                  className={`w-full transition-colors flex items-stretch group ${activeTagIndex === index ? 'bg-black text-white' : 'hover:bg-black hover:text-white'}`}
                                 >
-                                  <span className="truncate">#{tagName}</span>
-                                  <span className="shrink-0 flex items-center justify-center w-4 h-4 border border-[#DDD] group-hover:border-white">
-                                    {checked ? (
-                                      <Check size={10} strokeWidth={3} />
-                                    ) : indeterminate ? (
-                                      <Minus size={10} strokeWidth={3} />
-                                    ) : null}
-                                  </span>
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCommitTagPopoverChoice(tagName)}
+                                    className="min-w-0 flex-1 text-left px-2.5 py-2 flex items-center justify-between"
+                                  >
+                                    <span className="truncate">#{tagName}</span>
+                                    <span className="shrink-0 flex items-center justify-center w-4 h-4 border border-[#DDD] group-hover:border-white">
+                                      {checked ? (
+                                        <Check size={10} strokeWidth={3} />
+                                      ) : indeterminate ? (
+                                        <Minus size={10} strokeWidth={3} />
+                                      ) : null}
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteTag(tagName)}
+                                    className="shrink-0 px-2 text-[#9f2f22] hover:bg-[#9f2f22] hover:text-white"
+                                    title={`Delete tag ${tagName}`}
+                                    aria-label={`Delete tag ${tagName}`}
+                                  >
+                                    <X size={10} strokeWidth={3} />
+                                  </button>
+                                </div>
                               );
                             })}
                           
@@ -4163,21 +4466,35 @@ export default function App() {
                           {filteredListOptions.map((share, index) => {
                               const { checked, indeterminate } = getListState(share.id);
                               return (
-                                <button
+                                <div
                                   key={share.id}
-                                  onClick={() => void handleCommitListPopoverChoice(share.id)}
-                                  className={`w-full text-left px-2.5 py-2 transition-colors flex items-center justify-between group ${activeListIndex === index ? 'bg-black text-white' : 'hover:bg-black hover:text-white'}`}
+                                  className={`w-full transition-colors flex items-stretch group ${activeListIndex === index ? 'bg-black text-white' : 'hover:bg-black hover:text-white'}`}
                                 >
-                                  <span className="truncate flex-1 mr-2">{share.title}</span>
-                                  <span className="text-[9px] text-gray-400 group-hover:text-gray-300 mr-2 shrink-0">({share.itemCount} items)</span>
-                                  <span className="shrink-0 flex items-center justify-center w-4 h-4 border border-[#DDD] group-hover:border-white">
-                                    {checked ? (
-                                      <Check size={10} strokeWidth={3} />
-                                    ) : indeterminate ? (
-                                      <Minus size={10} strokeWidth={3} />
-                                    ) : null}
-                                  </span>
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleCommitListPopoverChoice(share.id)}
+                                    className="min-w-0 flex-1 text-left px-2.5 py-2 flex items-center justify-between"
+                                  >
+                                    <span className="truncate flex-1 mr-2">{share.title}</span>
+                                    <span className="text-[9px] text-gray-400 group-hover:text-gray-300 mr-2 shrink-0">({share.itemCount} items)</span>
+                                    <span className="shrink-0 flex items-center justify-center w-4 h-4 border border-[#DDD] group-hover:border-white">
+                                      {checked ? (
+                                        <Check size={10} strokeWidth={3} />
+                                      ) : indeterminate ? (
+                                        <Minus size={10} strokeWidth={3} />
+                                      ) : null}
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteList(share.id, share.title)}
+                                    className="shrink-0 px-2 text-[#9f2f22] hover:bg-[#9f2f22] hover:text-white"
+                                    title={`Delete list ${share.title || share.id}`}
+                                    aria-label={`Delete list ${share.title || share.id}`}
+                                  >
+                                    <X size={10} strokeWidth={3} />
+                                  </button>
+                                </div>
                               );
                             })}
                           
@@ -4342,6 +4659,24 @@ export default function App() {
                   </span>
                 )}
               </div>
+              {currentPath && authStatus?.user?.isOwner && !selectedTag ? (
+                <div className="basis-full mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest">
+                  <span className="text-[#888] dark:text-[#9da69e]">Folder Access</span>
+                  <span
+                    className={`peri-chip px-1.5 py-0.5 ${
+                      currentFolderDefaultAccess.admin === 'allow' ? 'text-[#1f5f8b]' : 'text-[#9f2f22]'
+                    }`}
+                  >
+                    Admin {currentFolderDefaultAccess.admin}
+                    {currentFolderDefaultAccessInherited.admin ? ' (inherit)' : ''}
+                  </span>
+                  {currentFolderDefaultAccessMixed?.admin ? (
+                    <span className="peri-chip px-1.5 py-0.5 text-[#8A5A44]">
+                      Mixed
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
               <label className="inline-flex items-center gap-1.5 ml-auto">
                 <span className="peri-control-label">Sort</span>
                 <select
@@ -4676,8 +5011,14 @@ export default function App() {
                   onClick={() => openLightbox(entry.path)}
                 >
                   <button
+                    type="button"
                     onClick={e => toggleSelection(entry.path, e)}
-                    className={`absolute top-2 left-2 z-20 w-6 h-6 border flex items-center justify-center transition-colors ${selectedImages.has(entry.path) ? 'bg-[#202522] border-[#202522]' : 'bg-white border-[#9faab4] hover:border-[#202522]'}`}
+                    aria-label={selectedImages.has(entry.path) ? `Deselect ${entry.name}` : `Select ${entry.name}`}
+                    className={`absolute top-2 left-2 z-20 w-6 h-6 border flex items-center justify-center transition-opacity duration-150 ${selectedImages.has(entry.path)
+                      ? 'bg-[#202522] border-[#202522] opacity-100'
+                      : isMaxMode
+                        ? 'bg-white/90 border-[#9faab4] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 hover:border-[#202522]'
+                        : 'bg-white border-[#9faab4] opacity-100 hover:border-[#202522]'}`}
                   >
                     {selectedImages.has(entry.path) && <Check size={16} className="text-white" strokeWidth={3} />}
                   </button>
@@ -4935,23 +5276,7 @@ export default function App() {
               {canEditServerFolderPermissions && (
                 <div className="peri-card__divider border-[1px] border-[#d4d4d8] bg-[#fafafa] px-3 py-3">
                   <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#888]">Access</div>
-                  <div className="grid gap-2 font-sans text-[12px] font-bold uppercase tracking-wider text-black sm:grid-cols-3">
-                    {folderQuickParentAccess.visibleToUsers ? (
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={folderQuickVisibleToUsers}
-                          onChange={event => setFolderQuickVisibleToUsers(event.target.checked)}
-                          className="h-4 w-4 accent-black"
-                        />
-                        User
-                      </label>
-                    ) : (
-                      <div className="flex items-center gap-2 text-[#888]">
-                        <Minus size={14} strokeWidth={2.25} />
-                        User inherited off
-                      </div>
-                    )}
+                  <div className="grid gap-2 font-sans text-[12px] font-bold uppercase tracking-wider text-black sm:grid-cols-2">
                     {folderQuickParentAccess.visibleToAdmins ? (
                       <label className="flex items-center gap-2">
                         <input
@@ -4975,15 +5300,15 @@ export default function App() {
                   </div>
                   <div className="mt-3 border-t border-[#d4d4d8] pt-3">
                     <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#888]">Approved Accounts</div>
-                    {folderQuickApprovedUsers.length === 0 ? (
-                      <p className="font-sans text-[12px] text-[#777]">No approved accounts are available.</p>
+                    {folderQuickApprovedUsers.filter(user => user.isOwner || user.isAdmin).length === 0 ? (
+                      <p className="font-sans text-[12px] text-[#777]">No approved admin accounts are available.</p>
                     ) : (
                       <div className="grid gap-2 font-sans text-[12px] sm:grid-cols-2">
-                        {folderQuickApprovedUsers.map(user => {
+                        {folderQuickApprovedUsers.filter(user => user.isOwner || user.isAdmin).map(user => {
                           const userId = String(user.id);
                           const parentAllowsAccount = folderQuickParentAccess.accounts[userId] ?? true;
                           const locked = Boolean(user.isOwner) || !parentAllowsAccount;
-                          const levelAllowsAccount = user.isAdmin ? folderQuickVisibleToAdmins : folderQuickVisibleToUsers;
+                          const levelAllowsAccount = user.isOwner || folderQuickVisibleToAdmins;
                           const currentMode = folderQuickAccountAccess[userId];
                           const inheritedLabel = levelAllowsAccount ? 'Inherit: allowed' : 'Inherit: denied';
                           const effectiveLabel = user.isOwner

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Privacy | JeffersonWM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="How JeffersonWM handles essential account sessions, optional analytics, and browser-stored preferences." />
+    <link rel="canonical" href="https://jeffersonwm.com/privacy/" />
+    <link rel="icon" type="image/svg+xml" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <link rel="shortcut icon" href="/jeffersonwm/assets/favicon-DxRHekBS.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="JeffersonWM" />
+    <meta property="og:title" content="Privacy | JeffersonWM" />
+    <meta property="og:description" content="How JeffersonWM handles essential account sessions, optional analytics, and browser-stored preferences." />
+    <meta property="og:url" content="https://jeffersonwm.com/privacy/" />
+    <meta property="og:image" content="https://jeffersonwm.com/bookmark-preview.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Privacy | JeffersonWM" />
+    <meta name="twitter:description" content="How JeffersonWM handles essential account sessions, optional analytics, and browser-stored preferences." />
+    <meta name="twitter:image" content="https://jeffersonwm.com/bookmark-preview.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=IBM+Plex+Sans+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --frame: 42px;
+        --ink: #111827;
+        --line: rgba(17, 24, 39, 0.18);
+        --muted: rgba(17, 24, 39, 0.66);
+        --paper: rgba(255, 255, 255, 0.76);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: var(--frame);
+        background: #fdfdfd;
+        color: var(--ink);
+        font-family: "IBM Plex Sans Condensed", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        position: relative;
+        isolation: isolate;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: url("/jeffersonwm/images/backgrounds/jeffwm-feed-lion-pattern-20260627.jpeg") repeat;
+        background-size: 900px auto;
+        opacity: 0.05;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      a { color: inherit; }
+
+      .shell { max-width: 760px; }
+
+      .logo-link { display: inline-block; margin-bottom: 0.75rem; }
+
+      .logo {
+        display: block;
+        width: 84px;
+        height: 84px;
+      }
+
+      h1, h2 {
+        font-family: "Young Serif", "Times New Roman", serif;
+        font-weight: 400;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 3vw, 2.4rem);
+        line-height: 1;
+      }
+
+      .updated {
+        margin: 0.55rem 0 2rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .intro {
+        margin: 0 0 1.5rem;
+        font-size: 1.1rem;
+        line-height: 1.6;
+      }
+
+      .policy-section {
+        padding: 1.2rem 1.3rem 1.3rem;
+        border-top: 1px solid var(--line);
+        background: var(--paper);
+      }
+
+      .policy-section:last-of-type { border-bottom: 1px solid var(--line); }
+
+      h2 {
+        margin: 0 0 0.5rem;
+        font-size: 1.25rem;
+        line-height: 1.1;
+      }
+
+      p, li {
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+
+      p { margin: 0; }
+
+      p + p { margin-top: 0.8rem; }
+
+      ul { margin: 0.8rem 0 0; padding-left: 1.2rem; }
+
+      li + li { margin-top: 0.35rem; }
+
+      .bottom-links {
+        position: fixed;
+        left: var(--frame);
+        bottom: var(--frame);
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+      }
+
+      .personal-link {
+        position: relative;
+        color: var(--ink);
+        font-size: 0.92rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-decoration: none;
+      }
+
+      .personal-link::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.1rem;
+        width: 100%;
+        height: 1px;
+        background: #d4d4d4;
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.15s ease-out;
+      }
+
+      .personal-link:hover::after { transform: scaleX(1); }
+
+      @media (max-width: 720px) {
+        :root { --frame: 24px; }
+        body { padding-bottom: 9rem; }
+        .policy-section { padding: 1rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <a class="logo-link" href="/" aria-label="Return to JeffersonWM home">
+        <img class="logo" src="/jeffersonwm/assets/favicon-DxRHekBS.svg" alt="JeffersonWM" />
+      </a>
+      <h1>Privacy</h1>
+      <p class="updated">Last updated October 23, 2026</p>
+
+      <p class="intro">This page explains the current information practices for JeffersonWM Home and the public JeffersonWM pages that link here.</p>
+
+      <section class="policy-section">
+        <h2>Essential account sessions</h2>
+        <p>Some JeffersonWM tools use the central Auth service to sign people in and keep an authenticated session active. That service uses an essential session cookie so it can recognize a signed-in account, protect account-only actions, and support sign out and session revocation. It is not used for optional analytics.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Optional analytics</h2>
+        <p>JeffersonWM Home, Feed, and Project Activity currently use Google Analytics to understand aggregate use of those public pages. Consent controls are being consolidated across the JeffersonWM domain and will gate that optional analytics once they are in place. When a page presents an analytics prompt, choosing No leaves optional analytics unloaded.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Browser preferences</h2>
+        <p>Some pages may store a small preference in the browser, such as an interface setting or a remembered consent choice. These values help the page remember a selection on the same browser. They can be removed through the browser's site-data controls.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Service providers</h2>
+        <p>Requests to JeffersonWM may be handled by the hosting and network providers that deliver the site. When analytics is accepted, Google Analytics receives the information described by its service. Those providers may process technical request information, such as browser, device, and network data, as part of delivering their services.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Your choices</h2>
+        <ul>
+          <li>Choose No when an analytics prompt appears to keep optional analytics off for that page.</li>
+          <li>Use your browser's controls to clear cookies and site storage or adjust browser privacy settings.</li>
+          <li>Sign out of an account when you are finished using account-only tools.</li>
+        </ul>
+      </section>
+
+      <section class="policy-section">
+        <h2>Updates</h2>
+        <p>This page will be updated when JeffersonWM's data practices materially change. The date above shows the latest revision.</p>
+      </section>
+    </main>
+
+    <nav class="bottom-links" aria-label="Site links">
+      <a class="personal-link" href="/">Home</a>
+      <a class="personal-link" href="/status/">Status</a>
+      <a class="personal-link" href="/project-activity/">Project Activity</a>
+      <a class="personal-link" href="/account/">Account</a>
+      <a class="personal-link" href="https://wmjefferson.com" target="_blank" rel="noopener noreferrer">William Jefferson</a>
+    </nav>
+  </body>
+</html>

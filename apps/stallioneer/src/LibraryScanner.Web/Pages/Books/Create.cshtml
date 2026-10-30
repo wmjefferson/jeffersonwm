@@ -5,23 +5,24 @@
     ViewData["Title"] = "Add book";
 }
 
-<section class="page-heading">
-    <div>
-        <p class="eyebrow">@(Model.SpeedMode ? "Rapid intake" : "ISBN / UPC lookup")</p>
-        <h1>@(Model.SpeedMode ? "Speed mode" : "Add from code")</h1>
-    </div>
-    <div class="header-actions">
-        @if (Model.SpeedMode)
-        {
-            <a class="btn btn-outline-secondary" asp-page="/Books/Create">Standard mode</a>
-        }
-        else
-        {
-            <a class="btn btn-outline-secondary" asp-page="/Books/Create" asp-route-speedMode="true">Speed mode</a>
-        }
-        <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
-    </div>
-</section>
+<section class="peri-page-shell">
+    <header class="peri-page-header">
+        <div>
+            <h1>@(Model.SpeedMode ? "Speed Mode" : "Add From Code")</h1>
+            <p>@(Model.SpeedMode ? "Rapid intake" : "ISBN / UPC lookup")</p>
+        </div>
+        <div class="header-actions">
+            @if (Model.SpeedMode)
+            {
+                <a class="btn btn-outline-secondary" asp-page="/Books/Create">Standard mode</a>
+            }
+            else
+            {
+                <a class="btn btn-outline-secondary" asp-page="/Books/Create" asp-route-speedMode="true">Speed mode</a>
+            }
+            <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
+        </div>
+    </header>
 
 @if (!string.IsNullOrWhiteSpace(Model.LookupMessage))
 {
@@ -112,7 +113,7 @@
                             }
                             else
                             {
-                                <div class="candidate-cover candidate-cover-placeholder" aria-hidden="true"></div>
+                                <img class="candidate-cover candidate-cover-placeholder" src="/images/cover-placeholder.svg" alt="No cover available" />
                             }
                             <div class="candidate-copy">
                                 <h3>@candidate.Title</h3>
@@ -134,6 +135,10 @@
             @if (!string.IsNullOrWhiteSpace(Model.Input.CoverImageUrl))
             {
                 <img class="cover-preview" src="@Model.Input.CoverImageUrl" alt="" />
+            }
+            else
+            {
+                <img class="cover-preview cover-preview--placeholder" src="/images/cover-placeholder.svg" alt="No cover available" />
             }
 
             @if (!string.IsNullOrWhiteSpace(Model.Input.MetadataSource))
@@ -392,6 +397,7 @@
         </section>
     </div>
 </form>
+</section>
 
 <script id="tag-data" type="application/json">
 @Html.Raw(JsonSerializer.Serialize(Model.AvailableTags.Select(tag => new { tag.Id, tag.Name, tag.Description, tag.Color })))

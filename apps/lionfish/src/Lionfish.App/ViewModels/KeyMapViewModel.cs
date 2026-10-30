@@ -47,6 +47,8 @@ public partial class KeyMapViewModel : ObservableObject
 
     public List<string> AvailableKeys { get; } = new()
     {
+        "(None)",
+        "Control", "Shift", "Alt",
         "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
         "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
         "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9",
@@ -55,7 +57,8 @@ public partial class KeyMapViewModel : ObservableObject
         "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
         "NumPad0", "NumPad1", "NumPad2", "NumPad3", "NumPad4", "NumPad5", "NumPad6", "NumPad7", "NumPad8", "NumPad9",
         "Add", "Subtract", "Multiply", "Divide", "Decimal",
-        "VolumeUp", "VolumeDown", "VolumeMute", "MediaPlayPause", "MediaNextTrack", "MediaPrevTrack"
+        "VolumeUp", "VolumeDown", "VolumeMute", "MediaPlayPause", "MediaNextTrack", "MediaPrevTrack",
+        "OemComma", "OemPeriod", "OemSemicolon", "OemQuotes", "OemMinus", "OemPlus", "OemQuestion", "OemTilde", "OemOpenBracket", "OemCloseBracket", "OemBackslash"
     };
 
     [ObservableProperty] private ObservableCollection<string> _availableMacros = new();
@@ -274,6 +277,23 @@ public partial class KeyMapViewModel : ObservableObject
             {
                 Mappings.Add(m);
             }
+
+            try
+            {
+                var config = _configStore.LoadConfig();
+                config.ActiveProfileId = newValue.Id;
+                if (SelectedDevice != null)
+                {
+                    var regDev = config.RegisteredDevices.FirstOrDefault(r =>
+                        r.HardwareId.Equals(SelectedDevice.HardwareId, StringComparison.OrdinalIgnoreCase));
+                    if (regDev != null)
+                    {
+                        regDev.ActiveProfileId = newValue.Id;
+                    }
+                }
+                _configStore.SaveConfig(config);
+            }
+            catch { }
         }
         SyncCurrentProfileToEngine();
         MappingsChanged?.Invoke();
@@ -379,19 +399,71 @@ public partial class KeyMapViewModel : ObservableObject
             if (Profiles.Count == 0) return;
         }
 
+        // If the current SelectedProfile is already valid for this device, keep it!
+        if (SelectedProfile != null && SelectedDevice != null)
+        {
+            bool isMatchingDevice = string.IsNullOrEmpty(SelectedProfile.DeviceHardwareId) ||
+                SelectedDevice.HardwareId.Contains(SelectedProfile.DeviceHardwareId, StringComparison.OrdinalIgnoreCase);
+
+            if (isMatchingDevice && Profiles.Any(p => p.Id == SelectedProfile.Id))
+            {
+                // Ensure mappings are in sync without resetting profile
+                if (Mappings.Count == 0 || Mappings.Count != SelectedProfile.Mappings.Count)
+                {
+                    Mappings.Clear();
+                    foreach (var m in SelectedProfile.Mappings)
+                    {
+                        Mappings.Add(m);
+                    }
+                    SyncCurrentProfileToEngine();
+                }
+                return;
+            }
+        }
+
         Profile? targetProfile = null;
+        var config = _configStore.LoadConfig();
 
         if (SelectedDevice != null)
         {
-            var match = Profiles.FirstOrDefault(p =>
-                !string.IsNullOrEmpty(p.DeviceHardwareId) &&
-                SelectedDevice.HardwareId.Contains(p.DeviceHardwareId, StringComparison.OrdinalIgnoreCase));
+            var regDev = config.RegisteredDevices.FirstOrDefault(r =>
+                r.HardwareId.Equals(SelectedDevice.HardwareId, StringComparison.OrdinalIgnoreCase));
 
-            targetProfile = match ?? Profiles.FirstOrDefault(p => string.IsNullOrEmpty(p.DeviceHardwareId)) ?? Profiles[0];
+            // 1. Try saved active profile for this device
+            if (!string.IsNullOrEmpty(regDev?.ActiveProfileId))
+            {
+                targetProfile = Profiles.FirstOrDefault(p => p.Id == regDev.ActiveProfileId);
+            }
+
+            // 2. Try global active profile if it matches this device
+            if (targetProfile == null && !string.IsNullOrEmpty(config.ActiveProfileId))
+            {
+                var globalMatch = Profiles.FirstOrDefault(p => p.Id == config.ActiveProfileId);
+                if (globalMatch != null && (string.IsNullOrEmpty(globalMatch.DeviceHardwareId) ||
+                    SelectedDevice.HardwareId.Contains(globalMatch.DeviceHardwareId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    targetProfile = globalMatch;
+                }
+            }
+
+            // 3. Try any profile assigned to this device hardware ID
+            if (targetProfile == null)
+            {
+                targetProfile = Profiles.FirstOrDefault(p =>
+                    !string.IsNullOrEmpty(p.DeviceHardwareId) &&
+                    SelectedDevice.HardwareId.Contains(p.DeviceHardwareId, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // 4. Fallback to generic or first profile
+            targetProfile ??= Profiles.FirstOrDefault(p => string.IsNullOrEmpty(p.DeviceHardwareId)) ?? Profiles[0];
         }
         else
         {
-            targetProfile = Profiles[0];
+            if (!string.IsNullOrEmpty(config.ActiveProfileId))
+            {
+                targetProfile = Profiles.FirstOrDefault(p => p.Id == config.ActiveProfileId);
+            }
+            targetProfile ??= Profiles[0];
         }
 
         if (SelectedProfile != targetProfile)
@@ -433,13 +505,47 @@ public partial class KeyMapViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ClearTargetKey()
+    {
+        if (SelectedMapping != null)
+        {
+            SelectedMapping.TargetKey = "(None)";
+            SelectedMapping.UpdateActionAssignment();
+        }
+    }
+
+    [RelayCommand]
+    private void MoveMappingUp(KeyMapping? mapping)
+    {
+        if (mapping == null) return;
+        int index = Mappings.IndexOf(mapping);
+        if (index > 0)
+        {
+            Mappings.Move(index, index - 1);
+            SaveCurrentProfile();
+        }
+    }
+
+    [RelayCommand]
+    private void MoveMappingDown(KeyMapping? mapping)
+    {
+        if (mapping == null) return;
+        int index = Mappings.IndexOf(mapping);
+        if (index >= 0 && index < Mappings.Count - 1)
+        {
+            Mappings.Move(index, index + 1);
+            SaveCurrentProfile();
+        }
+    }
+
+    [RelayCommand]
     private void AddMapping()
     {
         var newMapping = new KeyMapping
         {
             KeyName = "Press a key...",
             ActionType = "Keystroke",
-            TargetKey = "A"
+            TargetKey = "(None)"
         };
         newMapping.UpdateActionAssignment();
 

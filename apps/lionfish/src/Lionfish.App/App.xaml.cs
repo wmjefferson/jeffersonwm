@@ -1,5 +1,7 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading;
 using System.Windows;
@@ -11,6 +13,16 @@ namespace Lionfish.App;
 public partial class App : Application
 {
     private const string MutexName = "Lionfish.App.SingleInstance";
+    private const int HWND_BROADCAST = 0xffff;
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    public static extern int RegisterWindowMessage(string lpString);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool PostMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+
+    public static readonly int WmShowLionfish = RegisterWindowMessage("LIONFISH_SHOW_WINDOW_MSG");
+
     private Mutex? _mutex;
     private bool _hasMutex;
     public TrayService TrayService { get; } = new();
@@ -108,13 +120,75 @@ public partial class App : Application
 
         if (!createdNew)
         {
-            Log("Another instance is running, shutting down.");
-            _mutex.Dispose();
-            _mutex = null;
-            Console.WriteLine("[INFO] Lionfish is already running. Check your system tray (bottom-right near the clock).");
-            MessageBox.Show("Lionfish is already running in the background.\n\nLook for the Lionfish icon in your system tray (bottom-right near the clock) and click it to open the window.", "Lionfish", MessageBoxButton.OK, MessageBoxImage.Information);
-            Current.Shutdown();
-            return;
+            Log("Another instance is running.");
+
+            // 1. Try signaling the existing window to pop up (if it is alive and responding)
+            try
+            {
+                PostMessage((IntPtr)HWND_BROADCAST, WmShowLionfish, IntPtr.Zero, IntPtr.Zero);
+            }
+            catch { }
+
+            // 2. Prompt user with a clear Yes/No option to restart and bring window forward
+            var result = MessageBox.Show(
+                "Lionfish is already running in the background.\n\n" +
+                "Click 'Yes' to restart Lionfish and open the window.\n" +
+                "Click 'No' if you only wanted to keep the current background instance.",
+                "Lionfish — Already Running",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                Log("User chose to restart Lionfish. Terminating existing process(es)...");
+                try
+                {
+                    int currentPid = Environment.ProcessId;
+                    var otherProcesses = Process.GetProcessesByName("Lionfish")
+                        .Where(p => p.Id != currentPid)
+                        .ToList();
+
+                    foreach (var proc in otherProcesses)
+                    {
+                        try
+                        {
+                            proc.Kill();
+                            proc.WaitForExit(2000);
+                        }
+                        catch { }
+                    }
+
+                    _mutex?.Dispose();
+                    _mutex = null;
+
+                    Thread.Sleep(300);
+
+                    _mutex = new Mutex(true, MutexName, out createdNew);
+                    _hasMutex = createdNew;
+                    Log($"Post-kill mutex acquired: createdNew={createdNew}");
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error killing previous instance: {ex.Message}");
+                }
+
+                if (!createdNew)
+                {
+                    MessageBox.Show(
+                        "Unable to stop the existing Lionfish process. Please check Task Manager.",
+                        "Lionfish", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    Current.Shutdown();
+                    return;
+                }
+            }
+            else
+            {
+                Log("User chose not to restart. Exiting second instance.");
+                _mutex?.Dispose();
+                _mutex = null;
+                Current.Shutdown();
+                return;
+            }
         }
 
         // Global exception handling

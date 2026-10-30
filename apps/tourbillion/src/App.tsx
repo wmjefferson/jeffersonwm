@@ -149,6 +149,19 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [isMouseIdle, setIsMouseIdle] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(() => Boolean(document.fullscreenElement));
+
+  useEffect(() => {
+    if (!showSettings) return;
+
+    const closeFromOutsideClick = (event: PointerEvent) => {
+      if (!(event.target instanceof Element)) return;
+      if (event.target.closest('#settings-panel, #settings-trigger, #fullscreen-trigger')) return;
+      setShowSettings(false);
+    };
+
+    document.addEventListener('pointerdown', closeFromOutsideClick);
+    return () => document.removeEventListener('pointerdown', closeFromOutsideClick);
+  }, [showSettings]);
   
   const starsRef = useRef<Star[]>([]);
   const matrixRef = useRef<MatrixColumn[]>([]);

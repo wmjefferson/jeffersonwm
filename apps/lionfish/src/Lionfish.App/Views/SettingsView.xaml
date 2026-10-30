@@ -248,16 +248,31 @@
                 </StackPanel>
             </GroupBox>
 
-            <!-- Automation & Display Settings -->
-            <GroupBox Header="Automation &amp; On-Screen Display (OSD)">
+            <!-- Display Settings -->
+            <GroupBox Header="On-Screen Display (OSD)">
                 <StackPanel>
-                    <CheckBox Content="Automatic Profile Switching (app detection)" IsChecked="{Binding AutoProfileSwitching}" FontWeight="SemiBold"/>
-                    <TextBlock Text="Instantly switches the active profile based on the foreground application (sub-millisecond latency with 0% CPU). Set the target application for each profile in the Key Map tab." 
-                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="22,2,0,12"/>
-
+                    <!-- On-Screen Display (OSD) Toggle -->
                     <CheckBox Content="Show On-Screen Display (OSD) overlay panel" IsChecked="{Binding ShowOsdOverlay}" FontWeight="SemiBold"/>
-                    <TextBlock Text="Displays a compact floating HUD in the corner showing the active profile and last button pressed. Never steals keyboard focus. Can also be toggled from the notification tray." 
+                    <TextBlock Text="Displays a sleek, floating HUD showing the active profile and last button pressed in real time. Never steals keyboard focus. Drag anywhere on your screen to reposition (position is permanently remembered). Can also be toggled anytime from the notification tray icon or dismissed directly via its '✕' button." 
                                Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="22,2,0,4"/>
+
+                    <!-- 
+                    ========================================================================
+                    AUTOMATIC APP DETECTION (ON HOLD FOR FUTURE DEVELOPMENT)
+                    ========================================================================
+                    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,10,0,4">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock Text="🎯 Automatic App Detection (Auto-Profile Switching)" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                <Border Background="#1A4ECDC4" BorderBrush="{DynamicResource SecondaryAccentBrush}" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Planned for Future Update" FontSize="11" Foreground="{DynamicResource SecondaryAccentBrush}" FontWeight="SemiBold"/>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="Automatic profile switching based on your active foreground application is currently on hold and will be implemented in a future update. Profiles can currently be selected manually in the app or via the system tray menu." 
+                                       Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11.5" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    -->
                 </StackPanel>
             </GroupBox>
 

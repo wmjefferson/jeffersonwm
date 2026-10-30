@@ -26,7 +26,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private InterceptionStatus _interceptionStatus = InterceptionStatus.Active;
     [ObservableProperty] private string _activeProfileName = "Default Profile";
     [ObservableProperty] private int _activeDeviceCount = 0;
-    [ObservableProperty] private string _lastActionSummary = "Ready";
+    [ObservableProperty] private string _lastActionSummary = "(Waiting for button press...)";
 
     public DevicesViewModel DevicesVM { get; }
     public KeyMapViewModel KeyMapVM { get; }
@@ -198,6 +198,8 @@ public partial class MainViewModel : ObservableObject
         SyncRegisteredDevicesToInterception();
         KeyMapVM.SyncDevices(DevicesVM.Devices);
         SettingsVM.RefreshConfigOverview(DevicesVM.AllDiscoveredDevices);
+        ActiveProfileName = KeyMapVM.SelectedProfile?.Name ?? "Default Profile";
+        ActiveDeviceCount = DevicesVM.MacroPadCount;
 
         // 6. Start Interception capture loop
         if (_interceptionService.IsDriverInstalled)

@@ -25,11 +25,12 @@ body {
   min-width: 320px;
 }
 
-main {
+.page-shell {
   display: grid;
   min-height: 100vh;
   place-items: center;
   padding: 24px;
+  position: relative;
 }
 
 h1 {
@@ -40,8 +41,107 @@ h1 {
   text-align: center;
 }
 
+.link-banner {
+  align-items: center;
+  bottom: 72px;
+  display: flex;
+  gap: 24px;
+  height: 72px;
+  justify-content: center;
+  left: 0;
+  padding: 0 24px;
+  position: fixed;
+  right: 0;
+}
+
+.email-banner {
+  align-items: center;
+  bottom: 144px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 72px;
+  justify-content: center;
+  left: 0;
+  padding: 0 24px;
+  position: fixed;
+  right: 0;
+}
+
+.email-form {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  max-width: min(460px, 100%);
+  width: 100%;
+}
+
+.email-form input,
+.email-form button {
+  border: 1px solid #111111;
+  border-radius: 0;
+  color: #111111;
+  font: inherit;
+  min-height: 38px;
+}
+
+.email-form input {
+  background: #ffffff;
+  flex: 1;
+  min-width: 0;
+  padding: 0 12px;
+}
+
+.email-form button {
+  background: #111111;
+  color: #ffffff;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-weight: 700;
+  padding: 0 18px;
+}
+
+.email-form button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.email-form input:focus-visible,
+.email-form button:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 4px;
+}
+
+.email-status {
+  font-size: 12px;
+  line-height: 1;
+  margin: 0;
+  min-height: 12px;
+}
+
+.link-banner a {
+  color: #111111;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.link-banner a:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 6px;
+}
+
 @media (max-width: 560px) {
   h1 {
     font-size: 44px;
+  }
+
+  .link-banner {
+    gap: 18px;
+  }
+
+  .email-form {
+    max-width: 320px;
   }
 }

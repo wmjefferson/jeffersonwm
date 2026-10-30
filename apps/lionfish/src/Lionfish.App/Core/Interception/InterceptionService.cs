@@ -359,7 +359,7 @@ public class InterceptionService : IDisposable
 
         if (hardwareId.Equals("VID_30FA&PID_1340", StringComparison.OrdinalIgnoreCase))
         {
-            return ("8-Button Macro Pad (with Power Switch)", hardwareId, "USB Macro Keypad", "USB", false);
+            return ("K815 8-Button Macro Pad (with Power Button)", hardwareId, "USB Macro Keypad", "USB", false);
         }
 
         string friendlyName = GetFriendlyNameFromRegistry(devicePath, hardwareId);
@@ -659,7 +659,7 @@ public class InterceptionService : IDisposable
         {
             DeviceHandle = deviceId,
             HardwareId = hwId,
-            FriendlyName = hwId.Contains("30FA") ? "8-Button Macro Pad (with Rotary Knob)" :
+            FriendlyName = hwId.Contains("30FA") ? "K815 8-Button Macro Pad (with Power Button)" :
                            hwId.Contains("258E") ? "34-Key Numeric Keypad" : $"Keypad ({hwId})",
             DeviceCategory = "External USB Keypad",
             ConnectionType = "USB",

@@ -69,6 +69,12 @@ public class IndexModel(
     [BindProperty]
     public string? SelectedStatus { get; set; }
 
+    [BindProperty]
+    public List<int> AddTagIds { get; set; } = [];
+
+    [BindProperty]
+    public List<int> RemoveTagIds { get; set; } = [];
+
     public int TotalTitles { get; private set; }
 
     public int TotalQuantity { get; private set; }
@@ -239,13 +245,17 @@ public class IndexModel(
             return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
         }
 
-        if (SelectedCollectionId is null && SelectedLocationId is null && string.IsNullOrWhiteSpace(SelectedStatus))
+        var addTagIds = AddTagIds.Distinct().ToList();
+        var removeTagIds = RemoveTagIds.Except(addTagIds).Distinct().ToList();
+
+        if (SelectedCollectionId is null && SelectedLocationId is null && string.IsNullOrWhiteSpace(SelectedStatus) && addTagIds.Count == 0 && removeTagIds.Count == 0)
         {
-            StatusMessage = "Choose a collection, availability, or location first.";
+            StatusMessage = "Choose a collection, availability, location, or tag change first.";
             return RedirectToPage(new { Query, CollectionIds, TagIds, TagMode, LocationIds, Statuses, Sort, PageSize, PageNumber });
         }
 
         var books = await inventoryAccess.ScopeBooks(dbContext.Books, User)
+            .Include(book => book.BookTags)
             .Include(book => book.CollectionBooks)
             .Include(book => book.Copies)
             .Where(book => SelectedBookIds.Contains(book.Id))
@@ -276,6 +286,17 @@ public class IndexModel(
         }
 
         var status = string.IsNullOrWhiteSpace(SelectedStatus) ? null : SelectedStatus.Trim();
+        var addTags = addTagIds.Count == 0
+            ? []
+            : await inventoryAccess.ScopeTags(dbContext.Tags, User)
+                .Where(tag => addTagIds.Contains(tag.Id))
+                .ToListAsync();
+        var allowedRemoveTagIds = removeTagIds.Count == 0
+            ? new HashSet<int>()
+            : await inventoryAccess.ScopeTags(dbContext.Tags, User)
+                .Where(tag => removeTagIds.Contains(tag.Id))
+                .Select(tag => tag.Id)
+                .ToHashSetAsync();
         var now = DateTimeOffset.UtcNow;
         var changedBooks = 0;
         foreach (var book in books)
@@ -335,6 +356,33 @@ public class IndexModel(
                 }
 
                 bookChanged |= locationChanged;
+            }
+
+            foreach (var tagId in allowedRemoveTagIds)
+            {
+                var existing = book.BookTags.FirstOrDefault(item => item.TagId == tagId);
+                if (existing is null)
+                {
+                    continue;
+                }
+
+                book.BookTags.Remove(existing);
+                bookChanged = true;
+            }
+
+            foreach (var tag in addTags)
+            {
+                if (book.BookTags.Any(item => item.TagId == tag.Id))
+                {
+                    continue;
+                }
+
+                book.BookTags.Add(new BookTag
+                {
+                    Book = book,
+                    Tag = tag
+                });
+                bookChanged = true;
             }
 
             if (!bookChanged)

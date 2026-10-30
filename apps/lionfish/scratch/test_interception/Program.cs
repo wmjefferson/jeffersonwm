@@ -1,12 +1,23 @@
 using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
 class Program
 {
+    [StructLayout(LayoutKind.Sequential)]
+    struct HIDD_ATTRIBUTES
+    {
+        public int Size;
+        public ushort VendorID;
+        public ushort ProductID;
+        public ushort VersionNumber;
+    }
+
+    [DllImport("hid.dll", SetLastError = true)]
+    static extern bool HidD_GetAttributes(SafeFileHandle HidDeviceObject, ref HIDD_ATTRIBUTES Attributes);
+
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-    public static extern SafeFileHandle CreateFile(
+    static extern SafeFileHandle CreateFile(
         string lpFileName,
         uint dwDesiredAccess,
         uint dwShareMode,
@@ -17,30 +28,31 @@ class Program
 
     static void Main()
     {
-        string[] paths = new[]
-        {
-            @"\\?\hid#vid_30fa&pid_1340&mi_00#7&348bc95e&0&0000#{378de44c-56ef-11d1-bc8c-00a0c91405dd}",
-            @"\\?\hid#vid_30fa&pid_1340&mi_01&col01#7&306764d2&0&0000#{884b96c3-56ef-11d1-bc8c-00a0c91405dd}",
-            @"\\?\hid#vid_30fa&pid_1340&mi_01&col02#7&306764d2&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}",
-            @"\\?\hid#vid_30fa&pid_1340&mi_01&col03#7&306764d2&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}"
-        };
+        string path = @"\\?\hid#vid_30fa&pid_1340&mi_01&col01#7&306764d2&0&0000#{884b96c3-56ef-11d1-bc8c-00a0c91405dd}";
+        Console.WriteLine($"Testing: {path}");
 
-        const uint FILE_SHARE_READ = 1;
-        const uint FILE_SHARE_WRITE = 2;
-        const uint OPEN_EXISTING = 3;
+        // Try different access flags
+        uint[] accesses = new uint[] { 0, 0x80000000 /*GENERIC_READ*/, 0x10000000 /*GENERIC_ALL*/ };
+        string[] names = new[] { "0 (Query)", "GENERIC_READ", "GENERIC_ALL" };
 
-        foreach (var p in paths)
+        for (int i = 0; i < accesses.Length; i++)
         {
-            var handle = CreateFile(p, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero);
-            if (handle.IsInvalid)
+            var h = CreateFile(path, accesses[i], 1 | 2 /*FILE_SHARE_READ|WRITE*/, IntPtr.Zero, 3 /*OPEN_EXISTING*/, 0, IntPtr.Zero);
+            if (h.IsInvalid)
             {
                 int err = Marshal.GetLastWin32Error();
-                Console.WriteLine($"[FAIL] {p}\n       Error: {err}");
+                Console.WriteLine($"Access {names[i]}: Failed with error {err}");
             }
             else
             {
-                Console.WriteLine($"[OK] {p}");
-                handle.Close();
+                Console.WriteLine($"Access {names[i]}: SUCCESS!");
+                var attr = new HIDD_ATTRIBUTES();
+                attr.Size = Marshal.SizeOf(attr);
+                if (HidD_GetAttributes(h, ref attr))
+                {
+                    Console.WriteLine($"  VID: 0x{attr.VendorID:X4}, PID: 0x{attr.ProductID:X4}, Ver: 0x{attr.VersionNumber:X4}");
+                }
+                h.Close();
             }
         }
     }

@@ -59,6 +59,13 @@ public class MappingEngine
 
         if (mapping?.Action == null) return;
 
+        // Check if this action is a modifier-only key (e.g. Ctrl alone, Shift alone, Alt alone, Win alone)
+        if (mapping.Action is KeystrokeAction ka && IsModifierOnlyAction(ka))
+        {
+            HandleModifierKeyDispatch(mapping, ka, e);
+            return;
+        }
+
         bool shouldTrigger = (e.IsKeyDown && mapping.Trigger == KeyTrigger.OnKeyDown) ||
                              (!e.IsKeyDown && mapping.Trigger == KeyTrigger.OnKeyUp);
 
@@ -78,6 +85,60 @@ public class MappingEngine
                     System.Diagnostics.Debug.WriteLine($"Error executing action for [{mapping.KeyName}]: {ex.Message}");
                 }
             });
+        }
+    }
+
+    private readonly ConcurrentDictionary<string, bool> _activeDownKeys = new();
+
+    private static bool IsModifierOnlyAction(KeystrokeAction ka)
+    {
+        if (ka.Modifiers != ModifierKeys.None && ka.Key == VirtualKeyCode.None)
+            return true;
+
+        if (ka.Key is VirtualKeyCode.Control or VirtualKeyCode.LControl or VirtualKeyCode.RControl or
+                      VirtualKeyCode.Shift or VirtualKeyCode.LShift or VirtualKeyCode.RShift or
+                      VirtualKeyCode.Alt or VirtualKeyCode.LAlt or VirtualKeyCode.RAlt or
+                      VirtualKeyCode.LWin or VirtualKeyCode.RWin)
+            return true;
+
+        return false;
+    }
+
+    private void HandleModifierKeyDispatch(KeyMapping mapping, KeystrokeAction ka, InterceptedKeyEventArgs e)
+    {
+        string keyId = $"{mapping.ScanCode}_{mapping.IsE0}";
+
+        if (e.IsKeyDown)
+        {
+            // Only trigger on initial press, ignore hardware auto-repeats while held
+            if (_activeDownKeys.TryAdd(keyId, true))
+            {
+                ActionExecuted?.Invoke(mapping, ka);
+
+                if (ka.Modifiers != ModifierKeys.None)
+                {
+                    InputSimulator.SendModifiersDown(ka.Modifiers);
+                }
+                if (ka.Key != VirtualKeyCode.None)
+                {
+                    InputSimulator.SendKeyDown(ka.Key);
+                }
+            }
+        }
+        else
+        {
+            // Physical button released: release held modifiers
+            if (_activeDownKeys.TryRemove(keyId, out _))
+            {
+                if (ka.Key != VirtualKeyCode.None)
+                {
+                    InputSimulator.SendKeyUp(ka.Key);
+                }
+                if (ka.Modifiers != ModifierKeys.None)
+                {
+                    InputSimulator.SendModifiersUp(ka.Modifiers);
+                }
+            }
         }
     }
 }

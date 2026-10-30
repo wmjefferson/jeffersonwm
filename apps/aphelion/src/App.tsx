@@ -175,6 +175,9 @@ export default function App() {
 
   const authBaseUrl = authStatus?.authBaseUrl || 'https://auth.jeffersonwm.com';
   const currentUser = authStatus?.user || null;
+  const accountLink = currentUser
+    ? (currentUser.isAdmin || currentUser.isOwner ? authBaseUrl : 'https://jeffersonwm.com/account/')
+    : null;
   const isGeneralPublic = authStatus?.requireAuth !== false && !currentUser;
   const canUseAccountTools = Boolean(currentUser) || authStatus?.requireAuth === false;
   const canAccessAdmin = authStatus?.requireAuth === false || Boolean(currentUser?.isOwner);
@@ -622,6 +625,7 @@ export default function App() {
           apiBaseUrl={apiBaseUrl}
           authStatus={authStatus}
           authLoading={authLoading}
+          accountLink={accountLink}
           onSignIn={openCentralAuth}
           onSignOut={handleSignOut}
         />
@@ -639,7 +643,12 @@ export default function App() {
     }
     return (
       <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
-        <AdminPage apiBaseUrl={apiBaseUrl} authStatus={authStatus} onSignOut={handleSignOut} />
+        <AdminPage
+          apiBaseUrl={apiBaseUrl}
+          authStatus={authStatus}
+          accountLink={accountLink}
+          onSignOut={handleSignOut}
+        />
       </Suspense>
     );
   }
@@ -782,13 +791,23 @@ export default function App() {
             </a>
           )}
           {currentUser ? (
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
-            >
-              Sign Out
-            </button>
+            <>
+              <a
+                href={accountLink || 'https://jeffersonwm.com/account/'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+              >
+                {currentUser.username}
+              </a>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="font-sans text-sm font-semibold text-gray-900 hover:text-[#de8bf7] transition-colors duration-1000 hover:duration-150"
+              >
+                Sign Out
+              </button>
+            </>
           ) : (
             <button
               type="button"

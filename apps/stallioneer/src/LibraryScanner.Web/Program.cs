@@ -78,6 +78,7 @@ builder.Services.AddRazorPages();
 var app = builder.Build();
 
 await EnsureAccountScopedInventorySchemaAsync(app.Services);
+await RefreshLegacyTagPaletteAsync(app.Services);
 await EnsureIdentityBootstrapAsync(app.Services);
 
 // Configure the HTTP request pipeline.
@@ -113,7 +114,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
-// Historical note: the former Bulk page was removed during development; Inventory now owns selection workflows.
 app.MapRazorPages()
    .WithStaticAssets();
 
@@ -268,5 +268,28 @@ static async Task EnsureAccountScopedInventorySchemaAsync(IServiceProvider servi
     finally
     {
         await connection.CloseAsync();
+    }
+}
+
+static async Task RefreshLegacyTagPaletteAsync(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var tags = await dbContext.Tags.ToListAsync();
+    var changed = false;
+
+    foreach (var tag in tags.Where(tag => InventoryText.IsLegacyDefaultTagColor(tag.Color)))
+    {
+        var refreshedColor = InventoryText.DefaultTagColor(tag.Name);
+        if (!string.Equals(tag.Color, refreshedColor, StringComparison.OrdinalIgnoreCase))
+        {
+            tag.Color = refreshedColor;
+            changed = true;
+        }
+    }
+
+    if (changed)
+    {
+        await dbContext.SaveChangesAsync();
     }
 }

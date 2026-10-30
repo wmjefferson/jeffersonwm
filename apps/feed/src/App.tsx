@@ -2,6 +2,8 @@ import { ChangeEvent, CSSProperties, FormEvent, useEffect, useMemo, useRef, useS
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
+  ArrowDown,
+  ArrowUp,
   Briefcase,
   Clock,
   Code,
@@ -34,6 +36,7 @@ interface FeedItem {
   source: string;
   created_at: string;
   pinned_at?: string | null;
+  pinned_order?: number | null;
   tint_color?: string | null;
 }
 
@@ -1493,6 +1496,43 @@ export default function App() {
     }
   };
 
+  const handlePinnedMove = async (item: FeedItem, direction: -1 | 1) => {
+    const currentIndex = pinnedItems.findIndex((pinnedItem) => pinnedItem.id === item.id);
+    const nextIndex = currentIndex + direction;
+
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= pinnedItems.length) {
+      return;
+    }
+
+    const orderedIds = pinnedItems.map((pinnedItem) => pinnedItem.id);
+    [orderedIds[currentIndex], orderedIds[nextIndex]] = [orderedIds[nextIndex], orderedIds[currentIndex]];
+
+    setPosting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(apiUrl('/api/feed/pinned-order'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: secretInput, orderedIds }),
+      });
+
+      if (response.status === 401) {
+        throw new Error('Invalid secret');
+      }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update pinned order');
+      }
+
+      await fetchFeed();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update pinned order');
+    } finally {
+      setPosting(false);
+    }
+  };
+
   useEffect(() => {
     fetchFeed();
     fetchWeekSummaries();
@@ -1824,6 +1864,11 @@ export default function App() {
     return visibleItems
       .filter((item) => Boolean(item.pinned_at))
       .sort((left, right) => {
+        const leftOrder = typeof left.pinned_order === 'number' ? left.pinned_order : Number.POSITIVE_INFINITY;
+        const rightOrder = typeof right.pinned_order === 'number' ? right.pinned_order : Number.POSITIVE_INFINITY;
+        if (leftOrder !== rightOrder) {
+          return leftOrder - rightOrder;
+        }
         const leftPinned = left.pinned_at ? parseFeedDate(left.pinned_at).getTime() : 0;
         const rightPinned = right.pinned_at ? parseFeedDate(right.pinned_at).getTime() : 0;
         return rightPinned - leftPinned;
@@ -1962,7 +2007,7 @@ export default function App() {
   );
   const selectedWeekSummaryStyle =
     generatedWeekSummaryVariants.find((style) => style.id === selectedWeekSummaryStyleId) || null;
-  const renderFeedEntry = (item: FeedItem) => (
+  const renderFeedEntry = (item: FeedItem, pinnedIndex?: number) => (
     <div
       key={item.id}
       id={getEntryAnchorId(item)}
@@ -2006,6 +2051,30 @@ export default function App() {
               <Share2 size={12} />
               <span className="share-label">{copiedEntryId === item.id ? 'Copied' : 'Share'}</span>
             </button>
+            {isLoggedIn && pinnedIndex !== undefined && pinnedItems.length > 1 && (
+              <span className="pinned-arrange" aria-label={`Arrange pinned entry: ${item.title}`}>
+                <button
+                  type="button"
+                  className="icon-link pinned-arrange-button"
+                  onClick={() => handlePinnedMove(item, -1)}
+                  disabled={posting || pinnedIndex === 0}
+                  aria-label={`Move ${item.title} up`}
+                  title="Move up"
+                >
+                  <ArrowUp size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="icon-link pinned-arrange-button"
+                  onClick={() => handlePinnedMove(item, 1)}
+                  disabled={posting || pinnedIndex === pinnedItems.length - 1}
+                  aria-label={`Move ${item.title} down`}
+                  title="Move down"
+                >
+                  <ArrowDown size={13} />
+                </button>
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -2382,7 +2451,7 @@ export default function App() {
               <span className="pinned-count">{pinnedItems.length}</span>
             </div>
             <div className="timeline">
-              {pinnedItems.map((item) => (
+              {pinnedItems.map((item, index) => (
                 <motion.article
                   key={`pinned-${item.id}`}
                   initial={{ opacity: 0, y: 12 }}
@@ -2390,7 +2459,7 @@ export default function App() {
                   className={`feed-card feed-card--pinned ${item.tint_color ? 'feed-card--tinted' : ''}`}
                   style={getEntryTintStyle(item)}
                 >
-                  {renderFeedEntry(item)}
+                  {renderFeedEntry(item, index)}
                 </motion.article>
               ))}
             </div>
@@ -2997,6 +3066,10 @@ export default function App() {
           </section>
         )}
       </main>
+      <footer className="site-footer" aria-label="Site footer">
+        <span>© 2026 <a href="https://jeffersonwm.com">Jefferson Williams</a>. All rights reserved.</span>
+        <a href="https://github.com/wmjefferson" target="_blank" rel="noreferrer">GitHub.</a>
+      </footer>
     </div>
   );
 }

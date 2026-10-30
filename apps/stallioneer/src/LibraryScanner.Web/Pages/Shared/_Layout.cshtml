@@ -1,6 +1,9 @@
 @inject Microsoft.Extensions.Options.IOptions<LibraryScanner.Web.Services.CentralAuthOptions> CentralAuthOptions
 @{
     var currentPage = (ViewContext.RouteData.Values["page"] as string) ?? string.Empty;
+    var bodyClass = string.Equals(currentPage, "/Index", StringComparison.OrdinalIgnoreCase)
+        ? "home-page"
+        : string.Empty;
     string BannerLinkClass(string page) =>
         string.Equals(currentPage, page, StringComparison.OrdinalIgnoreCase)
             ? "page-banner__link is-active"
@@ -26,7 +29,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/LibraryScanner.Web.styles.css" asp-append-version="true" />
 </head>
-<body data-stallioneer-auth-base-url="@CentralAuthOptions.Value.AuthBaseUrl.TrimEnd('/')">
+<body class="@bodyClass" data-stallioneer-auth-base-url="@CentralAuthOptions.Value.AuthBaseUrl.TrimEnd('/')">
     <div class="shell-gutters" aria-hidden="true">
         <div class="shell-gutter shell-gutter--left"></div>
         <div class="shell-gutter shell-gutter--right"></div>

@@ -24,7 +24,8 @@ function copyStaticRuntimeFilesToDist() {
         resolve(distDir, 'account', 'widget', 'index.html'),
         resolve(distDir, 'development', 'index.html'),
         resolve(distDir, 'project-activity', 'index.html'),
-        resolve(distDir, 'scholarship', 'index.html'),
+        resolve(distDir, 'privacy', 'index.html'),
+        resolve(distDir, 'single-page.html'),
         resolve(distDir, 'status', 'index.html'),
       ]
 
@@ -88,8 +89,8 @@ function prettyRootPagesInDev() {
     ['/account/widget/', '/account/widget/index.html'],
     ['/project-activity', '/project-activity/index.html'],
     ['/project-activity/', '/project-activity/index.html'],
-    ['/scholarship', '/scholarship/index.html'],
-    ['/scholarship/', '/scholarship/index.html'],
+    ['/privacy', '/privacy/index.html'],
+    ['/privacy/', '/privacy/index.html'],
     ['/status', '/status/index.html'],
     ['/status/', '/status/index.html'],
     ['/development', '/development/index.html'],
@@ -101,7 +102,11 @@ function prettyRootPagesInDev() {
     configureServer(server: ViteDevServer) {
       server.middlewares.use((req: IncomingMessage, _res, next) => {
         const pathName = req.url?.split('?')[0]
-        const rewritePath = pathName ? pageRoutes.get(pathName) : undefined
+        let rewritePath = pathName ? pageRoutes.get(pathName) : undefined
+
+        if (!rewritePath && pathName && /^\/[a-zA-Z0-9_-]+\/?$/.test(pathName) && !pathName.includes('.')) {
+          rewritePath = '/single-page.html'
+        }
 
         if (rewritePath && req.url && pathName) {
           req.url = req.url.replace(pathName, rewritePath)

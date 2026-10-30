@@ -50,6 +50,8 @@ ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
 }
 SESSION_COOKIE_NAME = "perihelion_session"
+SHARE_UNLOCK_COOKIE_PREFIX = "peri_share_unlock_"
+SHARE_UNLOCK_DAYS = int(os.environ.get("PERIHELION_SHARE_UNLOCK_DAYS", "7"))
 SESSION_DAYS = int(os.environ.get("PERIHELION_SESSION_DAYS", "30"))
 REQUIRE_AUTH = os.environ.get("PERIHELION_REQUIRE_AUTH", "true").lower() in {"1", "true", "yes", "on"}
 SERVER_LIBRARY_REQUIRE_AUTH = os.environ.get(
@@ -601,6 +603,10 @@ def can_manage_shared_item(item: dict, user: dict | None) -> bool:
     return bool(user_id and owner_user_id == user_id)
 
 
+def can_manage_share_password(item: dict, user: dict | None) -> bool:
+    return is_owner(user)
+
+
 def load_tag_sharing() -> dict:
     ensure_data_dir()
     if not TAG_SHARING_PATH.is_file():
@@ -1002,6 +1008,19 @@ def folder_child_access_mixed(folder_path: str) -> dict:
     }
 
 
+def folder_access_display_payload(folder_path: str, details: dict | None = None) -> dict:
+    if not folder_path:
+        return {
+            "defaultAccess": {"user": "allow", "admin": "allow"},
+            "defaultAccessInherited": {"user": False, "admin": False},
+            "defaultAccessMixed": {"user": False, "admin": False},
+        }
+
+    payload = folder_default_access_display(folder_path, details)
+    payload["defaultAccessMixed"] = folder_child_access_mixed(folder_path)
+    return payload
+
+
 def post_folder_default_access_changed_event(
     folder_path: str,
     before: dict,
@@ -1104,6 +1123,8 @@ def can_access_folder(folder_path: str, user: dict | None) -> bool:
         return True
     if user and user.get("isOwner"):
         return True
+    if user and not user.get("isAdmin"):
+        return False
 
     paths = folder_path_parts(folder_path)
     if not paths:
@@ -1727,6 +1748,9 @@ def load_share_record(share_id: str) -> dict | None:
     data["owner_username"] = str(data.get("owner_username") or data.get("username") or data["owner_user_id"]).strip()
     data["share_scope"] = normalize_share_scope(data.get("share_scope"))
     data["shared_account_ids"] = normalize_account_ids(data.get("shared_account_ids"))
+    data["password_enabled"] = bool(data.get("password_enabled") and data.get("password_hash"))
+    data["password_hash"] = str(data.get("password_hash") or "").strip()
+    data["password_hint"] = str(data.get("password_hint") or "").strip()
     files = []
     missing_images = []
     for rel_path in data["images"]:
@@ -1787,6 +1811,8 @@ def list_share_records(user: dict | None = None) -> list[dict]:
                 "owner_username": str(data.get("owner_username") or data.get("username") or share_user_id).strip(),
                 "share_scope": normalize_share_scope(data.get("share_scope")),
                 "shared_account_ids": normalize_account_ids(data.get("shared_account_ids")),
+                "password_enabled": bool(data.get("password_enabled") and data.get("password_hash")),
+                "password_hint": str(data.get("password_hint") or "").strip(),
             }
         )
     shares.sort(key=lambda share: share.get("created_at") or "", reverse=True)
@@ -1808,6 +1834,9 @@ def save_share_record(
     existing = load_share_record(share_id)
     share_scope = normalize_share_scope((existing or {}).get("share_scope"))
     shared_account_ids = normalize_account_ids((existing or {}).get("shared_account_ids"))
+    password_enabled = bool((existing or {}).get("password_enabled"))
+    password_hash = str((existing or {}).get("password_hash") or "").strip()
+    password_hint = str((existing or {}).get("password_hint") or "").strip()
     if existing:
         if existing.get("owner_user_id"):
             user_id = str(existing.get("owner_user_id"))
@@ -1830,11 +1859,57 @@ def save_share_record(
         "owner_username": username or user_id or "wm",
         "share_scope": share_scope,
         "shared_account_ids": shared_account_ids,
+        "password_enabled": password_enabled,
+        "password_hash": password_hash,
+        "password_hint": password_hint,
     }
     share_file = SHARES_DIR / f"{share_id}.json"
     share_file.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     payload["itemCount"] = len(payload["images"])
     return payload
+
+
+def public_share_payload(share: dict) -> dict:
+    payload = dict(share)
+    payload.pop("password_hash", None)
+    payload["password_enabled"] = bool(payload.get("password_enabled"))
+    return payload
+
+
+def locked_share_payload(share: dict) -> dict:
+    return {
+        "ok": False,
+        "locked": True,
+        "passwordRequired": True,
+        "id": share.get("id"),
+        "title": share.get("title") or "",
+        "description": share.get("description") or "",
+        "password_hint": share.get("password_hint") or "",
+    }
+
+
+def share_password_required(share: dict) -> bool:
+    return bool(share.get("password_enabled") and share.get("password_hash"))
+
+
+def share_unlock_cookie_name(share_id: str) -> str:
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "", str(share_id or ""))[:32] or "share"
+    return f"{SHARE_UNLOCK_COOKIE_PREFIX}{safe_id}"
+
+
+def share_unlock_token(share: dict) -> str:
+    secret = AUTH_INTERNAL_LOG_TOKEN or BOOTSTRAP_ADMIN_PASSWORD or "perihelion-share-unlock"
+    message = f"{share.get('id')}:{share.get('password_hash')}"
+    return hmac.new(secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def share_is_unlocked(handler: BaseHTTPRequestHandler, share: dict, user: dict | None = None) -> bool:
+    if not share_password_required(share):
+        return True
+    if can_manage_share_password(share, user):
+        return True
+    token = cookie_map(handler).get(share_unlock_cookie_name(str(share.get("id") or "")))
+    return bool(token and hmac.compare_digest(token, share_unlock_token(share)))
 
 
 def hash_password(password: str, salt: str | None = None) -> str:
@@ -2443,6 +2518,14 @@ class Handler(BaseHTTPRequestHandler):
             f"{SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Secure; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
         )
 
+    def _set_share_unlock_cookie(self, share: dict) -> tuple[str, str]:
+        expires_at = datetime.now(timezone.utc) + timedelta(days=SHARE_UNLOCK_DAYS)
+        expires_text = expires_at.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        return (
+            "Set-Cookie",
+            f"{share_unlock_cookie_name(str(share.get('id') or ''))}={share_unlock_token(share)}; Path=/; HttpOnly; SameSite=Lax; Secure; Expires={expires_text}",
+        )
+
     def _require_admin(self) -> dict | None:
         user = current_user_from_handler(self)
         if not user:
@@ -2821,20 +2904,18 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path.startswith("/api/share/"):
-                user = require_server_library_access(self)
-                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
-                    return
+                user = current_user_from_handler(self)
                 share_id = unquote(path[len("/api/share/"):]).strip("/")
                 share = load_share_record(share_id)
                 if not share:
                     self._send_json({"error": "Shared page not found"}, 404)
                     return
-                if not can_access_shared_item(share, user):
-                    self._send_json({"error": "You do not have permission to view this list"}, 403)
+                if not share_is_unlocked(self, share, user):
+                    self._send_json(locked_share_payload(share), 423)
                     return
                 share = dict(share)
                 share["images"] = [image for image in share.get("images", []) if can_access_file_path(str(image), user)]
-                self._send_json(share)
+                self._send_json(public_share_payload(share))
                 return
 
             if path == "/api/folder-cover":
@@ -2855,6 +2936,7 @@ class Handler(BaseHTTPRequestHandler):
                     "visibleToUsers": True,
                     "visibleToAdmins": True,
                 }
+                access_display = folder_access_display_payload(folder_path, details)
                 self._send_json({
                     "ok": True,
                     "folderPath": folder_path,
@@ -2865,6 +2947,7 @@ class Handler(BaseHTTPRequestHandler):
                     "description": details["description"],
                     "visibleToUsers": details["visibleToUsers"],
                     "visibleToAdmins": details["visibleToAdmins"],
+                    **access_display,
                     **(folder_access_payload(folder_path) if user and user.get("isAdmin") else {}),
                 })
                 return
@@ -3307,7 +3390,7 @@ class Handler(BaseHTTPRequestHandler):
                     user,
                     "perihelion",
                 )
-                self._send_json({"ok": True, "id": share_id, "share": data})
+                self._send_json({"ok": True, "id": share_id, "share": public_share_payload(data)})
                 return
 
             match = re.fullmatch(r"/api/share/([^/]+)", path)
@@ -3331,7 +3414,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"error": "Invalid images array"}, 400)
                     return
                 updated = save_share_record(share_id, title, images, share.get("created_at"), description=description, user=user)
-                self._send_json({"ok": True, "share": updated})
+                self._send_json({"ok": True, "share": public_share_payload(updated)})
                 return
 
             match = re.fullmatch(r"/api/share/([^/]+)/access", path)
@@ -3352,7 +3435,62 @@ class Handler(BaseHTTPRequestHandler):
                 share["shared_account_ids"] = normalize_account_ids(payload.get("accountIds"))
                 share_file = SHARES_DIR / f"{share_id}.json"
                 share_file.write_text(json.dumps(share, ensure_ascii=False), encoding="utf-8")
-                self._send_json({"ok": True, "share": load_share_record(share_id)})
+                self._send_json({"ok": True, "share": public_share_payload(load_share_record(share_id) or {})})
+                return
+
+            match = re.fullmatch(r"/api/share/([^/]+)/password", path)
+            if match:
+                user = require_server_library_access(self)
+                if SERVER_LIBRARY_REQUIRE_AUTH and not user:
+                    return
+                share_id = unquote(match.group(1)).strip()
+                share = load_share_record(share_id)
+                if not share:
+                    self._send_json({"error": "Shared page not found"}, 404)
+                    return
+                if not can_manage_share_password(share, user):
+                    self._send_json({"error": "Only the owner can edit share passwords right now"}, 403)
+                    return
+                payload = load_json_body(self)
+                enabled = bool(payload.get("enabled"))
+                password = str(payload.get("password") or "")
+                share["password_hint"] = str(payload.get("passwordHint") or "").strip()
+                if enabled:
+                    if password:
+                        share["password_hash"] = hash_password(password)
+                    elif not share.get("password_hash"):
+                        self._send_json({"error": "Password is required"}, 400)
+                        return
+                    share["password_enabled"] = True
+                else:
+                    share["password_enabled"] = False
+                    share["password_hash"] = ""
+                    share["password_hint"] = ""
+                share_file = SHARES_DIR / f"{share_id}.json"
+                share_file.write_text(json.dumps(share, ensure_ascii=False), encoding="utf-8")
+                self._send_json({"ok": True, "share": public_share_payload(load_share_record(share_id) or {})})
+                return
+
+            match = re.fullmatch(r"/api/share/([^/]+)/unlock", path)
+            if match:
+                user = current_user_from_handler(self)
+                share_id = unquote(match.group(1)).strip()
+                share = load_share_record(share_id)
+                if not share:
+                    self._send_json({"error": "Shared page not found"}, 404)
+                    return
+                payload = load_json_body(self)
+                password = str(payload.get("password") or "")
+                if not share_password_required(share):
+                    self._send_json({"ok": True, "share": public_share_payload(share)})
+                    return
+                if not password or not verify_password(password, str(share.get("password_hash") or "")):
+                    self._send_json({"error": "Incorrect share password"}, 401)
+                    return
+                self._send_json(
+                    {"ok": True, "share": public_share_payload(share)},
+                    extra_headers=[self._set_share_unlock_cookie(share)],
+                )
                 return
 
             if path == "/api/local-folder-opened":
@@ -3447,6 +3585,7 @@ class Handler(BaseHTTPRequestHandler):
                         )
                 cover_state = get_folder_cover_state(folder_path)
                 details = get_folder_detail_record(folder_path)
+                access_display = folder_access_display_payload(folder_path, details)
                 self._send_json({
                     "ok": True,
                     "folderPath": folder_path,
@@ -3457,6 +3596,7 @@ class Handler(BaseHTTPRequestHandler):
                     "description": details["description"],
                     "visibleToUsers": details["visibleToUsers"],
                     "visibleToAdmins": details["visibleToAdmins"],
+                    **access_display,
                     **folder_access_payload(folder_path),
                 })
                 return

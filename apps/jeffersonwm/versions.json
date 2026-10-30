@@ -1,15 +1,15 @@
 {
-  "updatedAt": "2026-09-25T04:55:16.921Z",
+  "updatedAt": "2026-10-19T02:16:40.313Z",
   "apps": {
     "jeffersonwm": {
       "label": "JeffersonWM",
-      "version": "0.3.1",
-      "updatedAt": "2026-09-21 19:09 PDT"
+      "version": "0.4.0",
+      "updatedAt": "2026-10-17 19:47 PDT"
     },
     "feed": {
       "label": "Feed",
-      "version": "0.2.10",
-      "updatedAt": "2026-09-21 19:15 PDT"
+      "version": "0.2.12",
+      "updatedAt": "2026-10-18 19:16 PDT"
     },
     "vermilion": {
       "label": "Vermilion",
@@ -38,8 +38,8 @@
     },
     "perihelion": {
       "label": "Perihelion",
-      "version": "1.9.1",
-      "updatedAt": "2026-09-21 19:09 PDT"
+      "version": "1.9.2",
+      "updatedAt": "2026-10-04 20:13 PDT"
     },
     "bullion": {
       "label": "Bullion",
@@ -83,13 +83,18 @@
     },
     "auth-jeffersonwm": {
       "label": "Auth / Multimillion",
-      "version": "0.5.2",
-      "updatedAt": "2026-09-21 19:14 PDT"
+      "version": "0.5.3",
+      "updatedAt": "2026-10-14 19:41 PDT"
     },
     "billionaire": {
       "label": "Billionaire",
       "version": "0.2.1",
       "updatedAt": "2026-09-04 21:42 PDT"
+    },
+    "scallions": {
+      "label": "Scallions",
+      "version": "0.2.0",
+      "updatedAt": "2026-10-17 19:46 PDT"
     }
   }
 }

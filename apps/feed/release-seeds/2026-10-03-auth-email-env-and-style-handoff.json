@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Auth email, env safety, and style-standardization handoff",
+  "content": "<p>Auth notification email delivery was traced end-to-end after the live restart. The main issue was runtime env confusion rather than a broken notification system: live secrets belong in the untracked server <code>.env</code>, while tracked reference env files stay sanitized.</p><ul><li>SMTP verification and a direct diagnostic send succeeded, and the message arrived after a short provider delay.</li><li>The live Auth server should start from <code>E:\\auth-jeffersonwm\\backend</code>, not the UNC share path, so Node/tsx resolves the app correctly.</li><li>Perihelion multi-element exports are already using the intended model: one notification event with an Elements JSON link instead of one event per exported item.</li><li>Next direction: start with Auth, align its title/tabs/section-block structure to Perihelion, then turn that into a reusable Peri demo/reference for the rest of the sites.</li></ul>",
+  "url": "https://auth.jeffersonwm.com/",
+  "source": "manual",
+  "external_id": "auth-email-env-style-handoff-2026-10-03",
+  "created_at": "2026-10-03 18:45:00"
+}

@@ -5,21 +5,22 @@
     ViewData["Title"] = "Edit book";
 }
 
-<section class="page-heading">
-    <div>
-        <p class="eyebrow">
-            @Model.Input.Isbn13
-            <button type="button" class="copy-button" data-copy-text="@Model.Input.Isbn13" title="Copy ISBN" aria-label="Copy ISBN"><span class="copy-icon" aria-hidden="true"></span></button>
-        </p>
-        <h1>Edit book</h1>
-    </div>
-    <div class="header-actions edit-header-actions">
-        <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
-        <button class="btn btn-primary" form="edit-book-form">Save changes</button>
-        <a class="btn btn-outline-secondary" asp-page="/Books/Edit" asp-route-id="@Model.Input.Id">Clear changes</a>
-        <button asp-page-handler="Delete" class="btn btn-outline-danger" form="edit-book-form" onclick="return confirm('Delete this book and all of its copies? This cannot be undone.');">Delete book</button>
-    </div>
-</section>
+<section class="peri-page-shell">
+    <header class="peri-page-header">
+        <div>
+            <h1>Edit Book</h1>
+            <p>
+                @Model.Input.Isbn13
+                <button type="button" class="copy-button" data-copy-text="@Model.Input.Isbn13" title="Copy ISBN" aria-label="Copy ISBN"><span class="copy-icon" aria-hidden="true"></span></button>
+            </p>
+        </div>
+        <div class="header-actions edit-header-actions">
+            <a class="btn btn-outline-secondary" asp-page="/Books/Index">Back</a>
+            <button class="btn btn-primary" form="edit-book-form">Save changes</button>
+            <a class="btn btn-outline-secondary" asp-page="/Books/Edit" asp-route-id="@Model.Input.Id">Clear changes</a>
+            <button asp-page-handler="Delete" class="btn btn-outline-danger" form="edit-book-form" onclick="return confirm('Delete this book and all of its copies? This cannot be undone.');">Delete book</button>
+        </div>
+    </header>
 
 <form method="post" id="edit-book-form" class="entry-grid edit-layout" data-unsaved-changes-form>
     <input asp-for="Input.Id" type="hidden" />
@@ -33,6 +34,10 @@
                 <a href="@Model.PreviewCoverUrl" target="_blank" rel="noreferrer" class="cover-preview-link">
                     <img class="cover-preview edit-cover-preview" src="@Model.PreviewCoverUrl" alt="Cover preview for @Model.Input.Title" />
                 </a>
+            }
+            else
+            {
+                <img class="cover-preview edit-cover-preview cover-preview--placeholder" src="/images/cover-placeholder.svg" alt="No cover available for @Model.Input.Title" />
             }
             <div class="field-stack">
                 <label asp-for="Input.Isbn13"></label>
@@ -258,6 +263,7 @@
         </section>
     </div>
 </form>
+</section>
 
 <template id="copy-card-template">
     <article class="copy-editor-card" data-copy-card>

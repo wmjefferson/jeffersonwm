@@ -160,7 +160,7 @@ public class AdminModel(
             ModelState.AddModelError($"{nameof(NewTag)}.{nameof(NewTag.Name)}", "Enter at least one tag name.");
         }
 
-        if (!ModelState.IsValid)
+        if (!TryValidateModel(NewTag, nameof(NewTag)))
         {
             await LoadPageAsync();
             return Page();

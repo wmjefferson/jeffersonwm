@@ -1,8 +1,10 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using Lionfish.Core.Config;
 
 namespace Lionfish.App.Views;
 
@@ -40,6 +42,22 @@ public partial class OsdOverlayWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        try
+        {
+            var configStore = new ConfigStore();
+            var config = configStore.LoadConfig();
+            if (config.OsdLeft >= 0 && config.OsdTop >= 0 &&
+                config.OsdLeft < SystemParameters.VirtualScreenWidth - 40 &&
+                config.OsdTop < SystemParameters.VirtualScreenHeight - 40)
+            {
+                Left = config.OsdLeft;
+                Top = config.OsdTop;
+                _hasCustomPosition = true;
+                return;
+            }
+        }
+        catch { }
+
         if (!_hasCustomPosition)
         {
             // Position neatly in the bottom-right corner of the work area
@@ -57,8 +75,42 @@ public partial class OsdOverlayWindow : Window
             try
             {
                 DragMove();
+                SavePosition();
             }
             catch { }
         }
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        Hide();
+        if (DataContext is ViewModels.MainViewModel mainVm)
+        {
+            mainVm.SettingsVM.ShowOsdOverlay = false;
+        }
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        // Cancel the actual window destruction so it can be re-shown anytime without error
+        e.Cancel = true;
+        Hide();
+        if (DataContext is ViewModels.MainViewModel mainVm)
+        {
+            mainVm.SettingsVM.ShowOsdOverlay = false;
+        }
+    }
+
+    private void SavePosition()
+    {
+        try
+        {
+            var configStore = new ConfigStore();
+            var config = configStore.LoadConfig();
+            config.OsdLeft = Left;
+            config.OsdTop = Top;
+            configStore.SaveConfig(config);
+        }
+        catch { }
     }
 }

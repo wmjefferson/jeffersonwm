@@ -287,7 +287,7 @@ app.get('/api/fonts', async (_req, res) => {
   if (pool) {
     try {
       const [rows] = await pool.query(
-        'SELECT name FROM widget_fonts WHERE round IN (1, 2) AND weight > 0 ORDER BY name ASC'
+        'SELECT name FROM widget_fonts WHERE billionaire = 1 AND weight > 0 AND (hidden = 0 OR hidden IS NULL) ORDER BY name ASC'
       );
       if (Array.isArray(rows) && rows.length > 0) {
         const fonts = (rows as Array<{ name: string }>).map((r) => r.name);

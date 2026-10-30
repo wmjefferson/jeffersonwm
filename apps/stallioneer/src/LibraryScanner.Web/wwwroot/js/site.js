@@ -554,6 +554,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const previousPageButton = document.querySelector("[data-inventory-page-previous]");
         const nextPageButton = document.querySelector("[data-inventory-page-next]");
         const filterCount = document.querySelector("[data-inventory-filter-count]");
+        const activeFilterItems = document.querySelector("[data-active-filter-items]");
         let currentPage = pageNumberInput instanceof HTMLInputElement ? Number(pageNumberInput.value) || 1 : 1;
         let isLoading = false;
 
@@ -620,6 +621,46 @@ document.addEventListener("DOMContentLoaded", () => {
                 label.classList.toggle("is-active", active);
                 label.setAttribute("aria-pressed", String(active));
             });
+
+            if (activeFilterItems instanceof HTMLElement) {
+                const filters = [];
+                const query = queryInput instanceof HTMLInputElement ? queryInput.value.trim() : "";
+                if (query) {
+                    filters.push(`Search: ${query}`);
+                }
+
+                const collectCheckedLabels = (name, prefix) => {
+                    inventoryFilterForm.querySelectorAll(`input[name="${name}"]:checked`).forEach((input) => {
+                        if (!(input instanceof HTMLInputElement)) {
+                            return;
+                        }
+
+                        const label = input.closest("[data-inventory-toggle-label]");
+                        const text = label instanceof HTMLElement
+                            ? Array.from(label.querySelectorAll("span"))
+                                .map((span) => span.textContent?.trim() ?? "")
+                                .find(Boolean)
+                            : "";
+                        if (text) {
+                            filters.push(`${prefix}: ${text}`);
+                        }
+                    });
+                };
+
+                collectCheckedLabels("CollectionIds", "Collection");
+                collectCheckedLabels("TagIds", "Tag");
+                collectCheckedLabels("LocationIds", "Location");
+                collectCheckedLabels("Statuses", "Availability");
+
+                const tagMode = tagModeInput instanceof HTMLInputElement ? tagModeInput.value.toUpperCase() : "AND";
+                if (selectedValues("TagIds").length > 1) {
+                    filters.push(`Tag mode: ${tagMode}`);
+                }
+
+                activeFilterItems.innerHTML = filters.length > 0
+                    ? filters.map((filter) => `<span class="active-filter-chip">${escapeHtml(filter)}</span>`).join("")
+                    : '<span class="active-filter-strip__empty">None</span>';
+            }
         };
 
         const renderBooks = (books) => {
@@ -645,7 +686,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const titleAuthor = book.authors ? `${book.title} - ${book.authors}` : book.title;
                 const cover = book.coverImageUrl
                     ? `<img src="${escapeHtml(book.coverImageUrl)}" alt="" />`
-                    : '<div class="cover-placeholder"></div>';
+                    : '<img class="cover-placeholder" src="/images/cover-placeholder.svg" alt="No cover available" />';
                 const collections = (book.collections ?? [])
                     .map((collection) => `<span class="collection-pill">${escapeHtml(collection.name ?? collection.Name ?? collection)}</span>`)
                     .join("");
@@ -1008,15 +1049,50 @@ document.addEventListener("DOMContentLoaded", () => {
         const sharedStatus = inventorySelectionPanel.querySelector("[data-inventory-shared-status]");
         const sharedLocation = inventorySelectionPanel.querySelector("[data-inventory-shared-location]");
         const tagModeInput = document.querySelector("[data-inventory-tag-mode-value]");
+        const tagMutations = document.querySelector("[data-inventory-tag-mutations]");
         const inventoryFilterForm = document.querySelector("[data-inventory-filter-form]");
         const tagModeButtons = Array.from(document.querySelectorAll("[data-inventory-tag-mode]"))
             .filter((button) => button instanceof HTMLButtonElement);
+        const stagedTagStates = new Map();
+        let lastSelectionSignature = "";
 
         const getSelectionInputs = () => Array.from(document.querySelectorAll("[data-select-item]"))
             .filter((item) => item instanceof HTMLInputElement);
+        const getSelectedBookIds = () => getSelectionInputs()
+            .filter((input) => input.checked)
+            .map((input) => input.dataset.bookId ?? input.value);
+        const getSelectionSignature = () => getSelectedBookIds().sort().join(",");
         const selectedTagIds = () => Array.from(document.querySelectorAll('input[name="TagIds"]:checked'))
             .filter((input) => input instanceof HTMLInputElement)
             .map((input) => input.value);
+        const syncTagMutationFields = () => {
+            if (!(tagMutations instanceof HTMLElement)) {
+                return;
+            }
+
+            tagMutations.innerHTML = "";
+            stagedTagStates.forEach((state, tagId) => {
+                if (state !== "add" && state !== "remove") {
+                    return;
+                }
+
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = state === "add" ? "AddTagIds" : "RemoveTagIds";
+                input.value = tagId;
+                tagMutations.appendChild(input);
+            });
+        };
+        const resetStagedTagStatesIfSelectionChanged = () => {
+            const signature = getSelectionSignature();
+            if (signature === lastSelectionSignature) {
+                return;
+            }
+
+            stagedTagStates.clear();
+            lastSelectionSignature = signature;
+            syncTagMutationFields();
+        };
         const distinctValues = (values) => Array.from(new Set(values.filter((value) => value && value.length > 0)));
         const getIntersection = (lists, keySelector) => {
             if (lists.length === 0) {
@@ -1101,11 +1177,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 }).length;
                 const hasSelection = selectedTotal > 0;
                 const isFilterActive = !hasSelection && activeTagIds.includes(id);
-                const isActive = hasSelection && appliedCount === selectedTotal;
-                const isMixed = appliedCount > 0 && appliedCount < selectedTotal;
+                const stagedState = stagedTagStates.get(id) ?? "previous";
+                const isPendingAdd = hasSelection && stagedState === "add";
+                const isPendingRemove = hasSelection && stagedState === "remove";
+                const isActive = hasSelection && appliedCount === selectedTotal && !isPendingRemove;
+                const isMixed = appliedCount > 0 && appliedCount < selectedTotal && stagedState === "previous";
                 const stateLabel = !hasSelection
                     ? isFilterActive ? `filtering visible books by this tag (${activeMode})` : "click to filter visible books by this tag"
-                    : isActive ? "on all selected books" : isMixed ? "on some selected books" : "off";
+                    : isPendingAdd ? "will be added when Apply is pressed"
+                        : isPendingRemove ? "will be removed when Apply is pressed"
+                            : isActive ? "already on all selected books"
+                                : isMixed ? "already on some selected books" : "off";
                 const classes = [
                     "tag-pill",
                     "tag-toggle-button",
@@ -1113,13 +1195,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     isFilterActive ? "is-filter-active" : "",
                     isFilterActive && activeTagIds.length > 1 ? "is-filter-combined" : "",
                     isActive ? "is-active" : "",
-                    isMixed ? "is-mixed" : ""
+                    isMixed ? "is-mixed" : "",
+                    isPendingAdd ? "is-pending-add" : "",
+                    isPendingRemove ? "is-pending-remove" : ""
                 ].filter(Boolean).join(" ");
 
-                return `<button type="button" class="${classes}" style="--tag-color:${escapeTagHtml(color)}" data-inventory-tag-toggle="${escapeTagHtml(id)}" title="${escapeTagHtml(description || `${label} is ${stateLabel}`)}">${escapeTagHtml(label)}</button>`;
+                return `<button type="button" class="${classes}" style="--tag-color:${escapeTagHtml(color)}" data-inventory-tag-toggle="${escapeTagHtml(id)}" data-current-tag-count="${appliedCount}" data-selected-book-count="${selectedTotal}" title="${escapeTagHtml(description || `${label} ${stateLabel}`)}">${escapeTagHtml(label)}</button>`;
             }).join("");
         };
         const updateInventorySelectionSummary = () => {
+            resetStagedTagStatesIfSelectionChanged();
             const selectedBooks = getSelectionInputs()
                 .filter((input) => input.checked)
                 .map((input) => inventoryBookMap.get(input.dataset.bookId ?? input.value))
@@ -1198,6 +1283,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const hasSelection = getSelectionInputs().some((input) => input.checked);
                 if (hasSelection) {
+                    const tagId = button.dataset.inventoryTagToggle ?? "";
+                    const currentCount = Number(button.dataset.currentTagCount ?? "0");
+                    const currentState = stagedTagStates.get(tagId) ?? "previous";
+                    const nextState = currentCount > 0
+                        ? currentState === "previous"
+                            ? "remove"
+                            : currentState === "remove"
+                                ? "add"
+                                : "previous"
+                        : currentState === "add"
+                            ? "previous"
+                            : "add";
+
+                    if (nextState === "previous") {
+                        stagedTagStates.delete(tagId);
+                    } else {
+                        stagedTagStates.set(tagId, nextState);
+                    }
+
+                    syncTagMutationFields();
+                    updateInventorySelectionSummary();
                     return;
                 }
 

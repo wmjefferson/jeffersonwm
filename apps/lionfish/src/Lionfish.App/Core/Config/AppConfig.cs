@@ -24,4 +24,6 @@ public class AppConfig
     public List<string> HiddenDeviceHardwareIds { get; set; } = new();
     public bool AutoProfileSwitching { get; set; } = false;
     public bool ShowOsdOverlay { get; set; } = false;
+    public double OsdLeft { get; set; } = -1;
+    public double OsdTop { get; set; } = -1;
 }

@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "I Went to City paused and parked",
+  "content": "<p><strong>I Went to City</strong> was built far enough to preserve the useful structure, then intentionally paused. I changed my mind, and the assignment this was for expired.</p><p>The work is still recoverable: the Vite/React app, Send page email capture, Auth notification logging path, backend runtime scripts, tunnel launcher, ASO publish helper, and server sync path were completed and documented. The project was published once through the normal workflow, then parked behind a deliberate 404 so the public URL does not show the draft while the idea is on hold.</p><p>A paused-project snapshot was saved on the server share, and a revisit note now documents how to resume local dev, restart the backend, run the tunnel, make the public site visible again, and track the app in Git again if the concept gets revived later.</p>",
+  "url": "https://jeffersonwm.com/iwenttocity/",
+  "source": "manual",
+  "external_id": "iwenttocity-paused-and-parked-2026-10-11",
+  "created_at": "2026-10-11 21:45:00"
+}

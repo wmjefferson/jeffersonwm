@@ -27,6 +27,11 @@
         --radius: 6px;
       }
 
+      html {
+        scrollbar-gutter: stable;
+        overflow-y: scroll;
+      }
+
       * {
         box-sizing: border-box;
       }
@@ -194,12 +199,24 @@
         gap: 0.75rem;
       }
 
+      .filter-pill-group,
       .round-pills {
         display: flex;
         flex-wrap: wrap;
+        align-items: center;
         gap: 0.35rem;
       }
 
+      .filter-group-label {
+        font-size: 0.76rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin-right: 0.15rem;
+      }
+
+      .filter-pill,
       .round-pill {
         background: rgba(17, 24, 39, 0.04);
         border: 1px solid var(--line);
@@ -211,22 +228,76 @@
         border-radius: 999px;
         cursor: pointer;
         transition: all 0.15s ease;
+        user-select: none;
       }
 
+      .filter-pill:hover,
       .round-pill:hover {
         border-color: var(--ink);
         color: var(--ink);
       }
 
+      .filter-pill.is-active,
       .round-pill.is-active {
         background: var(--ink);
         border-color: var(--ink);
         color: #ffffff;
       }
 
+      /* View Switcher */
+      .view-switcher {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: #ffffff;
+      }
+
+      .view-btn {
+        background: #ffffff;
+        border: none;
+        border-right: 1px solid var(--line);
+        font-family: inherit;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--muted);
+        padding: 0.4rem 0.75rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.15s ease;
+      }
+
+      .view-btn:last-child {
+        border-right: none;
+      }
+
+      .view-btn:hover {
+        background: rgba(17, 24, 39, 0.04);
+        color: var(--ink);
+      }
+
+      .view-btn.is-active {
+        background: var(--ink);
+        color: #ffffff;
+      }
+
+      .view-btn svg {
+        display: block;
+      }
+
       .filter-controls {
         display: flex;
         flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem;
+        flex: 1;
+        min-width: 320px;
+      }
+
+      .toolbar-actions {
+        display: flex;
         align-items: center;
         gap: 0.6rem;
       }
@@ -261,6 +332,87 @@
         cursor: pointer;
       }
 
+      .custom-dropdown {
+        position: relative;
+        display: inline-block;
+      }
+
+      .custom-dropdown-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        user-select: none;
+        white-space: nowrap;
+      }
+
+      .custom-dropdown-btn:hover {
+        border-color: rgba(17, 24, 39, 0.35);
+      }
+
+      .custom-dropdown-btn:focus-visible {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(91, 126, 163, 0.15);
+      }
+
+      .custom-dropdown-btn .caret {
+        display: inline-block;
+        width: 0;
+        height: 0;
+        vertical-align: middle;
+        border-top: 4px solid var(--ink);
+        border-right: 4px solid transparent;
+        border-left: 4px solid transparent;
+        transition: transform 0.15s ease;
+      }
+
+      .custom-dropdown.is-open .custom-dropdown-btn .caret {
+        transform: rotate(180deg);
+      }
+
+      .custom-dropdown-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        background: #ffffff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        min-width: 100%;
+        white-space: nowrap;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        padding: 0.3rem 0;
+      }
+
+      .custom-dropdown-menu[hidden] {
+        display: none !important;
+      }
+
+      .custom-dropdown-item {
+        font-family: inherit;
+        font-size: 0.88rem;
+        font-weight: 500;
+        padding: 0.5rem 0.9rem;
+        border: none;
+        background: transparent;
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: background-color 0.12s ease;
+        white-space: nowrap;
+      }
+
+      .custom-dropdown-item:hover,
+      .custom-dropdown-item:focus {
+        background-color: #f3f4f6;
+        outline: none;
+      }
+
       .sample-text-bar {
         display: flex;
         align-items: center;
@@ -284,11 +436,52 @@
         border-color: var(--accent);
       }
 
-      /* Font Cards Grid */
+      /* Font Cards Grid & List View */
       .font-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
         gap: 1.25rem;
+      }
+
+      /* List View (Google Web Fonts style) */
+      .font-grid.is-list-view {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+
+      .font-grid.is-list-view .font-card {
+        padding: 1.35rem 1.6rem;
+        gap: 1.1rem;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .font-grid.is-list-view .font-card-title {
+        font-size: 1.2rem;
+      }
+
+      .font-grid.is-list-view .font-preview-stage {
+        min-height: 90px;
+        padding: 1rem 1.25rem;
+      }
+
+      .font-grid.is-list-view .font-preview-text {
+        font-size: clamp(1.8rem, 3.2vw, 2.5rem);
+        line-height: 1.25;
+      }
+
+      .font-grid.is-list-view .font-controls {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.25rem;
+        padding-top: 0.75rem;
+      }
+
+      .font-grid.is-list-view .control-row {
+        gap: 0.75rem;
       }
 
       .font-card {
@@ -307,6 +500,54 @@
       .font-card:hover {
         border-color: rgba(17, 24, 39, 0.35);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      }
+
+      .font-card.is-hidden {
+        opacity: 0.65;
+        border-color: #e5e7eb;
+        background: #fafaf9;
+      }
+
+      .font-card.is-hidden .font-preview-text {
+        opacity: 0.45;
+      }
+
+      .hidden-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0.15rem 0.45rem;
+        border-radius: 4px;
+        background: #fee2e2;
+        color: #b91c1c;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .latin-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0.15rem 0.45rem;
+        border-radius: 4px;
+        background: #e0f2fe;
+        color: #0369a1;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .font-type-parentheses {
+        font-size: 0.82rem;
+        font-weight: 500;
+        color: var(--muted);
+        margin-left: 0.25rem;
+      }
+
+      .hide-toggle-label {
+        color: var(--muted);
+      }
+
+      .font-card.is-hidden .hide-toggle-label {
+        color: #b91c1c;
+        font-weight: 700;
       }
 
       .font-card-header {
@@ -406,6 +647,31 @@
         color: var(--muted);
       }
 
+      .site-checkboxes {
+        display: inline-flex;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      .site-toggle-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--ink);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .site-toggle-label input[type="checkbox"] {
+        cursor: pointer;
+        accent-color: #111111;
+        width: 15px;
+        height: 15px;
+        margin: 0;
+      }
+
       .number-buttons {
         display: inline-flex;
         border: 1px solid var(--line);
@@ -457,7 +723,133 @@
         opacity: 1;
       }
 
-      /* Special Dates Section */
+      /* Category & Season Badges */
+      .badge-category {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        line-height: 1.2;
+        background: #f3f4f6;
+        color: #374151;
+      }
+
+      .badge-category--fruit {
+        background: #fde8e8;
+        color: #991b1b;
+      }
+
+      .badge-category--vegetable {
+        background: #def7ec;
+        color: #03543f;
+      }
+
+      .badge-category--sport {
+        background: #e1effe;
+        color: #1e429f;
+      }
+
+      .badge-category--holiday {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .badge-category--civic {
+        background: #ede9fe;
+        color: #5b21b6;
+      }
+
+      .badge-category--zodiac {
+        background: #fce7f3;
+        color: #9d174d;
+      }
+
+      .badge-category--moon {
+        background: #e0e7ff;
+        color: #3730a3;
+      }
+
+      .badge-category--other {
+        background: #f3f4f6;
+        color: #374151;
+      }
+
+      .badge-in-season {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #047857;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+      }
+
+      .badge-in-season::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+      }
+
+      .badge-ending-soon {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #b45309;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+      }
+
+      .badge-ending-soon::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #f59e0b;
+      }
+
+      .badge-coming-soon {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #1d4ed8;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+      }
+
+      .badge-coming-soon::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #3b82f6;
+      }
+
+      .badge-off-season {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--muted);
+      }
+
+      /* Special Dates & Seasons Section */
       .dates-section {
         display: flex;
         flex-direction: column;
@@ -693,6 +1085,490 @@
         transform: translateY(0);
       }
 
+      /* Singles Tab Styles */
+      .singles-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+
+      .single-card {
+        background: var(--card-bg);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 1.1rem 1.35rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .single-card:hover {
+        border-color: rgba(17, 24, 39, 0.26);
+      }
+
+      .single-card.is-collapsed {
+        gap: 0;
+        padding-top: 0.9rem;
+        padding-bottom: 0.9rem;
+      }
+
+      .single-card.is-collapsed .single-card-header {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+
+      .single-card.is-collapsed .single-card-fields {
+        display: none;
+      }
+
+      .single-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding-bottom: 0.85rem;
+        border-bottom: 1px solid var(--line);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .single-card-header-left {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+        min-width: 0;
+      }
+
+      .single-accordion-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--muted);
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: transform 0.18s ease, color 0.15s ease;
+      }
+
+      .single-accordion-toggle:hover {
+        color: var(--ink);
+      }
+
+      .single-card:not(.is-collapsed) .single-accordion-toggle {
+        transform: rotate(90deg);
+      }
+
+      .single-card-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        background: rgba(17, 24, 39, 0.06);
+        color: var(--ink);
+        padding: 0.2rem 0.55rem;
+        border-radius: 4px;
+      }
+
+      .single-status-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0.18rem 0.55rem;
+        border-radius: 4px;
+        line-height: 1.3;
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .single-status-badge.is-active {
+        background: rgba(16, 185, 129, 0.12);
+        color: #065f46;
+      }
+
+      .single-status-badge.is-inactive {
+        background: rgba(107, 114, 128, 0.12);
+        color: #6b7280;
+      }
+
+      .single-card-url-link {
+        font-family: inherit;
+        font-size: 1.1rem;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--ink);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: color 0.15s ease;
+      }
+
+      .single-card-url-link:hover {
+        color: var(--accent);
+        text-decoration: underline;
+        text-underline-offset: 0.15em;
+      }
+
+      .single-card-url-link .external-icon {
+        font-size: 0.82rem;
+        opacity: 0.45;
+        transition: opacity 0.15s ease, transform 0.15s ease;
+      }
+
+      .single-card-url-link:hover .external-icon {
+        opacity: 1;
+        transform: translate(1px, -1px);
+      }
+
+      .single-card-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: default;
+      }
+
+      .single-status-toggle-btn {
+        min-width: 68px;
+        font-weight: 600;
+        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      }
+
+      .single-status-toggle-btn.is-active {
+        background: rgba(16, 185, 129, 0.1);
+        color: #047857;
+        border-color: rgba(16, 185, 129, 0.35);
+      }
+
+      .single-status-toggle-btn.is-active:hover {
+        background: rgba(16, 185, 129, 0.2);
+        border-color: rgba(16, 185, 129, 0.5);
+      }
+
+      .single-status-toggle-btn.is-inactive {
+        background: rgba(107, 114, 128, 0.08);
+        color: #4b5563;
+        border-color: rgba(107, 114, 128, 0.3);
+      }
+
+      .single-status-toggle-btn.is-inactive:hover {
+        background: rgba(107, 114, 128, 0.16);
+        border-color: rgba(107, 114, 128, 0.45);
+      }
+
+      .single-card-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+      }
+
+      .single-checkbox-row {
+        display: flex;
+        align-items: center;
+        margin-top: 0.25rem;
+      }
+
+      .single-checkbox-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        font-size: 0.92rem;
+        font-weight: 500;
+        color: var(--ink);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      /* Singles Rich Editor Styles */
+      .rich-composer {
+        margin-top: 0.35rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #ffffff;
+        overflow: hidden;
+      }
+
+      .rich-editor-bar {
+        display: flex;
+        align-items: stretch;
+        border-bottom: 1px solid var(--line);
+        background: #f8fafc;
+        flex-wrap: wrap;
+      }
+
+      .rich-editor-tabs {
+        display: flex;
+        align-items: stretch;
+        flex: 0 0 auto;
+      }
+
+      .rich-editor-tab {
+        min-width: 4.8rem;
+        border: 0;
+        border-right: 1px solid var(--line);
+        background: transparent;
+        color: var(--muted);
+        padding: 0.55rem 0.85rem;
+        font-family: inherit;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.15s ease, color 0.15s ease;
+      }
+
+      .rich-editor-tab:hover,
+      .rich-editor-tab--active {
+        background: #ffffff;
+        color: var(--ink);
+      }
+
+      .rich-editor-tab--active {
+        margin-bottom: -1px;
+        border-bottom: 1px solid #ffffff;
+      }
+
+      .rich-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem;
+        flex: 1 1 auto;
+        padding: 0.25rem 0.45rem;
+      }
+
+      .rich-tool {
+        border: 0;
+        border-radius: var(--radius);
+        background: transparent;
+        color: var(--muted);
+        padding: 0.35rem 0.52rem;
+        font-family: inherit;
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        cursor: pointer;
+        transition: background-color 0.15s ease, color 0.15s ease;
+      }
+
+      .rich-tool:hover:not(:disabled) {
+        background: rgba(17, 24, 39, 0.08);
+        color: var(--ink);
+      }
+
+      .rich-tool:disabled {
+        cursor: default;
+        opacity: 0.32;
+      }
+
+      .rich-tool--italic {
+        font-style: italic;
+      }
+
+      .rich-editor-surface,
+      .rich-preview-surface {
+        min-height: 140px;
+        padding: 0.85rem;
+        outline: 0;
+      }
+
+      .rich-preview-surface {
+        background: #ffffff;
+        color: var(--ink);
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+
+      .rich-preview-empty {
+        color: var(--muted);
+        font-style: italic;
+        margin: 0;
+      }
+
+      .markdown-editor-textarea {
+        display: block;
+        width: 100%;
+        min-height: 140px;
+        border: 0;
+        outline: 0;
+        resize: vertical;
+        background: transparent;
+        color: var(--ink);
+        font-family: inherit;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      .markdown-editor-textarea::placeholder {
+        color: rgba(17, 24, 39, 0.38);
+      }
+
+      .rich-editor-surface:focus-within {
+        box-shadow: inset 0 0 0 2px rgba(91, 126, 163, 0.35);
+      }
+
+      .rich-preview-surface p {
+        margin: 0 0 0.75rem;
+      }
+      .rich-preview-surface p:last-child,
+      .rich-preview-surface ul:last-child,
+      .rich-preview-surface ol:last-child,
+      .rich-preview-surface blockquote:last-child {
+        margin-bottom: 0;
+      }
+      .rich-preview-surface h2,
+      .rich-preview-surface h3,
+      .rich-preview-surface h4,
+      .rich-preview-surface h5 {
+        margin: 0.9rem 0 0.4rem;
+        font-family: 'Young Serif', serif;
+        font-weight: 400;
+        color: var(--ink);
+      }
+      .rich-preview-surface h2 { font-size: 1.25rem; }
+      .rich-preview-surface h3 { font-size: 1.15rem; }
+      .rich-preview-surface h4,
+      .rich-preview-surface h5 { font-size: 1rem; }
+      .rich-preview-surface ul,
+      .rich-preview-surface ol {
+        margin: 0.3rem 0 0.75rem;
+        padding-left: 1.3rem;
+      }
+      .rich-preview-surface li {
+        margin-bottom: 0.3rem;
+      }
+      .rich-preview-surface blockquote {
+        margin: 0.75rem 0;
+        padding-left: 0.85rem;
+        border-left: 3px solid var(--line);
+        color: var(--muted);
+      }
+      .rich-preview-surface code {
+        padding: 0.1rem 0.28rem;
+        background: rgba(17, 24, 39, 0.07);
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 0.88em;
+        border-radius: 3px;
+      }
+      .rich-preview-surface a {
+        color: #1f4fd6;
+        text-decoration: underline;
+      }
+
+      /* Season Modal Date Picker Enhancements */
+      .date-picker-block {
+        background: #fbfbfb;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 0.85rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+
+      .date-picker-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .date-picker-title {
+        font-size: 0.84rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ink);
+      }
+
+      .sub-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+      }
+
+      .day-preset-boxes {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.45rem;
+      }
+
+      .day-preset-btn {
+        background: #ffffff;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 0.45rem 0.35rem;
+        font-family: inherit;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.15rem;
+        transition: all 0.12s ease;
+        line-height: 1.15;
+      }
+
+      .day-preset-btn:hover {
+        border-color: var(--ink);
+        color: var(--ink);
+      }
+
+      .day-preset-btn.is-active {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: #ffffff;
+      }
+
+      .day-preset-btn.is-active .day-preset-sub {
+        color: rgba(255, 255, 255, 0.75);
+      }
+
+      .day-preset-sub {
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: var(--muted);
+      }
+
+      .day-specific-row {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+      }
+
+      .day-num-input {
+        width: 100px;
+        font-family: inherit;
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 0.4rem 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #ffffff;
+        outline: none;
+      }
+
+      .day-num-input:focus {
+        border-color: var(--accent);
+      }
+
+      .day-limit-text {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--muted);
+      }
+
       @media (max-width: 720px) {
         body {
           padding: 1.5rem;
@@ -733,24 +1609,43 @@
           <button class="tab-button" id="tab-dates" type="button">
             Special Dates <span class="tab-badge" id="dates-total-badge">0</span>
           </button>
+          <button class="tab-button" id="tab-seasons" type="button">
+            Seasons <span class="tab-badge" id="seasons-total-badge">0</span>
+          </button>
+          <button class="tab-button" id="tab-singles" type="button">
+            Singles <span class="tab-badge" id="singles-total-badge">1</span>
+          </button>
         </div>
 
         <!-- VIEW 1: TYPEFACES -->
         <section id="view-fonts">
-          <div class="toolbar">
-            <div class="toolbar-row">
-              <div class="round-pills" id="round-pills">
-                <button class="round-pill is-active" data-round="all" type="button">All Rounds</button>
-                <button class="round-pill" data-round="1" type="button">R1</button>
-                <button class="round-pill" data-round="2" type="button">R2</button>
-                <button class="round-pill" data-round="3" type="button">R3</button>
-                <button class="round-pill" data-round="4" type="button">R4</button>
-                <button class="round-pill" data-round="5" type="button">R5</button>
-                <button class="round-pill" data-round="6" type="button">R6</button>
-                <button class="round-pill" data-round="7" type="button">R7</button>
-                <button class="round-pill" data-round="8" type="button">R8</button>
+          <div class="dates-section" style="margin-bottom: 1.25rem;">
+            <div class="dates-header-row">
+              <div>
+                <h2 style="margin: 0; font-family: 'Young Serif', serif; font-size: 1.4rem;">Typefaces Catalog</h2>
+                <p style="margin: 0.2rem 0 0; font-size: 0.88rem; color: var(--muted);">Curated typography and display typefaces loaded across widget and consumer apps.</p>
               </div>
+            </div>
+          </div>
 
+          <div class="toolbar">
+            <!-- Row 1: Filter Toggles -->
+            <div class="toolbar-row" style="gap: 1.25rem;">
+              <div class="filter-pill-group" id="filter-pills">
+                <span class="filter-group-label">Filters:</span>
+                <button class="filter-pill" data-filter="active" type="button" title="Toggle Active fonts">Active</button>
+                <button class="filter-pill" data-filter="hidden" type="button" title="Toggle Hidden fonts">Hidden</button>
+                <button class="filter-pill" data-filter="widget" type="button" title="Toggle Widget fonts">Widget</button>
+                <button class="filter-pill" data-filter="billionaire" type="button" title="Toggle Billionaire fonts">Billionaire</button>
+                <button class="filter-pill" data-filter="scallions" type="button" title="Toggle Scallions fonts">Scallions</button>
+                <button class="filter-pill" data-filter="latin_variant" type="button" title="Toggle Non-Latin fonts (using Latin variant)">Non-Latin</button>
+                <button class="filter-pill" data-filter="is_symbol" type="button" title="Toggle Symbol fonts">Symbols</button>
+                <button class="filter-pill" data-filter="modified" type="button" title="Toggle Modified fonts">Modified</button>
+              </div>
+            </div>
+
+            <!-- Row 2: Search, Sample preset, Sample text, View switcher, Sort -->
+            <div class="toolbar-row">
               <div class="filter-controls">
                 <input
                   type="text"
@@ -759,20 +1654,10 @@
                   placeholder="Search font names..."
                   autocomplete="off"
                 />
-                <select class="select-input" id="font-sort">
-                  <option value="alpha">Sort: Alphabetical (A-Z)</option>
-                  <option value="prob">Sort: Probability (High-Low)</option>
-                  <option value="round">Sort: Round (1-8)</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="toolbar-row">
-              <div class="sample-text-bar">
                 <select class="select-input" id="sample-preset">
                   <option value="default">Sample: Widget Default</option>
                   <option value="pangram">Sample: Pangram</option>
-                  <option value="alphabet">Sample: Alphabet & Digits</option>
+                  <option value="alphabet">Sample: Alphabet &amp; Digits</option>
                   <option value="custom">Sample: Custom Text</option>
                 </select>
                 <input
@@ -783,10 +1668,46 @@
                   placeholder="Type preview text..."
                 />
               </div>
-              <button class="action-btn" id="btn-reset-all" type="button" title="Reset all 213 typefaces to Weight: 3 and Probability: 3">
-                ↺ Reset All (3/3)
-              </button>
+
+              <div class="toolbar-actions">
+                <div class="view-switcher" id="view-switcher">
+                  <button type="button" class="view-btn is-active" data-view="grid" title="Grid view">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                      <rect x="1" y="1" width="6" height="6" rx="1"/>
+                      <rect x="9" y="1" width="6" height="6" rx="1"/>
+                      <rect x="1" y="9" width="6" height="6" rx="1"/>
+                      <rect x="9" y="9" width="6" height="6" rx="1"/>
+                    </svg>
+                    Grid
+                  </button>
+                  <button type="button" class="view-btn" data-view="list" title="List view (Google Fonts specimen style)">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                      <rect x="1" y="2" width="14" height="3" rx="0.75"/>
+                      <rect x="1" y="7" width="14" height="3" rx="0.75"/>
+                      <rect x="1" y="12" width="14" height="3" rx="0.75"/>
+                    </svg>
+                    List
+                  </button>
+                </div>
+                <div class="custom-dropdown" id="font-sort-dropdown">
+                  <button type="button" class="select-input custom-dropdown-btn" id="font-sort-btn">
+                    <span id="font-sort-label">Sort: A–Z</span>
+                    <span class="caret"></span>
+                  </button>
+                  <div class="custom-dropdown-menu" id="font-sort-menu" hidden>
+                    <button type="button" class="custom-dropdown-item" id="font-opt-alpha">Sort: Z–A</button>
+                    <button type="button" class="custom-dropdown-item" id="font-opt-prob">Sort: Probability (High–Low)</button>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            <!-- Commented out Reset All button as requested -->
+            <!--
+            <button class="action-btn" id="btn-reset-all" type="button" title="Reset all 213 typefaces to Weight: 3 and Probability: 3">
+              ↺ Reset All (3/3)
+            </button>
+            -->
           </div>
 
           <div class="font-grid" id="font-grid"></div>
@@ -804,8 +1725,127 @@
               <button class="primary-btn" id="btn-add-date" type="button">+ Add Special Date</button>
             </div>
 
+            <div class="toolbar" style="margin-bottom: 0.5rem;">
+              <div class="toolbar-row">
+                <div class="filter-controls">
+                  <input
+                    type="text"
+                    class="search-input"
+                    id="date-search"
+                    placeholder="Search special dates..."
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="custom-dropdown" id="date-sort-dropdown">
+                  <button type="button" class="select-input custom-dropdown-btn" id="date-sort-btn">
+                    <span id="date-sort-label">Sort: Calendar Date (Jan – Dec)</span>
+                    <span class="caret"></span>
+                  </button>
+                  <div class="custom-dropdown-menu" id="date-sort-menu" hidden>
+                    <button type="button" class="custom-dropdown-item" id="date-opt-cal">Sort: Calendar Date (Dec – Jan)</button>
+                    <button type="button" class="custom-dropdown-item" id="date-opt-alpha">Sort: A–Z</button>
+                    <button type="button" class="custom-dropdown-item" id="date-opt-created">Sort: Date Added (Newest First)</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="dates-list" id="dates-list"></div>
-            <div class="empty-state" id="dates-empty" hidden>No special dates configured yet.</div>
+            <div class="empty-state" id="dates-empty" hidden>No special dates match your filter.</div>
+          </div>
+        </section>
+
+        <!-- VIEW 3: SEASONS -->
+        <section id="view-seasons" hidden>
+          <div class="dates-section">
+            <div class="dates-header-row">
+              <div>
+                <h2 style="margin: 0; font-family: 'Young Serif', serif; font-size: 1.4rem;">Seasons Master List</h2>
+                <p style="margin: 0.2rem 0 0; font-size: 0.88rem; color: var(--muted);">California in-season produce and sports seasons tracked by Scallions.</p>
+              </div>
+              <button class="primary-btn" id="btn-add-season" type="button">+ Add Season Item</button>
+            </div>
+
+            <div class="toolbar" style="margin-bottom: 0.5rem;">
+              <!-- Row 1: Filters (Independent toggles) -->
+              <div class="toolbar-row" style="gap: 1.25rem;">
+                <div class="filter-pill-group" id="season-filter-pills">
+                  <span class="filter-group-label">Category:</span>
+                  <button class="filter-pill is-active" data-season-cat="all" type="button">All</button>
+                  <button class="filter-pill" data-season-cat="fruit" type="button">Fruits</button>
+                  <button class="filter-pill" data-season-cat="vegetable" type="button">Vegetables</button>
+                  <button class="filter-pill" data-season-cat="sport" type="button">Sports</button>
+                  <button class="filter-pill" data-season-cat="other" type="button">Other</button>
+                  <span style="border-left: 1px solid var(--line); margin: 0 0.35rem; height: 1.25rem;"></span>
+                  <button class="filter-pill" id="pill-in-season" data-season-in-season="1" type="button" title="Show only items in season today">In Season Now</button>
+                </div>
+              </div>
+              <!-- Row 2: Search & Sort -->
+              <div class="toolbar-row">
+                <div class="filter-controls">
+                  <input
+                    type="text"
+                    class="search-input"
+                    id="season-search"
+                    placeholder="Search season items..."
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="custom-dropdown" id="season-sort-dropdown">
+                  <button type="button" class="select-input custom-dropdown-btn" id="season-sort-btn">
+                    <span id="season-sort-label">Sort: A–Z</span>
+                    <span class="caret"></span>
+                  </button>
+                  <div class="custom-dropdown-menu" id="season-sort-menu" hidden>
+                    <button type="button" class="custom-dropdown-item" id="season-opt-alpha">Sort: Z–A</button>
+                    <button type="button" class="custom-dropdown-item" id="season-opt-date">Sort: Date</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dates-list" id="seasons-list"></div>
+            <div class="empty-state" id="seasons-empty" hidden>No season items match your filter.</div>
+          </div>
+        </section>
+
+        <!-- VIEW 4: SINGLES -->
+        <section id="view-singles" hidden>
+          <div class="dates-section">
+            <div class="dates-header-row">
+              <div>
+                <h2 style="margin: 0; font-family: 'Young Serif', serif; font-size: 1.4rem;">Singles Pages</h2>
+                <p style="margin: 0.2rem 0 0; font-size: 0.88rem; color: var(--muted);">Standalone single-page shells. Edit title, body text (lipsum), and bottom links visibility.</p>
+              </div>
+              <button class="primary-btn" id="btn-add-single" type="button">+ Add Single Page</button>
+            </div>
+
+            <div class="toolbar" style="margin-bottom: 1.25rem;">
+              <div class="toolbar-row">
+                <div class="filter-controls">
+                  <input
+                    type="text"
+                    class="search-input"
+                    id="single-search"
+                    placeholder="Search singles by title or text..."
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="custom-dropdown" id="single-sort-dropdown">
+                  <button type="button" class="select-input custom-dropdown-btn" id="single-sort-btn">
+                    <span id="single-sort-label">Sort: A–Z</span>
+                    <span class="caret"></span>
+                  </button>
+                  <div class="custom-dropdown-menu" id="single-sort-menu" hidden>
+                    <button type="button" class="custom-dropdown-item" id="single-opt-alpha">Sort: Z–A</button>
+                    <button type="button" class="custom-dropdown-item" id="single-opt-date">Sort: Date Added</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="singles-list" id="singles-list"></div>
+            <div class="empty-state" id="singles-empty" hidden>No singles match your search.</div>
           </div>
         </section>
       </main>
@@ -865,6 +1905,130 @@
           <div class="modal-buttons">
             <button class="action-btn" id="btn-modal-cancel" type="button">Cancel</button>
             <button class="primary-btn" type="submit" id="btn-modal-save">Save Event</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Add / Edit Season Item -->
+    <div class="modal-backdrop" id="season-modal" hidden>
+      <div class="modal-card">
+        <h2 id="season-modal-title">Add Season Item</h2>
+        <form class="modal-form" id="season-form">
+          <input type="hidden" id="season-id" name="id" />
+
+          <div class="form-group">
+            <label for="season-name">Item Name</label>
+            <input type="text" id="season-name" name="name" required placeholder="e.g. Asparagus or NBA Basketball" />
+          </div>
+
+          <div class="form-group">
+            <label for="season-category">Category</label>
+            <select class="select-input" id="season-category" name="category" required style="width: 100%;">
+              <option value="fruit">Fruit</option>
+              <option value="vegetable">Vegetable</option>
+              <option value="sport">Sport</option>
+              <option value="holiday">Holiday</option>
+              <option value="civic">Civic</option>
+              <option value="zodiac">Zodiac</option>
+              <option value="moon">Moon</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <!-- Start Date Block -->
+          <div class="date-picker-block">
+            <div class="date-picker-header">
+              <span class="date-picker-title">Start Date</span>
+            </div>
+            <div class="form-group">
+              <label for="season-start-month" class="sub-label">Month</label>
+              <select class="select-input" id="season-start-month" name="start_month" required style="width: 100%;">
+                <option value="1">January (1)</option>
+                <option value="2">February (2)</option>
+                <option value="3">March (3)</option>
+                <option value="4">April (4)</option>
+                <option value="5">May (5)</option>
+                <option value="6">June (6)</option>
+                <option value="7">July (7)</option>
+                <option value="8">August (8)</option>
+                <option value="9">September (9)</option>
+                <option value="10">October (10)</option>
+                <option value="11">November (11)</option>
+                <option value="12">December (12)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-top: 0.25rem;">
+              <label class="sub-label">Day Selection</label>
+              <div class="day-preset-boxes" id="season-start-preset-boxes">
+                <button type="button" class="day-preset-btn" data-target="start" data-preset="mid">
+                  <span class="day-preset-name">Mid-month</span>
+                  <span class="day-preset-sub">15th</span>
+                </button>
+                <button type="button" class="day-preset-btn" data-target="start" data-preset="end">
+                  <span class="day-preset-name">End of Month</span>
+                  <span class="day-preset-sub" id="season-start-end-sub">31st</span>
+                </button>
+                <button type="button" class="day-preset-btn is-active" data-target="start" data-preset="specific">
+                  <span class="day-preset-name">Specific date</span>
+                  <span class="day-preset-sub" id="season-start-spec-sub">1st</span>
+                </button>
+              </div>
+              <div class="day-specific-row" id="season-start-specific-row" style="margin-top: 0.5rem;">
+                <input type="number" id="season-start-day" name="start_day" min="1" max="31" value="1" placeholder="Day" class="day-num-input" />
+                <span class="day-limit-text" id="season-start-limit-text">Limit: 1 – 31</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- End Date Block -->
+          <div class="date-picker-block">
+            <div class="date-picker-header">
+              <span class="date-picker-title">End Date</span>
+            </div>
+            <div class="form-group">
+              <label for="season-end-month" class="sub-label">Month</label>
+              <select class="select-input" id="season-end-month" name="end_month" required style="width: 100%;">
+                <option value="1">January (1)</option>
+                <option value="2">February (2)</option>
+                <option value="3">March (3)</option>
+                <option value="4">April (4)</option>
+                <option value="5">May (5)</option>
+                <option value="6">June (6)</option>
+                <option value="7">July (7)</option>
+                <option value="8">August (8)</option>
+                <option value="9">September (9)</option>
+                <option value="10">October (10)</option>
+                <option value="11">November (11)</option>
+                <option value="12">December (12)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-top: 0.25rem;">
+              <label class="sub-label">Day Selection</label>
+              <div class="day-preset-boxes" id="season-end-preset-boxes">
+                <button type="button" class="day-preset-btn" data-target="end" data-preset="mid">
+                  <span class="day-preset-name">Mid-month</span>
+                  <span class="day-preset-sub">15th</span>
+                </button>
+                <button type="button" class="day-preset-btn is-active" data-target="end" data-preset="end">
+                  <span class="day-preset-name">End of Month</span>
+                  <span class="day-preset-sub" id="season-end-end-sub">31st</span>
+                </button>
+                <button type="button" class="day-preset-btn" data-target="end" data-preset="specific">
+                  <span class="day-preset-name">Specific date</span>
+                  <span class="day-preset-sub" id="season-end-spec-sub">31st</span>
+                </button>
+              </div>
+              <div class="day-specific-row" id="season-end-specific-row" style="display: none; margin-top: 0.5rem;">
+                <input type="number" id="season-end-day" name="end_day" min="1" max="31" value="31" placeholder="Day" class="day-num-input" />
+                <span class="day-limit-text" id="season-end-limit-text">Limit: 1 – 31</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-buttons">
+            <button class="action-btn" id="btn-season-modal-cancel" type="button">Cancel</button>
+            <button class="primary-btn" type="submit" id="btn-season-modal-save">Save Item</button>
           </div>
         </form>
       </div>
@@ -959,13 +2123,48 @@
           4: 'Bold (700)',
           5: 'Black (900)'
         };
+
+        const KNOWN_LATIN_FONTS = new Set([
+          "Abhaya Libre", "ADLaM Display", "Akaya Kanadaka", "Alan Sans", "Alexandria", "Alkalami",
+          "Almarai", "Amiri", "Amita", "Anek Kannada", "Angkor", "Athiti", "Badeen Display",
+          "Bai Jamjuree", "Black And White Picture", "Blaka Ink", "Cairo Play", "Chokokutai",
+          "Dhurjati", "DotGothic16", "Kirang Haerang", "Kumar One", "Mogra", "Palette Mosaic",
+          "Rozha One", "Shizuru", "Shrikhand", "Stick", "Stick No Bills", "Vibes"
+        ]);
+
+        const KNOWN_SYMBOL_FONTS = new Set([
+          "Alien Block", "Libre Barcode 39 Extended", "Noto Color Emoji", "Rubik Maps", "Wavefont", "Yarndings 20"
+        ]);
+
+        const KNOWN_HIDDEN_FONTS = new Set([
+          "Archivo Black", "Asimovian", "Bangers", "Barriecito", "Baskervville", "Bungee Shade",
+          "Bungee Spice", "Caesar Dressing", "Chokokutai", "Eater", "Ewert", "Fascinate Inline",
+          "Fleur De Leah", "Fontdiner Swanky", "Freckle Face", "Frijole", "Graduate", "Grand Hotel",
+          "Honk", "Jacquard 24 Charted", "Kirang Haerang", "Kumar One", "Libre Barcode 39 Extended",
+          "Lobster", "Lobster Two", "Miniver", "Mogra", "Nabla", "New Amsterdam", "Orbitron",
+          "Pacifico", "Permanent Marker", "Rubik Maps", "Sarina", "Schoolbell", "Shrikhand",
+          "Special Elite", "Stalemate", "Stick", "Story Script", "Vast Shadow", "Vibes", "Yarndings 20"
+        ]);
+
+        function isFontModified(f) {
+          return Boolean(
+            f._dirty ||
+            f.hidden === 1 ||
+            (f.weight !== undefined && Number(f.weight) !== 3) ||
+            (f.probability !== undefined && Number(f.probability) !== 3) ||
+            (f.widget !== undefined && f.widget !== 1) ||
+            (f.billionaire !== undefined && f.billionaire !== 1) ||
+            (f.scallions !== undefined && f.scallions !== 1)
+          );
+        }
         
         let allFonts = [];
         let allEvents = [];
         let activeTab = 'fonts';
-        let selectedRound = 'all';
+        let selectedFilters = new Set();
+        let currentView = localStorage.getItem('jeffwm_widget_font_view') || 'grid';
         let searchQuery = '';
-        let sortMode = 'alpha';
+        let sortMode = 'alpha_asc';
         let sampleText = '12:00 PM • San Francisco';
         let loadedGoogleFonts = new Set();
         let authUser = null;
@@ -976,26 +2175,81 @@
         const fontGrid = document.getElementById('font-grid');
         const fontsEmpty = document.getElementById('fonts-empty');
         const fontSearch = document.getElementById('font-search');
-        const fontSort = document.getElementById('font-sort');
+        const fontSortDropdown = document.getElementById('font-sort-dropdown');
+        const fontSortBtn = document.getElementById('font-sort-btn');
+        const fontSortLabel = document.getElementById('font-sort-label');
+        const fontOptAlpha = document.getElementById('font-opt-alpha');
+        const fontOptProb = document.getElementById('font-opt-prob');
         const samplePreset = document.getElementById('sample-preset');
         const sampleTextInput = document.getElementById('sample-text');
-        const roundPills = document.getElementById('round-pills');
+        const filterPills = document.getElementById('filter-pills');
+        const viewSwitcher = document.getElementById('view-switcher');
         const btnResetAll = document.getElementById('btn-reset-all');
         const tabFonts = document.getElementById('tab-fonts');
         const tabDates = document.getElementById('tab-dates');
+        const tabSeasons = document.getElementById('tab-seasons');
+        const tabSingles = document.getElementById('tab-singles');
         const viewFonts = document.getElementById('view-fonts');
         const viewDates = document.getElementById('view-dates');
+        const viewSeasons = document.getElementById('view-seasons');
+        const viewSingles = document.getElementById('view-singles');
         const fontsTotalBadge = document.getElementById('fonts-total-badge');
         const datesTotalBadge = document.getElementById('dates-total-badge');
+        const seasonsTotalBadge = document.getElementById('seasons-total-badge');
+        const singlesTotalBadge = document.getElementById('singles-total-badge');
         const datesList = document.getElementById('dates-list');
         const datesEmpty = document.getElementById('dates-empty');
+        const dateSearch = document.getElementById('date-search');
+        const dateSortDropdown = document.getElementById('date-sort-dropdown');
+        const dateSortBtn = document.getElementById('date-sort-btn');
+        const dateSortLabel = document.getElementById('date-sort-label');
+        const dateOptCal = document.getElementById('date-opt-cal');
+        const dateOptAlpha = document.getElementById('date-opt-alpha');
+        const dateOptCreated = document.getElementById('date-opt-created');
         const btnAddDate = document.getElementById('btn-add-date');
         const dateModal = document.getElementById('date-modal');
         const dateForm = document.getElementById('date-form');
         const btnModalCancel = document.getElementById('btn-modal-cancel');
         const modalTitle = document.getElementById('modal-title');
+        const seasonsList = document.getElementById('seasons-list');
+        const seasonsEmpty = document.getElementById('seasons-empty');
+        const seasonSearch = document.getElementById('season-search');
+        const seasonSortDropdown = document.getElementById('season-sort-dropdown');
+        const seasonSortBtn = document.getElementById('season-sort-btn');
+        const seasonSortLabel = document.getElementById('season-sort-label');
+        const seasonSortMenu = document.getElementById('season-sort-menu');
+        const seasonFilterPills = document.getElementById('season-filter-pills');
+        const pillInSeason = document.getElementById('pill-in-season');
+        const btnAddSeason = document.getElementById('btn-add-season');
+        const seasonModal = document.getElementById('season-modal');
+        const seasonForm = document.getElementById('season-form');
+        const btnSeasonModalCancel = document.getElementById('btn-season-modal-cancel');
+        const seasonModalTitle = document.getElementById('season-modal-title');
+        const singlesList = document.getElementById('singles-list');
+        const singlesEmpty = document.getElementById('singles-empty');
+        const singleSearch = document.getElementById('single-search');
+        const singleSortDropdown = document.getElementById('single-sort-dropdown');
+        const singleSortBtn = document.getElementById('single-sort-btn');
+        const singleSortLabel = document.getElementById('single-sort-label');
+        const singleSortMenu = document.getElementById('single-sort-menu');
+        const singleOptAlpha = document.getElementById('single-opt-alpha');
+        const singleOptDate = document.getElementById('single-opt-date');
+        const btnAddSingle = document.getElementById('btn-add-single');
         const toastEl = document.getElementById('toast');
         const btnLogin = document.getElementById('btn-login');
+
+        let allSeasons = [];
+        let seasonCategoryFilter = 'all';
+        let seasonOnlyInSeason = false;
+        let seasonSearchQuery = '';
+        let seasonSortMode = 'alpha_asc';
+
+        let allSingles = [];
+        let singleSearchQuery = '';
+        let singleSortMode = 'alpha_asc';
+
+        let dateSearchQuery = '';
+        let dateSortMode = 'calendar_asc';
 
         function showToast(msg) {
           toastEl.textContent = msg;
@@ -1019,7 +2273,10 @@
           loadedGoogleFonts.add(fontName);
           const link = document.createElement('link');
           link.rel = 'stylesheet';
-          link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName).replace(/%20/g, '+')}:ital,wght@0,100..900;1,100..900&display=swap`;
+          const url = fontName === 'Buda'
+            ? 'https://fonts.googleapis.com/css2?family=Buda:wght@300&display=swap'
+            : `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName).replace(/%20/g, '+')}&display=swap`;
+          link.href = url;
           document.head.appendChild(link);
         }
 
@@ -1044,21 +2301,50 @@
         function renderFontCards() {
           let filtered = [...allFonts];
 
-          if (selectedRound !== 'all') {
-            const rNum = parseInt(selectedRound, 10);
-            filtered = filtered.filter(f => f.round === rNum);
+          // 1. Status filters: Active vs Hidden
+          const hasActive = selectedFilters.has('active');
+          const hasHidden = selectedFilters.has('hidden');
+          if (hasActive && !hasHidden) {
+            filtered = filtered.filter(f => !f.hidden && f.weight > 0);
+          } else if (hasHidden && !hasActive) {
+            filtered = filtered.filter(f => f.hidden === 1);
           }
 
+          // 2. Modified filter
+          if (selectedFilters.has('modified')) {
+            filtered = filtered.filter(f => isFontModified(f));
+          }
+
+          // 3. Site toggles (Widget, Billionaire, Scallions)
+          const siteFilters = ['widget', 'billionaire', 'scallions'].filter(k => selectedFilters.has(k));
+          if (siteFilters.length > 0) {
+            filtered = filtered.filter(f => siteFilters.every(k => f[k] === 1));
+          }
+
+          // 4. Latin variant and Symbols filters
+          if (selectedFilters.has('latin_variant')) {
+            filtered = filtered.filter(f => f.latin_variant === 1);
+          }
+
+          if (selectedFilters.has('is_symbol')) {
+            filtered = filtered.filter(f => f.is_symbol === 1);
+          }
+
+          // 5. Search query
           if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase().trim();
             filtered = filtered.filter(f => f.name.toLowerCase().includes(q));
           }
 
-          if (sortMode === 'prob') {
+          // 6. Clean Sorting
+          if (sortMode === 'alpha_desc') {
+            filtered.sort((a, b) => b.name.localeCompare(a.name));
+          } else if (sortMode === 'prob_asc') {
+            filtered.sort((a, b) => (a.probability || 3) - (b.probability || 3) || a.name.localeCompare(b.name));
+          } else if (sortMode === 'prob_desc') {
             filtered.sort((a, b) => (b.probability || 3) - (a.probability || 3) || a.name.localeCompare(b.name));
-          } else if (sortMode === 'round') {
-            filtered.sort((a, b) => (a.round || 1) - (b.round || 1) || a.name.localeCompare(b.name));
           } else {
+            // Default alpha_asc (A-Z)
             filtered.sort((a, b) => a.name.localeCompare(b.name));
           }
 
@@ -1072,13 +2358,22 @@
           fontsEmpty.hidden = true;
 
           filtered.forEach(font => {
-            const assignedRound = Number(font.round) || FONT_ROUNDS[font.name] || 1;
-            font.round = assignedRound;
-            font.weight = Number(font.weight) || 3;
-            font.probability = Number(font.probability) || 3;
+            font.weight = Number(font.weight) === 0 ? 0 : (Number(font.weight) || 3);
+            font.probability = Number(font.probability) === 0 ? 0 : (Number(font.probability) || 3);
+            font.hidden = font.hidden !== undefined ? (font.hidden === 1 || font.hidden === true ? 1 : 0) : (KNOWN_HIDDEN_FONTS.has(font.name) ? 1 : 0);
+            font.widget = font.widget !== undefined ? (font.widget !== 0 && font.widget !== false ? 1 : 0) : (font.hidden ? 0 : 1);
+            font.billionaire = font.billionaire !== 0 && font.billionaire !== false ? 1 : 0;
+            font.scallions = font.scallions !== 0 && font.scallions !== false ? 1 : 0;
+            font.latin_variant = font.latin_variant !== undefined ? (font.latin_variant === 1 || font.latin_variant === true ? 1 : 0) : (KNOWN_LATIN_FONTS.has(font.name) ? 1 : 0);
+            font.is_symbol = font.is_symbol !== undefined ? (font.is_symbol === 1 || font.is_symbol === true ? 1 : 0) : (KNOWN_SYMBOL_FONTS.has(font.name) ? 1 : 0);
+            font.last_widget = font.last_widget !== undefined && font.last_widget !== null ? Number(font.last_widget) : (font.widget || 1);
+            font.last_billionaire = font.last_billionaire !== undefined && font.last_billionaire !== null ? Number(font.last_billionaire) : (font.billionaire || 1);
+            font.last_scallions = font.last_scallions !== undefined && font.last_scallions !== null ? Number(font.last_scallions) : (font.scallions || 1);
+            font.last_weight = Number(font.last_weight) || 3;
+            font.last_probability = Number(font.last_probability) || 3;
 
             const card = document.createElement('div');
-            card.className = 'font-card';
+            card.className = font.hidden === 1 ? 'font-card is-hidden' : 'font-card';
             card.setAttribute('data-font-name', font.name);
             card.setAttribute('data-font-weight', WEIGHT_CSS_MAP[font.weight] || '500');
 
@@ -1091,17 +2386,19 @@
             `).join('');
 
             const googleFontUrl = `https://fonts.google.com/specimen/${encodeURIComponent(font.name.replace(/ /g, '+'))}`;
+            const latinLabel = font.latin_variant === 1 ? ' <span class="font-type-parentheses">(Non-Latin)</span>' : '';
+            const symbolLabel = font.is_symbol === 1 ? ' <span class="font-type-parentheses">(Symbol)</span>' : '';
 
             card.innerHTML = `
               <div>
                 <div class="font-card-header">
                   <h3 class="font-card-title">
                     <a class="font-card-title-link" href="${googleFontUrl}" target="_blank" rel="noopener noreferrer" title="View ${escapeHtml(font.name)} on Google Fonts">
-                      ${escapeHtml(font.name)} <span class="external-icon">↗</span>
+                      ${escapeHtml(font.name)}${latinLabel}${symbolLabel} <span class="external-icon">↗</span>
                     </a>
                   </h3>
                   <div class="font-card-meta">
-                    <span class="round-badge">Round ${assignedRound}</span>
+                    ${font.hidden === 1 ? '<span class="hidden-badge">Hidden</span>' : ''}
                     <span class="saving-indicator" id="save-${encodeURIComponent(font.name)}">Saved</span>
                   </div>
                 </div>
@@ -1114,12 +2411,33 @@
 
               <div class="font-controls">
                 <div class="control-row">
-                  <span class="control-label weight-label">Weight Scale (${WEIGHT_LABELS[font.weight] || 'Med (500)'})</span>
+                  <span class="control-label weight-label">Weight Scale (${font.weight === 0 ? 'Disabled (0)' : (WEIGHT_LABELS[font.weight] || 'Med (500)')})</span>
                   <div class="number-buttons">${weightBtns}</div>
                 </div>
                 <div class="control-row">
                   <span class="control-label prob-label">Probability (Rating ${font.probability || 3}/5)</span>
                   <div class="number-buttons">${probBtns}</div>
+                </div>
+                <div class="control-row font-sites-row" style="margin-top: 0.25rem;">
+                  <span class="control-label">Filters</span>
+                  <div class="site-checkboxes">
+                    <label class="site-toggle-label">
+                      <input type="checkbox" class="site-checkbox" data-site="widget" ${font.widget === 1 ? 'checked' : ''} ${font.hidden === 1 ? 'disabled' : ''} />
+                      Widget
+                    </label>
+                    <label class="site-toggle-label">
+                      <input type="checkbox" class="site-checkbox" data-site="billionaire" ${font.billionaire === 1 ? 'checked' : ''} ${font.hidden === 1 ? 'disabled' : ''} />
+                      Billionaire
+                    </label>
+                    <label class="site-toggle-label">
+                      <input type="checkbox" class="site-checkbox" data-site="scallions" ${font.scallions === 1 ? 'checked' : ''} ${font.hidden === 1 ? 'disabled' : ''} />
+                      Scallions
+                    </label>
+                    <label class="site-toggle-label hide-toggle-label" style="margin-left: auto;">
+                      <input type="checkbox" class="hide-checkbox" ${font.hidden === 1 ? 'checked' : ''} />
+                      Hide
+                    </label>
+                  </div>
                 </div>
               </div>
             `;
@@ -1136,6 +2454,18 @@
 
                 if (type === 'weight') {
                   font.weight = val;
+                  font.last_weight = val;
+                  font._dirty = true;
+                  if (font.hidden === 1) {
+                    font.hidden = 0;
+                    card.classList.remove('is-hidden');
+                    const hideCb = card.querySelector('.hide-checkbox');
+                    if (hideCb) hideCb.checked = false;
+                    card.querySelector('.hidden-badge')?.remove();
+                    card.querySelectorAll('.site-checkbox').forEach(cb => {
+                      cb.disabled = false;
+                    });
+                  }
                   const cssWeight = WEIGHT_CSS_MAP[val] || '500';
                   card.setAttribute('data-font-weight', cssWeight);
                   if (previewEl) {
@@ -1149,6 +2479,8 @@
                   });
                 } else if (type === 'prob') {
                   font.probability = val;
+                  font.last_probability = val;
+                  font._dirty = true;
                   if (probLabelEl) {
                     probLabelEl.textContent = `Probability (Rating ${val}/5)`;
                   }
@@ -1160,6 +2492,89 @@
                 await saveFont(font);
               });
             });
+
+            card.querySelectorAll('.site-checkbox').forEach(cb => {
+              cb.addEventListener('change', async (e) => {
+                const site = e.currentTarget.getAttribute('data-site');
+                const checked = e.currentTarget.checked ? 1 : 0;
+                font[site] = checked;
+                font._dirty = true;
+                if (site === 'widget') font.last_widget = checked;
+                if (site === 'billionaire') font.last_billionaire = checked;
+                if (site === 'scallions') font.last_scallions = checked;
+                await saveFont(font);
+              });
+            });
+
+            const hideCb = card.querySelector('.hide-checkbox');
+            if (hideCb) {
+              hideCb.addEventListener('change', async (e) => {
+                const isHidden = e.currentTarget.checked ? 1 : 0;
+                font.hidden = isHidden;
+                font._dirty = true;
+
+                if (isHidden === 1) {
+                  // Automatically disable
+                  if (font.widget === 1 || font.billionaire === 1 || font.scallions === 1) {
+                    font.last_widget = font.widget;
+                    font.last_billionaire = font.billionaire;
+                    font.last_scallions = font.scallions;
+                  }
+                  if (font.weight > 0) {
+                    font.last_weight = font.weight;
+                  }
+                  if (font.probability > 0) {
+                    font.last_probability = font.probability;
+                  }
+
+                  font.widget = 0;
+                  font.billionaire = 0;
+                  font.scallions = 0;
+                  font.weight = 0;
+
+                  card.classList.add('is-hidden');
+                  card.querySelectorAll('.site-checkbox').forEach(cb => {
+                    cb.checked = false;
+                    cb.disabled = true;
+                  });
+                  card.querySelectorAll('[data-type="weight"]').forEach(b => b.classList.remove('is-active'));
+                  if (weightLabelEl) {
+                    weightLabelEl.textContent = 'Weight Scale (Disabled)';
+                  }
+                  const metaEl = card.querySelector('.font-card-meta');
+                  if (metaEl && !metaEl.querySelector('.hidden-badge')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'hidden-badge';
+                    badge.textContent = 'Hidden';
+                    metaEl.insertBefore(badge, metaEl.firstChild);
+                  }
+                } else {
+                  // Automatically enable last setting
+                  font.widget = font.last_widget !== undefined && font.last_widget !== 0 ? font.last_widget : 1;
+                  font.billionaire = font.last_billionaire !== undefined && font.last_billionaire !== 0 ? font.last_billionaire : 1;
+                  font.scallions = font.last_scallions !== undefined && font.last_scallions !== 0 ? font.last_scallions : 1;
+                  font.weight = font.last_weight && font.last_weight > 0 ? font.last_weight : 3;
+                  font.probability = font.last_probability && font.last_probability > 0 ? font.last_probability : 3;
+
+                  card.classList.remove('is-hidden');
+                  card.querySelectorAll('.site-checkbox').forEach(cb => {
+                    cb.disabled = false;
+                    const site = cb.getAttribute('data-site');
+                    cb.checked = font[site] === 1;
+                  });
+                  card.querySelectorAll('[data-type="weight"]').forEach(b => {
+                    const val = parseInt(b.getAttribute('data-val'), 10);
+                    b.classList.toggle('is-active', val === font.weight);
+                  });
+                  if (weightLabelEl) {
+                    weightLabelEl.textContent = `Weight Scale (${WEIGHT_LABELS[font.weight] || font.weight})`;
+                  }
+                  card.querySelector('.hidden-badge')?.remove();
+                }
+
+                await saveFont(font);
+              });
+            }
 
             fontGrid.appendChild(card);
             fontObserver.observe(card);
@@ -1175,7 +2590,21 @@
 
           const res = await fetchJson(`${WIDGET_API_BASE}/fonts/${encodeURIComponent(font.name)}`, {
             method: 'PUT',
-            body: JSON.stringify({ weight: font.weight || 3, probability: font.probability || 3 })
+            body: JSON.stringify({
+              weight: Number(font.weight) >= 0 ? Number(font.weight) : 3,
+              probability: Number(font.probability) >= 0 ? Number(font.probability) : 3,
+              widget: font.widget !== 0 && font.widget !== false ? 1 : 0,
+              billionaire: font.billionaire !== 0 && font.billionaire !== false ? 1 : 0,
+              scallions: font.scallions !== 0 && font.scallions !== false ? 1 : 0,
+              latin_variant: font.latin_variant === 1 || font.latin_variant === true ? 1 : 0,
+              is_symbol: font.is_symbol === 1 || font.is_symbol === true ? 1 : 0,
+              hidden: font.hidden === 1 || font.hidden === true ? 1 : 0,
+              last_widget: font.last_widget !== 0 && font.last_widget !== false ? 1 : 0,
+              last_billionaire: font.last_billionaire !== 0 && font.last_billionaire !== false ? 1 : 0,
+              last_scallions: font.last_scallions !== 0 && font.last_scallions !== false ? 1 : 0,
+              last_weight: Number(font.last_weight) || 3,
+              last_probability: Number(font.last_probability) || 3,
+            })
           });
 
           if (indicator) {
@@ -1191,22 +2620,62 @@
           datesTotalBadge.textContent = allEvents.length;
           datesList.innerHTML = '';
 
-          if (allEvents.length === 0) {
+          let list = [...allEvents];
+
+          // Search query
+          if (dateSearchQuery) {
+            const q = dateSearchQuery.toLowerCase();
+            list = list.filter(evt => (evt.name || '').toLowerCase().includes(q) || (evt.description || '').toLowerCase().includes(q));
+          }
+
+          // Sort
+          if (dateSortMode === 'calendar_desc') {
+            list.sort((a, b) => {
+              const aD = new Date(a.date);
+              const bD = new Date(b.date);
+              const aVal = (aD.getUTCMonth() + 1) * 100 + aD.getUTCDate();
+              const bVal = (bD.getUTCMonth() + 1) * 100 + bD.getUTCDate();
+              return bVal - aVal;
+            });
+          } else if (dateSortMode === 'alpha_desc') {
+            list.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+          } else if (dateSortMode === 'alpha_asc' || dateSortMode === 'alpha') {
+            list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          } else if (dateSortMode === 'created_desc') {
+            list.sort((a, b) => new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime());
+          } else if (dateSortMode === 'created_asc') {
+            list.sort((a, b) => new Date(a.created_at || a.date || 0).getTime() - new Date(b.created_at || b.date || 0).getTime());
+          } else {
+            // Default calendar_asc (Jan - Dec)
+            list.sort((a, b) => {
+              const aD = new Date(a.date);
+              const bD = new Date(b.date);
+              const aVal = (aD.getUTCMonth() + 1) * 100 + aD.getUTCDate();
+              const bVal = (bD.getUTCMonth() + 1) * 100 + bD.getUTCDate();
+              return aVal - bVal;
+            });
+          }
+
+          if (list.length === 0) {
             datesEmpty.hidden = false;
             return;
           }
           datesEmpty.hidden = true;
 
-          allEvents.forEach(evt => {
+          list.forEach(evt => {
             const row = document.createElement('div');
             row.className = 'date-item';
 
             const startStr = formatDate(evt.date);
             const endStr = evt.end_date ? ` – ${formatDate(evt.end_date)}` : '';
+            const createdStr = evt.created_at ? `<span style="margin-left: 0.75rem; color: var(--muted); font-size: 0.78rem;">Added: ${formatDate(evt.created_at.slice(0, 10))}</span>` : '';
 
             row.innerHTML = `
               <div class="date-info">
-                <h3 class="date-title">${escapeHtml(evt.name)}</h3>
+                <div style="display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap;">
+                  <h3 class="date-title" style="margin: 0;">${escapeHtml(evt.name)}</h3>
+                  ${createdStr}
+                </div>
                 <div class="date-meta">📅 ${startStr}${endStr}</div>
                 ${evt.description ? `<div class="date-desc">${escapeHtml(evt.description)}</div>` : ''}
               </div>
@@ -1299,37 +2768,1539 @@
           activeTab = 'fonts';
           tabFonts.classList.add('is-active');
           tabDates.classList.remove('is-active');
+          tabSeasons.classList.remove('is-active');
+          tabSingles.classList.remove('is-active');
           viewFonts.hidden = false;
           viewDates.hidden = true;
+          viewSeasons.hidden = true;
+          viewSingles.hidden = true;
         });
 
         tabDates.addEventListener('click', () => {
           activeTab = 'dates';
           tabDates.classList.add('is-active');
           tabFonts.classList.remove('is-active');
+          tabSeasons.classList.remove('is-active');
+          tabSingles.classList.remove('is-active');
           viewDates.hidden = false;
           viewFonts.hidden = true;
+          viewSeasons.hidden = true;
+          viewSingles.hidden = true;
         });
 
-        // Round Pills
-        roundPills.querySelectorAll('.round-pill').forEach(pill => {
-          pill.addEventListener('click', (e) => {
-            roundPills.querySelectorAll('.round-pill').forEach(p => p.classList.remove('is-active'));
-            e.currentTarget.classList.add('is-active');
-            selectedRound = e.currentTarget.getAttribute('data-round');
-            renderFontCards();
-          });
+        tabSeasons.addEventListener('click', () => {
+          activeTab = 'seasons';
+          tabSeasons.classList.add('is-active');
+          tabFonts.classList.remove('is-active');
+          tabDates.classList.remove('is-active');
+          tabSingles.classList.remove('is-active');
+          viewSeasons.hidden = false;
+          viewFonts.hidden = true;
+          viewDates.hidden = true;
+          viewSingles.hidden = true;
+          renderSeasons();
         });
+
+        tabSingles.addEventListener('click', () => {
+          activeTab = 'singles';
+          tabSingles.classList.add('is-active');
+          tabFonts.classList.remove('is-active');
+          tabDates.classList.remove('is-active');
+          tabSeasons.classList.remove('is-active');
+          viewSingles.hidden = false;
+          viewFonts.hidden = true;
+          viewDates.hidden = true;
+          viewSeasons.hidden = true;
+          renderSingles();
+        });
+
+        const FULL_MONTH_NAMES = [
+          '', 'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+
+        function getHolidayRelativeStatus(startMonth, startDay) {
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const todayMidnight = new Date(currentYear, now.getMonth(), now.getDate()).getTime();
+
+          for (const year of [currentYear - 1, currentYear, currentYear + 1]) {
+            const holidayMidnight = new Date(year, Number(startMonth) - 1, Number(startDay)).getTime();
+            const diffDays = Math.round((holidayMidnight - todayMidnight) / 86400000);
+
+            if (diffDays === 0) {
+              return 'today';
+            }
+            if (diffDays === 1) {
+              return 'tomorrow';
+            }
+            if (diffDays === -1) {
+              return 'yesterday';
+            }
+          }
+
+          return null;
+        }
+
+        function isItemInSeason(startMonth, startDay, endMonth, endDay, category = '') {
+          if (String(category).toLowerCase() === 'holiday' && Number(startMonth) === Number(endMonth) && Number(startDay) === Number(endDay)) {
+            return getHolidayRelativeStatus(startMonth, startDay) === 'today';
+          }
+          const now = new Date();
+          const curMonth = now.getMonth() + 1;
+          const curDay = now.getDate();
+          const current = curMonth * 100 + curDay;
+          const start = Number(startMonth) * 100 + Number(startDay);
+          const end = Number(endMonth) * 100 + Number(endDay);
+
+          if (start <= end) {
+            return current >= start && current <= end;
+          }
+          // Wrap-around season (e.g. Nov to Feb)
+          return current >= start || current <= end;
+        }
+
+        function isItemEndingSoon(startMonth, startDay, endMonth, endDay, id = '', daysThreshold = 14) {
+          if (!isItemInSeason(startMonth, startDay, endMonth, endDay)) {
+            return false;
+          }
+
+          // Tournaments 2-3 weeks long (tennis, sumo, etc.) do not show Ending Soon
+          const startVal = Number(startMonth) * 100 + Number(startDay);
+          const endVal = Number(endMonth) * 100 + Number(endDay);
+          const durationDays = startVal <= endVal
+            ? Math.round((new Date(2026, Number(endMonth) - 1, Number(endDay)).getTime() - new Date(2026, Number(startMonth) - 1, Number(startDay)).getTime()) / 86400000)
+            : Math.round((new Date(2027, Number(endMonth) - 1, Number(endDay)).getTime() - new Date(2026, Number(startMonth) - 1, Number(startDay)).getTime()) / 86400000);
+
+          if (String(id).startsWith('tennis-') || durationDays <= 25) {
+            return false;
+          }
+
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const todayStart = new Date(currentYear, now.getMonth(), now.getDate()).getTime();
+          const currentVal = (now.getMonth() + 1) * 100 + now.getDate();
+
+          let endYear = currentYear;
+          if (startVal > endVal && currentVal >= startVal) {
+            endYear = currentYear + 1;
+          }
+
+          const endDate = new Date(endYear, Number(endMonth) - 1, Number(endDay)).getTime();
+          const diffDays = Math.ceil((endDate - todayStart) / (1000 * 60 * 60 * 24));
+
+          return diffDays >= 0 && diffDays <= daysThreshold;
+        }
+
+        function isItemComingSoon(startMonth, startDay, endMonth, endDay, daysThreshold = 7) {
+          if (isItemInSeason(startMonth, startDay, endMonth, endDay)) {
+            return false;
+          }
+
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const todayStart = new Date(currentYear, now.getMonth(), now.getDate()).getTime();
+
+          const startVal = Number(startMonth) * 100 + Number(startDay);
+          const currentVal = (now.getMonth() + 1) * 100 + now.getDate();
+
+          let startYear = currentYear;
+          if (currentVal > startVal) {
+            startYear = currentYear + 1;
+          }
+
+          const startDate = new Date(startYear, Number(startMonth) - 1, Number(startDay)).getTime();
+          const diffDays = Math.ceil((startDate - todayStart) / (1000 * 60 * 60 * 24));
+
+          return diffDays > 0 && diffDays <= daysThreshold;
+        }
+
+        function formatApproximateDate(month, day) {
+          const monthName = FULL_MONTH_NAMES[Number(month)] || month;
+          const d = Number(day);
+          if (d <= 8) {
+            return monthName;
+          }
+          if (d <= 21) {
+            return `Mid-${monthName}`;
+          }
+          return `End of ${monthName}`;
+        }
+
+        function formatActualDate(month, day, year) {
+          const monthName = FULL_MONTH_NAMES[Number(month)] || month;
+          return year ? `${monthName} ${day}, ${year}` : `${monthName} ${day}`;
+        }
+
+        function getSportSeasonYears(startMonth, startDay, endMonth, endDay) {
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const currentVal = (now.getMonth() + 1) * 100 + now.getDate();
+          const startVal = Number(startMonth) * 100 + Number(startDay);
+          const endVal = Number(endMonth) * 100 + Number(endDay);
+          const rollsOver = startVal > endVal;
+
+          let currentStartYear, currentEndYear;
+          if (rollsOver) {
+            if (currentVal <= endVal) {
+              currentStartYear = currentYear - 1;
+              currentEndYear = currentYear;
+            } else {
+              currentStartYear = currentYear;
+              currentEndYear = currentYear + 1;
+            }
+          } else {
+            currentStartYear = currentYear;
+            currentEndYear = currentYear;
+          }
+
+          return {
+            currentStartYear,
+            currentEndYear,
+            nextStartYear: currentStartYear + 1,
+            nextEndYear: currentEndYear + 1
+          };
+        }
+
+        function formatSeasonRange(category, startMonth, startDay, endMonth, endDay) {
+          const cat = String(category).toLowerCase();
+          if (cat === 'sport' || cat === 'holiday' || cat === 'civic' || cat === 'zodiac' || cat === 'moon' || cat === 'other') {
+            if (cat === 'sport') {
+              const { currentStartYear, currentEndYear } = getSportSeasonYears(startMonth, startDay, endMonth, endDay);
+              const startStr = formatActualDate(startMonth, startDay, currentStartYear);
+              const endStr = formatActualDate(endMonth, endDay, currentEndYear);
+              return `${startStr} – ${endStr}`;
+            }
+            if (startMonth === endMonth && startDay === endDay) {
+              return formatActualDate(startMonth, startDay);
+            }
+            const startStr = formatActualDate(startMonth, startDay);
+            const endStr = formatActualDate(endMonth, endDay);
+            return `${startStr} – ${endStr}`;
+          }
+
+          const sM = formatApproximateDate(startMonth, startDay);
+          const eM = formatApproximateDate(endMonth, endDay);
+          return `${sM} – ${eM}`;
+        }
+
+        function formatNextSeasonRange(category, startMonth, startDay, endMonth, endDay) {
+          if (String(category).toLowerCase() !== 'sport') {
+            return null;
+          }
+          const { nextStartYear, nextEndYear } = getSportSeasonYears(startMonth, startDay, endMonth, endDay);
+          const startStr = formatActualDate(startMonth, startDay, nextStartYear);
+          const endStr = formatActualDate(endMonth, endDay, nextEndYear);
+          return `${startStr} – ${endStr}`;
+        }
+
+        function renderSeasons() {
+          seasonsList.innerHTML = '';
+          let list = [...allSeasons];
+
+          // 1. Category filter
+          if (seasonCategoryFilter !== 'all') {
+            if (seasonCategoryFilter === 'other') {
+              const standardCats = ['fruit', 'vegetable', 'sport'];
+              list = list.filter(item => !standardCats.includes(String(item.category).toLowerCase()));
+            } else {
+              list = list.filter(item => String(item.category).toLowerCase() === seasonCategoryFilter);
+            }
+          }
+
+          // 2. In Season Now filter (independent toggle)
+          if (seasonOnlyInSeason) {
+            list = list.filter(item => {
+              const isSingleDayHoliday = String(item.category).toLowerCase() === 'holiday' && Number(item.start_month) === Number(item.end_month) && Number(item.start_day) === Number(item.end_day);
+              if (isSingleDayHoliday) {
+                return getHolidayRelativeStatus(item.start_month, item.start_day) !== null;
+              }
+              return isItemInSeason(item.start_month, item.start_day, item.end_month, item.end_day, item.category);
+            });
+          }
+
+          // 3. Search query
+          if (seasonSearchQuery) {
+            const q = seasonSearchQuery.toLowerCase();
+            list = list.filter(item => item.name.toLowerCase().includes(q) || String(item.category).toLowerCase().includes(q));
+          }
+
+          // 4. Sorting
+          if (seasonSortMode === 'alpha_desc') {
+            list.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+          } else if (seasonSortMode === 'date' || seasonSortMode === 'season_asc' || seasonSortMode === 'calendar') {
+            // Sort chronologically starting with current date
+            const now = new Date();
+            const curVal = (now.getMonth() + 1) * 100 + now.getDate();
+            list.sort((a, b) => {
+              const aVal = Number(a.start_month) * 100 + Number(a.start_day);
+              const bVal = Number(b.start_month) * 100 + Number(b.start_day);
+              const aDist = (aVal - curVal + 1200) % 1200;
+              const bDist = (bVal - curVal + 1200) % 1200;
+              return aDist - bDist;
+            });
+          } else {
+            // Default alpha_asc (A–Z)
+            list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          }
+
+          seasonsTotalBadge.textContent = allSeasons.length;
+          seasonsEmpty.hidden = list.length > 0;
+
+          list.forEach(item => {
+            const isSingleDayHoliday = String(item.category).toLowerCase() === 'holiday' && Number(item.start_month) === Number(item.end_month) && Number(item.start_day) === Number(item.end_day);
+            const holidayStatus = isSingleDayHoliday ? getHolidayRelativeStatus(item.start_month, item.start_day) : null;
+            const inSeason = isItemInSeason(item.start_month, item.start_day, item.end_month, item.end_day, item.category);
+            const isOther = ['holiday', 'civic', 'zodiac', 'moon', 'other'].includes(String(item.category).toLowerCase()) || item.id === 'fiscal-year-start' || item.id === 'fiscal-year-end';
+            const endingSoon = !isOther && inSeason && isItemEndingSoon(item.start_month, item.start_day, item.end_month, item.end_day, item.id);
+            const comingSoon = !isOther && !inSeason && isItemComingSoon(item.start_month, item.start_day, item.end_month, item.end_day);
+            const rangeStr = formatSeasonRange(item.category, item.start_month, item.start_day, item.end_month, item.end_day);
+            const catClass = `badge-category--${String(item.category).toLowerCase()}`;
+            const createdStr = item.created_at ? `<span style="margin-left: 0.75rem; color: var(--muted); font-size: 0.78rem;">Added: ${formatDate(item.created_at.slice(0, 10))}</span>` : '';
+
+            let statusBadge = inSeason ? '<span class="badge-in-season">In Season Now</span>' : '<span class="badge-off-season">Off Season</span>';
+            if (holidayStatus === 'tomorrow') {
+              statusBadge = '<span class="badge-coming-soon">Tomorrow</span>';
+            } else if (holidayStatus === 'yesterday') {
+              statusBadge = '<span class="badge-ending-soon">Yesterday</span>';
+            } else if (holidayStatus === 'today') {
+              statusBadge = '<span class="badge-in-season">Today</span>';
+            }
+
+            const row = document.createElement('div');
+            row.className = 'date-item';
+            row.innerHTML = `
+              <div class="date-info">
+                <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                  <h3 class="date-title" style="margin: 0;">${escapeHtml(item.name)}</h3>
+                  <span class="badge-category ${catClass}">${escapeHtml(item.category)}</span>
+                  ${statusBadge}
+                  ${endingSoon ? '<span class="badge-ending-soon">Ending Soon</span>' : ''}
+                  ${comingSoon ? '<span class="badge-coming-soon">Coming Soon</span>' : ''}
+                  ${createdStr}
+                </div>
+                <div class="date-meta" style="margin-top: 0.25rem;">
+                  <strong>${isSingleDayHoliday ? 'Active Date:' : 'Active Dates:'}</strong> ${escapeHtml(rangeStr)}
+                </div>
+              </div>
+              <div class="date-actions">
+                <button type="button" class="action-btn btn-edit-season">Edit</button>
+                <button type="button" class="action-btn action-btn--danger btn-del-season">Delete</button>
+              </div>
+            `;
+
+            row.querySelector('.btn-edit-season').addEventListener('click', () => openEditSeasonModal(item));
+            row.querySelector('.btn-del-season').addEventListener('click', () => deleteSeasonItem(item.id, item.name));
+
+            seasonsList.appendChild(row);
+          });
+        }
+
+        function getDaysInMonth(month) {
+          const m = Number(month);
+          if ([4, 6, 9, 11].includes(m)) return 30;
+          if (m === 2) return 29; // covers leap years as well
+          return 31;
+        }
+
+        function getOrdinal(n) {
+          const num = Number(n);
+          if (!num) return '';
+          const s = ['th', 'st', 'nd', 'rd'];
+          const v = num % 100;
+          return num + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+
+        function updateSeasonDayPicker(prefix, forcedPreset = null, forcedDay = null) {
+          const monthEl = document.getElementById(`season-${prefix}-month`);
+          const dayEl = document.getElementById(`season-${prefix}-day`);
+          const endSub = document.getElementById(`season-${prefix}-end-sub`);
+          const specSub = document.getElementById(`season-${prefix}-spec-sub`);
+          const specRow = document.getElementById(`season-${prefix}-specific-row`);
+          const limitText = document.getElementById(`season-${prefix}-limit-text`);
+          const presetBtns = document.querySelectorAll(`.day-preset-btn[data-target="${prefix}"]`);
+
+          if (!monthEl || !dayEl) return;
+
+          const month = Number(monthEl.value) || 1;
+          const maxDays = getDaysInMonth(month);
+
+          dayEl.max = String(maxDays);
+          if (limitText) {
+            limitText.textContent = `Limit: 1 – ${maxDays}`;
+          }
+          if (endSub) {
+            endSub.textContent = getOrdinal(maxDays);
+          }
+
+          let activePreset = forcedPreset;
+          if (!activePreset) {
+            const activeBtn = document.querySelector(`.day-preset-btn[data-target="${prefix}"].is-active`);
+            activePreset = activeBtn ? activeBtn.getAttribute('data-preset') : 'specific';
+          }
+
+          if (forcedDay !== null && forcedDay !== undefined) {
+            dayEl.value = String(forcedDay);
+          }
+
+          let currentDay = Number(dayEl.value) || 1;
+
+          if (activePreset === 'mid') {
+            currentDay = 15;
+            dayEl.value = '15';
+            if (specRow) specRow.style.display = 'none';
+          } else if (activePreset === 'end') {
+            currentDay = maxDays;
+            dayEl.value = String(maxDays);
+            if (specRow) specRow.style.display = 'none';
+          } else {
+            // specific
+            if (currentDay > maxDays) {
+              currentDay = maxDays;
+              dayEl.value = String(maxDays);
+            } else if (currentDay < 1) {
+              currentDay = 1;
+              dayEl.value = '1';
+            }
+            if (specRow) specRow.style.display = 'flex';
+          }
+
+          if (specSub) {
+            specSub.textContent = getOrdinal(currentDay);
+          }
+
+          presetBtns.forEach(btn => {
+            const p = btn.getAttribute('data-preset');
+            btn.classList.toggle('is-active', p === activePreset);
+          });
+        }
+
+        function initSeasonDayPickers() {
+          ['start', 'end'].forEach(prefix => {
+            const monthEl = document.getElementById(`season-${prefix}-month`);
+            const dayEl = document.getElementById(`season-${prefix}-day`);
+            const presetBtns = document.querySelectorAll(`.day-preset-btn[data-target="${prefix}"]`);
+
+            if (monthEl) {
+              monthEl.addEventListener('change', () => {
+                updateSeasonDayPicker(prefix);
+              });
+            }
+
+            presetBtns.forEach(btn => {
+              btn.addEventListener('click', () => {
+                const preset = btn.getAttribute('data-preset');
+                updateSeasonDayPicker(prefix, preset);
+                if (preset === 'specific') {
+                  const input = document.getElementById(`season-${prefix}-day`);
+                  if (input) {
+                    input.focus();
+                    input.select();
+                  }
+                }
+              });
+            });
+
+            if (dayEl) {
+              dayEl.addEventListener('input', () => {
+                const month = Number(document.getElementById(`season-${prefix}-month`).value) || 1;
+                const maxDays = getDaysInMonth(month);
+                let val = Number(dayEl.value);
+                if (val > maxDays) {
+                  dayEl.value = String(maxDays);
+                  val = maxDays;
+                } else if (val < 1 && dayEl.value !== '') {
+                  dayEl.value = '1';
+                  val = 1;
+                }
+                const specSub = document.getElementById(`season-${prefix}-spec-sub`);
+                if (specSub && val) {
+                  specSub.textContent = getOrdinal(val);
+                }
+              });
+            }
+          });
+        }
+        initSeasonDayPickers();
+
+        function openAddSeasonModal() {
+          seasonModalTitle.textContent = 'Add Season Item';
+          document.getElementById('season-id').value = '';
+          document.getElementById('season-name').value = '';
+          document.getElementById('season-category').value = 'fruit';
+          document.getElementById('season-start-month').value = '1';
+          document.getElementById('season-end-month').value = '12';
+          updateSeasonDayPicker('start', 'specific', 1);
+          updateSeasonDayPicker('end', 'end', 31);
+          seasonModal.hidden = false;
+        }
+
+        function openEditSeasonModal(item) {
+          seasonModalTitle.textContent = 'Edit Season Item';
+          document.getElementById('season-id').value = item.id || '';
+          document.getElementById('season-name').value = item.name || '';
+          document.getElementById('season-category').value = item.category || 'fruit';
+
+          const sMonth = Number(item.start_month) || 1;
+          const sDay = Number(item.start_day) || 1;
+          const sMax = getDaysInMonth(sMonth);
+          document.getElementById('season-start-month').value = String(sMonth);
+          let sPreset = 'specific';
+          if (sDay === 15) sPreset = 'mid';
+          else if (sDay === sMax) sPreset = 'end';
+          updateSeasonDayPicker('start', sPreset, sDay);
+
+          const eMonth = Number(item.end_month) || 12;
+          const eDay = Number(item.end_day) || 31;
+          const eMax = getDaysInMonth(eMonth);
+          document.getElementById('season-end-month').value = String(eMonth);
+          let ePreset = 'specific';
+          if (eDay === 15) ePreset = 'mid';
+          else if (eDay === eMax) ePreset = 'end';
+          updateSeasonDayPicker('end', ePreset, eDay);
+
+          seasonModal.hidden = false;
+        }
+
+        async function deleteSeasonItem(id, name) {
+          if (!confirm(`Are you sure you want to delete "${name}" from Seasons?`)) return;
+          const res = await fetchJson(`${WIDGET_API_BASE}/seasons/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          if (res?.ok !== false) {
+            allSeasons = allSeasons.filter(s => s.id !== id);
+            renderSeasons();
+            showToast(`Deleted "${name}"`);
+          } else {
+            alert('Failed to delete season item: ' + (res?.error || 'Unknown error'));
+          }
+        }
+
+        btnSeasonModalCancel.addEventListener('click', () => { seasonModal.hidden = true; });
+        btnAddSeason.addEventListener('click', openAddSeasonModal);
+
+        seasonForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const id = document.getElementById('season-id').value;
+          const name = document.getElementById('season-name').value.trim();
+          const category = document.getElementById('season-category').value;
+          const start_month = Number(document.getElementById('season-start-month').value);
+          const start_day = Number(document.getElementById('season-start-day').value);
+          const end_month = Number(document.getElementById('season-end-month').value);
+          const end_day = Number(document.getElementById('season-end-day').value);
+
+          if (!name) return;
+
+          const maxStart = getDaysInMonth(start_month);
+          const maxEnd = getDaysInMonth(end_month);
+          if (!start_day || start_day < 1 || start_day > maxStart) {
+            alert(`Start day must be between 1 and ${maxStart} for the selected month.`);
+            return;
+          }
+          if (!end_day || end_day < 1 || end_day > maxEnd) {
+            alert(`End day must be between 1 and ${maxEnd} for the selected month.`);
+            return;
+          }
+
+          const isEdit = Boolean(id);
+          const url = isEdit ? `${WIDGET_API_BASE}/seasons/${encodeURIComponent(id)}` : `${WIDGET_API_BASE}/seasons`;
+          const method = isEdit ? 'PUT' : 'POST';
+
+          const res = await fetchJson(url, {
+            method,
+            body: JSON.stringify({ id, name, category, start_month, start_day, end_month, end_day })
+          });
+
+          if (res?.ok !== false) {
+            seasonModal.hidden = true;
+            await loadSeasons();
+            showToast(isEdit ? `Updated "${name}"` : `Added "${name}"`);
+          } else {
+            alert('Failed to save season item: ' + (res?.error || 'Unknown error'));
+          }
+        });
+
+        if (seasonFilterPills) {
+          seasonFilterPills.querySelectorAll('[data-season-cat]').forEach(pill => {
+            pill.addEventListener('click', (e) => {
+              seasonFilterPills.querySelectorAll('[data-season-cat]').forEach(p => p.classList.remove('is-active'));
+              e.currentTarget.classList.add('is-active');
+              seasonCategoryFilter = e.currentTarget.getAttribute('data-season-cat');
+              renderSeasons();
+            });
+          });
+        }
+
+        if (pillInSeason) {
+          pillInSeason.addEventListener('click', () => {
+            seasonOnlyInSeason = !seasonOnlyInSeason;
+            pillInSeason.classList.toggle('is-active', seasonOnlyInSeason);
+            renderSeasons();
+          });
+        }
+
+        if (seasonSearch) {
+          seasonSearch.addEventListener('input', (e) => {
+            seasonSearchQuery = e.target.value.trim();
+            renderSeasons();
+          });
+        }
+
+        // Generic dropdown handling
+        function toggleDropdown(dropdownEl) {
+          if (!dropdownEl) return;
+          const menu = dropdownEl.querySelector('.custom-dropdown-menu');
+          const isOpen = dropdownEl.classList.contains('is-open');
+          document.querySelectorAll('.custom-dropdown').forEach(dd => {
+            if (dd !== dropdownEl) {
+              dd.classList.remove('is-open');
+              const m = dd.querySelector('.custom-dropdown-menu');
+              if (m) m.hidden = true;
+            }
+          });
+          if (isOpen) {
+            dropdownEl.classList.remove('is-open');
+            if (menu) menu.hidden = true;
+          } else {
+            dropdownEl.classList.add('is-open');
+            if (menu) menu.hidden = false;
+          }
+        }
+
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('.custom-dropdown')) {
+            document.querySelectorAll('.custom-dropdown').forEach(dd => {
+              dd.classList.remove('is-open');
+              const m = dd.querySelector('.custom-dropdown-menu');
+              if (m) m.hidden = true;
+            });
+          }
+        });
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            document.querySelectorAll('.custom-dropdown').forEach(dd => {
+              dd.classList.remove('is-open');
+              const m = dd.querySelector('.custom-dropdown-menu');
+              if (m) m.hidden = true;
+            });
+          }
+        });
+
+        function updateSeasonSortDropdown() {
+          if (!seasonSortMenu || !seasonSortLabel) return;
+          if (seasonSortMode === 'date') {
+            seasonSortLabel.textContent = 'Sort: Date';
+            seasonSortMenu.innerHTML = `
+              <button type="button" class="custom-dropdown-item" data-season-sort="alpha_asc">Sort: A–Z</button>
+              <button type="button" class="custom-dropdown-item" data-season-sort="alpha_desc">Sort: Z–A</button>
+            `;
+          } else if (seasonSortMode === 'alpha_desc') {
+            seasonSortLabel.textContent = 'Sort: Z–A';
+            seasonSortMenu.innerHTML = `
+              <button type="button" class="custom-dropdown-item" data-season-sort="alpha_asc">Sort: A–Z</button>
+              <button type="button" class="custom-dropdown-item" data-season-sort="date">Sort: Date</button>
+            `;
+          } else {
+            // Default alpha_asc
+            seasonSortLabel.textContent = 'Sort: A–Z';
+            seasonSortMenu.innerHTML = `
+              <button type="button" class="custom-dropdown-item" data-season-sort="alpha_desc">Sort: Z–A</button>
+              <button type="button" class="custom-dropdown-item" data-season-sort="date">Sort: Date</button>
+            `;
+          }
+
+          seasonSortMenu.querySelectorAll('[data-season-sort]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const targetSort = e.currentTarget.getAttribute('data-season-sort');
+              seasonSortMode = targetSort;
+              seasonSortDropdown.classList.remove('is-open');
+              seasonSortMenu.hidden = true;
+              updateSeasonSortDropdown();
+              renderSeasons();
+            });
+          });
+        }
+
+        if (seasonSortBtn && seasonSortDropdown) {
+          seasonSortBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDropdown(seasonSortDropdown);
+          });
+          updateSeasonSortDropdown();
+        }
+
+        // ==========================
+        // Singles Functions
+        // ==========================
+        const DEFAULT_SINGLE_ITEM = {
+          id: 'bill-jefferson',
+          slug: 'bill-jefferson',
+          title: 'Bill Jefferson',
+          body_text:
+            'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+          show_bottom_links: 1,
+          is_active: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const expandedSingleIds = new Set();
+        let reservedSingleSlugs = new Set([
+          'feed', 'aphelion', 'tourbillion', 'battalion', 'perihelion', 'lionship',
+          'scallions', 'dookydetective', 'jeffershizzle', 'bullion', 'vermilion',
+          'millionfold', 'iwenttocity', 'stallioneer', 'wmjefferson', 'copy',
+          'auth', 'multimillion', 'account', 'status', 'project-activity',
+          'development', 'underconstruction', 'widget', 'home',
+          'api', 'admin', 'login', 'logout', 'signup', 'register', 'oauth', 'callback',
+          'assets', 'images', 'dist', 'src', 'docs', 'scripts', 'favicon', 'robots',
+          'sitemap', '404', '500', 'index'
+        ]);
+
+        async function loadReservedSingleSlugs() {
+          try {
+            const res = await fetch('/reserved-urls.txt');
+            if (res.ok) {
+              const text = await res.text();
+              const lines = text.split(/\r?\n/);
+              const set = new Set();
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('#')) continue;
+                set.add(trimmed.toLowerCase());
+              }
+              if (set.size > 0) {
+                reservedSingleSlugs = set;
+                return;
+              }
+            }
+          } catch (_e) {}
+
+          try {
+            const metaRes = await fetch(`${WIDGET_API_BASE}/singles-meta/reserved-urls`);
+            if (metaRes.ok) {
+              const meta = await metaRes.json();
+              if (Array.isArray(meta.reserved_slugs) && meta.reserved_slugs.length > 0) {
+                reservedSingleSlugs = new Set(meta.reserved_slugs.map(s => String(s).toLowerCase()));
+              }
+            }
+          } catch (_err) {}
+        }
+
+        function isSafeRichUrl(value) {
+          if (!value) return false;
+          if (value.startsWith('/') || value.startsWith('#')) return true;
+          try {
+            const parsed = new URL(value, window.location.origin);
+            return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);
+          } catch (_e) {
+            return false;
+          }
+        }
+
+        function formatInlineMarkdown(value) {
+          let html = escapeHtml(value);
+          const protectedSegments = [];
+          const protectSegment = (segment) => {
+            const token = `@@PROTECTED${protectedSegments.length}@@`;
+            protectedSegments.push(segment);
+            return token;
+          };
+
+          html = html.replace(/`([^`]+)`/g, (_match, code) => {
+            return protectSegment(`<code>${code}</code>`);
+          });
+
+          html = html.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_match, alt, url) => {
+            if (!isSafeRichUrl(url)) return '';
+            return protectSegment(`<figure><img src="${url}" alt="${alt}" loading="lazy" /><figcaption>${alt}</figcaption></figure>`);
+          });
+
+          html = html.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_match, label, url) => {
+            if (!isSafeRichUrl(url)) return label;
+            return protectSegment(`<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+          });
+
+          html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+          html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+          html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+          html = html.replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
+
+          protectedSegments.forEach((segment, index) => {
+            html = html.replace(`@@PROTECTED${index}@@`, segment);
+          });
+
+          return html;
+        }
+
+        function formatMarkdownHtml(value) {
+          if (!value) return '';
+          const lines = String(value).replace(/\r\n/g, '\n').split('\n');
+          const html = [];
+          let paragraph = [];
+          let listType = null;
+          let blockquote = [];
+
+          const flushParagraph = () => {
+            if (paragraph.length === 0) return;
+            html.push(`<p>${paragraph.map(formatInlineMarkdown).join('<br />')}</p>`);
+            paragraph = [];
+          };
+
+          const closeList = () => {
+            if (!listType) return;
+            html.push(`</${listType}>`);
+            listType = null;
+          };
+
+          const flushBlockquote = () => {
+            if (blockquote.length === 0) return;
+            html.push(`<blockquote><p>${blockquote.map(formatInlineMarkdown).join('<br />')}</p></blockquote>`);
+            blockquote = [];
+          };
+
+          lines.forEach((line) => {
+            const trimmed = line.trim();
+
+            if (!trimmed) {
+              flushParagraph();
+              closeList();
+              flushBlockquote();
+              return;
+            }
+
+            if (/^!\[[^\]]*\]\([^)]+\)$/.test(trimmed)) {
+              flushParagraph();
+              closeList();
+              flushBlockquote();
+              html.push(formatInlineMarkdown(trimmed));
+              return;
+            }
+
+            const headingMatch = trimmed.match(/^(#{1,4})\s+(.+)$/);
+            if (headingMatch) {
+              flushParagraph();
+              closeList();
+              flushBlockquote();
+              const level = Math.min(6, headingMatch[1].length + 1);
+              html.push(`<h${level}>${formatInlineMarkdown(headingMatch[2])}</h${level}>`);
+              return;
+            }
+
+            const blockquoteMatch = trimmed.match(/^>\s?(.*)$/);
+            if (blockquoteMatch) {
+              flushParagraph();
+              closeList();
+              blockquote.push(blockquoteMatch[1]);
+              return;
+            }
+
+            const unorderedMatch = trimmed.match(/^[-*]\s+(.+)$/);
+            const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+            if (unorderedMatch || orderedMatch) {
+              flushParagraph();
+              flushBlockquote();
+              const nextType = unorderedMatch ? 'ul' : 'ol';
+              if (listType && listType !== nextType) {
+                closeList();
+              }
+              if (!listType) {
+                listType = nextType;
+                html.push(`<${listType}>`);
+              }
+              html.push(`<li>${formatInlineMarkdown((unorderedMatch || orderedMatch)?.[1] || '')}</li>`);
+              return;
+            }
+
+            closeList();
+            flushBlockquote();
+            paragraph.push(trimmed);
+          });
+
+          flushParagraph();
+          closeList();
+          flushBlockquote();
+
+          return html.join('');
+        }
+
+        function titleToSlug(title) {
+          return String(title || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'untitled';
+        }
+
+        async function saveSingle(item, updates) {
+          Object.assign(item, updates);
+          item.updated_at = new Date().toISOString();
+          localStorage.setItem('jeffersonwm_singles', JSON.stringify(allSingles));
+
+          try {
+            await fetchJson(`${WIDGET_API_BASE}/singles/${encodeURIComponent(item.id)}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                id: item.id,
+                title: item.title,
+                slug: item.slug,
+                body_text: item.body_text,
+                show_bottom_links: item.show_bottom_links,
+                is_active: item.is_active
+              })
+            });
+          } catch (err) {
+            console.warn('API save failed, persisted to local cache:', err);
+          }
+        }
+
+        async function loadSingles() {
+          await loadReservedSingleSlugs();
+          try {
+            const data = await fetchJson(`${WIDGET_API_BASE}/singles`);
+            if (Array.isArray(data) && data.length > 0) {
+              allSingles = data;
+            } else {
+              const cached = JSON.parse(localStorage.getItem('jeffersonwm_singles') || 'null');
+              if (Array.isArray(cached) && cached.length > 0) {
+                allSingles = cached;
+              } else {
+                allSingles = [{ ...DEFAULT_SINGLE_ITEM }];
+              }
+            }
+          } catch (err) {
+            console.warn('Could not load singles from API, reading cache:', err);
+            const cached = JSON.parse(localStorage.getItem('jeffersonwm_singles') || 'null');
+            if (Array.isArray(cached) && cached.length > 0) {
+              allSingles = cached;
+            } else {
+              allSingles = [{ ...DEFAULT_SINGLE_ITEM }];
+            }
+          }
+
+          allSingles.forEach((s) => {
+            if (s.is_active === undefined) s.is_active = 1;
+          });
+
+          if (expandedSingleIds.size === 0 && allSingles.length > 0) {
+            expandedSingleIds.add(allSingles[0].id);
+          }
+
+          if (singlesTotalBadge) singlesTotalBadge.textContent = String(allSingles.length);
+          localStorage.setItem('jeffersonwm_singles', JSON.stringify(allSingles));
+          renderSingles();
+        }
+
+        function renderSingles() {
+          if (!singlesList) return;
+          singlesList.innerHTML = '';
+
+          let filtered = allSingles.slice();
+          if (singleSearchQuery) {
+            const q = singleSearchQuery.toLowerCase();
+            filtered = filtered.filter(s =>
+              (s.title && s.title.toLowerCase().includes(q)) ||
+              (s.slug && s.slug.toLowerCase().includes(q)) ||
+              (s.body_text && s.body_text.toLowerCase().includes(q))
+            );
+          }
+
+          if (singleSortMode === 'alpha_asc') {
+            filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+          } else if (singleSortMode === 'alpha_desc') {
+            filtered.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+          } else if (singleSortMode === 'date_desc') {
+            filtered.sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
+          }
+
+          if (singlesEmpty) singlesEmpty.hidden = filtered.length > 0;
+          if (filtered.length === 0) return;
+
+          filtered.forEach((item) => {
+            const card = document.createElement('div');
+            card.className = 'single-card';
+            card.dataset.id = item.id;
+
+            const isChecked = item.show_bottom_links === 1 || item.show_bottom_links === true || item.show_bottom_links === '1';
+            const isActive = item.is_active === undefined || item.is_active === 1 || item.is_active === true || item.is_active === '1';
+            const isExpanded = expandedSingleIds.has(item.id);
+
+            if (!isExpanded) {
+              card.classList.add('is-collapsed');
+            }
+
+            card.innerHTML = `
+              <div class="single-card-header">
+                <div class="single-card-header-left">
+                  <button type="button" class="single-accordion-toggle" aria-label="Toggle card">
+                    <span class="single-accordion-arrow">▶</span>
+                  </button>
+                  <a class="single-card-url-link" href="/${encodeURIComponent(item.slug)}/" target="_blank" rel="noopener noreferrer" title="View public page in new tab">
+                    /<span class="single-link-slug">${escapeHtml(item.slug)}</span>/ <span class="external-icon">↗</span>
+                  </a>
+                  <span class="single-status-badge ${isActive ? 'is-active' : 'is-inactive'}">${isActive ? 'Active' : 'Inactive'}</span>
+                </div>
+                <div class="single-card-header-actions">
+                  <button type="button" class="action-btn single-status-toggle-btn ${isActive ? 'is-active' : 'is-inactive'}">${isActive ? 'Active' : 'Inactive'}</button>
+                  <button type="button" class="action-btn action-btn--danger single-delete-btn">Delete</button>
+                </div>
+              </div>
+
+              <div class="single-card-fields">
+                <div class="form-group">
+                  <label>Title</label>
+                  <input type="text" class="single-title-input" value="${escapeHtml(item.title || '')}" placeholder="Page title (e.g. Bill Jefferson)">
+                  <div class="single-slug-warning" style="display: none; color: #dc2626; font-size: 0.82rem; font-weight: 500; margin-top: 0.35rem;"></div>
+                </div>
+
+                <div class="form-group">
+                  <label>Body Text</label>
+                  <div class="rich-composer">
+                    <div class="rich-editor-bar">
+                      <div class="rich-editor-tabs" role="tablist" aria-label="Body text mode">
+                        <button type="button" class="rich-editor-tab rich-editor-tab--active" data-tab="write" role="tab" aria-selected="true">Write</button>
+                        <button type="button" class="rich-editor-tab" data-tab="preview" role="tab" aria-selected="false">Preview</button>
+                      </div>
+                      <div class="rich-toolbar" aria-label="Markdown formatting tools">
+                        <button type="button" class="rich-tool" data-action="h2" title="Heading 2">H</button>
+                        <button type="button" class="rich-tool" data-action="bold" title="Bold">B</button>
+                        <button type="button" class="rich-tool rich-tool--italic" data-action="italic" title="Italic">I</button>
+                        <button type="button" class="rich-tool" data-action="ul" title="Unordered List">List</button>
+                        <button type="button" class="rich-tool" data-action="ol" title="Ordered List">1.2</button>
+                        <button type="button" class="rich-tool" data-action="quote" title="Quote">Quote</button>
+                        <button type="button" class="rich-tool" data-action="code" title="Inline Code">Code</button>
+                        <button type="button" class="rich-tool" data-action="link" title="Insert Link">Link</button>
+                      </div>
+                    </div>
+                    <div class="rich-editor-surface" role="tabpanel">
+                      <textarea class="single-body-input markdown-editor-textarea" rows="5" placeholder="Enter paragraph or markdown text...">${escapeHtml(item.body_text || '')}</textarea>
+                    </div>
+                    <div class="rich-preview-surface feed-html" role="tabpanel" style="display: none;"></div>
+                  </div>
+                </div>
+
+                <div class="single-checkbox-row">
+                  <label class="single-checkbox-label">
+                    <input type="checkbox" class="single-links-checkbox" ${isChecked ? 'checked' : ''}>
+                    <span>Display site links block at bottom of page (Home, Status, etc.)</span>
+                  </label>
+                </div>
+              </div>
+            `;
+
+            const cardHeader = card.querySelector('.single-card-header');
+            const toggleBtn = card.querySelector('.single-accordion-toggle');
+            const titleInput = card.querySelector('.single-title-input');
+            const slugWarning = card.querySelector('.single-slug-warning');
+            const bodyInput = card.querySelector('.single-body-input');
+            const tabWrite = card.querySelector('.rich-editor-tab[data-tab="write"]');
+            const tabPreview = card.querySelector('.rich-editor-tab[data-tab="preview"]');
+            const editorSurface = card.querySelector('.rich-editor-surface');
+            const previewSurface = card.querySelector('.rich-preview-surface');
+            const toolbarTools = card.querySelectorAll('.rich-tool');
+            const linksCheckbox = card.querySelector('.single-links-checkbox');
+            const linkSlug = card.querySelector('.single-link-slug');
+            const urlLink = card.querySelector('.single-card-url-link');
+            const statusToggleBtn = card.querySelector('.single-status-toggle-btn');
+            const statusBadge = card.querySelector('.single-status-badge');
+            const deleteBtn = card.querySelector('.single-delete-btn');
+
+            function toggleAccordion() {
+              card.classList.toggle('is-collapsed');
+              if (card.classList.contains('is-collapsed')) {
+                expandedSingleIds.delete(item.id);
+              } else {
+                expandedSingleIds.add(item.id);
+              }
+            }
+
+            cardHeader.addEventListener('click', (e) => {
+              if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input')) return;
+              toggleAccordion();
+            });
+
+            toggleBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              toggleAccordion();
+            });
+
+            urlLink.addEventListener('click', (e) => {
+              e.stopPropagation();
+            });
+
+            function updateMarkdownPreview() {
+              const content = bodyInput.value.trim();
+              previewSurface.innerHTML = content
+                ? formatMarkdownHtml(bodyInput.value)
+                : '<p class="rich-preview-empty">Nothing to preview yet.</p>';
+            }
+
+            function switchToTab(mode) {
+              if (mode === 'write') {
+                tabWrite.classList.add('rich-editor-tab--active');
+                tabWrite.setAttribute('aria-selected', 'true');
+                tabPreview.classList.remove('rich-editor-tab--active');
+                tabPreview.setAttribute('aria-selected', 'false');
+                editorSurface.style.display = '';
+                previewSurface.style.display = 'none';
+                toolbarTools.forEach((b) => { b.disabled = false; });
+                bodyInput.focus();
+              } else {
+                const updatedBody = bodyInput.value;
+                if (updatedBody !== item.body_text) {
+                  void saveSingle(item, { body_text: updatedBody });
+                  showToast('Saved body text');
+                }
+                tabPreview.classList.add('rich-editor-tab--active');
+                tabPreview.setAttribute('aria-selected', 'true');
+                tabWrite.classList.remove('rich-editor-tab--active');
+                tabWrite.setAttribute('aria-selected', 'false');
+                editorSurface.style.display = 'none';
+                previewSurface.style.display = 'block';
+                toolbarTools.forEach((b) => { b.disabled = true; });
+                updateMarkdownPreview();
+              }
+            }
+
+            if (tabWrite && tabPreview) {
+              tabWrite.addEventListener('click', (e) => {
+                e.stopPropagation();
+                switchToTab('write');
+              });
+
+              tabPreview.addEventListener('click', (e) => {
+                e.stopPropagation();
+                switchToTab('preview');
+              });
+            }
+
+            function insertMarkdownWrap(before, after = '', placeholder = 'text') {
+              const value = bodyInput.value;
+              const start = bodyInput.selectionStart ?? value.length;
+              const end = bodyInput.selectionEnd ?? value.length;
+              const selected = value.slice(start, end) || placeholder;
+              const inserted = `${before}${selected}${after}`;
+              bodyInput.value = `${value.slice(0, start)}${inserted}${value.slice(end)}`;
+              bodyInput.focus();
+              const nextStart = start + before.length;
+              const nextEnd = nextStart + selected.length;
+              bodyInput.setSelectionRange(nextStart, nextEnd);
+            }
+
+            function insertMarkdownBlock(prefix, placeholder = 'text') {
+              const value = bodyInput.value;
+              const start = bodyInput.selectionStart ?? value.length;
+              const end = bodyInput.selectionEnd ?? value.length;
+              const selected = value.slice(start, end) || placeholder;
+              const inserted = selected
+                .split('\n')
+                .map((line) => `${prefix}${line || placeholder}`)
+                .join('\n');
+              bodyInput.value = `${value.slice(0, start)}${inserted}${value.slice(end)}`;
+              bodyInput.focus();
+              bodyInput.setSelectionRange(start + prefix.length, start + inserted.length);
+            }
+
+            function handleRichLink() {
+              const href = window.prompt('Link URL (http, https, or /path)');
+              if (!href) return;
+              if (!isSafeRichUrl(href)) {
+                alert('Please enter a valid http, https, mailto, or local /path link.');
+                return;
+              }
+              const value = bodyInput.value;
+              const start = bodyInput.selectionStart ?? value.length;
+              const end = bodyInput.selectionEnd ?? value.length;
+              const selected = value.slice(start, end) || 'link text';
+              const inserted = `[${selected}](${href})`;
+              bodyInput.value = `${value.slice(0, start)}${inserted}${value.slice(end)}`;
+              bodyInput.focus();
+              const linkLabelStart = start + 1;
+              bodyInput.setSelectionRange(linkLabelStart, linkLabelStart + selected.length);
+            }
+
+            toolbarTools.forEach((btn) => {
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = btn.dataset.action;
+                if (action === 'h2') insertMarkdownBlock('## ', 'Heading');
+                else if (action === 'bold') insertMarkdownWrap('**', '**', 'bold text');
+                else if (action === 'italic') insertMarkdownWrap('_', '_', 'italic text');
+                else if (action === 'ul') insertMarkdownBlock('- ', 'List item');
+                else if (action === 'ol') insertMarkdownBlock('1. ', 'List item');
+                else if (action === 'quote') insertMarkdownBlock('> ', 'Quote');
+                else if (action === 'code') insertMarkdownWrap('`', '`', 'code');
+                else if (action === 'link') handleRichLink();
+              });
+            });
+
+            function validateTitleSlug(val) {
+              const currentSlug = titleToSlug(val);
+              if (linkSlug) linkSlug.textContent = currentSlug;
+              if (urlLink) urlLink.setAttribute('href', `/${encodeURIComponent(currentSlug)}/`);
+
+              if (reservedSingleSlugs.has(currentSlug)) {
+                titleInput.style.borderColor = '#dc2626';
+                if (slugWarning) {
+                  slugWarning.textContent = `⚠️ "/${currentSlug}/" is a reserved system URL and cannot be used.`;
+                  slugWarning.style.display = 'block';
+                }
+                return false;
+              } else {
+                titleInput.style.borderColor = '';
+                if (slugWarning) {
+                  slugWarning.textContent = '';
+                  slugWarning.style.display = 'none';
+                }
+                return true;
+              }
+            }
+
+            titleInput.addEventListener('input', (e) => {
+              validateTitleSlug(e.target.value);
+            });
+
+            // Autosave Title on blur
+            titleInput.addEventListener('blur', () => {
+              const updatedTitle = titleInput.value.trim();
+              if (!updatedTitle) {
+                titleInput.value = item.title;
+                validateTitleSlug(item.title);
+                return;
+              }
+              const updatedSlug = titleToSlug(updatedTitle);
+              if (reservedSingleSlugs.has(updatedSlug)) {
+                alert(`Cannot use reserved URL "/${updatedSlug}/". This path is reserved for system routes or applications.`);
+                titleInput.value = item.title;
+                validateTitleSlug(item.title);
+                return;
+              }
+              if (updatedTitle !== item.title) {
+                void saveSingle(item, { title: updatedTitle, slug: updatedSlug });
+                showToast(`Saved "${updatedTitle}"`);
+              }
+            });
+
+            // Autosave Body Text on blur
+            bodyInput.addEventListener('blur', () => {
+              const updatedBody = bodyInput.value;
+              if (updatedBody !== item.body_text) {
+                void saveSingle(item, { body_text: updatedBody });
+                showToast('Saved body text');
+              }
+            });
+
+            // Autosave site links toggle on change
+            linksCheckbox.addEventListener('change', () => {
+              const showLinks = linksCheckbox.checked ? 1 : 0;
+              void saveSingle(item, { show_bottom_links: showLinks });
+              showToast(showLinks ? 'Site links displayed' : 'Site links hidden');
+            });
+
+            // Active / Inactive toggle button
+            statusToggleBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const currentActive = item.is_active === undefined || item.is_active === 1 || item.is_active === true || item.is_active === '1';
+              const newActive = currentActive ? 0 : 1;
+
+              statusToggleBtn.className = `action-btn single-status-toggle-btn ${newActive ? 'is-active' : 'is-inactive'}`;
+              statusToggleBtn.textContent = newActive ? 'Active' : 'Inactive';
+
+              if (statusBadge) {
+                statusBadge.className = `single-status-badge ${newActive ? 'is-active' : 'is-inactive'}`;
+                statusBadge.textContent = newActive ? 'Active' : 'Inactive';
+              }
+
+              void saveSingle(item, { is_active: newActive });
+              showToast(newActive ? `"${item.title}" is now Active` : `"${item.title}" is now Inactive`);
+            });
+
+            // Delete button
+            deleteBtn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              if (allSingles.length <= 1) {
+                if (!confirm(`Are you sure you want to delete "${item.title}"? This is your only singles page.`)) return;
+              } else {
+                if (!confirm(`Are you sure you want to delete "${item.title}"?`)) return;
+              }
+
+              try {
+                await fetchJson(`${WIDGET_API_BASE}/singles/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+              } catch (_e) {}
+
+              expandedSingleIds.delete(item.id);
+              allSingles = allSingles.filter(s => s.id !== item.id);
+              localStorage.setItem('jeffersonwm_singles', JSON.stringify(allSingles));
+              if (singlesTotalBadge) singlesTotalBadge.textContent = String(allSingles.length);
+              renderSingles();
+              showToast(`Deleted "${item.title}"`);
+            });
+
+            singlesList.appendChild(card);
+          });
+        }
+
+        if (btnAddSingle) {
+          btnAddSingle.addEventListener('click', async () => {
+            let count = allSingles.length + 1;
+            let newTitle = `New Single ${count}`;
+            let newSlug = titleToSlug(newTitle);
+            while (reservedSingleSlugs.has(newSlug)) {
+              count++;
+              newTitle = `New Single ${count}`;
+              newSlug = titleToSlug(newTitle);
+            }
+            const newId = `single-${Date.now()}`;
+
+            const newSingle = {
+              id: newId,
+              slug: newSlug,
+              title: newTitle,
+              body_text: DEFAULT_SINGLE_ITEM.body_text,
+              show_bottom_links: 1,
+              is_active: 1,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+
+            expandedSingleIds.add(newId);
+
+            try {
+              const res = await fetchJson(`${WIDGET_API_BASE}/singles`, {
+                method: 'POST',
+                body: JSON.stringify(newSingle)
+              });
+              if (res?.single) {
+                allSingles.unshift(res.single);
+              } else {
+                allSingles.unshift(newSingle);
+              }
+            } catch (_err) {
+              allSingles.unshift(newSingle);
+            }
+
+            localStorage.setItem('jeffersonwm_singles', JSON.stringify(allSingles));
+            if (singlesTotalBadge) singlesTotalBadge.textContent = String(allSingles.length);
+            renderSingles();
+            showToast(`Created "${newTitle}"`);
+
+            const firstCardTitle = singlesList.querySelector('.single-title-input');
+            if (firstCardTitle) {
+              firstCardTitle.focus();
+              firstCardTitle.select();
+            }
+          });
+        }
+
+        if (singleSearch) {
+          singleSearch.addEventListener('input', (e) => {
+            singleSearchQuery = e.target.value.trim();
+            renderSingles();
+          });
+        }
+
+        if (singleSortBtn && singleSortDropdown) {
+          singleSortBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDropdown(singleSortDropdown);
+          });
+        }
+
+        if (singleOptAlpha) {
+          singleOptAlpha.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (singleSortMode === 'alpha_asc') {
+              singleSortMode = 'alpha_desc';
+              singleSortLabel.textContent = 'Sort: Z–A';
+              singleOptAlpha.textContent = 'Sort: A–Z';
+            } else {
+              singleSortMode = 'alpha_asc';
+              singleSortLabel.textContent = 'Sort: A–Z';
+              singleOptAlpha.textContent = 'Sort: Z–A';
+            }
+            singleSortDropdown.classList.remove('is-open');
+            if (singleSortMenu) singleSortMenu.hidden = true;
+            renderSingles();
+          });
+        }
+
+        if (singleOptDate) {
+          singleOptDate.addEventListener('click', (e) => {
+            e.stopPropagation();
+            singleSortMode = 'date_desc';
+            singleSortLabel.textContent = 'Sort: Date Added';
+            singleSortDropdown.classList.remove('is-open');
+            if (singleSortMenu) singleSortMenu.hidden = true;
+            renderSingles();
+          });
+        }
+
+        if (dateSearch) {
+          dateSearch.addEventListener('input', (e) => {
+            dateSearchQuery = e.target.value.trim();
+            renderDates();
+          });
+        }
+
+        if (dateSortBtn && dateSortDropdown) {
+          dateSortBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDropdown(dateSortDropdown);
+          });
+        }
+
+        if (dateOptCal) {
+          dateOptCal.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (dateSortMode === 'calendar_asc') {
+              dateSortMode = 'calendar_desc';
+              dateSortLabel.textContent = 'Sort: Calendar Date (Dec – Jan)';
+              dateOptCal.textContent = 'Sort: Calendar Date (Jan – Dec)';
+            } else {
+              dateSortMode = 'calendar_asc';
+              dateSortLabel.textContent = 'Sort: Calendar Date (Jan – Dec)';
+              dateOptCal.textContent = 'Sort: Calendar Date (Dec – Jan)';
+            }
+            dateSortDropdown.classList.remove('is-open');
+            dateSortDropdown.querySelector('.custom-dropdown-menu').hidden = true;
+            renderDates();
+          });
+        }
+
+        if (dateOptAlpha) {
+          dateOptAlpha.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (dateSortMode === 'alpha_asc') {
+              dateSortMode = 'alpha_desc';
+              dateSortLabel.textContent = 'Sort: Z–A';
+              dateOptAlpha.textContent = 'Sort: A–Z';
+            } else {
+              dateSortMode = 'alpha_asc';
+              dateSortLabel.textContent = 'Sort: A–Z';
+              dateOptAlpha.textContent = 'Sort: Z–A';
+            }
+            dateSortDropdown.classList.remove('is-open');
+            dateSortDropdown.querySelector('.custom-dropdown-menu').hidden = true;
+            renderDates();
+          });
+        }
+
+        if (dateOptCreated) {
+          dateOptCreated.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (dateSortMode === 'created_desc') {
+              dateSortMode = 'created_asc';
+              dateSortLabel.textContent = 'Sort: Date Added (Oldest First)';
+              dateOptCreated.textContent = 'Sort: Date Added (Newest First)';
+            } else {
+              dateSortMode = 'created_desc';
+              dateSortLabel.textContent = 'Sort: Date Added (Newest First)';
+              dateOptCreated.textContent = 'Sort: Date Added (Oldest First)';
+            }
+            dateSortDropdown.classList.remove('is-open');
+            dateSortDropdown.querySelector('.custom-dropdown-menu').hidden = true;
+            renderDates();
+          });
+        }
+
+        async function loadSeasons() {
+          const data = await fetchJson(`${WIDGET_API_BASE}/seasons`);
+          if (Array.isArray(data)) {
+            allSeasons = data;
+            seasonsTotalBadge.textContent = allSeasons.length;
+            renderSeasons();
+          }
+        }
+
+
+        // Filter Pills (Selectable toggles for Active, Inactive, Widget, Billionaire, Scallions, Non-Latin, Symbols)
+        if (filterPills) {
+          filterPills.querySelectorAll('[data-filter]').forEach(pill => {
+            pill.addEventListener('click', (e) => {
+              const filter = e.currentTarget.getAttribute('data-filter');
+              if (selectedFilters.has(filter)) {
+                selectedFilters.delete(filter);
+                e.currentTarget.classList.remove('is-active');
+              } else {
+                selectedFilters.add(filter);
+                e.currentTarget.classList.add('is-active');
+              }
+              renderFontCards();
+            });
+          });
+        }
+
+        // View Switcher (Grid vs List - Google Web Fonts style)
+        if (viewSwitcher) {
+          if (currentView === 'list') {
+            fontGrid.classList.add('is-list-view');
+          } else {
+            fontGrid.classList.remove('is-list-view');
+          }
+          viewSwitcher.querySelectorAll('.view-btn').forEach(btn => {
+            btn.classList.toggle('is-active', btn.getAttribute('data-view') === currentView);
+            btn.addEventListener('click', (e) => {
+              const view = e.currentTarget.getAttribute('data-view');
+              currentView = view;
+              localStorage.setItem('jeffwm_widget_font_view', view);
+              viewSwitcher.querySelectorAll('.view-btn').forEach(b => {
+                b.classList.toggle('is-active', b.getAttribute('data-view') === view);
+              });
+              if (view === 'list') {
+                fontGrid.classList.add('is-list-view');
+              } else {
+                fontGrid.classList.remove('is-list-view');
+              }
+            });
+          });
+        }
 
         fontSearch.addEventListener('input', (e) => {
           searchQuery = e.target.value;
           renderFontCards();
         });
 
-        fontSort.addEventListener('change', (e) => {
-          sortMode = e.target.value;
-          renderFontCards();
-        });
+        if (fontSortBtn && fontSortDropdown) {
+          fontSortBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDropdown(fontSortDropdown);
+          });
+        }
+
+        if (fontOptAlpha) {
+          fontOptAlpha.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (sortMode === 'alpha_asc') {
+              sortMode = 'alpha_desc';
+              fontSortLabel.textContent = 'Sort: Z–A';
+              fontOptAlpha.textContent = 'Sort: A–Z';
+            } else {
+              sortMode = 'alpha_asc';
+              fontSortLabel.textContent = 'Sort: A–Z';
+              fontOptAlpha.textContent = 'Sort: Z–A';
+            }
+            fontSortDropdown.classList.remove('is-open');
+            fontSortDropdown.querySelector('.custom-dropdown-menu').hidden = true;
+            renderFontCards();
+          });
+        }
+
+        if (fontOptProb) {
+          fontOptProb.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (sortMode === 'prob_desc') {
+              sortMode = 'prob_asc';
+              fontSortLabel.textContent = 'Sort: Probability (Low–High)';
+              fontOptProb.textContent = 'Sort: Probability (High–Low)';
+            } else {
+              sortMode = 'prob_desc';
+              fontSortLabel.textContent = 'Sort: Probability (High–Low)';
+              fontOptProb.textContent = 'Sort: Probability (Low–High)';
+            }
+            fontSortDropdown.classList.remove('is-open');
+            fontSortDropdown.querySelector('.custom-dropdown-menu').hidden = true;
+            renderFontCards();
+          });
+        }
 
         function updateSamplePreviewText(text) {
           sampleText = text || '12:00 PM • San Francisco';
@@ -1395,12 +4366,32 @@
         async function loadFonts() {
           const data = await fetchJson(`${WIDGET_API_BASE}/fonts`);
           if (Array.isArray(data)) {
-            allFonts = data.map(f => ({
-              ...f,
-              round: Number(f.round) || FONT_ROUNDS[f.name] || 1,
-              weight: Number(f.weight) || 3,
-              probability: Number(f.probability) || 3,
-            }));
+            allFonts = data.map(f => {
+              const isHidden = f.hidden !== undefined ? (f.hidden === 1 || f.hidden === true ? 1 : 0) : (KNOWN_HIDDEN_FONTS.has(f.name) ? 1 : 0);
+              const isLatin = f.latin_variant !== undefined ? (f.latin_variant === 1 || f.latin_variant === true ? 1 : 0) : (KNOWN_LATIN_FONTS.has(f.name) ? 1 : 0);
+              const isSymbol = f.is_symbol !== undefined ? (f.is_symbol === 1 || f.is_symbol === true ? 1 : 0) : (KNOWN_SYMBOL_FONTS.has(f.name) ? 1 : 0);
+              const isWidget = f.widget !== undefined ? (f.widget !== 0 && f.widget !== false ? 1 : 0) : (isHidden ? 0 : 1);
+              const isBillionaire = f.billionaire !== undefined ? (f.billionaire !== 0 && f.billionaire !== false ? 1 : 0) : 1;
+              const isScallions = f.scallions !== undefined ? (f.scallions !== 0 && f.scallions !== false ? 1 : 0) : 1;
+
+              return {
+                ...f,
+                round: Number(f.round) || FONT_ROUNDS[f.name] || 1,
+                weight: Number(f.weight) === 0 ? 0 : (Number(f.weight) || 3),
+                probability: Number(f.probability) === 0 ? 0 : (Number(f.probability) || 3),
+                widget: isWidget,
+                billionaire: isBillionaire,
+                scallions: isScallions,
+                latin_variant: isLatin,
+                is_symbol: isSymbol,
+                hidden: isHidden,
+                last_widget: f.last_widget !== undefined && f.last_widget !== null ? Number(f.last_widget) : (isWidget || 1),
+                last_billionaire: f.last_billionaire !== undefined && f.last_billionaire !== null ? Number(f.last_billionaire) : (isBillionaire || 1),
+                last_scallions: f.last_scallions !== undefined && f.last_scallions !== null ? Number(f.last_scallions) : (isScallions || 1),
+                last_weight: Number(f.last_weight) || 3,
+                last_probability: Number(f.last_probability) || 3,
+              };
+            });
             renderFontCards();
           }
         }
@@ -1425,7 +4416,7 @@
             authPrompt.hidden = true;
             if (!isDataLoaded) {
               isDataLoaded = true;
-              await Promise.all([loadFonts(), loadEvents()]);
+              await Promise.all([loadFonts(), loadEvents(), loadSeasons(), loadSingles()]);
             }
           } else {
             isDataLoaded = false;

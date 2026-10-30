@@ -1,20 +1,21 @@
 {
   "name": "feed",
   "private": true,
-  "version": "0.2.10",
+  "version": "0.2.12",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
     "server": "tsx server.ts",
-    "build": "vite build && node ..\\..\\scripts\\finish-stamp.mjs --label \"build\"",
-    "publish": "node ..\\..\\scripts\\publish-feed.mjs && node ..\\..\\scripts\\finish-stamp.mjs --label \"publish\"",
+    "build": "node \"%INIT_CWD%\\scripts\\build-client.mjs\"",
+    "publish:client": "node \"%INIT_CWD%\\scripts\\publish-client.mjs\"",
+    "publish": "npm run build && npm run publish:client",
     "preview": "vite preview",
     "clean": "rm -rf dist && node ..\\..\\scripts\\finish-stamp.mjs --label \"clean\"",
     "version": "node -e \"console.log('Use npm run version:patch, npm run version:minor, or npm run version:major')\"",
     "version:patch": "npm version patch --no-git-tag-version && node ..\\..\\scripts\\finish-stamp.mjs --label \"version:patch\"",
     "version:minor": "npm version minor --no-git-tag-version && node ..\\..\\scripts\\finish-stamp.mjs --label \"version:minor\"",
     "version:major": "npm version major --no-git-tag-version && node ..\\..\\scripts\\finish-stamp.mjs --label \"version:major\"",
-    "lint": "tsc --noEmit && node ..\\..\\scripts\\finish-stamp.mjs --label \"lint\""
+    "lint": "tsc -p \"%INIT_CWD%\\tsconfig.json\" --noEmit"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

@@ -19,6 +19,7 @@ const apps = [
   monorepoApp('Tourbillion', 'tourbillion'),
   monorepoApp('Bullion', 'bullion'),
   monorepoApp('I Went to City', 'iwenttocity'),
+  monorepoApp('Scallions', 'scallions'),
   standaloneApp('Auth / Multimillion', 'auth-jeffersonwm', 'auth'),
   standaloneApp('Copy', 'copy'),
   standaloneApp('Dooky Detective', 'dookydetective'),

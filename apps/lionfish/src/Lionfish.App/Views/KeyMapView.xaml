@@ -128,13 +128,15 @@
 
                     <Grid Grid.Row="0" Margin="4,0,4,8">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="1.2*"/>
                             <ColumnDefinition Width="2*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Physical Key" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        <TextBlock Grid.Column="1" Text="Assigned Action" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        <TextBlock Grid.Column="2" Text="Action" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <TextBlock Grid.Column="0" Text="Order" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,16,0"/>
+                        <TextBlock Grid.Column="1" Text="Physical Key" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <TextBlock Grid.Column="2" Text="Assigned Action" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <TextBlock Grid.Column="3" Text="Action" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
                     </Grid>
 
                     <ListBox Grid.Row="1" ItemsSource="{Binding Mappings}" SelectedItem="{Binding SelectedMapping}" HorizontalContentAlignment="Stretch" BorderThickness="0" Background="Transparent">
@@ -143,16 +145,23 @@
                                 <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,6">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="1.2*"/>
                                             <ColumnDefinition Width="2*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel VerticalAlignment="Center">
+                                        
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center">
+                                            <Button Content="▲" Command="{Binding DataContext.MoveMappingUpCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Padding="6,2" Margin="0,0,3,0" ToolTip="Move up in list"/>
+                                            <Button Content="▼" Command="{Binding DataContext.MoveMappingDownCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Padding="6,2" ToolTip="Move down in list"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding KeyName}" FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding ScanCode, StringFormat='{}ScanCode: 0x{0:X2}'}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                         </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding ActionAssignment}" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryAccentBrush}" TextTrimming="CharacterEllipsis"/>
-                                        <Button Grid.Column="2" Content="Edit" Command="{Binding DataContext.EditMappingCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Padding="10,4"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ActionAssignment}" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryAccentBrush}" TextTrimming="CharacterEllipsis"/>
+                                        <Button Grid.Column="3" Content="Edit" Command="{Binding DataContext.EditMappingCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Padding="10,4"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -222,9 +231,19 @@
                                     <CheckBox Content="Win" IsChecked="{Binding SelectedMapping.IsWin}"/>
                                 </WrapPanel>
 
-                                <TextBlock Text="Target Key" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                                <ComboBox ItemsSource="{Binding AvailableKeys}" SelectedItem="{Binding SelectedMapping.TargetKey}" 
-                                          IsEditable="True" Text="{Binding SelectedMapping.TargetKey, UpdateSourceTrigger=PropertyChanged}"
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Target Key (optional if modifier checked)" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Content="✕ Clear" Command="{Binding ClearTargetKeyCommand}" 
+                                            Style="{StaticResource SecondaryButton}" Padding="8,2" FontSize="11"
+                                            ToolTip="Set Target Key to (None) to use modifier(s) alone"/>
+                                </Grid>
+                                <ComboBox ItemsSource="{Binding AvailableKeys}" 
+                                          SelectedItem="{Binding SelectedMapping.TargetKey, Mode=TwoWay}" 
+                                          IsTextSearchEnabled="True"
                                           Margin="0,0,0,12"/>
                             </StackPanel>
 

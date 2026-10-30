@@ -172,6 +172,7 @@ interface FeedItemRow extends FeedDbRow {
   external_id?: string | null;
   created_at: string | Date;
   pinned_at?: string | Date | null;
+  pinned_order?: number | null;
   tint_color?: string | null;
 }
 
@@ -1071,7 +1072,7 @@ async function initDb() {
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = 'feed_items'
-          AND COLUMN_NAME IN ('pinned_at', 'tint_color')
+          AND COLUMN_NAME IN ('pinned_at', 'pinned_order', 'tint_color')
       `,
     );
     const columnSet = new Set(
@@ -1079,6 +1080,9 @@ async function initDb() {
     );
     if (!columnSet.has("pinned_at")) {
       await pool.query(`ALTER TABLE feed_items ADD COLUMN pinned_at TIMESTAMP NULL DEFAULT NULL`);
+    }
+    if (!columnSet.has("pinned_order")) {
+      await pool.query(`ALTER TABLE feed_items ADD COLUMN pinned_order INT NULL DEFAULT NULL`);
     }
     if (!columnSet.has("tint_color")) {
       await pool.query(`ALTER TABLE feed_items ADD COLUMN tint_color VARCHAR(16) NULL DEFAULT NULL`);
@@ -1246,7 +1250,7 @@ app.get("/api/changelog/schema", (_req, res) => {
 
 app.get("/api/feed", async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY pinned_at IS NULL, pinned_at DESC, created_at DESC");
+    const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY pinned_at IS NULL, COALESCE(pinned_order, 2147483647), pinned_at DESC, created_at DESC");
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -1289,7 +1293,7 @@ app.get("/api/feed/week-summary-style-drafts", handleWeekSummaryVariants);
 
 app.get("/atom.xml", async (_req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY pinned_at IS NULL, pinned_at DESC, created_at DESC LIMIT 200");
+    const [rows] = await pool.query("SELECT * FROM feed_items ORDER BY pinned_at IS NULL, COALESCE(pinned_order, 2147483647), pinned_at DESC, created_at DESC LIMIT 200");
     const items = (Array.isArray(rows) ? rows : []) as FeedItemRow[];
     res.type("application/atom+xml; charset=utf-8").send(buildAtomFeedXml(items));
   } catch (err) {
@@ -1503,16 +1507,61 @@ app.post("/api/feed/:id/pin", async (req, res) => {
       return res.status(404).json({ error: "Feed item not found" });
     }
 
-    await pool.execute(
-      "UPDATE feed_items SET pinned_at = ? WHERE id = ?",
-      [pinned ? new Date().toISOString().slice(0, 19).replace("T", " ") : null, id],
-    );
+    if (pinned) {
+      await pool.execute("UPDATE feed_items SET pinned_order = pinned_order + 1 WHERE pinned_at IS NOT NULL AND pinned_order IS NOT NULL");
+      await pool.execute(
+        "UPDATE feed_items SET pinned_at = ?, pinned_order = 1 WHERE id = ?",
+        [new Date().toISOString().slice(0, 19).replace("T", " "), id],
+      );
+    } else {
+      await pool.execute("UPDATE feed_items SET pinned_at = NULL, pinned_order = NULL WHERE id = ?", [id]);
+    }
 
     void logAuthHistory('feed.entry_pinned', `${pinned ? 'Pinned' : 'Unpinned'}: ${entry.title || `Item #${id}`}`);
     res.json({ success: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update pinned state" });
+  }
+});
+
+app.post("/api/feed/pinned-order", async (req, res) => {
+  const { secret, orderedIds } = req.body || {};
+
+  if (secret !== process.env.FEED_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+    return res.status(400).json({ error: "Pinned order is required" });
+  }
+
+  const normalizedIds = orderedIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+  const uniqueIds = [...new Set(normalizedIds)];
+
+  if (uniqueIds.length !== orderedIds.length) {
+    return res.status(400).json({ error: "Pinned order contains invalid entries" });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    for (let index = 0; index < uniqueIds.length; index += 1) {
+      await connection.execute(
+        "UPDATE feed_items SET pinned_order = ? WHERE id = ? AND pinned_at IS NOT NULL",
+        [index + 1, uniqueIds[index]],
+      );
+    }
+    await connection.commit();
+    void logAuthHistory('feed.pinned_reordered', `Reordered ${uniqueIds.length} pinned feed entries`);
+    res.json({ success: true });
+  } catch (err) {
+    await connection.rollback();
+    console.error(err);
+    res.status(500).json({ error: "Failed to update pinned order" });
+  } finally {
+    connection.release();
   }
 });
 

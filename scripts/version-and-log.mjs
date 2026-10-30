@@ -38,6 +38,9 @@ const appRegistry = {
   multimillion: standaloneApp('Auth / Multimillion', 'multimillion', 'multimillion'),
   wmjefferson: standaloneApp('WM Jefferson', 'wmjefferson', 'wmjefferson'),
   wmjeff: standaloneApp('WM Jefferson', 'wmjefferson', 'wmjeff'),
+  scallions: monorepoApp('Scallions', 'scallions', 'scallions'),
+  scallion: monorepoApp('Scallions', 'scallions', 'scallion'),
+  scall: monorepoApp('Scallions', 'scallions', 'scall'),
 };
 
 function monorepoApp(label, slug, logKey = slug) {

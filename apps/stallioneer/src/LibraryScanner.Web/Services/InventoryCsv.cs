@@ -31,12 +31,17 @@ public static class InventoryCsv
 
     public static string ExportBooks(IEnumerable<Book> books)
     {
+        return ExportBooks(books, InventoryExportField.All);
+    }
+
+    public static string ExportBooks(IEnumerable<Book> books, IReadOnlyList<InventoryExportField> fields)
+    {
         var builder = new StringBuilder();
-        builder.AppendLine(string.Join(",", Headers.Select(Escape)));
+        builder.AppendLine(string.Join(",", fields.Select(field => Escape(field.Key))));
 
         foreach (var book in books)
         {
-            var row = InventoryExportField.All.Select(field => field.Value(book));
+            var row = fields.Select(field => field.Value(book));
 
             builder.AppendLine(string.Join(",", row.Select(Escape)));
         }

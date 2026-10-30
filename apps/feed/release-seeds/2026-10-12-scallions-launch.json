@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Scallions — new app launched",
+  "content": "<p><strong>Scallions</strong> is a new JeffersonWM app, built in a single session from scratch. The concept started as a simple page — a clean clone of the I Went to City layout, blank with a bottom banner and centered text — but it quickly grew into something with its own identity.</p><p>The app is a California-focused seasonal directory. It presents a minimal alphabetized vertical list of fruits, vegetables, and sports seasons. Clicking any item opens a popup with its approximate start and end dates for the year. Nothing more. The design is intentionally sparse: just a list of what is in season right now, rendered in a rotating set of curated typefaces.</p><p>The typefaces are pulled dynamically from the platform <code>widget_fonts</code> database and assigned randomly on every page load, so each visit looks slightly different. The seasonal data lives in the same database, making future additions straightforward.</p><p>Scallions is live at <a href=\"https://jeffersonwm.com/scallions/\">jeffersonwm.com/scallions</a>.</p>",
+  "url": "https://jeffersonwm.com/scallions/",
+  "source": "manual",
+  "external_id": "scallions-launch-2026-10-12",
+  "created_at": "2026-10-12 21:00:00"
+}

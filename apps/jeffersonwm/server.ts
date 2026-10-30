@@ -2,6 +2,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import mysql from 'mysql2/promise';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createProjectActivityService } from './projectActivity.js';
@@ -54,6 +55,17 @@ type WidgetFont = {
   round?: number;
   weight?: number;
   probability?: number;
+  billionaire?: number | boolean;
+  scallions?: number | boolean;
+  widget?: number | boolean;
+  latin_variant?: number | boolean;
+  is_symbol?: number | boolean;
+  hidden?: number | boolean;
+  last_billionaire?: number | boolean;
+  last_scallions?: number | boolean;
+  last_widget?: number | boolean;
+  last_weight?: number;
+  last_probability?: number;
 };
 
 type WidgetEvent = {
@@ -63,6 +75,18 @@ type WidgetEvent = {
   date: string;
   end_date?: string | null;
   is_public?: number | boolean;
+  created_at?: string | null;
+};
+
+type WidgetSingle = {
+  id: string;
+  slug: string;
+  title: string;
+  body_text: string;
+  show_bottom_links: number | boolean;
+  is_active?: number | boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type UserWidgetPreference = {
@@ -1350,7 +1374,7 @@ async function getEvents() {
   }
 
   const [rows] = await pool.query(
-    `SELECT id, name, description, date, end_date, is_public
+    `SELECT id, name, description, date, end_date, is_public, created_at
      FROM widget_special_dates
      ORDER BY MONTH(date) ASC, DAY(date) ASC, name ASC`,
   );
@@ -1359,6 +1383,7 @@ async function getEvents() {
     ...event,
     date: normalizeDateValue(event.date),
     end_date: event.end_date ? normalizeDateValue(event.end_date) : null,
+    created_at: event.created_at ? normalizeDateValue(event.created_at) : null,
   }));
 }
 
@@ -1368,7 +1393,7 @@ async function getUserEvents(authUserId: string) {
   }
 
   const [rows] = await pool.query(
-    `SELECT id, auth_user_id, name, description, date, end_date
+    `SELECT id, auth_user_id, name, description, date, end_date, created_at
      FROM user_widget_special_dates
      WHERE auth_user_id = ?
      ORDER BY MONTH(date) ASC, DAY(date) ASC, name ASC`,
@@ -1379,6 +1404,7 @@ async function getUserEvents(authUserId: string) {
     ...event,
     date: normalizeDateValue(event.date),
     end_date: event.end_date ? normalizeDateValue(event.end_date) : null,
+    created_at: event.created_at ? normalizeDateValue(event.created_at) : null,
   }));
 }
 
@@ -1404,7 +1430,7 @@ async function getFonts() {
   }
 
   const [rows] = await pool.query(
-    `SELECT id, name, round, weight, probability
+    `SELECT id, name, round, weight, probability, billionaire, scallions, widget, latin_variant, is_symbol, hidden, last_billionaire, last_scallions, last_widget, last_weight, last_probability
      FROM widget_fonts
      ORDER BY name ASC`,
   );
@@ -1950,22 +1976,99 @@ app.put('/api/widget/fonts/:name', requireWidgetAdmin, async (req, res) => {
     return;
   }
 
-  const weight = Number(req.body?.weight);
-  const probability = Number(req.body?.probability ?? req.body?.weight);
+  const weight = req.body?.weight !== undefined ? Number(req.body.weight) : undefined;
+  const probability = req.body?.probability !== undefined ? Number(req.body.probability) : undefined;
+  const billionaire = req.body?.billionaire !== undefined ? (req.body.billionaire ? 1 : 0) : undefined;
+  const scallions = req.body?.scallions !== undefined ? (req.body.scallions ? 1 : 0) : undefined;
+  const widget = req.body?.widget !== undefined ? (req.body.widget ? 1 : 0) : undefined;
+  const latin_variant = req.body?.latin_variant !== undefined ? (req.body.latin_variant ? 1 : 0) : undefined;
+  const is_symbol = req.body?.is_symbol !== undefined ? (req.body.is_symbol ? 1 : 0) : undefined;
+  const hidden = req.body?.hidden !== undefined ? (req.body.hidden ? 1 : 0) : undefined;
+  const last_billionaire = req.body?.last_billionaire !== undefined ? (req.body.last_billionaire ? 1 : 0) : undefined;
+  const last_scallions = req.body?.last_scallions !== undefined ? (req.body.last_scallions ? 1 : 0) : undefined;
+  const last_widget = req.body?.last_widget !== undefined ? (req.body.last_widget ? 1 : 0) : undefined;
+  const last_weight = req.body?.last_weight !== undefined ? Number(req.body.last_weight) : undefined;
+  const last_probability = req.body?.last_probability !== undefined ? Number(req.body.last_probability) : undefined;
 
-  if (!Number.isFinite(weight) || weight < 1 || weight > 5 || !Number.isFinite(probability)) {
-    res.status(400).json({ ok: false, error: 'Expected weight 1-5 and numeric probability.' });
+  const sets: string[] = [];
+  const params: unknown[] = [];
+
+  if (weight !== undefined && Number.isFinite(weight) && weight >= 0 && weight <= 5) {
+    sets.push('weight = ?');
+    params.push(weight);
+  }
+  if (probability !== undefined && Number.isFinite(probability)) {
+    sets.push('probability = ?');
+    params.push(probability);
+  }
+  if (billionaire !== undefined) {
+    sets.push('billionaire = ?');
+    params.push(billionaire);
+  }
+  if (scallions !== undefined) {
+    sets.push('scallions = ?');
+    params.push(scallions);
+  }
+  if (widget !== undefined) {
+    sets.push('widget = ?');
+    params.push(widget);
+  }
+  if (latin_variant !== undefined) {
+    sets.push('latin_variant = ?');
+    params.push(latin_variant);
+  }
+  if (is_symbol !== undefined) {
+    sets.push('is_symbol = ?');
+    params.push(is_symbol);
+  }
+  if (hidden !== undefined) {
+    sets.push('hidden = ?');
+    params.push(hidden);
+  }
+  if (last_billionaire !== undefined) {
+    sets.push('last_billionaire = ?');
+    params.push(last_billionaire);
+  }
+  if (last_scallions !== undefined) {
+    sets.push('last_scallions = ?');
+    params.push(last_scallions);
+  }
+  if (last_widget !== undefined) {
+    sets.push('last_widget = ?');
+    params.push(last_widget);
+  }
+  if (last_weight !== undefined && Number.isFinite(last_weight) && last_weight >= 0 && last_weight <= 5) {
+    sets.push('last_weight = ?');
+    params.push(last_weight);
+  }
+  if (last_probability !== undefined && Number.isFinite(last_probability) && last_probability >= 0 && last_probability <= 5) {
+    sets.push('last_probability = ?');
+    params.push(last_probability);
+  }
+
+  if (sets.length === 0) {
+    res.status(400).json({ ok: false, error: 'No valid fields to update.' });
     return;
   }
 
-  await db.execute('UPDATE widget_fonts SET weight = ?, probability = ? WHERE name = ?', [
-    weight,
-    probability,
-    req.params.name,
-  ]);
+  params.push(req.params.name);
+  await db.execute(`UPDATE widget_fonts SET ${sets.join(', ')} WHERE name = ?`, params);
 
   const authUser = await getAuthUser(req);
-  void logAuthHistory(authUser, 'widget.font_updated', { name: req.params.name, weight, probability });
+  void logAuthHistory(authUser, 'widget.font_updated', {
+    name: req.params.name,
+    weight,
+    probability,
+    billionaire,
+    scallions,
+    widget,
+    hidden,
+    last_billionaire,
+    last_scallions,
+    last_widget,
+    last_weight,
+    last_probability,
+  });
   res.json({ ok: true });
 });
 
@@ -2067,6 +2170,464 @@ app.delete('/api/widget/events/:id', requireWidgetAdmin, async (req, res) => {
   await db.execute('DELETE FROM widget_special_dates WHERE id = ?', [req.params.id]);
   const authUser = await getAuthUser(req);
   void logAuthHistory(authUser, 'widget.special_date_deleted', { id: req.params.id, name: eventName });
+  res.json({ ok: true });
+});
+
+// Seasons / Scallions Items Endpoints
+app.get('/api/widget/seasons', requireWidgetAdmin, async (_req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  try {
+    const [rows] = await db.query(
+      'SELECT id, name, category, start_month, start_day, end_month, end_day, created_at FROM scallions_items ORDER BY category ASC, name ASC',
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Seasons items could not be loaded.',
+    });
+  }
+});
+
+app.post('/api/widget/seasons', requireWidgetAdmin, async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  const { name, category, start_month, start_day, end_month, end_day } = req.body || {};
+  if (!name || !category || !start_month || !start_day || !end_month || !end_day) {
+    res.status(400).json({ ok: false, error: 'Expected name, category, start_month, start_day, end_month, and end_day.' });
+    return;
+  }
+
+  const id = req.body.id || String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  try {
+    await db.execute(
+      `INSERT INTO scallions_items (id, name, category, start_month, start_day, end_month, end_day)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         name = VALUES(name),
+         category = VALUES(category),
+         start_month = VALUES(start_month),
+         start_day = VALUES(start_day),
+         end_month = VALUES(end_month),
+         end_day = VALUES(end_day)`,
+      [id, name, category, Number(start_month), Number(start_day), Number(end_month), Number(end_day)],
+    );
+
+    const authUser = await getAuthUser(req);
+    void logAuthHistory(authUser, 'widget.season_item_saved', { id, name, category });
+    res.json({ ok: true, id });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Season item could not be saved.',
+    });
+  }
+});
+
+app.put('/api/widget/seasons/:id', requireWidgetAdmin, async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  const { name, category, start_month, start_day, end_month, end_day } = req.body || {};
+  if (!name || !category || !start_month || !start_day || !end_month || !end_day) {
+    res.status(400).json({ ok: false, error: 'Expected name, category, start_month, start_day, end_month, and end_day.' });
+    return;
+  }
+
+  try {
+    await db.execute(
+      `UPDATE scallions_items
+       SET name = ?, category = ?, start_month = ?, start_day = ?, end_month = ?, end_day = ?
+       WHERE id = ?`,
+      [name, category, Number(start_month), Number(start_day), Number(end_month), Number(end_day), req.params.id],
+    );
+
+    const authUser = await getAuthUser(req);
+    void logAuthHistory(authUser, 'widget.season_item_updated', { id: req.params.id, name, category });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Season item could not be updated.',
+    });
+  }
+});
+
+app.delete('/api/widget/seasons/:id', requireWidgetAdmin, async (req, res) => {
+  const db = requireDb(res);
+  if (!db) {
+    return;
+  }
+
+  let itemName = req.params.id;
+  try {
+    const [rows] = await db.query('SELECT name FROM scallions_items WHERE id = ? LIMIT 1', [req.params.id]);
+    if (Array.isArray(rows) && (rows as any)[0]?.name) {
+      itemName = (rows as any)[0].name;
+    }
+  } catch (_e) {
+    // Ignore lookup error
+  }
+
+  try {
+    await db.execute('DELETE FROM scallions_items WHERE id = ?', [req.params.id]);
+    const authUser = await getAuthUser(req);
+    void logAuthHistory(authUser, 'widget.season_item_deleted', { id: req.params.id, name: itemName });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : 'Season item could not be deleted.',
+    });
+  }
+});
+
+// Singles Pages Endpoints & Reserved URLs
+const singlesJsonPath = path.join(__dirname, 'public', 'singles.json');
+const reservedUrlsPaths = [
+  path.join(__dirname, 'reserved-urls.txt'),
+  path.join(__dirname, 'public', 'reserved-urls.txt'),
+  path.join(__dirname, '..', '..', 'reserved-urls.txt'),
+];
+
+const DEFAULT_RESERVED_SLUGS = new Set([
+  'feed', 'aphelion', 'tourbillion', 'battalion', 'perihelion', 'lionship',
+  'scallions', 'dookydetective', 'jeffershizzle', 'bullion', 'vermilion',
+  'millionfold', 'iwenttocity', 'stallioneer', 'wmjefferson', 'copy',
+  'auth', 'multimillion', 'account', 'status', 'project-activity',
+  'development', 'underconstruction', 'widget', 'home',
+  'api', 'admin', 'login', 'logout', 'signup', 'register', 'oauth', 'callback',
+  'assets', 'images', 'dist', 'src', 'docs', 'scripts', 'favicon', 'robots',
+  'sitemap', '404', '500', 'index'
+]);
+
+function loadReservedSlugs(): Set<string> {
+  for (const filePath of reservedUrlsPaths) {
+    try {
+      if (fs.existsSync(filePath)) {
+        const text = fs.readFileSync(filePath, 'utf8');
+        const lines = text.split(/\r?\n/);
+        const set = new Set<string>();
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          set.add(trimmed.toLowerCase());
+        }
+        if (set.size > 0) return set;
+      }
+    } catch (_err) {
+      // fallback
+    }
+  }
+  return DEFAULT_RESERVED_SLUGS;
+}
+
+function isReservedSingleSlug(slug: string): boolean {
+  const normalized = String(slug || '').trim().toLowerCase();
+  const set = loadReservedSlugs();
+  return set.has(normalized);
+}
+
+const DEFAULT_SINGLES: WidgetSingle[] = [
+  {
+    id: 'bill-jefferson',
+    slug: 'bill-jefferson',
+    title: 'Bill Jefferson',
+    body_text:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+    show_bottom_links: 1,
+    is_active: 1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+function titleToSingleSlug(title: string): string {
+  return String(title || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'untitled';
+}
+
+function readSinglesFile(): WidgetSingle[] {
+  try {
+    if (fs.existsSync(singlesJsonPath)) {
+      const data = JSON.parse(fs.readFileSync(singlesJsonPath, 'utf8'));
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (_e) {
+    // fallback
+  }
+  return DEFAULT_SINGLES;
+}
+
+function writeSinglesFile(items: WidgetSingle[]) {
+  try {
+    fs.writeFileSync(singlesJsonPath, JSON.stringify(items, null, 2), 'utf8');
+  } catch (error) {
+    console.warn('Could not persist singles.json:', error);
+  }
+}
+
+async function ensureSinglesTable(db: mysql.Pool | mysql.Connection) {
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS widget_singles (
+        id VARCHAR(64) PRIMARY KEY,
+        slug VARCHAR(128) NOT NULL UNIQUE,
+        title VARCHAR(255) NOT NULL,
+        body_text TEXT NOT NULL,
+        show_bottom_links TINYINT(1) NOT NULL DEFAULT 1,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    try {
+      await db.execute(`ALTER TABLE widget_singles ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1`);
+    } catch (_colErr) {
+      // Column may already exist
+    }
+
+    const [rows] = await db.query('SELECT COUNT(*) as count FROM widget_singles');
+    if (Array.isArray(rows) && (rows as any)[0]?.count === 0) {
+      const fileItems = readSinglesFile();
+      for (const item of fileItems) {
+        await db.execute(
+          `INSERT INTO widget_singles (id, slug, title, body_text, show_bottom_links, is_active)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE title = VALUES(title), body_text = VALUES(body_text), show_bottom_links = VALUES(show_bottom_links), is_active = VALUES(is_active)`,
+          [item.id, item.slug, item.title, item.body_text, item.show_bottom_links ? 1 : 0, (item.is_active === 0 || item.is_active === false) ? 0 : 1],
+        );
+      }
+    }
+  } catch (err) {
+    console.warn('Could not ensure widget_singles table:', err);
+  }
+}
+
+app.get('/api/widget/singles', async (_req, res) => {
+  const db = pool;
+  if (!db) {
+    return res.json(readSinglesFile());
+  }
+
+  try {
+    await ensureSinglesTable(db);
+    const [rows] = await db.query(
+      'SELECT id, slug, title, body_text, show_bottom_links, is_active, created_at, updated_at FROM widget_singles ORDER BY title ASC',
+    );
+    const list = Array.isArray(rows) ? (rows as WidgetSingle[]) : [];
+    if (list.length > 0) {
+      writeSinglesFile(list);
+    }
+    res.json(list.length > 0 ? list : readSinglesFile());
+  } catch (error) {
+    console.warn('Database singles query failed, falling back to file:', error);
+    res.json(readSinglesFile());
+  }
+});
+
+app.get('/api/widget/singles/:slugOrId', async (req, res) => {
+  const param = req.params.slugOrId.toLowerCase();
+  const db = pool;
+
+  if (db) {
+    try {
+      await ensureSinglesTable(db);
+      const [rows] = await db.query(
+        'SELECT id, slug, title, body_text, show_bottom_links, is_active, created_at, updated_at FROM widget_singles WHERE slug = ? OR id = ? LIMIT 1',
+        [param, param],
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        const single = rows[0] as WidgetSingle;
+        const authUser = await getAuthUser(req);
+        const isAdmin = Boolean(authUser && isWidgetAdminUser(authUser));
+        if (!isAdmin && (single.is_active === 0 || single.is_active === false || (single as any).is_active === '0')) {
+          return res.status(404).json({ ok: false, error: 'Single page not found or inactive.' });
+        }
+        return res.json(single);
+      }
+    } catch (_e) {
+      // fallback to file
+    }
+  }
+
+  const fileItems = readSinglesFile();
+  const match = fileItems.find((s) => s.slug.toLowerCase() === param || s.id.toLowerCase() === param);
+  if (match) {
+    const authUser = await getAuthUser(req);
+    const isAdmin = Boolean(authUser && isWidgetAdminUser(authUser));
+    if (!isAdmin && (match.is_active === 0 || match.is_active === false || (match as any).is_active === '0')) {
+      return res.status(404).json({ ok: false, error: 'Single page not found or inactive.' });
+    }
+    return res.json(match);
+  }
+
+  res.status(404).json({ ok: false, error: 'Single page not found.' });
+});
+
+app.get('/api/widget/singles-meta/reserved-urls', (_req, res) => {
+  res.json({
+    ok: true,
+    reserved_slugs: Array.from(loadReservedSlugs()).sort(),
+  });
+});
+
+app.post('/api/widget/singles', requireWidgetAdmin, async (req, res) => {
+  const { title, body_text, show_bottom_links, is_active } = req.body || {};
+  if (!title) {
+    res.status(400).json({ ok: false, error: 'Expected title.' });
+    return;
+  }
+
+  const slug = titleToSingleSlug(title);
+  if (isReservedSingleSlug(slug)) {
+    res.status(400).json({
+      ok: false,
+      error: `Cannot use reserved URL '/${slug}/'. This path is reserved by the system.`,
+    });
+    return;
+  }
+
+  const id = req.body.id || slug;
+  const bodyText = typeof body_text === 'string' ? body_text : DEFAULT_SINGLES[0].body_text;
+  const showLinks = (show_bottom_links === 0 || show_bottom_links === false || show_bottom_links === '0') ? 0 : 1;
+  const isActive = (is_active === 0 || is_active === false || is_active === '0') ? 0 : 1;
+
+  const newSingle: WidgetSingle = {
+    id,
+    slug,
+    title: String(title).trim(),
+    body_text: bodyText,
+    show_bottom_links: showLinks,
+    is_active: isActive,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const db = pool;
+  if (db) {
+    try {
+      await ensureSinglesTable(db);
+      await db.execute(
+        `INSERT INTO widget_singles (id, slug, title, body_text, show_bottom_links, is_active)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           slug = VALUES(slug),
+           title = VALUES(title),
+           body_text = VALUES(body_text),
+           show_bottom_links = VALUES(show_bottom_links),
+           is_active = VALUES(is_active)`,
+        [id, slug, newSingle.title, newSingle.body_text, showLinks, isActive],
+      );
+    } catch (err) {
+      console.warn('Could not insert single to DB:', err);
+    }
+  }
+
+  const fileItems = readSinglesFile().filter((s) => s.id !== id && s.slug !== slug);
+  fileItems.push(newSingle);
+  writeSinglesFile(fileItems);
+
+  const authUser = await getAuthUser(req);
+  void logAuthHistory(authUser, 'widget.single_page_created', { id, slug, title: newSingle.title });
+  res.json({ ok: true, single: newSingle });
+});
+
+app.put('/api/widget/singles/:id', requireWidgetAdmin, async (req, res) => {
+  const id = req.params.id;
+  const { title, body_text, show_bottom_links, is_active } = req.body || {};
+  if (!title) {
+    res.status(400).json({ ok: false, error: 'Expected title.' });
+    return;
+  }
+
+  const slug = titleToSingleSlug(title);
+  if (isReservedSingleSlug(slug)) {
+    res.status(400).json({
+      ok: false,
+      error: `Cannot use reserved URL '/${slug}/'. This path is reserved by the system.`,
+    });
+    return;
+  }
+
+  const bodyText = typeof body_text === 'string' ? body_text : '';
+  const showLinks = (show_bottom_links === 0 || show_bottom_links === false || show_bottom_links === '0') ? 0 : 1;
+  const isActive = (is_active === 0 || is_active === false || is_active === '0') ? 0 : 1;
+
+  const db = pool;
+  if (db) {
+    try {
+      await ensureSinglesTable(db);
+      await db.execute(
+        `UPDATE widget_singles
+         SET slug = ?, title = ?, body_text = ?, show_bottom_links = ?, is_active = ?
+         WHERE id = ?`,
+        [slug, String(title).trim(), bodyText, showLinks, isActive, id],
+      );
+    } catch (err) {
+      console.warn('Could not update single in DB:', err);
+    }
+  }
+
+  const fileItems = readSinglesFile();
+  const existing = fileItems.find((s) => s.id === id);
+  if (existing) {
+    existing.title = String(title).trim();
+    existing.slug = slug;
+    existing.body_text = bodyText;
+    existing.show_bottom_links = showLinks;
+    existing.is_active = isActive;
+    existing.updated_at = new Date().toISOString();
+  } else {
+    fileItems.push({
+      id,
+      slug,
+      title: String(title).trim(),
+      body_text: bodyText,
+      show_bottom_links: showLinks,
+      is_active: isActive,
+      updated_at: new Date().toISOString(),
+    });
+  }
+  writeSinglesFile(fileItems);
+
+  const authUser = await getAuthUser(req);
+  void logAuthHistory(authUser, 'widget.single_page_updated', { id, slug, title: String(title).trim() });
+  res.json({ ok: true, id, slug });
+});
+
+app.delete('/api/widget/singles/:id', requireWidgetAdmin, async (req, res) => {
+  const id = req.params.id;
+  const db = pool;
+
+  if (db) {
+    try {
+      await ensureSinglesTable(db);
+      await db.execute('DELETE FROM widget_singles WHERE id = ?', [id]);
+    } catch (err) {
+      console.warn('Could not delete single from DB:', err);
+    }
+  }
+
+  const fileItems = readSinglesFile().filter((s) => s.id !== id);
+  writeSinglesFile(fileItems);
+
+  const authUser = await getAuthUser(req);
+  void logAuthHistory(authUser, 'widget.single_page_deleted', { id });
   res.json({ ok: true });
 });
 
