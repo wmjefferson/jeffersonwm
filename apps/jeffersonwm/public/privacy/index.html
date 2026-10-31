@@ -57,12 +57,7 @@
 
       a { color: inherit; }
 
-      .shell {
-        max-width: 760px;
-        /* The site-links column is fixed on wide screens. Reserve its footprint
-           so the last policy section can never scroll beneath it. */
-        padding-bottom: 8rem;
-      }
+      .shell { max-width: 760px; }
 
       .logo-link { display: inline-block; margin-bottom: 0.75rem; }
 
@@ -123,13 +118,16 @@
       li + li { margin-top: 0.35rem; }
 
       .bottom-links {
-        position: fixed;
+        /* This is a long reading page: unlike the home screen, its links belong
+           after the policy rather than floating over the final section. */
+        position: static;
         left: var(--frame);
         bottom: var(--frame);
         display: flex;
         flex-direction: column;
         align-items: flex-start;
         gap: 0.4rem;
+        margin-top: 2.5rem;
       }
 
       .personal-link {
@@ -158,7 +156,6 @@
 
       @media (max-width: 720px) {
         :root { --frame: 24px; }
-        .shell { padding-bottom: 9rem; }
         .policy-section { padding: 1rem; }
       }
     </style>
