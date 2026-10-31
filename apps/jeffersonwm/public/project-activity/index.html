@@ -64,6 +64,9 @@
 
       body {
         margin: 0;
+        /* The service status matrix is a desktop-style, two-up dashboard.
+           Preserve its reading width rather than compressing labels and pills. */
+        min-width: 900px;
         min-height: 100vh;
         padding: var(--frame);
         background: #fdfdfd;
@@ -547,16 +550,17 @@
       .service-table-wrap { overflow-x: auto; }
 
       .service-table {
+        width: 100%;
         min-width: 720px;
         table-layout: fixed;
       }
 
       .service-table .service-column {
-        width: 38%;
+        width: 38%; /* 50% pair: service label + status pill */
       }
 
       .service-table .service-status-column {
-        width: 12%;
+        width: 12%; /* 50% pair: service label + status pill */
       }
 
       .timeline-search {
