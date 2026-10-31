@@ -1,0 +1,9 @@
+{
+  "secret": "the-feed-secret",
+  "title": "Auth account and activity layout refinement",
+  "content": "<p>Tonight's Auth pass stayed focused on making the administration surface read more like the rest of the JeffersonWM tools: flatter, calmer, and easier to scan without turning account data into a stack of heavy cards.</p><p>What changed:</p><ul><li><strong>Perihelion-style headings:</strong> Auth page titles and account names now use the same Inter Tight, bold, uppercase, tight-tracking treatment as Perihelion. Every account name carries a direct lifecycle label: Registered, Approved, Blocked, or Deleted.</li><li><strong>Flatter account surface:</strong> standard cards, panels, and identity blocks no longer create solid background containers. The main page frame now keeps content inside the gutter lines with a consistent inset instead.</li><li><strong>Readable app memberships:</strong> account app names remain individual links, separated by ordinary text spaces outside the links. They wrap as a normal left-aligned paragraph rather than becoming one continuous underline or a hanging-indent list.</li><li><strong>Activity calibration:</strong> Activity log rows now use a restrained 50% dark fill, preserving row definition while allowing the shared background to remain visible.</li></ul><p>The broader direction is intentionally incremental: shared page language where it helps, but small per-surface adjustments when the administrative data needs a clearer reading rhythm.</p>",
+  "url": "https://auth.jeffersonwm.com/#accounts",
+  "source": "manual",
+  "external_id": "auth-account-activity-layout-refinement-2026-10-30",
+  "created_at": "2026-10-30 21:42:00"
+}
