@@ -57,7 +57,12 @@
 
       a { color: inherit; }
 
-      .shell { max-width: 760px; }
+      .shell {
+        max-width: 760px;
+        /* The site-links column is fixed on wide screens. Reserve its footprint
+           so the last policy section can never scroll beneath it. */
+        padding-bottom: 8rem;
+      }
 
       .logo-link { display: inline-block; margin-bottom: 0.75rem; }
 
@@ -153,7 +158,7 @@
 
       @media (max-width: 720px) {
         :root { --frame: 24px; }
-        body { padding-bottom: 9rem; }
+        .shell { padding-bottom: 9rem; }
         .policy-section { padding: 1rem; }
       }
     </style>
